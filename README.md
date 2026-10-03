@@ -12,7 +12,7 @@ Finding Detail → Report**.
 ## Run it
 
 ```bash
-git clone <this-repo-url>
+git clone git@github.com:SokpisethNhoeun/Reconnix_Terminal.git
 cd reconix-tui
 python3 -m venv .venv
 source .venv/bin/activate
