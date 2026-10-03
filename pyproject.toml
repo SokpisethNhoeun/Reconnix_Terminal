@@ -1,0 +1,27 @@
+[project]
+name = "reconix-tui"
+version = "0.3.0"
+description = "Reconix — AI-Powered Security Testing Assistant (interactive TUI demo)"
+requires-python = ">=3.9"
+dependencies = [
+    "textual>=0.80",
+    "rich>=13.7",
+]
+
+[project.scripts]
+reconix = "reconix.app:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["reconix", "reconix.commands", "reconix.models", "reconix.screens", "reconix.store", "reconix.widgets"]
+
+[tool.setuptools.package-data]
+reconix = ["reconix.tcss"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
