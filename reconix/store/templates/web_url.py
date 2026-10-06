@@ -74,8 +74,8 @@ def build_run(assessment) -> RunBundle:
         scan_card=("Scan · Nuclei + ZAP",
                    (("Potential issues", "3"), ("Needs login", "/api/orders/*"))),
         scan_requests=(387, 166, 94),
-        auth="password+otp",
-        auth_reason="Login (with a one-time code) required for /api/orders/*",
+        login_area="/api/orders/*",
+        login_2fa=True,                    # the demo target sends a code after the password
         candidate_note="Suspected issue on /api/orders/{id}: possible missing object-level "
                        "access check. Proposing limited validation.",
         candidate_log="Candidate F-001 · access control",
@@ -104,5 +104,5 @@ def build_run(assessment) -> RunBundle:
     )
     return RunBundle(scope=scope, script=build_rest(profile),
                      approvals=[profile.medium, profile.high], findings=findings,
-                     auth_kind=profile.auth, plan=make_plan(profile.plan),
+                     login_2fa=profile.login_2fa, plan=make_plan(profile.plan),
                      methodology=list(profile.methodology))

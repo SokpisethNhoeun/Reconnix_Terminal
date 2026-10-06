@@ -175,7 +175,7 @@
       "request_id": "approval-002",
       "decision": "APPROVED",
       "operator": "analyst",
-      "reason": "Check if token A can read token B's order",
+      "reason": "",
       "command_hash": "sha256:bc8caa3aae5f115e2f6acd18806eb90b30da0599a722323e54c318adf8f88214",
       "at": "2026-09-30T16:14:40+00:00"
     }
@@ -561,7 +561,7 @@
       "type": "activity",
       "who": "AI",
       "kind": "line",
-      "text": "Session cookie required for /v1/orders/*",
+      "text": "Login needed for /v1/orders/*: a session cookie (for Nuclei, Postman and ZAP API scan)",
       "tone": "warn",
       "rows": []
     },
@@ -581,7 +581,7 @@
       "type": "activity",
       "who": "USER",
       "kind": "line",
-      "text": "Authenticated · target login stored (cookie)",
+      "text": "Target login stored (cookie)",
       "tone": "ok",
       "rows": []
     },
@@ -671,7 +671,7 @@
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
-      "text": "Risk: HIGH · reason required",
+      "text": "Risk: HIGH · needs a double check",
       "tone": "warn",
       "rows": []
     },
@@ -681,7 +681,7 @@
       "type": "activity",
       "who": "USER",
       "kind": "line",
-      "text": "Approved: limited_validation (with reason)",
+      "text": "Approved: limited_validation (double-checked)",
       "tone": "ok",
       "rows": []
     },
@@ -691,7 +691,7 @@
       "type": "chat",
       "who": "policy",
       "kind": "banner",
-      "text": "HIGH action approved with a reason.",
+      "text": "HIGH action approved after a double check.",
       "tone": "ok",
       "rows": []
     },

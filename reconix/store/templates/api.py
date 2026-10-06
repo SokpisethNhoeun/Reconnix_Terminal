@@ -73,8 +73,7 @@ def build_run(assessment) -> RunBundle:
         scan_card=("Scan · Nuclei + ZAP",
                    (("Potential issues", "3"), ("Needs token", "/v1/orders/*"))),
         scan_requests=(133, 120, 48),
-        auth="cookie",
-        auth_reason="Session cookie required for /v1/orders/*",
+        login_area="/v1/orders/*",
         candidate_note="Suspected broken object-level authorization on /v1/orders/{id}. "
                        "Proposing limited validation.",
         candidate_log="Candidate F-001 · authorization",
@@ -103,5 +102,5 @@ def build_run(assessment) -> RunBundle:
     )
     return RunBundle(scope=scope, script=build_rest(profile),
                      approvals=[profile.medium, profile.high], findings=findings,
-                     auth_kind=profile.auth, plan=make_plan(profile.plan),
+                     login_2fa=profile.login_2fa, plan=make_plan(profile.plan),
                      methodology=list(profile.methodology))

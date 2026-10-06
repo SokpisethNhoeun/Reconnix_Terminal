@@ -77,16 +77,16 @@ def test_no_secret_reaches_the_saved_file():
         if gate is None:
             break
         if gate == "account":
-            store.provide_auth({"identity": "demo.tester", "secret": TEST_PASSWORD,
-                                "code": OTP_CODE})
+            store.provide_auth({"identity": "demo.tester", "secret": TEST_PASSWORD})
+        elif gate == "code":
+            store.provide_auth({"code": OTP_CODE})
         elif gate.startswith("approval:"):
             request = store.get_approval(gate.split(":", 1)[1])
             if request.risk == "HIGH":
                 token = store.request_confirmation(request.request_id, request.command_hash)
                 tokens.append(token)
                 store.approve(request.request_id, command_hash=request.command_hash,
-                              confirmation_token=token,
-                              reason="Validate the suspected finding")
+                              confirmation_token=token)
             else:
                 store.approve(request.request_id, command_hash=request.command_hash)
         else:

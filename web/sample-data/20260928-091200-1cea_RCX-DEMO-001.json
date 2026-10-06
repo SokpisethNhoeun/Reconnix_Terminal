@@ -176,7 +176,7 @@
       "request_id": "approval-002",
       "decision": "APPROVED",
       "operator": "analyst",
-      "reason": "Confirm the leaked credential is live on the test endpoint",
+      "reason": "",
       "command_hash": "sha256:e72d0e4205a6c27b656712b4db84eb821ddfcf5e78bab595ac83c5bfc0f5b862",
       "at": "2026-09-28T09:19:35+00:00"
     }
@@ -618,7 +618,7 @@
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
-      "text": "Risk: HIGH · reason required",
+      "text": "Risk: HIGH · needs a double check",
       "tone": "warn",
       "rows": []
     },
@@ -628,7 +628,7 @@
       "type": "activity",
       "who": "USER",
       "kind": "line",
-      "text": "Approved: secret_validation (with reason)",
+      "text": "Approved: secret_validation (double-checked)",
       "tone": "ok",
       "rows": []
     },
@@ -638,7 +638,7 @@
       "type": "chat",
       "who": "policy",
       "kind": "banner",
-      "text": "HIGH action approved with a reason.",
+      "text": "HIGH action approved after a double check.",
       "tone": "ok",
       "rows": []
     },

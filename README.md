@@ -28,7 +28,10 @@ pip install -r requirements-dev.txt     # + python-docx for the DOCX export
 pytest -q
 ```
 
-Web dashboard (Next.js, reads `~/.reconix/assessments`; `/web` in the TUI opens it):
+Web dashboard (Next.js, reads `~/.reconix/assessments`). Type `/web` in the TUI: the first
+time it installs the dashboard's packages and starts it in the background (`npm run dev`,
+output in `~/.reconix/web.log`), then your browser opens on it. A dashboard the TUI
+started stops when you quit. Needs Node.js. To run it on its own:
 
 ```bash
 cd web && npm install && npm run dev    # prints a sign-in link; /web opens the same one
@@ -42,20 +45,30 @@ RECONIX_DATA_DIR=sample-data npm run dev   # or browse the bundled sample assess
 
 1. **Start** — type a target (a URL, an IPv4 address or range, a git repo or a local
    path) or press Enter on an empty prompt for the demo. Anything else gets a short
-   answer and nothing starts.
+   answer and nothing starts. After your first line the logo makes way for the
+   conversation: your line on top, then Reconix's answer or one spinner line while it
+   works (`Ctrl+O` lists the steps it finished).
 2. **Template** — `/template` lets you pick one of four templates (Web URL, Network, API,
    Source Code) and type its target; a typed target picks its own template unless it fits
    several (then the screen asks, with the AI's pick recommended). Reconix drafts a
-   **scope manifest**: approve it, edit it (methods, excluded paths, ports, tools, time
-   limit), or reject it (nothing is tested; a fresh assessment starts).
+   **scope manifest**, shown in plain words (what it will test, what it may do, what it
+   will never touch, its tools): approve it, edit it (methods, excluded paths, ports,
+   tools, time limit), or reject it (nothing is tested; a fresh assessment starts).
 3. **Plan** — every phase, the target login it may need, and each risky action with its
    exact request. **Run plan** starts testing.
-4. **Execution** — the live run: tasks, an overall bar and the live output. It pauses
-   when a step needs you: the **target login** opens a secure form (cookie, or email +
-   password + one-time code; the code is never stored), and each **gated action** opens
-   the Approval screen. `Ctrl+C` stops the run.
-5. **Approval** — MEDIUM: approve or reject. HIGH: type a reason, approve, then confirm
-   once more ("No, go back" is selected). Rejecting stops the assessment.
+4. **Execution** — the live run: each task queued, running, paused or done (no
+   percentages: a backend can't know how far a scan has got), a spinner with what
+   Reconix is on and for how long, and the live output (time · who · message). The
+   output follows new lines while you're at the bottom; scroll up to read and it stays
+   put until `End`. It pauses
+   when a step needs you: the **target login** opens a secure form, and each **gated
+   action** opens the Approval screen. `Ctrl+C` stops the run. The login comes from the
+   scope's tools: OWASP ZAP needs a test account (email + password); Nuclei, Postman and
+   ZAP API scan a session cookie; nmap, testssl.sh and the code scanners nothing. One
+   login covers them all (a test account covers the cookie tools). If the target then
+   asks for a one-time code, a second form asks for just the code. It is never stored.
+5. **Approval** — MEDIUM: approve or reject. HIGH: approve, then double-check the exact
+   request ("No, go back" is selected). Rejecting stops the assessment.
 6. **Findings / Detail** — filter, sort, triage (open, fixed, accepted risk, false
    positive) and import nuclei / nmap / ZAP output.
 7. **Report** — export HTML, PDF, DOCX, JSON, SARIF, CSV or Markdown to `./reports/`,
@@ -83,6 +96,8 @@ command suggestions, and `?` shows the keys for the screen you are on.
 | `d` | approval details (scope limits, exact request, audit trail) |
 | `PgUp` / `PgDn` | scroll a long dialog |
 | `Ctrl+R` | search prompt history (on the Start prompt) |
+| `Ctrl+O` | expand / collapse the steps Reconix finished, under its spinner line |
+| `End` | Execution: jump to the newest line of the live output and follow it again |
 | `Ctrl+C` | stop the run (on Execution, after a confirmation) |
 | `f` / `s` / `t` / `i` | Findings: filter / cycle the sort / triage / import tool output |
 | `[` / `]` | previous / next finding on Finding Detail (same filter and sort) |
@@ -112,7 +127,7 @@ Type `/`, keep typing to filter, `↑`/`↓` to pick, `Tab` to complete, `Enter`
 | `/assessments` | list and reopen this session's assessments (alias `/list`) |
 | `/import` | add findings from a nuclei / nmap / ZAP output file |
 | `/audit` | activity log, audit trail and your feedback (aliases `/activity`, `/log`) |
-| `/web` | open the web dashboard in your browser (alias `/dashboard`) |
+| `/web` | open the web dashboard (it starts it first if needed; alias `/dashboard`) |
 | `/quit` | quit (alias `/exit`) |
 
 `/scope` is now `/template`.
@@ -122,7 +137,7 @@ Type `/`, keep typing to filter, `↑`/`↓` to pick, `Tab` to complete, `Enter`
 The store is the authority; the screens only ask. Testing starts only after the scope
 is approved **and** the plan is run. Each risky action waits for a human decision bound
 to the exact request (`store.approve()` checks the command hash); HIGH risk also needs a
-typed reason and the single-use token from `store.request_confirmation()`. The policy
+double check, the single-use token from `store.request_confirmation()`. The policy
 engine checks every request against the approved scope and blocks the rest. Target
 logins live in memory for the session only; one-time codes are never stored; evidence
 is masked; saved copies for the web dashboard (`~/.reconix/assessments`, 0600) never
@@ -148,14 +163,16 @@ reconix-tui/
     │   ├── run.py          # the run: start, advance, gates, stop
     │   ├── templates/      # web_url, network, api, source: scope, plan, findings, steps
     │   ├── scope.py, policy.py, approvals.py, vault.py
+    │   ├── scope_view.py     # the scope manifest in plain words
     │   ├── findings.py, findings_view.py, importers/, retest.py
     │   ├── plan.py, progress.py      # the Plan screen's rows, the flow line's states
     │   └── report*.py, snapshot.py, persist.py   # exports; saved copies for the web
     ├── theme.py            # color tokens (the stylesheet's $variables come from here)
     ├── reconix.tcss        # Textual stylesheet
     ├── browser.py          # open a URL / saved report without disturbing the TUI
+    ├── web_server.py       # /web starts and stops the dashboard (npm run dev in web/)
     ├── widgets/            # session bar + flow line, menus, prompt, question, run log,
-    │                       #   scope manifest view, spinner, finding cells
+    │                       #   scope manifest view, spinner + activity line, finding cells
     └── screens/
         ├── start.py        # 01 Start (prompt)
         ├── template.py     # 02 Template + scope manifest (replaces scope.py)

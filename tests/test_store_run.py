@@ -6,7 +6,7 @@ from reconix import store
 
 from .support import ASK_REQUEST, decide, event_kinds, play_until_gate, run_to
 
-GATES = ["scope", "plan", "account", "approval:approval-001", "approval:approval-002"]
+GATES = ["scope", "plan", "account", "code", "approval:approval-001", "approval:approval-002"]
 
 
 def test_nothing_plays_before_the_run_starts():

@@ -65,7 +65,7 @@ COMMANDS = (
             lambda app, arg: app.open_import()),
     Command("audit", "Activity log and audit trail", lambda app, arg: app.show_audit(),
             aliases=("activity", "log")),
-    Command("web", "Open the web dashboard in your browser",
+    Command("web", "Open the web dashboard in your browser (starts it if needed)",
             lambda app, arg: app.open_web_dashboard(), aliases=("dashboard",)),
     Command("quit", "Quit Reconix", lambda app, arg: app.exit(), aliases=("exit",)),
 )

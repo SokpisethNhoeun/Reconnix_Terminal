@@ -1,22 +1,25 @@
-"""Frame 05 — Live execution: the plan's tasks, an overall bar, and the live output.
+"""Frame 05 — Live execution: the plan's tasks, what Reconix is doing now, the live output.
 
 The run plays on its own (the app hosts it). This screen redraws after every step, says
-when the run is paused at a gate (Enter opens it), and offers ^C to stop.
+when the run is paused at a gate (Enter opens it), and offers ^C to stop. Nothing here is
+a percentage (a backend can't know how far a scan has got): a task is queued, running,
+paused or done, and one spinner line says what Reconix is on and for how long.
 """
+
+from datetime import timedelta
+from typing import List, Optional
 
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
-from textual.widgets import ProgressBar, Static
+from textual.containers import Vertical
+from textual.widgets import Static
 
 from .base import ReconixScreen
 from .choice import ChoiceScreen
 from .. import store, theme
-from ..models import GATE_ACCOUNT, GATE_APPROVAL_PREFIX, PROGRESS_BARS, Choice, PlanTask
-from ..widgets import RunLog
-
-TESTING_BARS = tuple(bar for bar in PROGRESS_BARS if bar != "report")
+from ..models import GATE_ACCOUNT, GATE_APPROVAL_PREFIX, GATE_CODE, Choice, PlanTask
+from ..widgets import RunLog, Spinner
 
 
 def run_state() -> str:
@@ -30,20 +33,29 @@ def run_state() -> str:
     if gate and store.gate_state(gate) == "pending":
         if gate.startswith(GATE_APPROVAL_PREFIX):
             return "approval"
-        if gate == GATE_ACCOUNT:
+        if gate in (GATE_ACCOUNT, GATE_CODE):
             return "login"
     return "running"
 
 
-def overall_percent() -> int:
-    progress = store.phase_progress()
-    return round(sum(progress[bar] for bar in TESTING_BARS) / len(TESTING_BARS))
+def duration_text(delta: Optional[timedelta]) -> str:
+    """'45s', '3m 07s', '1h 02m'."""
+    minutes, seconds = divmod(int(delta.total_seconds()) if delta else 0, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h {minutes:02d}m"
+    return f"{minutes}m {seconds:02d}s" if minutes else f"{seconds}s"
 
 
-def task_line(task: PlanTask) -> Text:
-    percent = store.phase_progress().get(task.key, 0)
+# what an active task says, by run state (anything else is waiting at a gate)
+ACTIVE_DETAIL = {"running": "running…", "stopped": "stopped"}
+
+
+def task_line(task: PlanTask, state: str) -> Text:
     color, glyph = theme.STATUS.get(task.status, (theme.DIM, "·"))
-    detail = {"done": "done", "active": f"{percent}%"}.get(task.status, "queued")
+    detail = "done" if task.status == "done" else "queued"
+    if task.status == "active":
+        detail = ACTIVE_DETAIL.get(state, "paused · waiting for you")
     if task.key == "report" and task.status == "active":
         detail = "ready · export it from the Report screen"
     text_color = theme.TEXT if task.status == "active" else theme.MUTED
@@ -67,6 +79,9 @@ def hint_line(state: str) -> Text:
         return Text.assemble((f"⏸ paused — {request.action} ({request.risk}) needs your "
                               "approval. Press ", theme.MEDIUM), key, (" to review it.",
                                                                        theme.MEDIUM))
+    if state == "login" and store.waiting_gate() == GATE_CODE:
+        return Text.assemble(("⏸ paused — the target sent a one-time code. Press ",
+                              theme.MEDIUM), key, (" to enter it.", theme.MEDIUM))
     if state == "login":
         return Text.assemble(("⏸ paused — testing needs the target login. Press ",
                               theme.MEDIUM), key, (" to add it securely.", theme.MEDIUM))
@@ -90,6 +105,7 @@ class ExecutionScreen(ReconixScreen):
         Binding("enter", "advance", "continue"),
         Binding("ctrl+c", "stop", "stop the run", show=False),
         Binding("escape", "detach", "back to plan", show=False),
+        Binding("end", "follow", "follow the live output", show=False),
     ]
 
     def compose_body(self) -> ComposeResult:
@@ -99,10 +115,9 @@ class ExecutionScreen(ReconixScreen):
             f"{store.selected_template().name} template", theme.DIM)), classes="ai-label")
         with Vertical(classes="panel", id="exec-panel"):
             for task in tasks:
-                yield Static(task_line(task), id=f"task-{task.key}", classes="task-row")
-            with Horizontal(classes="overall"):
-                yield Static(Text("overall ", style=theme.DIM))
-                yield ProgressBar(total=100, show_eta=False, id="overall-bar")
+                yield Static(task_line(task, run_state()), id=f"task-{task.key}",
+                             classes="task-row")
+            yield Spinner("", id="exec-spinner")
         log = RunLog(id="live-log")
         log.border_title = "▤ live output"
         yield log
@@ -110,13 +125,25 @@ class ExecutionScreen(ReconixScreen):
 
     def on_mount(self) -> None:
         self.refresh_live()
+        self.set_interval(1, self._draw_spinner)      # the elapsed time keeps counting
+
+    def _draw_spinner(self, tasks: Optional[List[PlanTask]] = None) -> None:
+        """While running: the task Reconix is on and the testing time so far."""
+        spinner = self.query_one("#exec-spinner", Spinner)
+        spinner.display = run_state() == "running"
+        if not spinner.display:
+            return
+        tasks = store.plan_tasks() if tasks is None else tasks
+        active = next((t for t in tasks if t.status == "active"), None)
+        spinner.set_message(f"{active.label}…" if active else "Working…",
+                            f"{duration_text(store.elapsed())} · ^C to stop")
 
     def refresh_live(self) -> None:
         state = run_state()
         tasks = store.plan_tasks()
         for task in tasks:
-            self.query_one(f"#task-{task.key}", Static).update(task_line(task))
-        self.query_one("#overall-bar", ProgressBar).update(progress=overall_percent())
+            self.query_one(f"#task-{task.key}", Static).update(task_line(task, state))
+        self._draw_spinner(tasks)
         panel = self.query_one("#exec-panel", Vertical)
         title, color = PANEL_TITLE[state]
         panel.border_title = Text(title, style=f"bold {color}")
@@ -129,15 +156,15 @@ class ExecutionScreen(ReconixScreen):
                                      f"{'' if counters['findings'] == 1 else 's'}")
         log = self.query_one("#live-log", RunLog)
         log.sync()
-        log.border_subtitle = self._log_subtitle(state)
+        log.set_status(self._log_status(state))
         self.query_one("#exec-hint", Static).update(hint_line(state))
 
     @staticmethod
-    def _log_subtitle(state: str) -> Text:
-        """Built as Text: the tools come from the (editable) scope, never markup."""
+    def _log_status(state: str) -> str:
+        """Plain text: the tools come from the (editable) scope; RunLog never parses markup."""
         tools = ", ".join(store.get_scope().tools)
-        return Text({"running": f"{tools} · ^C stop", "complete": f"{tools} · done",
-                     "stopped": f"{tools} · stopped"}.get(state, f"{tools} · paused"))
+        return {"running": f"{tools} · ^C stop", "complete": f"{tools} · done",
+                "stopped": f"{tools} · stopped"}.get(state, f"{tools} · paused")
 
     # --- keys ---------------------------------------------------------------------------------
     def action_advance(self) -> None:
@@ -169,3 +196,6 @@ class ExecutionScreen(ReconixScreen):
 
     def action_detach(self) -> None:
         self.app.goto("plan")
+
+    def action_follow(self) -> None:
+        self.query_one("#live-log", RunLog).follow()

@@ -28,7 +28,7 @@ class ApprovalDecision:
     decision: str      # "APPROVED" | "REJECTED"
     operator: str
     command_hash: str
-    reason: str = ""   # HIGH approvals must give one
+    reason: str = ""   # no longer asked (HIGH is double-checked); older saved copies have one
     created_at: datetime = field(default_factory=utc_now)
 
 

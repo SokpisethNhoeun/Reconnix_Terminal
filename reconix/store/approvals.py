@@ -1,4 +1,4 @@
-"""Approval of gated actions: MEDIUM needs a decision; HIGH a token and a typed reason.
+"""Approval of gated actions: MEDIUM needs a decision; HIGH a second confirmation too.
 
 These checks are the authority. The approval dialogs may pre-check for a nicer
 experience, but nothing is approved unless `approve()` accepts it.
@@ -6,7 +6,6 @@ experience, but nothing is approved unless `approve()` accepts it.
 
 import hashlib
 import secrets
-import unicodedata
 from typing import List, Optional
 
 from ..models import GATE_APPROVAL_PREFIX, ApprovalDecision, ApprovalRequest, Confirmation
@@ -16,19 +15,10 @@ from .errors import StoreValidationError
 from .scope import check_request
 from .transcript import add_activity
 
-MIN_REASON_LENGTH = 3
-MAX_REASON_LENGTH = 300
-
 
 def command_digest(command: str) -> str:
     """The hash an approval is bound to; `approve()` re-computes and compares it."""
     return "sha256:" + hashlib.sha256(command.encode("utf-8")).hexdigest()
-
-
-def clean_reason(text: str) -> str:
-    """The reason as it will be recorded: invisible characters removed, spaces collapsed."""
-    visible = "".join(c for c in text if unicodedata.category(c) not in ("Cf", "Cc", "Co"))
-    return " ".join(visible.split())
 
 
 def get_approval(request_id: str) -> ApprovalRequest:
@@ -39,7 +29,7 @@ def get_approval(request_id: str) -> ApprovalRequest:
 
 
 def needs_confirmation(request_id: str) -> bool:
-    """HIGH-risk actions need the confirmation token and a typed reason."""
+    """HIGH-risk actions need the double check: the single-use confirmation token."""
     return get_approval(request_id).risk == "HIGH"
 
 
@@ -123,24 +113,17 @@ def _consume_token(request_id: str, token: Optional[str]) -> None:
 # --- decisions -----------------------------------------------------------------------------
 def approve(
     request_id: str, *, command_hash: str, confirmation_token: Optional[str] = None,
-    reason: str = "",
 ) -> ApprovalDecision:
     """Record an approval, or raise StoreValidationError if any check fails.
 
-    `command_hash` binds the approval to the exact request the operator saw. HIGH
-    risk also needs an unused token from `request_confirmation()` and a typed reason.
-    The policy check runs before the decision is recorded, and the token is spent only
-    when everything else is valid, so a rejected reason doesn't burn it.
+    `command_hash` binds the approval to the exact request the operator saw. HIGH risk
+    also needs the double check: an unused token from `request_confirmation()`, which
+    the operator gets only by asking to approve and then confirming once more. The
+    policy check runs before the decision is recorded, and the token is spent only when
+    everything else is valid, so a blocked request doesn't burn it.
     """
     request = _pending(request_id)
     _check_hash(request, command_hash)
-    reason = clean_reason(reason)
-    if request.risk == "HIGH":
-        if len(reason) < MIN_REASON_LENGTH:
-            raise StoreValidationError(
-                f"HIGH-risk approvals need a reason of at least {MIN_REASON_LENGTH} characters.")
-        if len(reason) > MAX_REASON_LENGTH:
-            raise StoreValidationError(f"Keep the reason under {MAX_REASON_LENGTH} characters.")
     # The policy engine decides before the human decision is recorded.
     verdict = check_request(request.method, request.path)
     if not verdict.allowed:
@@ -149,10 +132,10 @@ def approve(
         _consume_token(request_id, confirmation_token)
     decision = ApprovalDecision(
         request_id=request_id, decision="APPROVED", operator=current_operator(),
-        command_hash=request.command_hash, reason=reason,
+        command_hash=request.command_hash,
     )
     lists.current().decisions.append(decision)
-    detail = " (with reason)" if request.risk == "HIGH" else ""
+    detail = " (double-checked)" if request.risk == "HIGH" else ""
     add_activity("USER", f"Approved: {request.action}{detail}", tone="ok")
     log_event("approval.approved", f"{request_id} {request.command_hash}")
     return decision

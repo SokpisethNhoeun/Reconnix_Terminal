@@ -6,7 +6,8 @@ that profile. No real scanning happens — the steps are illustrative. Step text
 `$assessment`, `$target`, `$template` and `$findings` (substituted in `run._fill`).
 """
 
-from typing import Tuple
+from dataclasses import replace
+from typing import List, Tuple
 
 from ..models import RunStep
 
@@ -34,3 +35,8 @@ def log(source: str, text: str, tone: str = "default", pause: float = 0.4) -> Ru
 
 def gate(name: str) -> RunStep:
     return RunStep("gate", name=name, pause=0.3)
+
+
+def only(when: str, *steps: RunStep) -> List[RunStep]:
+    """`steps`, played only if the run needs them: "login" or "code" (see RunStep.when)."""
+    return [replace(step, when=when) for step in steps]

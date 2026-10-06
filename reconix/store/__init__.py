@@ -42,12 +42,15 @@ from .scope import (
     approve_scope, blocked_count, check_request, edit_scope, get_scope, is_scope_approved,
     list_verdicts,
 )
+from .scope_view import describe_scope
 from .seed import DEMO_REQUEST, load_demo_data
 from .targets import check_target
 from .templates import get_template, list_templates, select_template, selected_template
-from .transcript import list_activity, list_chat
+from .transcript import last_exchange, list_activity, list_chat
+from .tools import tool_login, tools_login
 from .vault import (
-    current_auth_challenge, has_test_account, is_authenticated, provide_auth, vault_scope,
+    code_needed, current_auth_challenge, has_test_account, is_authenticated, is_code_verified,
+    login_done, login_kind, login_tools, provide_auth, vault_scope,
 )
 
 load_demo_data()
@@ -68,10 +71,11 @@ __all__ = [
     # gates
     "list_templates", "get_template", "select_template", "selected_template",
     "get_scope", "approve_scope", "edit_scope", "is_scope_approved", "reject_scope",
-    "check_request", "run_plan", "is_plan_started",
+    "describe_scope", "check_request", "run_plan", "is_plan_started",
     "list_verdicts", "blocked_count",
     "provide_auth", "current_auth_challenge", "has_test_account",
-    "is_authenticated", "vault_scope",
+    "is_authenticated", "is_code_verified", "vault_scope",
+    "login_kind", "login_tools", "login_done", "code_needed", "tool_login", "tools_login",
     "get_approval", "needs_confirmation", "request_confirmation", "decline_confirmation",
     "approve", "reject", "is_approved", "decision_for", "list_approval_decisions",
     "approvals_count",
@@ -85,7 +89,7 @@ __all__ = [
     "assessment_summary",
     "retest", "severity_trend", "compare_findings", "previous_assessment",
     # transcript, audit, history
-    "list_chat", "list_activity",
+    "list_chat", "last_exchange", "list_activity",
     "current_operator", "log_event", "list_events", "add_feedback", "list_feedback",
     "add_history", "list_history",
     # the saved copy the web dashboard reads

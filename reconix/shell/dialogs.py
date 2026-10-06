@@ -1,5 +1,5 @@
 """Pop-ups the app opens for commands and screens: assessments, triage, import, exports,
-the audit trail, the summary, and the web dashboard."""
+the audit trail and the summary. (/web lives in `web.py`.)"""
 
 from functools import partial
 from typing import List, Optional
@@ -134,18 +134,3 @@ class DialogsMixin:
         body += [Text(""), Text("Plan → Approve scope → Run plan → Test → Validate → Report",
                                 style=f"bold {theme.CYAN}")]
         return body
-
-    # --- the web dashboard ----------------------------------------------------------------------
-    def open_web_dashboard(self) -> None:
-        """Open the read-only web dashboard in the operator's browser, if it is running."""
-        url = store.web_dashboard_url()
-        if not url:
-            self.notify("Start the web dashboard first:  cd web && npm run dev",
-                        title="Web dashboard", severity="warning", markup=False, timeout=7)
-            return
-        if browser.open_url(url):
-            self.notify(f"Opening the web dashboard in your browser…  {url}",
-                        title="Web dashboard", markup=False, timeout=10)
-        else:
-            self.notify(f"Open it in your browser:  {url}", title="Web dashboard",
-                        severity="warning", markup=False, timeout=10)

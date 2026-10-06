@@ -1,7 +1,7 @@
-"""Frame 04 — Human approval gate (MEDIUM: one decision; HIGH: a reason + a second confirmation).
+"""Frame 04 — Human approval gate (MEDIUM: one decision; HIGH: a double check).
 
 The run stops here when it reaches a gated action. The store is the authority: it re-checks
-the command hash, the single-use confirmation token and the reason; the screen only asks.
+the command hash and, for HIGH risk, the single-use confirmation token; the screen only asks.
 When nothing is waiting, the screen lists the decisions made and the actions still ahead.
 """
 
@@ -13,15 +13,13 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
-from textual.widgets import Input, Label, Static
+from textual.widgets import Static
 
 from .base import ReconixScreen
 from .choice import ChoiceScreen, details_body
 from .. import store, theme
 from ..models import GATE_APPROVAL_PREFIX, ApprovalRequest, Choice
-from ..store.approvals import MAX_REASON_LENGTH, MIN_REASON_LENGTH, clean_reason
 from ..widgets import ChoiceMenu, Question, menu_hint
-from ..widgets.manifest import manifest_fields
 
 
 def waiting_request() -> Optional[ApprovalRequest]:
@@ -90,17 +88,11 @@ class ApprovalScreen(ReconixScreen):
             yield Static(Text.assemble(("$ ", f"bold {theme.GREEN}"), (req.command, theme.TEXT),
                                        ("   ", ""), (req.command_hash[:23] + "…", theme.DIM)),
                          classes="panel-note")
-        if self._high:
-            with Vertical(id="reason-row"):
-                yield Label("Reason (required for HIGH risk)", classes="field-label -warn")
-                yield Input(id="reason", placeholder="Why is this action needed?",
-                            max_length=MAX_REASON_LENGTH)
-                yield Static("", id="target-error")
         yield Question(
             "Approval", f"Run {req.action} on {store.get_assessment().target}?",
             [
                 Choice("approve", "Approve & run",
-                       "HIGH risk: asks you to confirm once more." if self._high
+                       "HIGH risk: you double-check the exact request first." if self._high
                        else "Runs this one request now."),
                 Choice("reject", "Reject",
                        "Not executed. The assessment stops; nothing else runs.", "danger"),
@@ -151,10 +143,7 @@ class ApprovalScreen(ReconixScreen):
         return line
 
     def on_mount(self) -> None:
-        if self._high:
-            self.query_one("#reason", Input).focus()
-        else:
-            self.focus_menu("approval-menu")
+        self.focus_menu("approval-menu")
 
     # --- choices -----------------------------------------------------------------------------
     def on_choice_menu_chosen(self, event: ChoiceMenu.Chosen) -> None:
@@ -165,30 +154,18 @@ class ApprovalScreen(ReconixScreen):
                     "plan": lambda: self.app.goto("plan")}
         handlers[event.choice_id]()
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        event.stop()
-        self.focus_menu("approval-menu")
-
     def chat_topic(self) -> str:
         if self._request is None:
             return "the approvals"
         return f"{self._request.action} on {store.get_assessment().target}"
 
-    # --- approve: one step, or a reason + two steps for HIGH risk -----------------------------
-    def _reason(self) -> str:
-        return self.query_one("#reason", Input).value if self._high else ""
-
+    # --- approve: one step, or a double check for HIGH risk ----------------------------------
     def action_approve(self) -> None:
         req = self._request
         if req is None:
             return
         if not self._high:
             self._approve(None)
-            return
-        if len(clean_reason(self._reason())) < MIN_REASON_LENGTH:
-            self.query_one("#target-error", Static).update(Text(
-                f"Type a reason first ({MIN_REASON_LENGTH}+ characters).", style=theme.CRITICAL))
-            self.query_one("#reason", Input).focus()
             return
         try:
             token = store.request_confirmation(req.request_id, req.command_hash)
@@ -216,7 +193,7 @@ class ApprovalScreen(ReconixScreen):
         req = self._request
         try:
             store.approve(req.request_id, command_hash=req.command_hash,
-                          confirmation_token=token, reason=self._reason())
+                          confirmation_token=token)
         except store.StoreValidationError as exc:
             self.notify_error(str(exc))
             return
@@ -228,8 +205,8 @@ class ApprovalScreen(ReconixScreen):
             Text.assemble(("$ ", f"bold {theme.GREEN}"), (req.command, theme.TEXT)),
             Text(req.command_hash, style=theme.DIM),
             Text(""),
-            Text.assemble(("Reason  ", theme.DIM), (clean_reason(self._reason()), theme.TEXT)),
-            Text(req.impact, style=theme.MUTED),
+            Text.assemble(("Purpose  ", theme.DIM), (req.purpose, theme.TEXT)),
+            Text.assemble(("Impact   ", theme.DIM), (req.impact, theme.MUTED)),
         ]
 
     def action_reject(self) -> None:
@@ -262,7 +239,7 @@ class ApprovalScreen(ReconixScreen):
 
     def _details_body(self) -> List[RenderableType]:
         req = self._request
-        scope = store.get_scope()
+        scope = store.describe_scope(store.get_scope())
         events = [e for e in store.list_events() if req.request_id in e.detail]
         blocked = [v for v in store.list_verdicts() if not v.allowed]
         return details_body([
@@ -277,11 +254,10 @@ class ApprovalScreen(ReconixScreen):
                 ("command", req.command, theme.TEXT),
                 ("hash", req.command_hash, theme.MUTED),
             ]),
-            ("Scope limits", [
-                (key.replace("_", " "), ", ".join(str(v) for v in value)
-                 if isinstance(value, list) else str(value), theme.MUTED)
-                for key, value in manifest_fields(scope)
-            ]),
+            ("Scope limits", [("", scope.headline, theme.TEXT)]
+             + [("may do", item, theme.MUTED) for item in scope.may_do]
+             + [("never touches", item, theme.CRITICAL) for item in scope.never]
+             + [("tools", ", ".join(scope.tools), theme.MUTED)]),
             ("Blocked by policy", [
                 (v.method, f"{v.path} · {v.reason}", theme.CRITICAL) for v in blocked
             ] or [("", "nothing blocked so far", theme.DIM)]),

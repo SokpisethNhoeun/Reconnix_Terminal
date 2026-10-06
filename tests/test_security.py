@@ -45,20 +45,23 @@ def test_only_the_newest_confirmation_token_works():
     first = store.request_confirmation(HIGH, request.command_hash)
     second = store.request_confirmation(HIGH, request.command_hash)
     with pytest.raises(store.StoreValidationError):
-        store.approve(HIGH, command_hash=request.command_hash, confirmation_token=first,
-                      reason="Validate it")
-    store.approve(HIGH, command_hash=request.command_hash, confirmation_token=second,
-                  reason="Validate it")
+        store.approve(HIGH, command_hash=request.command_hash, confirmation_token=first)
+    store.approve(HIGH, command_hash=request.command_hash, confirmation_token=second)
 
 
-@pytest.mark.parametrize("reason", ["​", " ​‍ ", "ab", "\x00\x00\x00"])
-def test_invisible_or_tiny_reasons_are_refused(reason):
-    run_to(f"approval:{HIGH}")
-    request = store.get_approval(HIGH)
-    token = store.request_confirmation(HIGH, request.command_hash)
-    with pytest.raises(store.StoreValidationError, match="reason"):
-        store.approve(HIGH, command_hash=request.command_hash, confirmation_token=token,
-                      reason=reason)
+def test_a_high_token_is_not_given_for_a_medium_action():
+    run_to("approval:approval-001")
+    request = store.get_approval("approval-001")
+    with pytest.raises(store.StoreValidationError):
+        store.request_confirmation("approval-001", request.command_hash)
+
+
+def test_the_password_cant_be_given_at_the_code_step():
+    run_to("code")
+    before = list(lists.current().vault)
+    with pytest.raises(store.StoreValidationError, match="digits"):
+        store.provide_auth({"identity": "intruder", "secret": "other-password"})
+    assert lists.current().vault == before and not store.is_code_verified()
 
 
 def test_a_template_is_chosen_once():

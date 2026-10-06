@@ -2,7 +2,6 @@
 
 from typing import Callable, List, Optional, Sequence
 
-from rich.text import Text
 from textual import events
 from textual.actions import SkipAction
 from textual.app import ComposeResult
@@ -87,7 +86,6 @@ class PromptBox(Vertical):
         # The menu is a CSS overlay drawn just above the input, so opening it
         # never moves the input or the content around it.
         yield SuggestionMenu(id="suggestions")
-        yield Static(id="prompt-status")      # spinner line, same overlay slot
         yield PromptInput(self, value=self._initial, placeholder=self._placeholder, id="prompt")
         yield Static(id="prompt-hint", markup=True)
 
@@ -112,23 +110,19 @@ class PromptBox(Vertical):
         self.input.focus()
 
     @property
-    def busy(self) -> bool:
-        return bool(self.query_one("#prompt-status", Static).display)
+    def locked(self) -> bool:
+        return self.input.disabled
 
-    def set_busy(self, status: Optional[Text]) -> None:
-        """Show a status line above the input and lock it, or (None) unlock it."""
-        line = self.query_one("#prompt-status", Static)
-        if status is None:
-            line.display = False
+    def set_locked(self, locked: bool) -> None:
+        """Lock the input while Reconix works (the host shows the spinner), or unlock it."""
+        if not locked:
             self.input.disabled = False
             self.input.focus()
             self._update_hint()
             return
         self.menu.display = False
-        line.update(status)
-        line.display = True
         self.input.disabled = True
-        self.query_one("#prompt-hint", Static).update("")   # input keys don't work while busy
+        self.query_one("#prompt-hint", Static).update("")   # input keys don't work while locked
 
     def clear(self) -> None:
         self._history.reset()

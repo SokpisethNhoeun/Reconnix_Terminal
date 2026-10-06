@@ -1,7 +1,8 @@
 """What a target login needs: the challenge a step raises and the fields it asks for.
 
-A tool may need a session cookie, an email/username and password, a one-time code, or a
-password followed by a code. The one-time code is never stored.
+The tools decide the login (a session cookie, or a test account: email/username and
+password). If the target asks for a one-time code after the password, that's a separate
+challenge, asked on its own right after. The one-time code is never stored.
 """
 
 from dataclasses import dataclass
@@ -19,7 +20,7 @@ class AuthField:
 
 @dataclass(frozen=True)
 class AuthChallenge:
-    kind: str                  # "cookie" | "password" | "otp" | "password+otp"
+    kind: str                  # "cookie" | "password" | "otp"
     title: str                 # dialog heading, e.g. "SECURE INPUT · SESSION COOKIE"
     note: str                  # one line on what it is
     fields: Tuple[AuthField, ...]
@@ -41,13 +42,8 @@ CHALLENGES = {
         (IDENTITY, PASSWORD)),
     "otp": AuthChallenge(
         "otp", "SECURE INPUT · ONE-TIME CODE",
-        "Enter the current 6-digit code. It is used once and never stored.",
+        "The target sent a one-time code. Enter it now: it is used once and never stored.",
         (CODE,)),
-    "password+otp": AuthChallenge(
-        "password+otp", "SECURE INPUT · TEST ACCOUNT + CODE",
-        "Password is kept in memory for this session; the one-time code is used once and "
-        "never stored.",
-        (IDENTITY, PASSWORD, CODE)),
 }
 
 

@@ -11,7 +11,8 @@ PROGRESS_BARS: Tuple[str, ...] = ("discovery", "scanning", "validation", "analys
 GATE_TEMPLATE = "template"
 GATE_SCOPE = "scope"
 GATE_PLAN = "plan"
-GATE_ACCOUNT = "account"
+GATE_ACCOUNT = "account"          # the target login the tools need (cookie or test account)
+GATE_CODE = "code"                # the one-time code, asked on its own after the password
 GATE_APPROVAL_PREFIX = "approval:"
 
 
@@ -32,6 +33,8 @@ class RunStep:
     complete  the assessment is finished
 
     `pause` is the delay in seconds before the step plays (the controller scales it).
+    `when` makes a step conditional: "login" plays only if the approved tools need a
+    target login, "code" only if that login is followed by a one-time code.
     """
 
     kind: str
@@ -46,6 +49,7 @@ class RunStep:
     method: str = ""
     path: str = ""
     pause: float = 0.6
+    when: str = ""             # "" (always) | "login" | "code"
 
 
 @dataclass
@@ -93,7 +97,8 @@ class RunState:
     started_at: Optional[datetime] = None    # when testing began (scope approved)
     finished_at: Optional[datetime] = None
     requests: int = 0
-    authenticated: bool = False          # a target login was provided when a step needed it
+    authenticated: bool = False          # the target login was provided when a step needed it
+    code_verified: bool = False          # the one-time code after it was accepted (never kept)
     progress: Dict[str, int] = field(default_factory=dict)
     revealed: List[str] = field(default_factory=list)   # finding ids shown so far
     report_path: str = ""

@@ -21,7 +21,11 @@ from textual.widgets import Input, Label, Static
 from .base import ReconixScreen
 from .. import store, theme
 from ..models import GATE_SCOPE, GATE_TEMPLATE, Choice
-from ..widgets import ChoiceMenu, Question, ScopeManifestView, Spinner, UserMessage, menu_hint
+from ..widgets import (
+    ActivityStatus, ChoiceMenu, Question, ScopeManifestView, UserMessage, menu_hint,
+)
+
+DRAFTING = "reconix is drafting the scope manifest…"
 
 
 def _template_choices(suggested: str = "") -> List[Choice]:
@@ -33,6 +37,11 @@ def _template_choices(suggested: str = "") -> List[Choice]:
 def _ai_label(text: str) -> Static:
     return Static(Text.assemble(("◆ reconix ", theme.CYAN), (text, theme.DIM)),
                   classes="ai-label")
+
+
+def _steps() -> List[str]:
+    """What Reconix said since your latest line: the spinner's current and finished steps."""
+    return [e.text for e in store.last_exchange()[1]]
 
 
 def _request_message() -> List[UserMessage]:
@@ -103,13 +112,14 @@ class TemplateScreen(ReconixScreen):
 
     def _compose_busy(self) -> ComposeResult:
         yield from _request_message()
-        yield Spinner("reconix is drafting the scope manifest…", id="template-spinner",
-                      classes="spinner")
+        yield ActivityStatus(_steps(), DRAFTING, expanded=self.app.activity_expanded,
+                             id="template-activity", classes="activity")
 
     def _manifest_panel(self, approved: bool) -> ComposeResult:
         with Vertical(classes="panel success" if approved else "panel accent") as panel:
-            panel.border_title = "⛉ SCOPE MANIFEST"
-            panel.border_subtitle = "approved · locked" if approved else "draft · unapproved"
+            panel.border_title = "⛉ SCOPE"
+            panel.border_subtitle = ("approved · locked" if approved
+                                     else "draft · needs your approval")
             yield ScopeManifestView(store.get_scope(), classes="panel-body", id="manifest")
         yield Static(Text.assemble(("ℹ  ", theme.LOW), (
             "The agent can only act inside this manifest. Anything else is blocked before "
@@ -170,11 +180,9 @@ class TemplateScreen(ReconixScreen):
         manifests = self.query("#manifest")
         if manifests:
             manifests.first(ScopeManifestView).show(store.get_scope())   # after an edit
-        spinners = self.query("#template-spinner")
-        if spinners:
-            chat = [e for e in store.list_chat() if e.speaker == "reconix"]
-            if chat:
-                spinners.first(Spinner).set_message(chat[-1].text)
+        activity = self.query("#template-activity")
+        if activity:
+            activity.first(ActivityStatus).show(_steps())
 
     # --- choices -----------------------------------------------------------------------------
     def on_choice_menu_chosen(self, event: ChoiceMenu.Chosen) -> None:

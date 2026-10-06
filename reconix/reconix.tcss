@@ -222,18 +222,6 @@ ChoiceMenu > .option-list--option-hover {
 }
 
 /* Floats above the prompt input (first child + overlay + lifted by its own height). */
-/* Spinner line shown above the prompt while Reconix is "thinking" (same overlay slot). */
-#prompt-status {
-    display: none;
-    overlay: screen;
-    constrain: none inside;
-    offset-y: -100%;
-    width: 100%;
-    height: 1;
-    padding: 0 1;
-    background: $bg;
-}
-
 SuggestionMenu > .option-list--option-highlighted {
     background: $surface2;
 }
@@ -313,34 +301,15 @@ DataTable > .datatable--even-row {
     background: $surface2;
 }
 
-/* ----------------------------------------------------------- progress */
-ProgressBar {
-    height: 1;
-    width: auto;
-}
-
-ProgressBar > Bar {
-    width: 40;
-}
-
-ProgressBar Bar > .bar--bar      { color: $cyan; background: $border; }
-ProgressBar Bar > .bar--complete { color: $teal; background: $border; }
-
-ProgressBar PercentageStatus { color: $teal; text-style: bold; }
-ProgressBar ETAStatus { color: $dim; }
-
+/* ------------------------------------------- execution (no percentages: a spinner) */
 .task-row {
     height: 1;
     margin: 0;
 }
 
-.overall {
+#exec-spinner {
     height: 1;
     margin-top: 1;
-}
-
-.overall > Static {
-    width: auto;
 }
 
 /* --------------------------------------------------------------- log */
@@ -352,6 +321,12 @@ RichLog {
     height: 12;
     padding: 0 1;
     scrollbar-color: $border-strong;
+}
+
+/* The live output takes the rest of the Execution screen. */
+#live-log {
+    height: 1fr;
+    min-height: 6;
 }
 
 /* ------------------------------------------------------- start screen */
@@ -381,6 +356,18 @@ RichLog {
     width: 80;
     max-width: 100%;
     margin-top: 1;
+}
+
+/* After the first input: your line on top, then Reconix's answer or its spinner. */
+#start-conversation {
+    height: 1fr;
+    scrollbar-color: $border-strong;
+    scrollbar-background: $bg;
+    scrollbar-size-vertical: 1;
+}
+
+#start-reply {
+    height: auto;
 }
 
 /* -------------------------------------------------- findings / detail */
@@ -561,6 +548,12 @@ FormScreen {
     margin-bottom: 1;
 }
 
+/* A spinner line that Ctrl+O expands into the steps Reconix finished. */
+.activity {
+    height: auto;
+    margin-bottom: 1;
+}
+
 #target-row {
     height: auto;
     margin-top: 1;
@@ -573,11 +566,6 @@ FormScreen {
 #target-error {
     color: $critical;
     height: auto;
-}
-
-#reason-row {
-    height: auto;
-    margin-top: 1;
 }
 
 .approval-row {

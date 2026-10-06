@@ -10,7 +10,7 @@ from reconix.screens.forms import LoginForm
 from reconix.widgets import RunLog
 
 from .support import (
-    HIGH_REASON, SIZE, TEST_PASSWORD, auth_values, event_kinds, pass_gate, run_ui_to, settle,
+    SIZE, TEST_PASSWORD, auth_values, event_kinds, pass_gate, run_ui_to, settle,
 )
 
 
@@ -36,6 +36,7 @@ async def test_the_login_form_saves_and_clears_its_secrets(app):
         form = app.screen
         assert isinstance(form, LoginForm)
         assert form.query_one("#secret", Input).password          # masked
+        assert not form.query("#code")                             # no code with the password
         for field_id, value in auth_values(store.current_auth_challenge()).items():
             form.query_one(f"#{field_id}", Input).value = value
         inputs = list(form.query(Input))
@@ -43,22 +44,32 @@ async def test_the_login_form_saves_and_clears_its_secrets(app):
         await settle(pilot)
         assert store.is_authenticated()
         assert all(widget.value == "" for widget in inputs)       # cleared on close
-        assert isinstance(app.screen, ApprovalScreen)             # played on to MEDIUM
+        assert store.waiting_gate() == "code"
+        assert isinstance(app.screen, LoginForm)                   # then the code, on its own
+        assert [w.id for w in app.screen.query(Input)] == ["code"]
         assert TEST_PASSWORD not in screen_text(app)
+
+
+async def test_the_code_form_asks_only_for_the_code_then_plays_on(app):
+    async with app.run_test(size=SIZE) as pilot:
+        await run_ui_to(app, pilot, "code")
+        assert isinstance(app.screen, LoginForm)
+        app.screen.query_one("#code", Input).value = "123456"
+        app.screen.query_one("#submit").press()
+        await settle(pilot)
+        assert store.is_code_verified()
+        assert isinstance(app.screen, ApprovalScreen)             # played on to MEDIUM
 
 
 async def test_a_wrong_code_keeps_the_form_open(app):
     async with app.run_test(size=SIZE) as pilot:
-        await run_ui_to(app, pilot, "account")
-        values = auth_values(store.current_auth_challenge())
-        values["code"] = "12ab"
-        for field_id, value in values.items():
-            app.screen.query_one(f"#{field_id}", Input).value = value
+        await run_ui_to(app, pilot, "code")
+        app.screen.query_one("#code", Input).value = "12ab"
         app.screen.query_one("#submit").press()
         await settle(pilot)
         assert isinstance(app.screen, LoginForm)
         assert "6 digits" in str(app.screen.query_one("#form-error", Static).render())
-        assert not store.is_authenticated()
+        assert not store.is_code_verified()
 
 
 async def test_cancelled_login_pauses_and_enter_on_execution_reopens_it(app):
@@ -86,23 +97,21 @@ async def test_medium_approval_runs_the_one_request(app):
         assert isinstance(app.screen, ApprovalScreen)
 
 
-async def test_high_needs_a_reason_before_the_confirmation(app):
+async def test_high_asks_for_no_reason_only_a_double_check(app):
     async with app.run_test(size=SIZE) as pilot:
         await run_ui_to(app, pilot, "approval:approval-002")
-        assert app.screen.query_one("#reason", Input).has_focus
-        app.screen.focus_menu("approval-menu")
-        await pilot.press("1")                                   # Approve without a reason
+        assert not app.screen.query(Input)                       # nothing to type
+        assert app.focused.highlighted_id == "details"           # a stray Enter is harmless
+        await pilot.press("1")                                   # Approve & run
         await settle(pilot)
-        assert isinstance(app.screen, ApprovalScreen)
-        assert "reason" in str(app.screen.query_one("#target-error", Static).render())
-        assert "approval.confirmation_requested" not in event_kinds()
+        assert isinstance(app.screen, ChoiceScreen)              # the double check
+        assert "approval.confirmation_requested" in event_kinds()
+        assert not store.is_approved("approval-002")
 
 
 async def test_high_confirmation_defaults_to_no_and_voids_the_token(app):
     async with app.run_test(size=SIZE) as pilot:
         await run_ui_to(app, pilot, "approval:approval-002")
-        app.screen.query_one("#reason", Input).value = HIGH_REASON
-        app.screen.focus_menu("approval-menu")
         await pilot.press("1")
         await settle(pilot)
         assert isinstance(app.screen, ChoiceScreen)
@@ -116,13 +125,13 @@ async def test_high_confirmation_defaults_to_no_and_voids_the_token(app):
         assert "approval.confirmation_declined" in event_kinds()
 
 
-async def test_high_with_a_reason_and_yes_completes_the_run(app):
+async def test_high_double_checked_with_yes_completes_the_run(app):
     async with app.run_test(size=SIZE) as pilot:
         await run_ui_to(app, pilot, "approval:approval-002")
         await pass_gate(app, pilot)
         assert store.is_completed()
         decision = store.decision_for("approval-002")
-        assert decision.reason == HIGH_REASON
+        assert decision.decision == "APPROVED" and decision.reason == ""
         assert isinstance(app.screen, ExecutionScreen)
         assert "assessment complete" in str(app.screen.query_one("#exec-hint", Static).render())
 
@@ -174,8 +183,9 @@ async def test_execution_streams_the_run(app):
         app.goto("execution")
         await settle(pilot)
         log = app.screen.query_one(RunLog)
-        text = "\n".join(str(line.text) for line in log.lines)
-        assert "[POLICY] Blocked" in text
+        lines = [str(line.text) for line in log.lines]
+        text = "\n".join(lines)
+        assert any("  policy   Blocked:" in line for line in lines)
         assert "Assessment completed" in text
         assert TEST_PASSWORD not in text
 

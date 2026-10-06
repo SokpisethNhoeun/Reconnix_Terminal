@@ -143,6 +143,9 @@ def test_step_states_follow_the_run():
     play_until_gate()                                       # account
     assert store.step_states()["execution"] == "waiting"
     decide("account")
+    play_until_gate()                                       # the one-time code, on its own
+    assert store.step_states()["execution"] == "waiting"
+    decide("code")
     play_until_gate()                                       # MEDIUM approval
     assert store.step_states()["approval"] == "waiting"
     run_to_end()

@@ -63,8 +63,8 @@ async def test_a_question_gets_an_answer_and_nothing_starts(app):
         await settle(pilot)
         assert isinstance(app.screen, StartScreen)
         assert not store.get_run().started
-        reply = str(app.screen.query_one("#no-scope").render())
-        assert "› hello" in reply and "Hi!" in reply
+        assert "› hello" in str(app.screen.query_one(".user-msg").render())
+        assert "Hi!" in str(app.screen.query_one("#start-reply").render())
 
 
 async def test_a_target_starts_the_run_and_shows_the_request(app):

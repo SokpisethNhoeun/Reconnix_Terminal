@@ -84,7 +84,7 @@ export default async function PolicyPage() {
             </table>
           </TableWrap>
           <p className="text-[12.5px] text-muted">
-            HIGH approvals need the exact phrase and a reason. Every decision is bound to the hash of the request it allowed.
+            HIGH approvals need a second confirmation of the exact request. Every decision is bound to the hash of the request it allowed.
           </p>
         </Card>
       </div>

@@ -176,7 +176,7 @@
       "request_id": "approval-002",
       "decision": "APPROVED",
       "operator": "analyst",
-      "reason": "One probe to confirm the console needs a login",
+      "reason": "",
       "command_hash": "sha256:833f1b763684e05961f3212d10accb403af6c95ec23f79f966baed9d002ff4f3",
       "at": "2026-10-03T10:22:29+00:00"
     }
@@ -621,7 +621,7 @@
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
-      "text": "Risk: HIGH · reason required",
+      "text": "Risk: HIGH · needs a double check",
       "tone": "warn",
       "rows": []
     },
@@ -631,7 +631,7 @@
       "type": "activity",
       "who": "USER",
       "kind": "line",
-      "text": "Approved: single_login_probe (with reason)",
+      "text": "Approved: single_login_probe (double-checked)",
       "tone": "ok",
       "rows": []
     },
@@ -641,7 +641,7 @@
       "type": "chat",
       "who": "policy",
       "kind": "banner",
-      "text": "HIGH action approved with a reason.",
+      "text": "HIGH action approved after a double check.",
       "tone": "ok",
       "rows": []
     },

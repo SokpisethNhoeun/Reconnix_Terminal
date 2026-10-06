@@ -62,6 +62,8 @@ def test_an_approval_outside_the_scope_never_reaches_a_human():
     run_to("account")
     lists.current().approvals[0].path = "/admin/orders"      # the AI proposes an excluded path
     decide("account")
+    assert play_until_gate() == "code"
+    decide("code")
     assert play_until_gate() is None
     assert store.display_phase() == "stopped"
     assert store.decision_for("approval-001") is None

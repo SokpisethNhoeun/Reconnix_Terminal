@@ -7,7 +7,6 @@ from reconix import store
 SIZE = (140, 45)   # fixed terminal size so layout-dependent widgets behave the same
 
 TEST_PASSWORD = "s3cret-Pa55-for-tests"   # must never appear anywhere it is shown or saved
-HIGH_REASON = "Validate the suspected finding"
 
 # A bare hostname could be a site, an API or a network host, so the run asks for the
 # template. The demo request (a URL) and IPv4/repo/path targets pick theirs themselves.
@@ -30,7 +29,7 @@ def play_until_gate() -> Optional[str]:
 
 
 def auth_values(challenge) -> dict:
-    """Fill a target-login challenge: a test account, a cookie, and a dummy OTP code."""
+    """Fill a login step: a test account or a cookie, or (the code step) a dummy OTP code."""
     out = {}
     for field in challenge.fields:
         out[field.id] = ("123456" if field.otp
@@ -46,14 +45,14 @@ def decide(gate: str) -> None:
         store.approve_scope()
     elif gate == "plan":
         store.run_plan()
-    elif gate == "account":
+    elif gate in ("account", "code"):
         store.provide_auth(auth_values(store.current_auth_challenge()))
     elif gate.startswith("approval:"):
         request = store.get_approval(gate.split(":", 1)[1])
         if request.risk == "HIGH":
             token = store.request_confirmation(request.request_id, request.command_hash)
             store.approve(request.request_id, command_hash=request.command_hash,
-                          confirmation_token=token, reason=HIGH_REASON)
+                          confirmation_token=token)
         else:
             store.approve(request.request_id, command_hash=request.command_hash)
     else:
@@ -113,8 +112,6 @@ async def pass_gate(app, pilot) -> str:
     elif isinstance(screen, ApprovalScreen):
         request = store.get_approval(gate.split(":", 1)[1])
         if request.risk == "HIGH":
-            screen.query_one("#reason", Input).value = HIGH_REASON
-            screen.focus_menu("approval-menu")
             await pilot.press("1")                               # Approve & run
             await settle(pilot)
             assert isinstance(app.screen, ChoiceScreen)

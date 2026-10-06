@@ -1,17 +1,18 @@
 """The plan the operator reviews before running it: phases, the login, the gated actions.
 
-Built from the current assessment (its template's plan tasks, the login its run needs, and
+Built from the current assessment (its template's plan tasks, the login its tools need, and
 the approval requests its validation raises), with each row's status read live from the
 run. Empty until a template is chosen.
 """
 
 from typing import List
 
-from ..models import GATE_ACCOUNT, GATE_APPROVAL_PREFIX, PlanRow, PlanTask
+from ..models import GATE_ACCOUNT, GATE_APPROVAL_PREFIX, GATE_CODE, PlanRow, PlanTask
 from . import lists
 from .approvals import decision_for
 from .run import plan_tasks
-from .vault import current_auth_challenge, is_authenticated
+from .scope_view import join_and
+from .vault import login_done, login_kind, login_tools
 
 # What each phase does (the labels themselves are template-specific).
 PHASE_DETAIL = {
@@ -23,22 +24,22 @@ PHASE_DETAIL = {
 }
 LOGIN_LABEL = {
     "cookie": "session cookie", "password": "test account",
-    "otp": "one-time code", "password+otp": "test account + one-time code",
+    "password+otp": "test account, then a one-time code on its own",
 }
 
 
 def _login_row(num: str) -> PlanRow:
-    challenge = current_auth_challenge()
     run = lists.current().run
-    if is_authenticated():
+    if login_done():
         status = "done"
-    elif run.waiting_gate == GATE_ACCOUNT:
+    elif run.waiting_gate in (GATE_ACCOUNT, GATE_CODE):
         status = "active"
     else:
         status = "pending"
-    return PlanRow(num, "Target login", f"{LOGIN_LABEL.get(challenge.kind, challenge.kind)} "
-                   "· asked when testing needs it, kept for this session only",
-                   "LOW", "login", status)
+    kind = login_kind()
+    return PlanRow(num, "Target login", f"{LOGIN_LABEL.get(kind, kind)} for "
+                   f"{join_and(login_tools())} · asked when testing needs it, "
+                   "kept for this session only", "LOW", "login", status)
 
 
 def _approval_rows(prefix: str) -> List[PlanRow]:
@@ -62,7 +63,7 @@ def plan_overview() -> List[PlanRow]:
     tasks: List[PlanTask] = plan_tasks()
     if not tasks:
         return []
-    needs_login = current_auth_challenge() is not None
+    needs_login = bool(login_kind())
     rows: List[PlanRow] = []
     for n, task in enumerate(tasks, start=1):
         rows.append(PlanRow(str(n), task.label, PHASE_DETAIL.get(task.key, ""), "LOW", "auto",

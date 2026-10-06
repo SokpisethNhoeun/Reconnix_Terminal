@@ -1,6 +1,6 @@
 """The assistant chat and the activity log the dashboard shows."""
 
-from typing import List, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from ..models import ActivityEntry, ChatEntry
 from . import lists
@@ -13,6 +13,15 @@ CHAT_KINDS = ("text", "banner", "card", "check")
 
 def list_chat() -> List[ChatEntry]:
     return list(lists.current().chat)
+
+
+def last_exchange() -> Tuple[Optional[ChatEntry], List[ChatEntry]]:
+    """The operator's latest line and Reconix's entries after it; (None, []) before any."""
+    chat = lists.current().chat
+    for i in range(len(chat) - 1, -1, -1):
+        if chat[i].speaker == "you":
+            return chat[i], [e for e in chat[i + 1:] if e.speaker == "reconix"]
+    return None, []
 
 
 def list_activity() -> List[ActivityEntry]:

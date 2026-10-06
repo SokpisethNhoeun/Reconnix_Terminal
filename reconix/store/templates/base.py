@@ -3,19 +3,20 @@
 A template module describes its target in a `RunProfile`; `build_script()` turns that
 into the standard phased run (Plan → Scope → Run plan → Test → [Authenticate] → Validate
 → Analyze → Report). The rhythm and the gates are the same for every template; only the content
-differs, so all four behave consistently.
+differs, so all four behave consistently. The login steps are always in the script but
+play only if the approved scope's tools need a login (see `store/tools.py`).
 """
 
 from dataclasses import dataclass
 from typing import List, Tuple
 
 from ...models import (
-    GATE_ACCOUNT, GATE_PLAN, GATE_SCOPE, GATE_TEMPLATE, ApprovalRequest, Finding, PlanTask,
-    RunStep, ScopeManifest, Template,
+    GATE_ACCOUNT, GATE_CODE, GATE_PLAN, GATE_SCOPE, GATE_TEMPLATE, ApprovalRequest, Finding,
+    PlanTask, RunStep, ScopeManifest, Template,
 )
 from ...models.parser import ParsedTarget
 from ..approvals import command_digest
-from ..scenario import banner, card, check, gate, log, say
+from ..scenario import banner, card, check, gate, log, only, say
 
 Row = Tuple[str, str]
 
@@ -48,8 +49,8 @@ class RunProfile:
     high: ApprovalRequest
     findings: List[Finding]                # all findings, revealed through the run
     analysis_steps: Tuple[str, ...]
-    auth: str = ""                         # a login a step needs: cookie|password|otp|password+otp
-    auth_reason: str = ""                  # why a login is needed (shown before the gate)
+    login_area: str = "the signed-in area"  # what the tools test behind the target login
+    login_2fa: bool = False                # the target asks for a one-time code after the password
     extra_discovery: Tuple[str, ...] = ()  # extra activity-log lines during discovery
     scan_tool: str = "Nuclei"
     plan: Tuple[Tuple[str, str], ...] = ()  # the plan shown on the dashboard: (progress key, label)
@@ -62,7 +63,7 @@ class RunBundle:
     script: List[RunStep]
     approvals: List[ApprovalRequest]
     findings: List[Finding]
-    auth_kind: str = ""
+    login_2fa: bool = False
     plan: List[PlanTask] = None   # the named plan tasks, in order (set from the profile)
     methodology: List[str] = None   # standards followed (set from the profile)
 
@@ -156,13 +157,24 @@ def build_rest(profile: RunProfile) -> List[RunStep]:
     steps += _progress("scanning", 70, scan_bursts[min(1, len(scan_bursts) - 1)])
     steps.append(card(profile.scan_card[0], *profile.scan_card[1]))
 
-    if profile.auth:
-        steps.append(log("AI", profile.auth_reason, tone="warn"))
-        steps.append(banner("Further testing requires a target login.", tone="warn"))
-        steps.append(gate(GATE_ACCOUNT))
-        steps.append(say("Test session configured. Continuing within approved scope.",
-                         tone="muted"))
-        steps.append(log("POLICY", "Continuing within approved scope", tone="ok"))
+    # The target login the approved tools need ($login_need), then the code on its own
+    steps += only(
+        "login",
+        log("AI", f"Login needed for {profile.login_area}: $login_need", tone="warn"),
+        banner("Further testing requires a target login.", tone="warn"),
+        gate(GATE_ACCOUNT),
+    )
+    steps += only(
+        "code",
+        log("TOOL", "Signing in with the test account…"),
+        log("POLICY", "The target asked for a one-time code.", tone="warn"),
+        gate(GATE_CODE),
+    )
+    steps += only(
+        "login",
+        say("Test session configured. Continuing within approved scope.", tone="muted"),
+        log("POLICY", "Continuing within approved scope", tone="ok"),
+    )
     steps += _progress("scanning", 100, scan_bursts[-1])
 
     # Validate
@@ -177,9 +189,9 @@ def build_rest(profile: RunProfile) -> List[RunStep]:
     steps.append(banner("MEDIUM action approved by analyst.", tone="ok"))
     steps.append(log("TOOL", "Executing baseline request"))
     steps += _progress("validation", 45, 1)
-    steps.append(log("POLICY", "Risk: HIGH · reason required", tone="warn"))
+    steps.append(log("POLICY", "Risk: HIGH · needs a double check", tone="warn"))
     steps.append(gate(f"approval:{profile.high.request_id}"))
-    steps.append(banner("HIGH action approved with a reason.", tone="ok"))
+    steps.append(banner("HIGH action approved after a double check.", tone="ok"))
     steps.append(log("TOOL", "Running limited validation · 1 request"))
     steps += _progress("validation", 100, 1)
     steps.append(say("Validation completed. Evidence recorded with sensitive values masked.",

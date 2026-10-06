@@ -81,7 +81,7 @@ def apply_template(template_id: str, *, auto: bool = False) -> Template:
     assessment.scope = bundle.scope
     assessment.approvals = bundle.approvals
     assessment.findings = bundle.findings
-    assessment.auth_kind = bundle.auth_kind
+    assessment.login_2fa = bundle.login_2fa
     assessment.plan = bundle.plan or []
     assessment.methodology = bundle.methodology or []
     # The activity line is a step, so it plays after "Target parsed" (not before it).

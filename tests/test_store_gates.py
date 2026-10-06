@@ -3,6 +3,7 @@
 import pytest
 
 from reconix import store
+from reconix.store import lists
 
 from .support import ASK_REQUEST, TEST_PASSWORD, event_kinds, run_to
 
@@ -65,8 +66,8 @@ def test_policy_blocks_everything_before_the_scope_is_approved():
 
 
 # --- vault -----------------------------------------------------------------------------
-def _auth(identity="demo.tester", secret=TEST_PASSWORD, code="123456"):
-    return {"identity": identity, "secret": secret, "code": code}
+def _auth(identity="demo.tester", secret=TEST_PASSWORD):
+    return {"identity": identity, "secret": secret}
 
 
 def test_login_only_when_asked_and_validated():
@@ -74,14 +75,59 @@ def test_login_only_when_asked_and_validated():
     with pytest.raises(store.StoreValidationError):
         store.provide_auth(_auth())                   # not at the account gate
     run_to_account()
-    assert store.current_auth_challenge().kind == "password+otp"   # web_url needs a code
+    challenge = store.current_auth_challenge()
+    assert challenge.kind == "password"               # email + password only: no code yet
+    assert [f.id for f in challenge.fields] == ["identity", "secret"]
     for bad in [_auth(identity=""), _auth(identity="two words"), _auth(secret=""),
-                _auth(identity="u" * 65), _auth(code="12345"), _auth(code="abcdef")]:
+                _auth(identity="u" * 65)]:
         with pytest.raises(store.StoreValidationError):
             store.provide_auth(bad)
     store.provide_auth(_auth(identity="demo.tester"))
     assert store.is_authenticated() and store.has_test_account()
     assert store.vault_scope() == "staging.example.com"
+    with pytest.raises(store.StoreValidationError):
+        store.provide_auth(_auth(identity="someone.else"))     # each step is taken once
+
+
+def test_the_code_is_asked_on_its_own_after_the_password():
+    from .support import play_until_gate
+    run_to("scope")
+    run_to_account()
+    store.provide_auth(_auth())
+    assert play_until_gate() == "code"
+    challenge = store.current_auth_challenge()
+    assert challenge.kind == "otp" and [f.id for f in challenge.fields] == ["code"]
+    assert not store.login_done()
+    for bad in ["12345", "abcdef", "", "1234567"]:
+        with pytest.raises(store.StoreValidationError):
+            store.provide_auth({"code": bad})
+    store.provide_auth({"code": "123456"})
+    assert store.is_code_verified() and store.login_done()
+    assert [e.kind for e in lists.current().vault] == ["password"]   # the code isn't kept
+    with pytest.raises(store.StoreValidationError):
+        store.provide_auth({"code": "654321"})                       # once only
+    assert play_until_gate().startswith("approval:")
+
+
+@pytest.mark.parametrize("tools, kind", [
+    (["Nuclei", "OWASP ZAP"], "password+otp"),   # a test account covers the cookie tool
+    (["OWASP ZAP"], "password+otp"),
+    (["Nuclei"], "cookie"),
+    (["nmap"], ""),                              # no tool needs a login: no login steps
+])
+def test_the_scope_tools_decide_the_login(tools, kind):
+    from .support import play_until_gate
+    run_to("scope")
+    store.edit_scope(tools=tools)
+    assert store.login_kind() == kind
+    store.approve_scope()
+    assert play_until_gate() == "plan"
+    store.run_plan()
+    gate = play_until_gate()
+    assert gate == ("account" if kind else "approval:approval-001")
+    if kind:
+        expected = "password" if kind == "password+otp" else kind
+        assert store.current_auth_challenge().kind == expected
 
 
 def test_an_otp_only_challenge_stores_nothing():
@@ -146,19 +192,15 @@ def high():
     return store.get_approval(HIGH)
 
 
-def test_high_needs_token_and_reason(high):
+def test_high_needs_the_double_check_but_no_reason(high):
     assert store.needs_confirmation(HIGH)
-    with pytest.raises(store.StoreValidationError):     # no token
-        store.approve(HIGH, command_hash=high.command_hash, reason="Validate it")
+    with pytest.raises(store.StoreValidationError):     # no second confirmation
+        store.approve(HIGH, command_hash=high.command_hash)
     token = store.request_confirmation(HIGH, high.command_hash)
-    with pytest.raises(store.StoreValidationError):     # no reason
-        store.approve(HIGH, command_hash=high.command_hash, confirmation_token=token,
-                      reason="   ")
-    # The failed try did not burn the token.
-    decision = store.approve(HIGH, command_hash=high.command_hash, confirmation_token=token,
-                             reason=" Validate  the finding ")
-    assert decision.reason == "Validate the finding"
-    assert store.is_approved(HIGH)
+    decision = store.approve(HIGH, command_hash=high.command_hash, confirmation_token=token)
+    assert decision.reason == "" and store.is_approved(HIGH)
+    assert "Approved: limited_validation (double-checked)" in [
+        e.message for e in store.list_activity()]
 
 
 def test_a_high_token_works_once_and_only_for_its_hash(high):
@@ -166,21 +208,17 @@ def test_a_high_token_works_once_and_only_for_its_hash(high):
         store.request_confirmation(HIGH, "sha256:other")
     token = store.request_confirmation(HIGH, high.command_hash)
     with pytest.raises(store.StoreValidationError):
-        store.approve(HIGH, command_hash="sha256:other", confirmation_token=token,
-                      reason="Validate it")
-    store.approve(HIGH, command_hash=high.command_hash, confirmation_token=token,
-                  reason="Validate it")
+        store.approve(HIGH, command_hash="sha256:other", confirmation_token=token)
+    store.approve(HIGH, command_hash=high.command_hash, confirmation_token=token)
     with pytest.raises(store.StoreValidationError):
-        store.approve(HIGH, command_hash=high.command_hash, confirmation_token=token,
-                      reason="Validate it")
+        store.approve(HIGH, command_hash=high.command_hash, confirmation_token=token)
 
 
 def test_declining_voids_the_token_and_is_audited(high):
     token = store.request_confirmation(HIGH, high.command_hash)
     store.decline_confirmation(HIGH)
     with pytest.raises(store.StoreValidationError):
-        store.approve(HIGH, command_hash=high.command_hash, confirmation_token=token,
-                      reason="Validate it")
+        store.approve(HIGH, command_hash=high.command_hash, confirmation_token=token)
     assert event_kinds()[-2:] == ["approval.confirmation_requested",
                                   "approval.confirmation_declined"]
 

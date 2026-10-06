@@ -18,10 +18,14 @@ from textual.binding import Binding
 from . import store, theme
 from .commands import COMMANDS, Command, find, parse
 from .screens import ChoiceScreen, CommandBarScreen, HelpScreen, StartScreen
-from .shell import ActionsMixin, DialogsMixin, NavigationMixin, RunHostMixin
+from .shell import (
+    ActionsMixin, DialogsMixin, NavigationMixin, RunHostMixin, WebDashboardMixin,
+)
+from .widgets import ActivityStatus
 
 
-class ReconixApp(NavigationMixin, RunHostMixin, ActionsMixin, DialogsMixin, App):
+class ReconixApp(NavigationMixin, RunHostMixin, ActionsMixin, DialogsMixin, WebDashboardMixin,
+                 App):
     """Reconix — AI-Powered Security Testing Assistant (demo)."""
 
     CSS_PATH = "reconix.tcss"
@@ -35,6 +39,7 @@ class ReconixApp(NavigationMixin, RunHostMixin, ActionsMixin, DialogsMixin, App)
         Binding("slash", "command_bar", "commands", key_display="/"),
         Binding("question_mark", "help", "help", key_display="?"),
         Binding("ctrl+q", "quit", "quit"),
+        Binding("ctrl+o", "toggle_activity", "expand steps", show=False),
         # Quick jumps for presenting — hidden to keep the footer clean.
         Binding("1", "jump('start')", "start", show=False),
         Binding("2", "jump('template')", "template", show=False),
@@ -53,7 +58,9 @@ class ReconixApp(NavigationMixin, RunHostMixin, ActionsMixin, DialogsMixin, App)
         self.template_pick: Optional[str] = None  # template chosen with /template <id>
         self.findings_filter: str = "all"        # Findings list view (kept across screens)
         self.findings_sort: str = "severity"
+        self.activity_expanded = False           # Ctrl+O: list the steps Reconix finished
         self._init_run_host()
+        self._init_web()
 
     def get_css_variables(self) -> Dict[str, str]:
         # The stylesheet's $variables come from theme.py, the one place colors are defined.
@@ -66,6 +73,7 @@ class ReconixApp(NavigationMixin, RunHostMixin, ActionsMixin, DialogsMixin, App)
         # Quitting ends the session: mark the saved copies so the web dashboard shows an
         # unfinished run as interrupted rather than still waiting.
         self.controller.stop()
+        self.stop_web_dashboard()
         store.close_session()
 
     # --- global keys ---------------------------------------------------------------------------
@@ -74,6 +82,11 @@ class ReconixApp(NavigationMixin, RunHostMixin, ActionsMixin, DialogsMixin, App)
             self.pop_screen()
         else:
             self.push_screen(HelpScreen.for_screen(self.screen))
+
+    def action_toggle_activity(self) -> None:
+        self.activity_expanded = not self.activity_expanded
+        for status in self.screen.query(ActivityStatus):
+            status.set_expanded(self.activity_expanded)
 
     def action_command_bar(self) -> None:
         self.open_dialog(CommandBarScreen(), self._on_command_bar)

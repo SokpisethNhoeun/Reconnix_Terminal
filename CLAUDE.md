@@ -1,4 +1,8 @@
-# CLAUDE.md — Reconix TUI (classic UI)
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Reconix TUI (classic UI)
 
 Keyboard-first terminal UI for **Reconix**, an AI-powered security-testing
 assistant. Built with **Textual 8.x + Rich**, Python ≥ 3.9. The app runs on an
@@ -17,18 +21,30 @@ pip install -r requirements.txt
 python -m reconix                 # run the app (or: python run.py / reconix)
 pip install -r requirements-dev.txt   # pytest + pytest-asyncio + python-docx
 pytest -q                         # store tests + Textual Pilot tests (~70 s)
+pytest -q tests/test_store_run.py             # one file
+pytest -q tests/test_gates_ui.py::test_name   # one test   (or: pytest -q -k approval)
 python -m compileall -q reconix   # quick syntax check
-uvx ruff check --line-length 100 --select E,F,W,B reconix tests   # lint (no config yet)
-cd web && npm run dev             # web dashboard (npm test / npx tsc --noEmit / npx eslint)
+uvx ruff check --line-length 100 --select E,F,W,B reconix tests   # lint (no config yet;
+                                  #   a few E501/E402 already exist, don't add more)
 python scripts/make_sample_data.py    # regenerate web/sample-data after a process change
+python scripts/export_tokens.py       # theme.WEB_TOKENS → web/src/styles/tokens.css
+
+cd web && npm run dev             # web dashboard; RECONIX_DATA_DIR=sample-data for demo data
+npm test                          # vitest
+npm run lint && npm run typecheck # typecheck needs `npx next typegen` (or a build) first
+npm run build && npm run e2e      # Playwright on sample-data (needs a Chromium)
 ```
 
-Tests: `tests/conftest.py` resets the store around every test, plays the run instantly
+Tests: `asyncio_mode = "auto"`, so `async def test_…(app)` needs no marker; Pilot tests use
+`app.run_test(size=SIZE)` (`SIZE` from `tests/support.py`). `tests/conftest.py` resets the store around every test, plays the run instantly
 (`RunController.SPEED = 0`), points reports / saved copies / the web link at temp, and
 stubs `browser.open_url/open_path` (the `opened` fixture records them — never launch a
 real browser). `tests/support.py`: `run_to(gate)` / `decide(gate)` / `play_until_gate()`
 drive the store; `run_ui_to(app, pilot, gate)` / `pass_gate()` drive the screens;
 `settle(pilot)` lets screen switches and dialogs land (dialogs open on the app's next turn).
+`store.DEMO_REQUEST` (a URL) skips the template gate; pass `ASK_REQUEST` to stop at it.
+`TEST_PASSWORD` must never show up in output, logs, reports or saved copies. The
+`web_launches` fixture stubs `web_server` (start/install/stop): no test starts a real dashboard.
 
 ## Architecture
 
@@ -39,7 +55,8 @@ reconix/
 │   ├── navigation.py # FLOW, goto / go_next / go_prev, reload_screen, open_dialog
 │   ├── run_host.py   # hosts RunController; refresh_view, open_gate (deferral), resume_run
 │   ├── actions.py    # submit_request, template/scope/plan decisions, new / switch assessment
-│   └── dialogs.py    # assessments, triage, import, export, audit, summary, /web
+│   ├── dialogs.py    # assessments, triage, import, export, audit, summary
+│   └── web.py        # /web: open the dashboard, starting it in the background if needed
 ├── flow/             # RunController (plays store steps), gates.py (gate → screen), phases
 ├── commands/         # registry.py (Command: choices, ask, empty) + builtin.py (COMMANDS)
 ├── models/           # dataclasses: Assessment, RunState/RunStep/PlanRow, ScopeManifest, …
@@ -52,8 +69,10 @@ reconix/
 ├── theme.py          # color tokens; CSS_TOKENS feed the stylesheet's $variables
 ├── reconix.tcss      # Textual stylesheet (no hex values: $variables only)
 ├── browser.py        # open_url / open_path, detached and silent
+├── web_server.py     # start / stop `npm run dev` in web/ quietly (log: ~/.reconix/web.log)
 ├── widgets/          # SessionBar/FlowProgress, ChoiceMenu, PromptBox, Question, RunLog,
-│                     #   ScopeManifestView, Spinner, finding cells (widgets/findings.py)
+│                     #   ScopeManifestView, Spinner/ActivityStatus,
+│                     #   finding cells (widgets/findings.py)
 └── screens/
     ├── base.py       # ReconixScreen: chrome + body + footer; view_state / refresh_live
     ├── <frame>.py    # one file per flow frame (template.py replaced scope.py)
@@ -61,6 +80,24 @@ reconix/
     ├── choice.py     # ChoiceScreen dialog (+ details_body())
     ├── command_bar.py, help.py
 ```
+
+How the pieces connect:
+
+- **Store state** is module-level lists in `store/lists.py` (`ASSESSMENTS`, `CURRENT`,
+  session-wide `EVENTS`/history/feedback); only store modules import it. Importing
+  `reconix.store` loads the demo data; `store.reset` reloads it.
+- **A run is a list of `RunStep`s.** Choosing a template calls its module's
+  `build_scope(parsed)` and `build_run(assessment) -> RunBundle`; `templates/base.py`
+  (`RunProfile` → `build_script()`) weaves each template's content into the same phased
+  script and gates, so all four templates behave alike. A new template registers in
+  `templates/__init__.py` (`MODULES`, `CATALOG_ORDER`).
+- **`RunController`** (`flow/controller.py`) holds no data: it `peek()`s the next step,
+  waits `step.pause × SPEED`, calls `store.advance()`, then asks its host to redraw or
+  open a gate. With the backend wired, `advance()` becomes the server's event stream.
+- **Saved copies for `web/`**: `persist.autosave` writes `snapshot()` (secrets removed) to
+  `~/.reconix/assessments/` (`RECONIX_DATA_DIR`). The dashboard validates those files with
+  `web/src/lib/data/schema.ts`: change it together with `store/snapshot.py`, then rerun
+  `make_sample_data.py`.
 
 Key invariants:
 
@@ -73,7 +110,7 @@ Key invariants:
   rebuilds the screen (`app.reload_screen()`), or marks it stale if a dialog covers it.
   Small per-step updates go in `refresh_live()`.
 - **Gates route to screens** (`flow/gates.py`): template + scope → Template, plan → Plan,
-  approval:* → Approval, account → the LoginForm over the current screen. A gate that
+  approval:* → Approval, account and code → the LoginForm over the current screen. A gate that
   arrives while a dialog is open waits for it to close (`flow_screen_resumed`). After a
   decision, call `app.resume_run()` or `app.gate_decided(screen)`.
 - **The app opens its dialogs with `app.open_dialog(dialog, callback)`**, never
@@ -105,15 +142,25 @@ Key invariants:
   methods). A `Command` with `ask=False` uses its choices only as suggestions. The `/` app
   binding stays non-priority. A typed local path (`/home/me/app`) is a target, not a command.
 - **Colors come only from tokens** (`theme.*` in Rich, `$vars` in TCSS, fed from
-  `theme.CSS_TOKENS`). Add a token in `theme.py` only.
+  `theme.CSS_TOKENS`). Add a token in `theme.py` only. Web colors come from
+  `theme.WEB_TOKENS` through `scripts/export_tokens.py`; never edit the generated `tokens.css`.
 - **Repeated UI becomes a widget** in `reconix/widgets/`.
+- **Packages are listed explicitly** in `pyproject.toml` (`[tool.setuptools] packages`):
+  a new subpackage must be added there or the installed `reconix` command won't find it.
 
-## Project rules (from AGENTS.md, applied to this TUI)
+## Web dashboard (`web/`)
+
+Next.js 16 / React 19, **read-only**: no route writes or starts anything; decisions stay in
+the TUI. Read `web/CLAUDE.md` and `web/README.md` (Rules) before changing it. This Next.js
+version differs from older ones, so check `web/node_modules/next/dist/docs/` before writing
+code. Every page and route needs the `viewer` role (`proxy.ts`, and the handlers check again).
+
+## Project rules (applied to this TUI)
 
 1. **No single-file code.** One screen per file, one concern per module (see `shell/`).
 2. **Clean folder structure.** Follow the layout above; keep `__init__.py` exports current.
 3. **Validate on the backend.** The store is the security boundary here; the UI may
-   pre-check for UX (e.g. the HIGH reason length) but must show and respect the store's verdict.
+   pre-check for UX (e.g. the code's 6 digits) but must show and respect the store's verdict.
 4. **Protect actions by role.** Gated actions go through the approval gate; when auth is
    wired, hide or disable what the role can't do and treat 401/403 as final.
 5. **Reusable components.** Widgets, `FormScreen`, `ChoiceScreen`, theme helpers.
@@ -124,11 +171,13 @@ Key invariants:
 Authorized security testing only. Demo data uses reserved example domains and fake,
 masked evidence. Never run real scanners from the TUI; execution belongs to the backend,
 behind scope checks and human approval. Do not weaken the gates: testing starts only after
-the scope is approved and the plan is run; HIGH-risk actions need a typed reason, the
+the scope is approved and the plan is run; HIGH-risk actions need a double check, the
 single-use token from `request_confirmation()` and the matching command hash
-(`approve()` enforces all three); the confirmation dialog defaults to "No, go back". The
-one-time code is validated and never stored; secrets never reach chat, logs, reports or
-the saved copies (`snapshot.py` + `redact.py`).
+(`approve()` enforces both; no typed reason, by the owner's decision); the confirmation
+dialog defaults to "No, go back". The target login comes from the approved tools
+(`store/tools.py`); a one-time code is its own step (`GATE_CODE`) right after the
+password, validated and never stored; secrets never reach chat, logs, reports or the
+saved copies (`snapshot.py` + `redact.py`).
 
 ## Team: subagents and skills
 

@@ -18,8 +18,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from ..models import (
-    GATE_ACCOUNT, GATE_APPROVAL_PREFIX, GATE_PLAN, GATE_SCOPE, GATE_TEMPLATE, PROGRESS_BARS,
-    Assessment,
+    GATE_ACCOUNT, GATE_APPROVAL_PREFIX, GATE_CODE, GATE_PLAN, GATE_SCOPE, GATE_TEMPLATE,
+    PROGRESS_BARS, Assessment,
 )
 from . import lists
 from .assessment import assessment_status
@@ -27,6 +27,7 @@ from .findings import SEVERITY_ORDER
 from .redact import redact_all
 from .run import task_status
 from .templates import template_name
+from .vault import login_done, login_kind
 
 SCHEMA = "reconix.assessment/v1"
 
@@ -35,6 +36,7 @@ GATE_WAITS = {
     GATE_SCOPE: "scope approval",
     GATE_PLAN: "plan review",
     GATE_ACCOUNT: "target login",
+    GATE_CODE: "one-time code",
 }
 
 
@@ -61,12 +63,20 @@ def _pending_gate(assessment: Assessment) -> str:
         decided = run.plan_started
     elif gate == GATE_ACCOUNT:
         decided = run.authenticated
+    elif gate == GATE_CODE:
+        decided = run.code_verified
     elif gate.startswith(GATE_APPROVAL_PREFIX):
         request_id = gate[len(GATE_APPROVAL_PREFIX):]
         decided = any(d.request_id == request_id for d in assessment.decisions)
     else:
         decided = False
     return "" if decided else gate
+
+
+def _login(assessment: Assessment) -> Dict[str, Any]:
+    """The login its tools need, and whether every step of it was given (never the values)."""
+    kind = login_kind(assessment)
+    return {"kind": kind, "provided": bool(kind) and login_done(assessment)}
 
 
 def _request_id(gate: str) -> str:
@@ -179,7 +189,7 @@ def snapshot(assessment: Assessment, *, session_closed: bool = False) -> Dict[st
             "progress": {bar: run.progress.get(bar, 0) for bar in PROGRESS_BARS},
             "report_path": run.report_path,
         },
-        "login": {"kind": assessment.auth_kind, "provided": run.authenticated},
+        "login": _login(assessment),
         "plan": [{"key": t.key, "label": t.label, "status": task_status(t.key, run)}
                  for t in assessment.plan],
         "scope": _scope(assessment),

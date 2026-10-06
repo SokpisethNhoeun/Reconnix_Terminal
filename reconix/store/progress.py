@@ -6,7 +6,9 @@ The flow line under the session bar shows these: "done" ✓, "stopped" ✕, "wai
 
 from typing import Dict
 
-from ..models import GATE_ACCOUNT, GATE_APPROVAL_PREFIX, GATE_PLAN, GATE_SCOPE, GATE_TEMPLATE
+from ..models import (
+    GATE_ACCOUNT, GATE_APPROVAL_PREFIX, GATE_CODE, GATE_PLAN, GATE_SCOPE, GATE_TEMPLATE,
+)
 from . import lists
 from .approvals import list_approval_decisions
 
@@ -45,7 +47,7 @@ def step_states() -> Dict[str, str]:
         states["execution"] = "done"
     elif run.stopped and run.plan_started:
         states["execution"] = "stopped"
-    elif gate == GATE_ACCOUNT and not run.stopped:
+    elif gate in (GATE_ACCOUNT, GATE_CODE) and not run.stopped:
         states["execution"] = "waiting"
 
     if run.report_path:

@@ -1,3 +1,4 @@
+from .activity import ActivityStatus
 from .chat import UserMessage
 from .choice_menu import ChoiceMenu, SuggestionMenu, menu_hint
 from .chrome import FlowProgress, SessionBar
@@ -11,7 +12,7 @@ from .secret_input import SecretInput
 from .spinner import Spinner, spinner_line
 
 __all__ = [
-    "SessionBar", "FlowProgress", "ChoiceMenu", "SuggestionMenu", "menu_hint",
+    "ActivityStatus", "SessionBar", "FlowProgress", "ChoiceMenu", "SuggestionMenu", "menu_hint",
     "PromptHistory", "PromptBox", "PromptInput", "UserMessage", "Question",
     "SeverityStrip", "ScopeManifestView", "RunLog", "SecretInput", "Spinner",
     "spinner_line",

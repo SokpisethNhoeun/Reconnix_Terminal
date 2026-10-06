@@ -1,48 +1,28 @@
-"""The scope manifest, drawn as lightly syntax-highlighted JSON (Template screen)."""
-
-import json
-from typing import List, Tuple
+"""The scope manifest in plain words (Template screen): what Reconix may and won't do."""
 
 from rich.text import Text
 from textual.widgets import Static
 
-from .. import theme
+from .. import store, theme
 from ..models import ScopeManifest
 
 
-def manifest_fields(scope: ScopeManifest) -> List[Tuple[str, object]]:
-    """The keys shown for this kind of scope, in order."""
-    fields: List[Tuple[str, object]] = [
-        ("target", scope.target_url),
-        ("assessment", scope.assessment_type),
-        ("allowed_actions", scope.allowed_actions),
-        ("allowed_methods", scope.allowed_methods),
-    ]
-    if scope.kind == "network":
-        fields.append(("allowed_ports", scope.allowed_ports))
-    if scope.excluded_paths or scope.kind != "network":
-        fields.append(("excluded_paths", scope.excluded_paths))
-    fields += [
-        ("time_limit_minutes", scope.time_limit_minutes),
-        ("tools", scope.tools),
-    ]
-    return fields
-
-
 def manifest_text(scope: ScopeManifest) -> Text:
-    """JSON-looking Text. Built as Text, so a typed target is never parsed as markup."""
-    text = Text("{\n", style=theme.MUTED)
-    fields = manifest_fields(scope)
-    for i, (key, value) in enumerate(fields):
-        color = (theme.CRITICAL if key == "excluded_paths"
-                 else theme.NUMBER if isinstance(value, int) or key == "allowed_ports"
-                 else theme.STRING)
-        text.append("  ")
-        text.append(key, style=theme.KEY)
-        text.append(": ", style=theme.MUTED)
-        text.append(json.dumps(value), style=color)
-        text.append(",\n" if i < len(fields) - 1 else "\n", style=theme.MUTED)
-    text.append("}", style=theme.MUTED)
+    """The store's plain-language summary. Built as Text, so a typed target is never markup."""
+    summary = store.describe_scope(scope)
+    text = Text(summary.headline, style=theme.TEXT)
+    text.append("\n\nWhat it may do", style=f"bold {theme.TEXT}")
+    for item in summary.may_do:
+        text.append("\n  ✓ ", style=theme.GREEN)
+        text.append(item, style=theme.MUTED)
+    if summary.never:
+        text.append("\n\nWhat it will never touch", style=f"bold {theme.TEXT}")
+        for item in summary.never:
+            text.append("\n  ✗ ", style=theme.CRITICAL)
+            text.append(item, style=theme.MUTED)
+    if summary.tools:
+        text.append("\n\nTools it will use: ", style=f"bold {theme.TEXT}")
+        text.append(", ".join(summary.tools), style=theme.MUTED)
     return text
 
 

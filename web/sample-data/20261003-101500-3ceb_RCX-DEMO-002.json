@@ -567,7 +567,7 @@
       "type": "activity",
       "who": "AI",
       "kind": "line",
-      "text": "Session cookie required for /v1/orders/*",
+      "text": "Login needed for /v1/orders/*: a session cookie (for Nuclei, Postman and ZAP API scan)",
       "tone": "warn",
       "rows": []
     },
@@ -587,7 +587,7 @@
       "type": "activity",
       "who": "USER",
       "kind": "line",
-      "text": "Authenticated · target login stored (cookie)",
+      "text": "Target login stored (cookie)",
       "tone": "ok",
       "rows": []
     },
@@ -677,7 +677,7 @@
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
-      "text": "Risk: HIGH · reason required",
+      "text": "Risk: HIGH · needs a double check",
       "tone": "warn",
       "rows": []
     },

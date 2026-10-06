@@ -95,7 +95,7 @@ class RunHostMixin:
             self.resume_run()
             return
         self.refresh_view()
-        self.notify("Nothing runs until you add the login. Press Enter on Execution (5) "
+        self.notify("Nothing runs until you finish the sign-in. Press Enter on Execution (5) "
                     "to continue.", title="Paused")
 
     def _save(self) -> None:

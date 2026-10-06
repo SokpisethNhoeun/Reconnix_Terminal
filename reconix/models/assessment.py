@@ -53,7 +53,7 @@ class Assessment:
     template_auto: bool = False     # matched from an unambiguous target, not picked
     requested_ports: List[int] = field(default_factory=list)   # intent from the prompt
     requested_tools: List[str] = field(default_factory=list)   # intent from the prompt
-    auth_kind: str = ""             # the login a step needs: cookie|password|otp|password+otp
+    login_2fa: bool = False         # the target asks for a one-time code after the password
     approvals: List[ApprovalRequest] = field(default_factory=list)
     decisions: List[ApprovalDecision] = field(default_factory=list)
     confirmations: List[Confirmation] = field(default_factory=list)

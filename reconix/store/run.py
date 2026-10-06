@@ -1,8 +1,9 @@
 """The assessment run: play the next scripted step, stop at gates, and report where it is.
 
 `advance()` is the only way the run moves. At a gate it stays put until the store has
-recorded the human decision (template, scope, plan, test account, approval), so no step
-past a gate can play early, whatever the UI does.
+recorded the human decision (template, scope, plan, target login, one-time code,
+approval), so no step past a gate can play early, whatever the UI does. Steps marked
+`when` play only if the approved tools need them (a login, the code after it).
 """
 
 from datetime import timedelta
@@ -10,8 +11,8 @@ from string import Template as TextTemplate
 from typing import Dict, List, Optional
 
 from ..models import (
-    GATE_ACCOUNT, GATE_APPROVAL_PREFIX, GATE_PLAN, GATE_SCOPE, GATE_TEMPLATE, PROGRESS_BARS,
-    PlanTask, RunState, RunStep,
+    GATE_ACCOUNT, GATE_APPROVAL_PREFIX, GATE_CODE, GATE_PLAN, GATE_SCOPE, GATE_TEMPLATE,
+    PROGRESS_BARS, PlanTask, RunState, RunStep,
 )
 from ..models.base import utc_now
 from ..models.parser import ParsedTarget
@@ -26,11 +27,12 @@ from .replies import reply_to, reply_while_running
 from .scope import (
     blocked_count, check_request, get_scope, is_scope_approved, time_limit_reached,
 )
+from .scope_view import join_and
 from .targets import check_target
 from .templates import apply_template, selected_template, template_name
 from .templates.base import build_plan
 from .transcript import add_activity, add_chat, list_activity
-from .vault import is_authenticated
+from .vault import code_needed, is_authenticated, is_code_verified, login_kind, login_tools
 
 # The phase shown while the run waits at a gate.
 WAITING_PHASES = {
@@ -38,7 +40,11 @@ WAITING_PHASES = {
     GATE_SCOPE: "scope_pending",
     GATE_PLAN: "plan_pending",
     GATE_ACCOUNT: "waiting_account",
+    GATE_CODE: "waiting_account",
 }
+# How the login reads in step text ($login_need).
+LOGIN_WORDS = {"cookie": "a session cookie", "password": "a test account",
+               "password+otp": "a test account and a one-time code"}
 PIPELINE_SOURCES = {"AI": "ai", "POLICY": "policy", "TOOL": "tool"}
 
 
@@ -122,7 +128,7 @@ def say_to_assistant(text: str) -> None:
     """A message typed while the run is going; the demo assistant points to what it can do."""
     if not get_run().started:
         raise StoreValidationError("Start an assessment first.")
-    if get_run().waiting_gate == GATE_ACCOUNT:
+    if get_run().waiting_gate in (GATE_ACCOUNT, GATE_CODE):
         # Don't record it: an operator may be pasting the login into the wrong place.
         raise StoreValidationError("Reconix is waiting for the target login. Press Enter on "
                                    "the Execution screen to open the secure input; never "
@@ -151,7 +157,9 @@ def gate_state(gate: str) -> str:
     if gate == GATE_PLAN:
         return "open" if get_run().plan_started else "pending"
     if gate == GATE_ACCOUNT:
-        return "open" if is_authenticated() else "pending"
+        return "open" if not login_kind() or is_authenticated() else "pending"
+    if gate == GATE_CODE:
+        return "open" if not code_needed() or is_code_verified() else "pending"
     if gate.startswith(GATE_APPROVAL_PREFIX):
         decision = decision_for(gate[len(GATE_APPROVAL_PREFIX):])
         if decision is None:
@@ -200,13 +208,31 @@ def stop_run() -> None:
 
 
 # --- playing steps ---------------------------------------------------------------------------
-def peek() -> Optional[RunStep]:
-    """The next step, without playing it (None when the run can't move)."""
+def _applies(step: RunStep) -> bool:
+    """A `when` step plays only if the approved tools need it."""
+    if step.when == "login":
+        return bool(login_kind())
+    if step.when == "code":
+        return code_needed()
+    return True
+
+
+def _next_index() -> Optional[int]:
+    """Where the next step that applies sits in the script (None when the run can't move)."""
     run = get_run()
     script = lists.current().script
-    if not run.started or run.stopped or run.cursor >= len(script):
+    if not run.started or run.stopped:
         return None
-    return script[run.cursor]
+    index = run.cursor
+    while index < len(script) and not _applies(script[index]):
+        index += 1
+    return index if index < len(script) else None
+
+
+def peek() -> Optional[RunStep]:
+    """The next step, without playing it (None when the run can't move)."""
+    index = _next_index()
+    return None if index is None else lists.current().script[index]
 
 
 def advance() -> Optional[RunStep]:
@@ -215,10 +241,12 @@ def advance() -> Optional[RunStep]:
     At a gate that is still pending, the run records that it is waiting and returns
     the gate step without moving. Returns None when there is nothing to play.
     """
-    step = peek()
-    if step is None:
+    index = _next_index()
+    if index is None:
         return None
+    step = lists.current().script[index]
     run = get_run()
+    run.cursor = index                      # past the steps this run doesn't need
     if time_limit_reached():
         _stop("the scope's time limit was reached", "Time limit reached. Testing stopped.")
         return None
@@ -249,7 +277,13 @@ def _fill(text: str) -> str:
         template=template_name(assessment.template_id),
         picked="auto-selected" if assessment.template_auto else "selected",
         findings=findings_line(),
+        login_need=_login_need(),
     )
+
+
+def _login_need() -> str:
+    """'a test account and a one-time code (for OWASP ZAP)', for the login step's text."""
+    return f"{LOGIN_WORDS.get(login_kind(), 'no login')} (for {join_and(login_tools())})"
 
 
 def _apply(step: RunStep) -> None:

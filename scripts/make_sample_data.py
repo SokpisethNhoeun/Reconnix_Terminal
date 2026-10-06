@@ -59,7 +59,7 @@ base.datetime = FakeClock      # every store timestamp comes from base.utc_now()
 
 
 # --- playing a run -------------------------------------------------------------------------------
-def decide(gate: str, *, high: str, reason: str) -> bool:
+def decide(gate: str, *, high: str) -> bool:
     """Decide `gate`. Returns False to leave the run waiting there."""
     if gate == "template":
         store.select_template(store.get_assessment().template_id)
@@ -67,7 +67,7 @@ def decide(gate: str, *, high: str, reason: str) -> bool:
         store.approve_scope()
     elif gate == "plan":
         store.run_plan()
-    elif gate == "account":
+    elif gate in ("account", "code"):         # the login the tools need, then its code
         values = {}
         for field in store.current_auth_challenge().fields:
             values[field.id] = ("482913" if field.otp
@@ -84,12 +84,11 @@ def decide(gate: str, *, high: str, reason: str) -> bool:
         else:
             token = store.request_confirmation(request.request_id, request.command_hash)
             store.approve(request.request_id, command_hash=request.command_hash,
-                          confirmation_token=token, reason=reason)
+                          confirmation_token=token)
     return True
 
 
-def play(text: str, *, high: str = "approve", reason: str = "", fmt: str = "",
-         imports: str = "") -> None:
+def play(text: str, *, high: str = "approve", fmt: str = "", imports: str = "") -> None:
     if store.get_run().started:
         store.new_assessment()
     store.start_run(text)
@@ -98,7 +97,7 @@ def play(text: str, *, high: str = "approve", reason: str = "", fmt: str = "",
         if step is None:
             break
         if step.kind == "gate" and store.waiting_gate() == step.name:
-            if not decide(step.name, high=high, reason=reason):
+            if not decide(step.name, high=high):
                 break
     if fmt and store.is_completed():
         store.generate_report(fmt)
@@ -144,23 +143,19 @@ def main() -> None:
     snapshots = []
     snapshots += session(datetime(2026, 9, 28, 9, 12, tzinfo=utc), [
         dict(text="Review the source repository git@git.example.com:shop/storefront.git "
-                  "for security issues.",
-             reason="Confirm the leaked credential is live on the test endpoint",
-             fmt="markdown"),
+                  "for security issues.", fmt="markdown"),
     ])
     snapshots += session(datetime(2026, 9, 30, 16, 5, tzinfo=utc), [
         dict(text="Test the REST API at https://api.example.com/v1 for security issues.",
-             reason="Check if token A can read token B's order", fmt="markdown"),
+             fmt="markdown"),
     ])
     snapshots += session(datetime(2026, 10, 3, 10, 15, tzinfo=utc), [
-        dict(text="Scan the network host 192.0.2.10 for exposed services.",
-             reason="One probe to confirm the console needs a login", fmt="json"),
+        dict(text="Scan the network host 192.0.2.10 for exposed services.", fmt="json"),
         dict(text="Test the REST API at https://api.example.com/v1 for security issues.",
              high="reject", imports=NUCLEI, gap=12),
     ])
     snapshots += session(datetime(2026, 10, 5, 14, 3, tzinfo=utc), [
-        dict(text="Assess https://staging.example.com for web security issues.",
-             reason="Confirm finding F-001 before the report", fmt="markdown",
+        dict(text="Assess https://staging.example.com for web security issues.", fmt="markdown",
              imports=NUCLEI.split("\n")[0]),
         dict(text="Review the source repository git@git.example.com:shop/storefront.git "
                   "for security issues.", high="wait", gap=6),

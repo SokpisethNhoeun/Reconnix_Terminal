@@ -153,18 +153,22 @@ async def test_export_command_offers_every_format(app):
         assert store.get_run().report_path.endswith(".sarif")
 
 
-async def test_web_button_without_a_running_dashboard_says_how(app, opened):
+async def test_web_button_without_a_running_dashboard_starts_it(app, opened, web_launches):
     async with app.run_test(size=SIZE) as pilot:
         await show(app, pilot, "report")
         app.screen.query_one("#web", Button).press()
         await settle(pilot)
-        assert opened == []
-        assert any("npm run dev" in str(n.message) for n in app._notifications)
+        assert len(web_launches) == 1                 # npm run dev, in the background
+        assert opened == []                           # the dashboard opens the browser itself
+        assert any("Starting the web dashboard" in str(n.message)
+                   for n in app._notifications)
 
 
-async def test_web_opens_the_running_dashboard(app, opened):
+async def test_web_opens_the_running_dashboard(app, opened, web_launches, monkeypatch):
+    from reconix import web_server
     from reconix.store import persist
 
+    monkeypatch.setattr(web_server, "is_listening", lambda url: True)
     persist.WEB_URL_FILE.write_text("http://127.0.0.1:3100/login#token=abc\n")
     async with app.run_test(size=SIZE) as pilot:
         app.run_command_line("/web")
@@ -173,7 +177,7 @@ async def test_web_opens_the_running_dashboard(app, opened):
         await show(app, pilot, "report")
         await pilot.press("b")
         await settle(pilot)
-        assert len(opened) == 2
+        assert len(opened) == 2 and web_launches == []
 
 
 async def test_web_refuses_a_link_that_is_not_local(app, opened):

@@ -49,8 +49,8 @@ Start ──► Template ──► Plan ──► Execution ⇄ Approval ──�
 | 1 | Start | — | logo, quickstart, prompt. A target starts the run (parser picks the template); other text gets the rule-based reply under the quickstart; Enter on empty = demo request |
 | 2 | **Template** | `template`, `scope` | pick one of 4 templates → type its target → the drafted **scope manifest** (JSON look) → Approve / Edit manifest (form) / Reject |
 | 3 | Plan | **`plan` (new)** | the template's plan: phases + the gated actions with exact commands and risk → "Run plan" |
-| 4 | Approval | `approval:<id>` | MEDIUM: Approve & run / Reject. HIGH: reason field + second confirmation. Opens mid-run when the run reaches the action |
-| 5 | Execution | `account` (modal) | plan tasks with live status, overall bar, live log (chat + activity merged), ^C stop |
+| 4 | Approval | `approval:<id>` | MEDIUM: Approve & run / Reject. HIGH: a double check (second confirmation; no reason, see `LOGIN_AND_HIGH_RISK_PLAN.md`). Opens mid-run when the run reaches the action |
+| 5 | Execution | `account`, `code` (modals) | plan tasks with live status, a spinner (no %), live log (chat + activity merged; see `LIVE_OUTPUT_PLAN.md`), ^C stop |
 | 6 | Findings | — | severity strip, filter / sort, table; `t` triage, `i` import |
 | 7 | Detail | — | evidence + analysis panels (CVSS, CWE/OWASP, remediation); `t` triage, `[`/`]` prev/next |
 | 8 | Report | — | executive summary, severity bars, key findings, changes since last run; export HTML / PDF / DOCX / JSON / more…; **Web dashboard** button |

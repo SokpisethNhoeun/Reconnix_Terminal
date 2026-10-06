@@ -4,7 +4,7 @@ from typing import List
 
 import pytest
 
-from reconix import browser, store
+from reconix import browser, store, web_server
 from reconix.app import ReconixApp
 from reconix.flow import RunController
 from reconix.store import persist, report
@@ -34,6 +34,38 @@ def opened(monkeypatch) -> List[str]:
     calls: List[str] = []
     monkeypatch.setattr(browser, "open_url", lambda url: calls.append(url) or True)
     monkeypatch.setattr(browser, "open_path", lambda path: calls.append(path) or True)
+    return calls
+
+
+class FakeDashboard:
+    """Stands in for the `npm run dev` process: running until stopped."""
+
+    def __init__(self) -> None:
+        self.stopped = False
+        self.pid = -1
+
+    def poll(self):
+        return 0 if self.stopped else None
+
+
+@pytest.fixture(autouse=True)
+def web_launches(monkeypatch) -> List[object]:
+    """Nothing a test does may start a real web dashboard: record what would have run.
+
+    Each started FakeDashboard is appended; "install" marks an `npm install`. The real
+    readiness check is kept (nothing listens, so it never looks ready unless a test says).
+    """
+    calls: List[object] = []
+
+    def start(data_dir, url_file):
+        calls.append(FakeDashboard())
+        return calls[-1]
+
+    monkeypatch.setattr(web_server, "install", lambda: calls.append("install") or True)
+    monkeypatch.setattr(web_server, "start", start)
+    monkeypatch.setattr(web_server, "stop", lambda process: setattr(process, "stopped", True))
+    monkeypatch.setattr(web_server, "problem", lambda: "")
+    monkeypatch.setattr(web_server, "needs_install", lambda: False)
     return calls
 
 
