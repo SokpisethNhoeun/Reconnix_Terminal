@@ -11,8 +11,9 @@ files you are pointed at). Do not edit files.
 
 ## Check, in this order
 
-1. **Correctness**: logic bugs, wrong navigation targets, off-by-one on list
-   selection, broken imports, missing `__init__.py` exports, unhandled worker errors.
+1. **Correctness**: logic bugs, a gate that can be skipped, dialogs that never
+   dismiss, off-by-one on table selection, broken imports, missing `__init__.py`
+   exports, unhandled worker or timer errors.
 2. **Project rules**:
    - No code dumped into one file; one screen per file, one concern per module.
    - Folder structure matches `CLAUDE.md`.
@@ -20,10 +21,10 @@ files you are pointed at). Do not edit files.
    - HIGH-risk actions go through the approval gate and are role-protected.
    - Reusable widgets and theme helpers used instead of duplicated markup.
    - A big feature has a plan (in the PR, commit message, or conversation).
-3. **Conventions**: subclasses `ReconixScreen`; uses `app.go_next/goto`; no data
-   literals in screens; no hard-coded hex colors; tokens in sync between
-   `theme.py` and `reconix.tcss`; help overlay and README updated for new keys;
-   Python 3.9 compatible.
+3. **Conventions**: dialogs subclass `DialogScreen` with a safe first focus; the run
+   moves only through `store.advance()`; no dialog opened from inside a dialog; no
+   data literals in screens or dialogs; no hex colors outside `theme.py`; help
+   overlay and README updated for new keys; Python 3.9 compatible.
 4. **Tests**: new behavior has tests; tests are deterministic.
 5. **Simplicity**: dead code, needless abstraction, duplicated logic.
 

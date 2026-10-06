@@ -1,0 +1,131 @@
+/* Dialogs over the dashboard (screens/dialogs). The frame's border color is set per
+   tone in Python (DialogScreen.TONE), so only sizes and spacing live here. */
+
+DialogScreen {
+    align: center middle;
+    background: $bg 70%;
+}
+
+#dialog-wrap {
+    width: auto;
+    height: auto;
+    max-height: 95%;
+}
+
+.dialog-frame {
+    width: 100;
+    max-width: 96vw;
+    height: auto;
+    max-height: 90vh;
+    background: $surface;
+    padding: 1 2 0 2;
+}
+
+.dialog-note {
+    height: auto;
+    margin-bottom: 1;
+}
+
+.dialog-grid {
+    height: auto;
+    margin-bottom: 1;
+}
+
+.dialog-actions {
+    height: auto;
+    margin: 0 0 1 0;
+}
+
+.dialog-status {
+    width: 1fr;
+    height: 1;
+    content-align: right middle;
+    text-align: right;
+}
+
+.field-label {
+    color: $muted;
+    margin-top: 0;
+}
+
+.field-label.-warn { color: $medium; }
+
+.field-hint {
+    height: 1;
+    color: $dim;
+}
+
+.dialog-frame Input { margin-bottom: 1; }
+
+.dialog-frame ChoiceMenu,
+.dialog-frame ChoiceMenu > .option-list--option-highlighted,
+.dialog-frame ChoiceMenu:focus > .option-list--option-highlighted {
+    background: $surface;
+}
+
+.dialog-frame ChoiceMenu { margin-bottom: 1; }
+
+/* --------------------------------------------------------------- sizes */
+TemplateDialog .dialog-frame       { width: 92; }
+ScopeManifestDialog .dialog-frame  { width: 96; }
+ScopeEditDialog .dialog-frame      { width: 88; }
+SecureInputDialog .dialog-frame    { width: 76; }
+TargetDialog .dialog-frame         { width: 80; }
+ApprovalDialog .dialog-frame       { width: 100; }
+FindingsDialog .dialog-frame       { width: 124; }
+ReportDialog .dialog-frame         { width: 104; }
+SummaryDialog .dialog-frame        { width: 108; }
+ActivityDialog .dialog-frame       { width: 110; }
+AssessmentsDialog .dialog-frame    { width: 110; }
+ImportDialog .dialog-frame         { width: 84; }
+
+/* ------------------------------------------------------------ findings */
+FindingsDialog DataTable {
+    margin-bottom: 1;
+    background: $surface;
+}
+
+.finding-detail {
+    height: auto;
+    background: $surface;
+    padding: 1 1 0 1;
+    margin-bottom: 1;
+}
+
+/* -------------------------------------------------------------- report */
+#formats {
+    height: auto;
+    margin-bottom: 1;
+}
+
+.report-progress {
+    height: 1;
+    margin-bottom: 1;
+}
+
+.report-sections {
+    height: auto;
+    margin-bottom: 1;
+}
+
+/* ------------------------------------------------------------- summary */
+.summary-logo, .summary-flow, .summary-tagline {
+    width: 100%;
+    height: 1;
+    text-align: center;
+}
+
+.summary-logo    { margin-bottom: 1; }
+.summary-flow    { margin-top: 1; }
+.summary-tagline { margin-top: 1; }
+
+/* ------------------------------------------------------------ activity */
+ActivityDialog .dialog-body {
+    max-height: 70vh;
+}
+
+
+/* The summary is the closing card: the dashboard fades almost out behind it. */
+SummaryDialog { background: $bg 92%; }
+SummaryDialog #dialog-wrap { width: 108; max-width: 96vw; }
+SummaryDialog .dialog-frame { width: 100%; }

@@ -25,7 +25,7 @@ class CommandBarScreen(ModalScreen[Optional[str]]):
         with Vertical(id="command-bar"):
             yield PromptBox(
                 COMMANDS, store.list_history, initial="/", escape_clears=False,
-                placeholder="Type a command, e.g. /plan", id="command-box",
+                placeholder="Type a command, e.g. /findings", id="command-box",
             )
 
     def on_mount(self) -> None:

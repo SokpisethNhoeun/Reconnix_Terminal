@@ -14,24 +14,26 @@ targets, so you review strictly. Read `CLAUDE.md` first. Do not edit files.
 **Scope and authorization**
 - Targets, ports, URL patterns, HTTP methods, and tools are checked against the
   scope manifest **on the backend**, not only in the UI.
-- Out-of-scope and excluded paths can never be reached through a UI shortcut,
-  jump binding (`1…8`), or edit-params flow.
+- Out-of-scope and excluded paths can never be reached through a UI shortcut or
+  the scope-edit flow; every proposed request goes through `store.check_request()`
+  and nothing in Testing plays before `store.approve_scope()`.
 
-**Approval gate**
-- HIGH-risk steps cannot run without the second confirmation:
-  `store.request_confirmation()` issues a single-use token and `store.approve()`
-  must consume it (with a backend: two calls, both verified server-side).
-- Approval is bound to the specific command (command hash) and verified
-  server-side. Editing parameters after approval invalidates it.
-- The confirmation dialog defaults to the safe choice and has no letter or number
-  shortcuts, so repeated or held keys cannot approve.
-- Free text typed at a question ("Type something.") is stored as feedback only;
-  it must never approve, run, or change scope by itself.
-- Navigation (`→`, `Enter`, `/status`, `goto`) cannot skip past an unapproved gate
-  into execution (`app.can_enter_execution()`).
-- The demo shortcut (free `1…8` jumps to Execution) is confined to mock mode. In
-  the current demo it is known and accepted; flag it only if it is reachable when
-  a real backend is configured.
+**Approval gates**
+- The run moves only through `store.advance()`, which waits at each gate until the
+  store has recorded the decision; no key, command or dialog path can skip one.
+- HIGH-risk actions need a single-use token from `store.request_confirmation()`,
+  the exact phrase and a reason, all checked by `store.approve()` (with a backend:
+  verified server-side). Decisions are accepted only while the run waits on that
+  request, and only once.
+- Approval is bound to the specific request (command hash).
+- Approval dialogs open on Reject (HIGH on the phrase field) and have no letter or
+  number shortcuts, so repeated or held keys cannot approve. Esc decides nothing.
+- Free text (scope edit notes, chat messages) is recorded only; it must never
+  approve, run, or change scope by itself.
+
+**Secrets**
+- The test account is write-only in the vault; the password must never reach the
+  chat, activity log, audit events, findings, reports, `repr()` or exceptions.
 
 **Roles and auth**
 - Actions are hidden or disabled for roles that cannot perform them, and the

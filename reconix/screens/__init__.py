@@ -1,17 +1,8 @@
-from .start import StartScreen
-from .scope import ScopeScreen
-from .plan import PlanScreen
-from .approval import ApprovalScreen
-from .execution import ExecutionScreen
-from .findings_list import FindingsListScreen
-from .finding_detail import FindingDetailScreen
-from .report import ReportScreen
-from .help import HelpScreen
+"""The dashboard, its dialogs, and the shared overlays (choices, command bar, help)."""
+
 from .choice import ChoiceScreen
 from .command_bar import CommandBarScreen
+from .dashboard import DashboardScreen
+from .help import HelpScreen
 
-__all__ = [
-    "StartScreen", "ScopeScreen", "PlanScreen", "ApprovalScreen",
-    "ExecutionScreen", "FindingsListScreen", "FindingDetailScreen",
-    "ReportScreen", "HelpScreen", "ChoiceScreen", "CommandBarScreen",
-]
+__all__ = ["DashboardScreen", "HelpScreen", "ChoiceScreen", "CommandBarScreen"]

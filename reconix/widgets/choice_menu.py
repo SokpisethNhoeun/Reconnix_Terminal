@@ -3,7 +3,6 @@
 from typing import Any, List, Optional, Sequence, Tuple
 
 from rich.text import Text
-from textual import events
 from textual.binding import Binding
 from textual.message import Message
 from textual.widgets import OptionList
@@ -24,15 +23,13 @@ def menu_hint(esc: str = "cancel", *extra: str) -> str:
 class ChoiceMenu(OptionList):
     """A list of Choices drawn like Claude Code's questions.
 
-        ❯ 1. Approve (Recommended)
-             Accept the change and continue.
-          2. Reject
-          3. Type something.
-        ─────────────────────
-          4. Chat about this
+        ❯ 1. 001  Broken object-level authorization
+             HIGH
+          2. 002  Reflected input in search page
+             MEDIUM
 
-    Posts `Chosen` when a choice is picked and `Typed` when free text is sent from
-    an input row. Prompts are Rich Text, so labels are never parsed as markup.
+    Posts `Chosen` when a choice is picked. Prompts are Rich Text, so labels are
+    never parsed as markup.
     """
 
     COMPACT = False                 # one line per choice (used by the slash menu)
@@ -51,16 +48,6 @@ class ChoiceMenu(OptionList):
         def control(self) -> "ChoiceMenu":
             return self.menu
 
-    class Typed(Message):
-        def __init__(self, menu: "ChoiceMenu", text: str) -> None:
-            super().__init__()
-            self.menu = menu
-            self.text = text
-
-        @property
-        def control(self) -> "ChoiceMenu":
-            return self.menu
-
     def __init__(
         self, choices: Sequence[Choice] = (), *, default: int = 0,
         numbered: Optional[bool] = None,
@@ -70,14 +57,12 @@ class ChoiceMenu(OptionList):
         self._default = default
         self._numbered = self.NUMBERED if numbered is None else numbered
         self._pointer: Optional[int] = None
-        self._draft = ""                # text typed into the input row
         super().__init__(*self._build_options(), id=id, classes=classes)
 
     # --- public API -----------------------------------------------------------------
     def set_choices(self, choices: Sequence[Choice]) -> None:
         self._choices = list(choices)
         self._pointer = None
-        self._draft = ""
         self.set_options(self._build_options())   # resets `highlighted` to None
         first = self._first_enabled(0)
         if first is not None:
@@ -110,16 +95,8 @@ class ChoiceMenu(OptionList):
 
     def _activate(self, index: int) -> None:
         choice = self._choices[index]
-        if choice.disabled:          # also guards the screen's Enter fallback
-            return
-        if choice.kind != "input":
+        if not choice.disabled:      # also guards the screen's Enter fallback
             self.post_message(self.Chosen(self, choice.id))
-            return
-        text = self._draft.strip()
-        if text:
-            self._draft = ""
-            self._move_pointer(index)
-            self.post_message(self.Typed(self, text))
 
     def check_action(self, action: str, parameters: Tuple[Any, ...]) -> Optional[bool]:
         if action == "pick":
@@ -134,8 +111,7 @@ class ChoiceMenu(OptionList):
             self.app.bell()
             return
         self.highlighted = index
-        if self._choices[index].kind != "input":   # the input row just takes the cursor
-            self._activate(index)
+        self._activate(index)
 
     # --- rendering --------------------------------------------------------------------
     def _build_options(self) -> List[Optional[Option]]:
@@ -154,9 +130,18 @@ class ChoiceMenu(OptionList):
         line.append(f"{POINTER} " if highlighted else "  ",
                     style=f"bold {theme.CYAN if active else theme.DIM}")
         if self.COMPACT:
+            if choice.disabled:                     # dead end: visible but not pickable
+                line.append(choice.label, style=theme.DIM)
+                if choice.hint:
+                    line.append(f"  {choice.hint}", style=theme.DIM)
+                line.append("  (not in demo)", style=f"italic {theme.DIM}")
+                return line
             line.append(choice.label, style=f"bold {accent}" if highlighted else theme.TEXT)
             if choice.hint:
-                line.append(f"  {choice.hint}", style=theme.DIM)
+                line.append(f"  {choice.hint}", style=theme.MUTED if highlighted else theme.DIM)
+            if choice.tag:
+                line.append("  ")
+                line.append_text(theme.chip(choice.tag, "cyan"))
             return line
         number = f"{index + 1}. " if self._numbered else ""
         if choice.disabled:                         # dead end: visible but not pickable
@@ -164,14 +149,6 @@ class ChoiceMenu(OptionList):
             line.append("  (not in demo)", style=f"italic {theme.DIM}")
             return line
         line.append(number, style=accent if highlighted else theme.DIM)
-        if choice.kind == "input":
-            if self._draft:
-                line.append(self._draft, style=theme.TEXT)
-            else:
-                line.append(choice.label, style=theme.MUTED)
-            if active:
-                line.append("▏", style=theme.CYAN)
-            return line
         label = choice.label + (" (Recommended)" if choice.recommended else "")
         if highlighted:
             line.append(label, style=f"bold {accent}")
@@ -204,30 +181,20 @@ class ChoiceMenu(OptionList):
     def on_blur(self) -> None:
         self.call_later(self._move_pointer, self.highlighted)
 
-    def _on_key(self, event: events.Key) -> None:
-        # On the input row, keys type text instead of reaching menu or screen shortcuts.
-        choice = self._highlighted_choice()
-        if choice is None or choice.kind != "input":
-            return
-        if event.is_printable and event.character:
-            self._draft += event.character
-        elif event.key == "backspace" and self._draft:
-            self._draft = self._draft[:-1]
-        elif event.key == "escape" and self._draft:
-            self._draft = ""
-        else:
-            return
-        event.stop()
-        event.prevent_default()
-        self._move_pointer(self.highlighted)
-
     def _on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         event.stop()
         self._move_pointer(event.option_index)
 
     def _on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        event.stop()   # screens listen for Chosen / Typed, never the raw OptionList message
+        event.stop()   # screens listen for Chosen, never the raw OptionList message
         self._activate(event.option_index)
+
+
+class CompactMenu(ChoiceMenu):
+    """One line per choice, no numbers, takes focus (e.g. the template picker)."""
+
+    COMPACT = True
+    NUMBERED = False
 
 
 class SuggestionMenu(ChoiceMenu, can_focus=False):

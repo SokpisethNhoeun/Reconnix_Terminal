@@ -1,118 +1,70 @@
-"""The Start prompt: slash suggestions, completion, history, help."""
+"""The prompt: slash suggestions, history, help, and the command bar."""
 
-from reconix import store
-from reconix.commands import COMMANDS
-from reconix.screens import ChoiceScreen, FindingsListScreen, HelpScreen, ScopeScreen, StartScreen
-from reconix.store.seed import USER_REQUEST
+from reconix.screens import ChoiceScreen, CommandBarScreen, DashboardScreen, HelpScreen
+from reconix.screens.dialogs import ActivityDialog, FindingsDialog
 from reconix.widgets import PromptBox
 
-from .support import SIZE
+from .support import SIZE, run_ui_to
 
 
-def box(app) -> PromptBox:
-    return app.screen.query_one(PromptBox)
-
-
-async def test_slash_opens_every_command(app):
+async def test_slash_lists_every_command_above_the_input(app):
     async with app.run_test(size=SIZE) as pilot:
+        box = app.screen.query_one(PromptBox)
+        before = box.input.region
         await pilot.press("slash")
         await pilot.pause()
-        assert box(app).menu_open
-        assert box(app).menu.option_count == len(COMMANDS)
+        assert box.menu_open
+        assert box.input.region == before            # suggestions float; the input stays put
 
 
-async def test_suggestions_open_above_the_input_without_moving_it(app):
+async def test_typing_filters_and_enter_runs_the_highlight(app):
     async with app.run_test(size=SIZE) as pilot:
-        before = box(app).input.region
-        await pilot.press("slash")
+        box = app.screen.query_one(PromptBox)
+        await pilot.press("slash", "a", "c")
         await pilot.pause()
-        assert box(app).input.region == before
-        assert box(app).menu.region.bottom == before.y      # the list sits right on top of the input
-
-
-async def test_typing_filters_and_arrows_move(app):
-    async with app.run_test(size=SIZE) as pilot:
-        await pilot.press("slash", "f", "i")
-        await pilot.pause()
-        menu = box(app).menu
-        assert menu.option_count == 2
-        assert menu.highlighted_id == "findings"
-        await pilot.press("down")
-        assert menu.highlighted_id == "finding"
-        await pilot.press("up")
-        assert menu.highlighted_id == "findings"
-
-
-async def test_enter_runs_the_highlighted_command(app):
-    async with app.run_test(size=SIZE) as pilot:
-        await pilot.press("slash", "f", "i", "enter")
-        await pilot.pause()
-        assert isinstance(app.screen, FindingsListScreen)
-        assert store.list_history()[-1] == "/findings"
-
-
-async def test_esc_closes_the_menu_then_clears_the_text(app):
-    async with app.run_test(size=SIZE) as pilot:
-        await pilot.press("slash", "p", "l")
-        await pilot.pause()
-        await pilot.press("escape")
-        await pilot.pause()
-        assert not box(app).menu_open
-        assert box(app).input.value == "/pl"
-        await pilot.press("escape")
-        await pilot.pause()
-        assert box(app).input.value == ""
-        assert isinstance(app.screen, StartScreen)
-
-
-async def test_tab_completes_and_enter_asks_for_the_argument(app):
-    async with app.run_test(size=SIZE) as pilot:
-        await pilot.press("slash", "e", "x", "p", "tab")
-        await pilot.pause()
-        assert box(app).input.value == "/export "
-        assert not box(app).menu_open
+        assert box.menu.highlighted_id == "activity"
         await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, ActivityDialog)
+
+
+async def test_tab_completes_the_highlighted_command(app):
+    async with app.run_test(size=SIZE) as pilot:
+        box = app.screen.query_one(PromptBox)
+        await pilot.press("slash", "s", "u", "tab")
+        await pilot.pause()
+        assert box.input.value == "/summary"
+        assert not box.menu_open
+
+
+async def test_a_command_with_choices_asks_when_no_argument_is_given(app):
+    async with app.run_test(size=SIZE) as pilot:
+        await run_ui_to(app, pilot, None)
+        assert app.run_command_line("/finding")
         await pilot.pause()
         assert isinstance(app.screen, ChoiceScreen)
-        await pilot.press("down", "down", "enter")          # PDF, DOCX, JSON
-        await pilot.pause()
-        assert isinstance(app.screen, StartScreen)
-        assert [(e.kind, e.detail) for e in store.list_events()] == [
-            ("report.export_requested", "JSON"),
-        ]
-
-
-async def test_up_recalls_history_without_opening_the_menu(app):
-    store.add_history("/plan")
-    async with app.run_test(size=SIZE) as pilot:
-        await pilot.press("up")
-        await pilot.pause()
-        assert box(app).input.value == "/plan"
-        assert not box(app).menu_open
-        await pilot.press("up")
-        assert box(app).input.value == USER_REQUEST
-        await pilot.press("down", "down")
-        assert box(app).input.value == ""
-
-
-async def test_a_request_with_brackets_is_stored_and_shown(app):
-    async with app.run_test(size=SIZE) as pilot:
-        box(app).input.value = "scan [TARGET] now"
         await pilot.press("enter")
         await pilot.pause()
-        assert isinstance(app.screen, ScopeScreen)
-        assert store.latest_request().text == "scan [TARGET] now"
-        assert store.list_history()[-1] == "scan [TARGET] now"
-        assert "scan [TARGET] now" in str(app.screen.query_one(".user-msg").render())
+        assert isinstance(app.screen, FindingsDialog)
 
 
-async def test_rejected_request_keeps_the_text(app):
+async def test_unknown_command_keeps_the_text(app):
     async with app.run_test(size=SIZE) as pilot:
-        box(app).input.value = "x" * 501
+        box = app.screen.query_one(PromptBox)
+        box.input.value = "/nope"
         await pilot.press("enter")
         await pilot.pause()
-        assert isinstance(app.screen, StartScreen)
-        assert box(app).input.value == "x" * 501
+        assert box.input.value == "/nope"
+        assert isinstance(app.screen, DashboardScreen)
+
+
+async def test_up_recalls_the_demo_request(app):
+    async with app.run_test(size=SIZE) as pilot:
+        box = app.screen.query_one(PromptBox)
+        await pilot.press("up")
+        await pilot.pause()
+        assert "staging.example.com" in box.input.value
+        assert not box.menu_open
 
 
 async def test_question_mark_opens_help_only_on_an_empty_prompt(app):
@@ -121,17 +73,20 @@ async def test_question_mark_opens_help_only_on_an_empty_prompt(app):
         await pilot.pause()
         assert isinstance(app.screen, HelpScreen)
         await pilot.press("escape")
+        box = app.screen.query_one(PromptBox)
+        box.input.value = "why"
+        await pilot.press("question_mark")
         await pilot.pause()
-        await pilot.press("a", "question_mark")
-        await pilot.pause()
-        assert box(app).input.value == "a?"
+        assert box.input.value == "why?"
 
 
-async def test_unknown_command_keeps_the_text(app):
+async def test_the_command_bar_opens_from_a_panel(app):
     async with app.run_test(size=SIZE) as pilot:
-        box(app).input.value = "/nope"
+        await pilot.press("tab")                     # focus leaves the prompt
         await pilot.pause()
-        await pilot.press("enter")
+        await pilot.press("slash")
         await pilot.pause()
-        assert isinstance(app.screen, StartScreen)
-        assert box(app).input.value == "/nope"
+        assert isinstance(app.screen, CommandBarScreen)
+        await pilot.press("f", "i", "n", "d", "i", "n", "g", "s", "enter")
+        await pilot.pause()
+        assert isinstance(app.screen, FindingsDialog)

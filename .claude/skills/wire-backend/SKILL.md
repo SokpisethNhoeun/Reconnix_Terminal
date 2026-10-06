@@ -5,13 +5,15 @@ description: Procedure for replacing one in-memory store resource (reconix/store
 
 # Wire one data source to the backend
 
-Do one resource at a time (scope, plan, approval, execution, findings, report).
+Do one resource at a time (run events, scope, approvals, vault, findings, report).
+The run is the special one: `store.advance()` becomes the server's event stream
+(SSE or WebSocket) and `flow/controller.py` keeps playing it step by step.
 
 ## 1. Plan
 Write down, before coding:
 - Endpoint, method, auth requirement, and the role(s) allowed.
 - Request and response JSON shape, and the model it maps to.
-- Which screens consume it, and what they show while loading or on error.
+- Which widgets or dialogs consume it, and what they show while loading or on error.
 - Which validation the backend performs (the UI never replaces it).
 
 ## 2. Layers (create if missing)
@@ -33,8 +35,9 @@ from textual import work
 from ..api.errors import ApiError, ForbiddenError
 from ..store import findings as findings_store
 
-class FindingsListScreen(ReconixScreen):
+class FindingsDialog(DialogScreen):
     def on_mount(self) -> None:
+        super().on_mount()
         self.load_findings()
 
     @work(exclusive=True)
@@ -51,11 +54,12 @@ class FindingsListScreen(ReconixScreen):
 ```
 
 ## 4. Security rules
-- Approval: two calls. Request a confirmation (returns a single-use token), then
-  POST the command hash **and** the token; the backend verifies both and the
-  caller's role. Never mark a step approved locally.
-- Execution starts only from a backend response confirming approval and scope.
-- Escape backend and tool strings (`rich.markup.escape`) before rendering them as markup.
+- Approval: two calls for HIGH. Request a confirmation (returns a single-use token),
+  then POST the command hash, the token, the phrase and the reason; the backend
+  verifies all of them and the caller's role. Never mark an action approved locally.
+- The run continues past a gate only when the backend says the decision is recorded.
+- The test account goes to the backend vault; never keep, log or display the password.
+- Build backend and tool strings as `rich.text.Text`, never markup.
 - Never log or display tokens.
 
 ## 5. Finish

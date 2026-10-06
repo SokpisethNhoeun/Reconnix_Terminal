@@ -1,3 +1,5 @@
 -r requirements.txt
 pytest>=8
 pytest-asyncio>=0.23
+python-docx>=1.1        # optional DOCX report export (pure Python)
+# weasyprint>=61         # optional one-click PDF export (needs system libs: pango, cairo)

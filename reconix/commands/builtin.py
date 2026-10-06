@@ -1,6 +1,6 @@
 """The built-in slash commands. Handlers only call ReconixApp methods."""
 
-from typing import TYPE_CHECKING, Callable, List, Optional
+from typing import TYPE_CHECKING, List
 
 from .. import store
 from ..models import Choice
@@ -12,43 +12,34 @@ if TYPE_CHECKING:
 
 # --- argument choices ----------------------------------------------------------
 def _finding_choices(app: "ReconixApp") -> List[Choice]:
-    return [Choice(f.fid.lower(), f"{f.fid}  {f.title}", f.severity) for f in store.list_findings()]
+    return [Choice(f.fid, f"{f.fid}  {f.title}", f.severity) for f in store.list_findings()]
 
 
-def _export_choices(app: "ReconixApp") -> List[Choice]:
-    return [
-        Choice("pdf", "PDF", "printable report"),
-        Choice("docx", "DOCX", "editable document"),
-        Choice("json", "JSON", "machine-readable findings"),
-    ]
-
-
-# --- handlers --------------------------------------------------------------------
-def _goto(name: str) -> Callable[["ReconixApp", Optional[str]], None]:
-    def run(app: "ReconixApp", arg: Optional[str]) -> None:
-        app.goto(name)
-    return run
-
-
-def _open_finding(app: "ReconixApp", fid: Optional[str]) -> None:
-    ids = [f.fid.lower() for f in store.list_findings()]
-    app.open_finding(ids.index(fid or ""))
+def _template_choices(app: "ReconixApp") -> List[Choice]:
+    return [Choice(t.id, t.name, t.description, disabled=not t.available)
+            for t in store.list_templates()]
 
 
 COMMANDS = (
-    Command("help", "Show shortcuts for this screen", lambda app, arg: app.action_help()),
-    Command("new", "Back to the start prompt", _goto("start"), aliases=("start",)),
-    Command("scope", "Review the scope manifest", _goto("scope")),
-    Command("plan", "Review the test plan", _goto("plan")),
-    Command("approval", "Open the approval gate", _goto("approval")),
-    Command("status", "Live execution (after approval)",
-            lambda app, arg: app.open_execution(), aliases=("execution",)),
-    Command("findings", "List all findings", _goto("findings")),
-    Command("finding", "Open one finding…", _open_finding,
-            choices=_finding_choices, question="Which finding?"),
-    Command("report", "Open the assessment report", _goto("report")),
-    Command("audit", "Show the audit trail", lambda app, arg: app.show_audit()),
-    Command("export", "Export the report…", lambda app, fmt: app.export_report((fmt or "").upper()),
-            choices=_export_choices, question="Export the report as…"),
+    Command("help", "Show the keys", lambda app, arg: app.action_help()),
+    Command("findings", "List the findings (F2)", lambda app, arg: app.open_findings()),
+    Command("finding", "Open one finding…", lambda app, fid: app.open_findings(fid),
+            choices=_finding_choices, question="Which finding?",
+            empty="No findings yet. They appear as testing finds them."),
+    Command("template", "Pick a template, then type its target",
+            lambda app, tid: app.open_template(tid), choices=_template_choices,
+            question="Which kind of target?", aliases=("templates",)),
+    Command("activity", "Activity log and audit trail (F4)",
+            lambda app, arg: app.open_activity(), aliases=("audit", "log")),
+    Command("report", "Generate the report (F5)", lambda app, arg: app.open_report(),
+            aliases=("export",)),
+    Command("summary", "Show the assessment summary", lambda app, arg: app.open_summary()),
+    Command("assessments", "List and reopen assessments (F6)",
+            lambda app, arg: app.open_assessments(), aliases=("list",)),
+    Command("import", "Import tool output (nuclei/nmap/ZAP)", lambda app, arg: app.open_import()),
+    Command("web", "Open the web dashboard in your browser",
+            lambda app, arg: app.open_web_dashboard(), aliases=("dashboard",)),
+    Command("new", "Start a new assessment (optionally on a target)",
+            lambda app, arg: app.new_assessment(arg), aliases=("start",)),
     Command("quit", "Quit Reconix", lambda app, arg: app.exit(), aliases=("exit",)),
 )

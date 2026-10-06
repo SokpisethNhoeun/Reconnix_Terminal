@@ -35,8 +35,11 @@ reconix/
 - **Approval must be bound to the exact command.** Mirror the store's two calls:
   request a confirmation (the backend returns a single-use token), then send the
   command hash and that token; the backend verifies both.
-- Keep models compatible with the existing `PlanStep` / `Finding` fields so
-  screens need no changes, or update every consumer in the same change.
+- Keep models compatible with the existing `RunStep` / `ApprovalRequest` / `Finding`
+  fields so widgets and dialogs need no changes, or update every consumer in the same change.
+- `store.advance()` maps to the backend's run event stream; the gate functions
+  (`select_template`, `approve_scope`, `provide_auth`, `approve`, `reject`) map to
+  the endpoints that record decisions.
 - Do network I/O in Textual workers (`@work(exclusive=True)` or
   `run_worker`), never in `compose()`. Show a loading state and handle failure.
 - Secrets come from env vars or a config file outside the repo. Never log tokens.

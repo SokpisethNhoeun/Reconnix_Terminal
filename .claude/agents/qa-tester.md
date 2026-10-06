@@ -13,17 +13,19 @@ You are a QA engineer for the Reconix TUI. Read `CLAUDE.md` first, then use the
 1. **Set up the harness if it is missing**: `tests/` folder, `tests/conftest.py`,
    `pytest` + `pytest-asyncio` in a `requirements-dev.txt`, and
    `asyncio_mode = "auto"` under `[tool.pytest.ini_options]` in `pyproject.toml`.
-2. **Organize tests by area**, one file per concern:
-   `tests/test_navigation.py`, `tests/screens/test_<screen>.py`,
-   `tests/test_theme.py`, `tests/store/test_<resource>.py`.
+2. **Organize tests by area**, one file per concern (see the `write-tui-test` skill
+   for the current files): store rules, the dashboard, gate dialogs, other dialogs,
+   the prompt and commands.
 3. **Cover what matters most:**
-   - Flow navigation: `→`/`←`, `Enter`, `Esc`, number jumps, bounds at both ends.
-   - The approval gate: Approve opens a second confirmation that defaults to
-     "No"; repeated keys never approve; Down+Enter approves; `n`/`Esc` reject;
-     `→` waits for approval.
+   - The run: it stops at every gate, Esc means "decide later", Enter on the empty
+     prompt reopens the gate, Reject stops the run.
+   - The gates: scope opens on Edit; approvals open on Reject; HIGH Approve stays
+     disabled until phrase + reason; closing HIGH voids its token; the password
+     never appears anywhere.
    - Menus and the prompt: `/` suggestions filter, ↑/↓ move, Tab completes,
      Esc closes, history recall, and the input never moves.
-   - Findings selection: the selected row opens the matching detail.
+   - Findings selection: the highlighted row drives the detail panel.
+   - Reports: only after completion, only available formats, written to REPORTS_DIR.
    - Theme helpers: every severity and status maps to a token.
    - Services (once they exist): 401/403/422 and network errors are surfaced, not swallowed.
 4. Mock the backend at the service or `httpx` layer (`respx` or monkeypatch).

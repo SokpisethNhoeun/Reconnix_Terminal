@@ -1,120 +1,83 @@
 """Reconix TUI — main application.
 
-An interactive, keyboard-first demo of the Reconix security-testing flow, built
-with Textual. Data lives in the in-memory store (reconix/store). Navigate the flow with
-the arrow keys and Enter, type `/` for commands, and press `?` for the keys of the
-current screen.
+A keyboard-first demo of the Reconix security-testing flow, built with Textual. One
+dashboard shows the assistant, the assessment status and the activity log; each step
+that needs a human opens as a dialog over it. Data lives in the in-memory store
+(reconix/store). Type `/` for commands and press `?` for the keys.
 """
 
-from typing import Callable, List, Optional
+import shutil
+import subprocess
+import sys
+import webbrowser
+from typing import Dict, Optional
 
 from textual.app import App
 from textual.binding import Binding
 
 from . import store, theme
 from .commands import COMMANDS, Command, find, parse
-from .models import Choice
-from .screens import (
-    StartScreen, ScopeScreen, PlanScreen, ApprovalScreen, ExecutionScreen,
-    FindingsListScreen, FindingDetailScreen, ReportScreen, HelpScreen,
-    ChoiceScreen, CommandBarScreen,
-)
-from .screens.choice import details_body
+from .screens import ChoiceScreen, CommandBarScreen, DashboardScreen, HelpScreen
+from .screens.dialogs import AssessmentsDialog, TargetDialog
 
-# Ordered flow — left/right arrows and Enter walk through this sequence.
-FLOW = [
-    ("start",     StartScreen),
-    ("scope",     ScopeScreen),
-    ("plan",      PlanScreen),
-    ("approval",  ApprovalScreen),
-    ("execution", ExecutionScreen),
-    ("findings",  FindingsListScreen),
-    ("detail",    FindingDetailScreen),
-    ("report",    ReportScreen),
-]
-FLOW_ORDER = [name for name, _ in FLOW]
-FLOW_CLASSES = {name: cls for name, cls in FLOW}
+
+def _open_url(url: str) -> bool:
+    """Open a URL in the operator's browser without disturbing the terminal UI.
+
+    The desktop opener is launched detached with its output silenced (a browser that logs
+    to the terminal would scribble over the TUI); `webbrowser` is the fallback.
+    """
+    opener = {"linux": "xdg-open", "darwin": "open"}.get(sys.platform)
+    if opener and shutil.which(opener):
+        try:
+            subprocess.Popen([opener, url], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, start_new_session=True)
+            return True
+        except OSError:
+            pass
+    try:
+        return webbrowser.open(url)
+    except (OSError, webbrowser.Error):
+        return False
 
 
 class ReconixApp(App):
     """Reconix — AI-Powered Security Testing Assistant (demo)."""
 
-    CSS_PATH = "reconix.tcss"
+    CSS_PATH = ["styles/base.tcss", "styles/dashboard.tcss", "styles/dialogs.tcss"]
     TITLE = "reconix"
-    SUB_TITLE = "assessment-001"
     ENABLE_COMMAND_PALETTE = False   # Reconix has its own "/" command system
-    THINKING_SECONDS = 1.2           # Claude-style spinner after a request; 0 skips it
 
     BINDINGS = [
-        Binding("right", "nav_next", "next", show=False),
-        Binding("left", "nav_prev", "back", show=False),
         # "/" stays non-priority so a focused Input still receives it as text.
         Binding("slash", "command_bar", "commands", key_display="/"),
         Binding("question_mark", "help", "help", key_display="?"),
         Binding("ctrl+q", "quit", "quit"),
-        # Quick jumps for presenting — hidden to keep the footer clean.
-        Binding("1", "jump('start')", "start", show=False),
-        Binding("2", "jump('scope')", "scope", show=False),
-        Binding("3", "jump('plan')", "plan", show=False),
-        Binding("4", "jump('approval')", "approval", show=False),
-        Binding("5", "jump('execution')", "execution", show=False),
-        Binding("6", "jump('findings')", "findings", show=False),
-        Binding("7", "jump('detail')", "detail", show=False),
-        Binding("8", "jump('report')", "report", show=False),
     ]
 
     def __init__(self) -> None:
         super().__init__()
-        self.selected_finding: int = 0   # index into store.list_findings()
-        self.pending_prompt: str = ""    # draft for the Start prompt ("Chat about this")
-        self.findings_filter: str = "all"       # Findings list view (kept across screens)
-        self.findings_sort: str = "severity"
-        self.sub_title = store.get_assessment().assessment_id
-        self._index: int = 0             # position in FLOW_ORDER
+        self._dashboard: Optional[DashboardScreen] = None
+
+    def get_css_variables(self) -> Dict[str, str]:
+        # The stylesheets' $variables come from theme.py, the one place colors are defined.
+        return {**super().get_css_variables(), **theme.CSS_TOKENS}
 
     def on_mount(self) -> None:
-        self.push_screen(StartScreen())
+        self._dashboard = DashboardScreen()
+        self.push_screen(self._dashboard)
 
-    # --- flow navigation ------------------------------------------------------
-    def flow_order(self) -> List[str]:
-        """Screen keys in flow order (the one source of truth is FLOW)."""
-        return list(FLOW_ORDER)
+    def on_unmount(self) -> None:
+        # Quitting ends the session: mark the saved copies so the web dashboard shows
+        # an unfinished run as interrupted rather than still waiting.
+        store.close_session()
 
-    def _show(self, index: int) -> None:
-        index = max(0, min(index, len(FLOW_ORDER) - 1))
-        name = FLOW_ORDER[index]
-        if name == "execution" and not self.can_enter_execution():
-            # The one hard gate: execution is never reachable (even by a jump) unapproved.
-            self.notify("Execution starts only after you approve the step.", severity="warning")
-            return
-        self._index = index
-        self.switch_screen(FLOW_CLASSES[name]())
+    @property
+    def dashboard(self) -> DashboardScreen:
+        assert self._dashboard is not None, "the dashboard is pushed on mount"
+        return self._dashboard
 
-    def go_next(self) -> None:
-        if FLOW_ORDER[self._index] == "approval" and not self.can_enter_execution():
-            self.notify("Approve the step first: choose Approve & run.", severity="warning")
-            return
-        if self._index < len(FLOW_ORDER) - 1:
-            self._show(self._index + 1)
-
-    def go_prev(self) -> None:
-        if self._index > 0:
-            self._show(self._index - 1)
-
-    def goto(self, name: str) -> None:
-        if name in FLOW_ORDER:
-            self._show(FLOW_ORDER.index(name))
-
-    # --- actions --------------------------------------------------------------
-    def action_nav_next(self) -> None:
-        self.go_next()
-
-    def action_nav_prev(self) -> None:
-        self.go_prev()
-
-    def action_jump(self, name: str) -> None:
-        self.goto(name)
-
+    # --- global keys -------------------------------------------------------------------------
     def action_help(self) -> None:
         if isinstance(self.screen, HelpScreen):
             self.pop_screen()
@@ -122,17 +85,20 @@ class ReconixApp(App):
             self.push_screen(HelpScreen.for_screen(self.screen))
 
     def action_command_bar(self) -> None:
-        self.push_screen(CommandBarScreen(), self._on_command_bar)
+        if self.screen is self.dashboard:      # dialogs keep "/" for typing
+            self.push_screen(CommandBarScreen(), self._on_command_bar)
 
     def _on_command_bar(self, line: Optional[str]) -> None:
         if line:                     # runs after the bar has closed
             self.run_command_line(line)
 
-    # --- slash commands and requests --------------------------------------------
+    # --- slash commands and requests ------------------------------------------------------------
     def run_command_line(self, text: str) -> bool:
         """Run `/name [arg]`. Returns False (and warns) for an unknown command."""
         name, arg = parse(text)
         command = find(COMMANDS, name)
+        if command is None and "/" in name:
+            return self.submit_request(text)   # a local path (/home/me/app), not a command
         if command is None:
             self.notify(f"Unknown command /{name}. Type / to see the list.",
                         severity="warning", markup=False)
@@ -150,6 +116,9 @@ class ReconixApp(App):
         if arg and arg.lower() in {c.id for c in choices}:
             command.run(self, arg.lower())
             return
+        if not choices:
+            self.notify(command.empty or "Nothing to choose from yet.", severity="warning")
+            return
 
         def chosen(choice_id: Optional[str]) -> None:
             if choice_id:
@@ -161,25 +130,11 @@ class ReconixApp(App):
         )
 
     def submit_request(self, text: str) -> bool:
-        """A plain-language request from a prompt; empty starts the demo request."""
-        text = text.strip()
-        if text:
-            try:
-                store.add_request(text)
-            except store.StoreValidationError as exc:
-                self.notify(str(exc), severity="warning", markup=False)
-                return False
+        """A plain-language line from the prompt; the dashboard decides what it means."""
+        accepted = self.dashboard.submit(text)
+        if accepted and text.strip():
             self._remember(text)
-        self._think("reconix is drafting the scope manifest…", lambda: self.goto("scope"))
-        return True
-
-    def _think(self, message: str, then: Callable[[], None]) -> None:
-        """Let the current screen show a short spinner, then run `then`."""
-        think = getattr(self.screen, "think", None)
-        if self.THINKING_SECONDS <= 0 or think is None:
-            then()
-        else:
-            think(message, self.THINKING_SECONDS, then)
+        return accepted
 
     def _remember(self, text: str) -> None:
         try:
@@ -187,46 +142,88 @@ class ReconixApp(App):
         except store.StoreValidationError:
             pass   # history is best-effort; the action itself already succeeded
 
-    # --- shared actions (screens and commands) --------------------------------------
-    def export_report(self, fmt: str) -> None:
-        store.log_event("report.export_requested", fmt)
-        self.notify(f"Export to {fmt} isn't wired in this demo.", severity="information")
+    # --- actions shared by commands and keys ------------------------------------------------------
+    def new_assessment(self, target: Optional[str] = None) -> None:
+        """Start over on a fresh dashboard (the audit trail stays); optionally on `target`.
 
-    def open_chat(self, draft: str = "") -> None:
-        """Leave the current question and continue in the chat prompt."""
-        self.pending_prompt = draft
-        self.goto("start")
+        The store starts the run before the dashboard is rebuilt: the new dashboard is not
+        composed yet, and it plays a started run from its own on_mount.
+        """
+        store.new_assessment()
+        if target and target.strip():
+            try:
+                store.submit_prompt(target)
+            except store.StoreValidationError as exc:
+                self.notify(str(exc), severity="warning", markup=False)
+        self._rebuild_dashboard()
 
-    def open_finding(self, index: int) -> None:
-        self.selected_finding = index
-        self.goto("detail")
+    def open_template(self, template_id: Optional[str]) -> None:
+        """`/template`: type a target for the chosen template, then start on it."""
+        if template_id:
+            self.push_screen(TargetDialog(template_id),
+                             lambda text: self._target_entered(template_id, text))
 
-    def show_audit(self) -> None:
-        """Read-only view of the audit trail and any feedback typed at questions."""
-        events = store.list_events()
-        event_rows = [
-            (e.created_at.strftime("%H:%M:%S"),
-             f"{e.kind} · {e.detail}" if e.detail else e.kind, theme.MUTED)
-            for e in events
-        ] or [("", "No actions recorded yet.", theme.DIM)]
-        sections = [("Events", event_rows)]
-        feedback = store.list_feedback()
-        if feedback:
-            sections.append(("Your feedback",
-                             [(f.gate, f.text, theme.MUTED) for f in feedback]))
-        self.push_screen(ChoiceScreen(
-            "\u25a4 AUDIT TRAIL", "", [Choice("close", "Close")],
-            body=details_body(sections), chip="Audit",
-        ))
-
-    def can_enter_execution(self) -> bool:
-        return store.is_approved(store.get_pending_approval().request_id)
-
-    def open_execution(self) -> None:
-        if not self.can_enter_execution():
-            self.notify("Execution starts after approval. Use /approval.", severity="warning")
+    def _target_entered(self, template_id: str, text: Optional[str]) -> None:
+        if text is None:
+            return                           # cancelled: nothing starts
+        if not store.get_run().started:
+            self.dashboard.start(text, template_id)
             return
-        self.goto("execution")
+        store.new_assessment()               # one already ran: keep it, start a fresh one
+        try:
+            store.start_run(text, template_id)
+        except store.StoreValidationError as exc:
+            self.notify(str(exc), severity="warning", markup=False)
+        self._rebuild_dashboard()
+
+    def open_findings(self, fid: Optional[str] = None) -> None:
+        self.dashboard.action_findings(fid)
+
+    def open_activity(self) -> None:
+        self.dashboard.action_activity()
+
+    def open_report(self) -> None:
+        self.dashboard.action_report()
+
+    def open_import(self) -> None:
+        self.dashboard.action_import()
+
+    def open_assessments(self) -> None:
+        self.push_screen(AssessmentsDialog(), self._assessments_closed)
+
+    def _assessments_closed(self, result: Optional[str]) -> None:
+        if result == "new":
+            self.new_assessment()
+        elif result is not None and result.isdigit():
+            store.switch_assessment(int(result))
+            self._rebuild_dashboard()
+
+    def _rebuild_dashboard(self) -> None:
+        while len(self.screen_stack) > 2:
+            self.pop_screen()
+        self._dashboard = DashboardScreen()
+        self.switch_screen(self._dashboard)
+
+    def open_summary(self) -> None:
+        if not store.is_finished():
+            self.notify("The summary is ready once the assessment has finished.",
+                        severity="warning")
+            return
+        self.dashboard.open_summary()
+
+    def open_web_dashboard(self) -> None:
+        """Open the read-only web dashboard in the operator's browser, if it is running."""
+        url = store.web_dashboard_url()
+        if not url:
+            self.notify("Start the web dashboard first:  cd web && npm run dev",
+                        title="Web dashboard", severity="warning", markup=False, timeout=7)
+            return
+        if _open_url(url):
+            self.notify(f"Opening the web dashboard in your browser…  {url}",
+                        title="Web dashboard", markup=False, timeout=10)
+        else:
+            self.notify(f"Open it in your browser:  {url}",
+                        title="Web dashboard", severity="warning", markup=False, timeout=10)
 
 
 def main() -> None:

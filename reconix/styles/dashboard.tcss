@@ -1,0 +1,196 @@
+/* The dashboard: top bar, assistant | status + activity, prompt, F-keys. */
+
+DashboardScreen {
+    layout: vertical;
+    padding: 0 1;
+}
+
+#top {
+    height: 1;
+    margin: 1 1 1 1;
+}
+
+#top-bar {
+    width: 1fr;
+    height: 1;
+}
+
+#pane-toggle {
+    width: auto;
+    height: 1;
+    margin-left: 2;
+    color: $cyan;
+    background: $raised;
+}
+
+#pane-toggle:hover {
+    background: $cyan-bg;
+}
+
+#main {
+    height: 1fr;
+}
+
+/* ------------------------------------------------------------- panels */
+Panel {
+    background: $bg;
+    border: round $border-strong;
+    padding: 0 1;
+}
+
+Panel:focus-within { border: round $cyan; }
+
+#assistant {
+    width: 3fr;
+    height: 1fr;
+    border: round $cyan-dim;
+    margin-right: 1;
+}
+
+#assistant:focus-within { border: round $cyan; }
+
+#side {
+    width: 2fr;
+    min-width: 58;
+    height: 1fr;
+}
+
+#status {
+    height: auto;
+    padding: 1 1 0 1;
+}
+
+#plan {
+    height: 1fr;
+    min-height: 6;
+    margin-top: 1;
+    padding: 1 1 0 1;
+}
+
+#plan-list {
+    height: auto;
+}
+
+/* F7 / the Panel button closes the right pane; the assistant then fills the width. */
+DashboardScreen.-side-collapsed #side      { display: none; }
+DashboardScreen.-side-collapsed #assistant { width: 1fr; margin-right: 0; }
+
+/* Narrow terminals: the side column goes under the assistant and the area scrolls. */
+DashboardScreen.-narrow #main      { layout: vertical; overflow-y: auto; }
+DashboardScreen.-narrow #assistant { width: 1fr; height: 18; margin-right: 0; }
+DashboardScreen.-narrow #side      { width: 1fr; height: auto; margin-top: 1; }
+DashboardScreen.-narrow #plan      { height: auto; }
+
+/* -------------------------------------------------------------- chat */
+#chat-scroll {
+    height: 1fr;
+    align-vertical: bottom;
+    scrollbar-size-vertical: 1;
+    scrollbar-color: $border-strong;
+    scrollbar-background: $bg;
+}
+
+.chat-entry {
+    height: auto;
+    margin-top: 1;
+}
+
+.chat-speaker {
+    width: 11;
+    height: 1;
+    margin-right: 1;
+}
+
+.chat-text {
+    width: 1fr;
+    height: auto;
+}
+
+.chat-banner {
+    width: 1fr;
+    height: auto;
+    padding: 0 1;
+}
+
+.chat-banner.-block { background: $red-bg;   border-left: outer $critical; }
+.chat-banner.-warn  { background: $amber-bg; border-left: outer $medium; }
+.chat-banner.-ok    { background: $green-bg; border-left: outer $green; }
+
+/* Activity lines streamed into the assistant, indented under the chat text column. */
+.stream-line {
+    width: 1fr;
+    height: auto;
+    margin-left: 12;
+}
+
+.stream-line.-block {
+    margin-left: 0;
+    padding: 0 1;
+    background: $red-bg;
+    border-left: outer $critical;
+}
+
+.result-card {
+    width: 46;
+    max-width: 1fr;
+    height: auto;
+    background: $surface2;
+    border: round $border-strong;
+    padding: 0 1;
+}
+
+/* ------------------------------------------------------------- status */
+#status-grid {
+    height: auto;
+    margin-bottom: 1;
+}
+
+#counters {
+    height: auto;
+}
+
+.tile {
+    width: 1fr;
+    height: 4;
+    border: round $border;
+    padding: 0 1;
+    margin-right: 1;
+}
+
+.tile:last-of-type { margin-right: 0; }
+
+/* ------------------------------------------------------- activity log (F4 dialog) */
+.activity-row {
+    height: auto;
+    padding: 0 1;
+}
+
+.activity-row.-block {
+    background: $red-bg;
+    border-left: outer $critical;
+    padding: 0 0 0 0;
+}
+
+/* ------------------------------------------------------- prompt + keys */
+#prompt-box {
+    margin: 1 0 0 0;
+}
+
+#prompt-box #prompt {
+    background: $bg;
+    border: round $cyan-dim;
+}
+
+#prompt-box #prompt:focus {
+    border: round $cyan;
+}
+
+#prompt-box #prompt-hint {
+    display: none;
+}
+
+#fkeys {
+    height: 1;
+    margin: 0 0 1 0;
+    padding: 0 1;
+}
