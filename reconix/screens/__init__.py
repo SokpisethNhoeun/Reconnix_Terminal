@@ -1,5 +1,5 @@
 from .start import StartScreen
-from .scope import ScopeScreen
+from .template import TemplateScreen
 from .plan import PlanScreen
 from .approval import ApprovalScreen
 from .execution import ExecutionScreen
@@ -11,7 +11,7 @@ from .choice import ChoiceScreen
 from .command_bar import CommandBarScreen
 
 __all__ = [
-    "StartScreen", "ScopeScreen", "PlanScreen", "ApprovalScreen",
+    "StartScreen", "TemplateScreen", "PlanScreen", "ApprovalScreen",
     "ExecutionScreen", "FindingsListScreen", "FindingDetailScreen",
     "ReportScreen", "HelpScreen", "ChoiceScreen", "CommandBarScreen",
 ]

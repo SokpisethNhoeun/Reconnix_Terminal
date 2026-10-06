@@ -1,116 +1,79 @@
-"""Test-plan steps and the two-step approval gate for risky steps."""
+"""The plan the operator reviews before running it: phases, the login, the gated actions.
 
-import secrets
-from typing import List, Optional
+Built from the current assessment (its template's plan tasks, the login its run needs, and
+the approval requests its validation raises), with each row's status read live from the
+run. Empty until a template is chosen.
+"""
 
-from ..models import ApprovalDecision, ApprovalRequest, Confirmation, PlanStep
+from typing import List
+
+from ..models import GATE_ACCOUNT, GATE_APPROVAL_PREFIX, PlanRow, PlanTask
 from . import lists
-from .activity import current_operator, log_event
-from .errors import StoreValidationError
+from .approvals import decision_for
+from .run import plan_tasks
+from .vault import current_auth_challenge, is_authenticated
+
+# What each phase does (the labels themselves are template-specific).
+PHASE_DETAIL = {
+    "discovery": "map the permitted surface",
+    "scanning": "policy-checked checks on what discovery found",
+    "validation": "limited validation of the candidates",
+    "analysis": "merge duplicates · map to OWASP / CWE · score CVSS",
+    "report": "executive summary + findings · export from the Report screen",
+}
+LOGIN_LABEL = {
+    "cookie": "session cookie", "password": "test account",
+    "otp": "one-time code", "password+otp": "test account + one-time code",
+}
 
 
-def list_plan_steps() -> List[PlanStep]:
-    return list(lists.PLAN_STEPS)
+def _login_row(num: str) -> PlanRow:
+    challenge = current_auth_challenge()
+    run = lists.current().run
+    if is_authenticated():
+        status = "done"
+    elif run.waiting_gate == GATE_ACCOUNT:
+        status = "active"
+    else:
+        status = "pending"
+    return PlanRow(num, "Target login", f"{LOGIN_LABEL.get(challenge.kind, challenge.kind)} "
+                   "· asked when testing needs it, kept for this session only",
+                   "LOW", "login", status)
 
 
-def get_plan_step(num: int) -> PlanStep:
-    for step in lists.PLAN_STEPS:
-        if step.num == num:
-            return step
-    raise StoreValidationError(f"No plan step {num}.")
+def _approval_rows(prefix: str) -> List[PlanRow]:
+    rows = []
+    run = lists.current().run
+    for i, request in enumerate(lists.current().approvals):
+        decision = decision_for(request.request_id)
+        if decision is not None:
+            status = "done" if decision.decision == "APPROVED" else "rejected"
+        elif run.waiting_gate == GATE_APPROVAL_PREFIX + request.request_id:
+            status = "active"
+        else:
+            status = "pending"
+        rows.append(PlanRow(f"{prefix}{chr(ord('a') + i)}", request.action, request.purpose,
+                            request.risk, "approve", status, command=request.command))
+    return rows
 
 
-def get_pending_approval() -> ApprovalRequest:
-    return lists.APPROVAL_REQUESTS[-1]
+def plan_overview() -> List[PlanRow]:
+    """The plan as the Plan screen lists it (empty before a template is chosen)."""
+    tasks: List[PlanTask] = plan_tasks()
+    if not tasks:
+        return []
+    needs_login = current_auth_challenge() is not None
+    rows: List[PlanRow] = []
+    for n, task in enumerate(tasks, start=1):
+        rows.append(PlanRow(str(n), task.label, PHASE_DETAIL.get(task.key, ""), "LOW", "auto",
+                            task.status))
+        if task.key == "scanning" and needs_login:
+            rows.append(_login_row(f"{n}a"))
+        if task.key == "validation":
+            rows.extend(_approval_rows(str(n)))
+    return rows
 
 
-def _find_request(request_id: str) -> ApprovalRequest:
-    for request in lists.APPROVAL_REQUESTS:
-        if request.request_id == request_id:
-            return request
-    raise StoreValidationError(f"Unknown approval request {request_id}.")
-
-
-def _check_hash(request: ApprovalRequest, command_hash: str) -> None:
-    if command_hash != request.command_hash:
-        raise StoreValidationError("This approval is for a different command.")
-
-
-# --- two-step approval --------------------------------------------------------
-def needs_confirmation(request_id: str) -> bool:
-    """HIGH-risk steps need a second, explicit confirmation before approval."""
-    request = _find_request(request_id)
-    return get_plan_step(request.step_num).risk == "HIGH"
-
-
-def request_confirmation(request_id: str, command_hash: str) -> str:
-    """Start the second step of a HIGH-risk approval; returns a single-use token."""
-    request = _find_request(request_id)
-    _check_hash(request, command_hash)
-    token = secrets.token_hex(8)
-    lists.CONFIRMATIONS.append(Confirmation(request_id=request_id, token=token))
-    log_event("approval.confirmation_requested", request_id)
-    return token
-
-
-def decline_confirmation(request_id: str) -> None:
-    """The operator backed out of the second step: void any open tokens."""
-    _find_request(request_id)
-    for confirmation in lists.CONFIRMATIONS:
-        if confirmation.request_id == request_id:
-            confirmation.used = True
-    log_event("approval.confirmation_declined", request_id)
-
-
-def _consume_token(request_id: str, token: Optional[str]) -> None:
-    for confirmation in lists.CONFIRMATIONS:
-        if (confirmation.request_id == request_id and confirmation.token == token
-                and not confirmation.used):
-            confirmation.used = True
-            return
-    raise StoreValidationError("HIGH-risk steps need the second confirmation first.")
-
-
-def approve(
-    request_id: str, *, command_hash: str, confirmation_token: Optional[str] = None,
-) -> ApprovalDecision:
-    """Record an approval. These checks are the authority; the UI cannot skip them.
-
-    `command_hash` binds the approval to the exact command the operator saw.
-    HIGH-risk steps also need an unused token from `request_confirmation()`.
-    Raises StoreValidationError when a check fails.
-    """
-    request = _find_request(request_id)
-    _check_hash(request, command_hash)
-    if needs_confirmation(request_id):
-        _consume_token(request_id, confirmation_token)
-    decision = ApprovalDecision(
-        request_id=request_id, decision="APPROVED",
-        operator=current_operator(), command_hash=request.command_hash,
-    )
-    lists.APPROVAL_DECISIONS.append(decision)
-    log_event("approval.approved", f"{request_id} {request.command_hash}")
-    return decision
-
-
-def reject(request_id: str) -> ApprovalDecision:
-    request = _find_request(request_id)
-    decision = ApprovalDecision(
-        request_id=request_id, decision="REJECTED",
-        operator=current_operator(), command_hash=request.command_hash,
-    )
-    lists.APPROVAL_DECISIONS.append(decision)
-    log_event("approval.rejected", request_id)
-    return decision
-
-
-def is_approved(request_id: str) -> bool:
-    """True when the latest decision for this request is an approval."""
-    for decision in reversed(lists.APPROVAL_DECISIONS):
-        if decision.request_id == request_id:
-            return decision.decision == "APPROVED"
-    return False
-
-
-def list_approval_decisions() -> List[ApprovalDecision]:
-    return list(lists.APPROVAL_DECISIONS)
+def gated_count() -> int:
+    """How many planned actions wait for a human decision while the plan runs."""
+    return len(lists.current().approvals)

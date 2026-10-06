@@ -1,11 +1,13 @@
-# CLAUDE.md — Reconix TUI
+# CLAUDE.md — Reconix TUI (classic UI)
 
 Keyboard-first terminal UI for **Reconix**, an AI-powered security-testing
-assistant. Built with **Textual 8.x + Rich**, Python ≥ 3.9. The app currently
-runs on an **in-memory list store** (`reconix/store/`) and is the front-end skeleton for the
-Reconix FastAPI backend.
+assistant. Built with **Textual 8.x + Rich**, Python ≥ 3.9. The app runs on an
+**in-memory store** (`reconix/store/`) that plays a realistic, simulated assessment
+and is the seam for the Reconix backend. A read-only Next.js dashboard lives in `web/`.
 
-Flow: **Start → Scope → Plan → Approval → Execution → Findings → Finding Detail → Report**.
+Flow: **Start → Template → Plan → Approval → Execution → Findings → Finding Detail → Report**.
+Branch `classic-ui`: the original full-screen UI (53ac746) running version 1's process —
+see `docs/CLASSIC_UI_PLAN.md`.
 
 ## Commands
 
@@ -13,173 +15,143 @@ Flow: **Start → Scope → Plan → Approval → Execution → Findings → Fin
 source .venv/bin/activate
 pip install -r requirements.txt
 python -m reconix                 # run the app (or: python run.py / reconix)
-textual run --dev reconix.app:ReconixApp   # live CSS reload + devtools (needs textual-dev)
-pip install -r requirements-dev.txt   # pytest + pytest-asyncio
-pytest -q                         # Textual Pilot tests in tests/
+pip install -r requirements-dev.txt   # pytest + pytest-asyncio + python-docx
+pytest -q                         # store tests + Textual Pilot tests (~70 s)
 python -m compileall -q reconix   # quick syntax check
+uvx ruff check --line-length 100 --select E,F,W,B reconix tests   # lint (no config yet)
+cd web && npm run dev             # web dashboard (npm test / npx tsc --noEmit / npx eslint)
+python scripts/make_sample_data.py    # regenerate web/sample-data after a process change
 ```
 
-Tests live in `tests/` (`asyncio_mode = "auto"`; an autouse fixture resets the
-store around every test; `tests/support.py` has `SIZE`, `show()`, `event_kinds()`).
-See the `write-tui-test` skill. There is no linter yet; use `ruff` when adding one.
+Tests: `tests/conftest.py` resets the store around every test, plays the run instantly
+(`RunController.SPEED = 0`), points reports / saved copies / the web link at temp, and
+stubs `browser.open_url/open_path` (the `opened` fixture records them — never launch a
+real browser). `tests/support.py`: `run_to(gate)` / `decide(gate)` / `play_until_gate()`
+drive the store; `run_ui_to(app, pilot, gate)` / `pass_gate()` drive the screens;
+`settle(pilot)` lets screen switches and dialogs land (dialogs open on the app's next turn).
 
 ## Architecture
 
 ```
 reconix/
-├── app.py            # ReconixApp: FLOW, bindings, go_next/goto, run_command_line, submit_request
-├── commands/         # slash commands: registry.py (Command, match/find/parse) + builtin.py (COMMANDS)
-├── models/          # dataclasses shared by store and screens
-├── store/           # in-memory list store — the only backend seam
-│   ├── __init__.py   # public functions screens call (list_*, get_*, add_*, approve, log_event)
-│   ├── lists.py      # the shared Python lists (only store modules touch them)
-│   ├── seed.py       # demo rows loaded at import; store.reset() reloads them
-│   └── <resource>.py # assessment, plan (approval), execution, findings (filter/sort),
-│                     #   activity, history, progress (step_states for the tracker)
-├── theme.py          # color tokens + badge helpers for Rich markup
-├── reconix.tcss      # Textual stylesheet (same palette as theme.py)
-├── widgets/          # reusable widgets — export in __init__.py
-│   ├── chrome.py     # SessionBar, FlowProgress (flow step tracker under the bar)
-│   ├── choice_menu.py# ChoiceMenu (↑/↓ menu, posts Chosen), SuggestionMenu, menu_hint()
-│   ├── prompt.py     # PromptBox / PromptInput: slash suggestions, history, hint line
-│   ├── question.py   # Question: chip + bold question + numbered ChoiceMenu + hint (Claude-style HITL)
-│   ├── history.py    # PromptHistory (↑/↓ navigator)
-│   └── chat.py       # UserMessage (`› request`, rendered as Text)
+├── app.py            # ReconixApp: bindings, run_command_line / run_command (mixes in shell/)
+├── shell/            # app behaviour, one concern per module
+│   ├── navigation.py # FLOW, goto / go_next / go_prev, reload_screen, open_dialog
+│   ├── run_host.py   # hosts RunController; refresh_view, open_gate (deferral), resume_run
+│   ├── actions.py    # submit_request, template/scope/plan decisions, new / switch assessment
+│   └── dialogs.py    # assessments, triage, import, export, audit, summary, /web
+├── flow/             # RunController (plays store steps), gates.py (gate → screen), phases
+├── commands/         # registry.py (Command: choices, ask, empty) + builtin.py (COMMANDS)
+├── models/           # dataclasses: Assessment, RunState/RunStep/PlanRow, ScopeManifest, …
+├── store/            # the only backend seam; public functions in store/__init__.py
+│   ├── run.py        # start, advance (gates), run_plan, reject_scope, stop_run, phases
+│   ├── templates/    # per-template scope, plan, approvals, findings, script (base.py builds)
+│   ├── scope.py / policy.py / approvals.py / vault.py    # enforcement lives here
+│   ├── plan.py / progress.py / findings_view.py          # what the classic screens show
+│   └── report*.py / snapshot.py / persist.py             # exports; saved copies for web/
+├── theme.py          # color tokens; CSS_TOKENS feed the stylesheet's $variables
+├── reconix.tcss      # Textual stylesheet (no hex values: $variables only)
+├── browser.py        # open_url / open_path, detached and silent
+├── widgets/          # SessionBar/FlowProgress, ChoiceMenu, PromptBox, Question, RunLog,
+│                     #   ScopeManifestView, Spinner, finding cells (widgets/findings.py)
 └── screens/
-    ├── base.py       # ReconixScreen: chrome + body + footer; subclasses implement compose_body()
-    ├── <frame>.py    # one file per flow frame
-    ├── choice.py     # ChoiceScreen dialog (+ details_body()) for confirmations, details, choices
-    ├── command_bar.py# `/` command bar (bottom modal)
-    └── help.py       # contextual shortcuts overlay
+    ├── base.py       # ReconixScreen: chrome + body + footer; view_state / refresh_live
+    ├── <frame>.py    # one file per flow frame (template.py replaced scope.py)
+    ├── forms/        # FormScreen (+ LoginForm, ScopeEditForm, ImportForm)
+    ├── choice.py     # ChoiceScreen dialog (+ details_body())
+    ├── command_bar.py, help.py
 ```
 
 Key invariants:
 
-- **Every flow screen subclasses `ReconixScreen`** and sets `flow_name`,
-  `mode_name`, and optionally `scroll = False`. Screens only implement
-  `compose_body()`; never re-implement the chrome.
-- **Navigation goes through the app**: `self.app.go_next()`, `go_prev()`,
-  `goto(name)`. Flow order lives only in `FLOW` in `app.py`. A new screen must be
-  added to `FLOW`, to `screens/__init__.py`, to the `1…8` jump bindings if it is a
-  flow frame, and to `help.py` and the README key table.
-- **Screens never hold data literals.** Read through `reconix.store` functions,
-  never `store.lists` directly. Writes go through store functions too
-  (`add_request`, `approve`, `reject`, `log_event`), which validate input and
-  raise `StoreValidationError`. Getters return list copies. Shared UI state
-  such as `selected_finding` lives on `ReconixApp`.
-- **The sent request is a `UserMessage`** (highlighted bar, like Claude Code).
-- **Never put user or tool text into markup strings.** Build a `rich.text.Text`
-  (see `UserMessage`, the execution log, `ChoiceMenu` prompts). `textual.markup.escape`
-  misses `[UPPERCASE]` tags, so it is not enough.
-- **The flow tracker reads the store.** `FlowProgress` (in `ReconixScreen`) shows
-  `store.step_states()`; call `refresh_progress()` after a screen changes a step
-  (Execution does after finish/stop). Order comes from `app.flow_order()`.
-- **No dead ends.** An option that isn't available is `Choice(..., disabled=True)`:
-  dimmed with "(not in demo)", skipped by ↑/↓, ignored by digits and Enter. Never
-  add a choice, key or button that only pops an "isn't wired" toast.
-- **Findings view state** (`findings_filter`, `findings_sort`) lives on the app;
-  `store.find_findings(filter, sort)` returns `(store index, finding)` pairs and
-  table row keys are store indexes (never use the cursor row as an index).
-- **Thinking spinner.** `app.submit_request` calls `screen.think(...)` for a short
-  spinner above the prompt (`THINKING_SECONDS`, 0 in tests); Esc skips, Enter never does.
-- **Notify user text with `markup=False`** (e.g. unknown commands, store errors).
-- **Real actions ask first, and the store records them.** Stopping the scan
-  (`Ctrl+C` on Execution) and validating a finding (`v`) open a `ChoiceScreen`;
-  validation calls `store.validate_finding`. Free text from "Type something." is
-  saved with `store.add_feedback` and echoed on screen. `/audit` (`app.show_audit`)
-  shows `store.list_events()` + `store.list_feedback()`. Never fake these with a bare notify.
-- **Human-in-the-loop questions use the `Question` widget**, drawn like Claude Code:
-  chip, bold question, numbered choices with a description line, `(Recommended)`, and
-  the hint "Enter to select · ↑/↓ to navigate · Esc to …". It adds "Type something."
-  (free text → `ChoiceMenu.Typed` → `store.add_feedback`) and "Chat about this"
-  (`chat` → `app.open_chat`); `ReconixScreen` handles both. Handle `ChoiceMenu.Chosen`,
-  never a raw `OptionList.OptionSelected`, and add `Binding("enter", "choose", show=False)`
-  so Enter works when focus leaves the menu. A focused menu takes 1–9 for its numbered
-  choices (the 1…8 jumps work elsewhere). Pop-up questions use `ChoiceScreen`; risky
-  ones (`danger=True`) are unnumbered, have no shortcuts, and default to the safe choice.
-- **Prompts are `PromptBox`.** It posts `Submitted` / `CommandSubmitted`; the screen
-  calls `app.submit_request()` / `app.run_command_line()` and clears the box on
-  success. The widget never writes to the store. Suggestions are a CSS overlay
-  above the input, so opening them never moves the input.
-- **Slash commands live in `reconix/commands/`** (`COMMANDS` is a tuple). Handlers only
-  call app methods; the app runs them and records history. The `/` app binding
-  must stay non-priority, or focused Inputs stop receiving `/`.
-- **Never call `goto()` from inside a modal.** Dismiss with a result and act in the
-  callback (`switch_screen` under a modal drops the modal's callback).
-- **Colors come only from tokens.** Use `theme.*` constants and
-  `theme.severity_badge / status_badge / risk_badge` in Rich markup, and `$vars`
-  in `reconix.tcss`. Never hard-code a hex value in a screen. If you add a token,
-  add it to **both** `theme.py` and `reconix.tcss`.
-- **Repeated UI becomes a widget** in `reconix/widgets/`, not copy-paste.
-- The Start prompt and the command bar have a focused `Input`, so `←`/`→` move
-  the cursor there. Everywhere else they walk the flow.
+- **The store decides; screens ask.** Every decision goes through a store function that
+  validates it and raises `StoreValidationError` (shown with `markup=False`). Screens never
+  touch `store.lists` and never hold data literals. Getters return copies.
+- **The run is hosted by the app** (`shell/run_host.py`), not a screen, so it plays while
+  you browse. After each step the app calls `refresh_view()` on the top flow screen. A
+  screen whose layout depends on the run returns that state from `view_state()`; a change
+  rebuilds the screen (`app.reload_screen()`), or marks it stale if a dialog covers it.
+  Small per-step updates go in `refresh_live()`.
+- **Gates route to screens** (`flow/gates.py`): template + scope → Template, plan → Plan,
+  approval:* → Approval, account → the LoginForm over the current screen. A gate that
+  arrives while a dialog is open waits for it to close (`flow_screen_resumed`). After a
+  decision, call `app.resume_run()` or `app.gate_decided(screen)`.
+- **The app opens its dialogs with `app.open_dialog(dialog, callback)`**, never
+  `push_screen` with a callback: Textual returns a result to whatever was handling a
+  message at push time, and a flow screen may have been replaced since (the result is
+  then lost). Screens may push their own dialogs while they stay on screen.
+- **Navigation goes through the app**: `goto(name)`, `go_next()`, `go_prev()`. Flow order
+  lives only in `FLOW` (`shell/navigation.py`). Execution opens only after the plan has run
+  (`can_enter_execution`); ←/→ step over it until then. `_show` closes dialogs before it
+  switches, so never call `goto()` from inside a modal anyway — dismiss and act in the callback.
+  A new flow screen goes in `FLOW`, `screens/__init__.py`, the `1…8` bindings, `help.py`
+  and the README.
+- **Every flow screen subclasses `ReconixScreen`** and sets `flow_name`, `mode_name`,
+  optionally `scroll = False`, and implements `compose_body()`.
+- **Never put user, tool or scope text into markup.** Build `rich.text.Text` — including
+  `border_title` / `border_subtitle` and `Label`s (Textual parses plain strings as markup).
+- **Human-in-the-loop questions use the `Question` widget** (chip, numbered choices with a
+  description, `(Recommended)`, "Type something." → `store.add_feedback`, "Chat about this"
+  → `app.open_chat`). Handle `ChoiceMenu.Chosen`; add `Binding("enter", "choose", show=False)`.
+  Pop-ups use `ChoiceScreen`; risky ones (`danger=True`) are unnumbered and default to the
+  safe choice. The Approval menu highlights "View details" first so a stray Enter is harmless.
+- **Text input pop-ups use `FormScreen`** (`screens/forms/`): fields, an error line, Submit /
+  Cancel. `submit()` calls the store; a raised `StoreValidationError` keeps the form open.
+  Secret fields use `SecretInput`; LoginForm wraps them in `Secret` and clears on close.
+- **No dead ends.** Unavailable options are `Choice(..., disabled=True)` / disabled buttons.
+- **Findings are keyed by `fid`** (`app.selected_finding`, table row keys);
+  `store.find_findings(filter, sort)` returns findings; view state lives on the app.
+- **Prompts are `PromptBox`**; slash commands live in `reconix/commands/` (handlers call app
+  methods). A `Command` with `ask=False` uses its choices only as suggestions. The `/` app
+  binding stays non-priority. A typed local path (`/home/me/app`) is a target, not a command.
+- **Colors come only from tokens** (`theme.*` in Rich, `$vars` in TCSS, fed from
+  `theme.CSS_TOKENS`). Add a token in `theme.py` only.
+- **Repeated UI becomes a widget** in `reconix/widgets/`.
 
 ## Project rules (from AGENTS.md, applied to this TUI)
 
-1. **No single-file code.** One screen per file, one concern per module.
-   When wiring the backend, add `reconix/api/` (HTTPX client) and change the
-   bodies of the `reconix/store/` functions to call it; keep their signatures.
+1. **No single-file code.** One screen per file, one concern per module (see `shell/`).
 2. **Clean folder structure.** Follow the layout above; keep `__init__.py` exports current.
-3. **Validate on the backend.** The TUI is never the security boundary. Scope,
-   allowed actions/ports/tools, and approval checks must be enforced by
-   the backend. The UI may pre-validate for UX, but must also show and respect
-   the backend's verdict.
-4. **Protect actions by role.** Steps with `gate == "approve"` or HIGH risk must
-   go through the approval gate. When auth is wired, hide or disable actions the
-   current role cannot perform, and still treat the backend's 401/403 as final.
-5. **Reusable components.** Prefer widgets, theme helpers, and `ReconixScreen` hooks over duplication.
-6. **Plan before big features.** For anything touching several screens or the
-   backend seam, write a short plan first (files to change, data contract, key
-   bindings), then implement.
+3. **Validate on the backend.** The store is the security boundary here; the UI may
+   pre-check for UX (e.g. the HIGH reason length) but must show and respect the store's verdict.
+4. **Protect actions by role.** Gated actions go through the approval gate; when auth is
+   wired, hide or disable what the role can't do and treat 401/403 as final.
+5. **Reusable components.** Widgets, `FormScreen`, `ChoiceScreen`, theme helpers.
+6. **Plan before big features.** Write a short plan in `docs/` first.
 
 ## Security and safety context
 
-This is an authorized security-testing tool. Demo data must only use reserved
-example domains (`example.com`, RFC 2606) and fake evidence. Never add code that
-runs real scanners from the TUI directly; execution belongs to the backend,
-behind scope checks and human approval. Execution is the one hard gate: `app._show`
-refuses to open it (even via a `1…8` jump) unless `app.can_enter_execution()`.
-Do not weaken the approval gate:
-HIGH-risk steps need a second, explicit confirmation that the store enforces
-(`request_confirmation()` issues a single-use token; `approve()` requires it plus
-the matching command hash). The confirmation dialog defaults to "No, go back".
-
-**Demo-only shortcuts that must not reach real mode:**
-- The `1…8` presenter jumps can reach Execution without approval. (`→`, `Enter`
-  and `/status` are guarded by `app.can_enter_execution()`.)
-
-When the backend is wired, put the jumps behind mock mode only, and make Execution
-start only from a backend-confirmed approval.
+Authorized security testing only. Demo data uses reserved example domains and fake,
+masked evidence. Never run real scanners from the TUI; execution belongs to the backend,
+behind scope checks and human approval. Do not weaken the gates: testing starts only after
+the scope is approved and the plan is run; HIGH-risk actions need a typed reason, the
+single-use token from `request_confirmation()` and the matching command hash
+(`approve()` enforces all three); the confirmation dialog defaults to "No, go back". The
+one-time code is validated and never stored; secrets never reach chat, logs, reports or
+the saved copies (`snapshot.py` + `redact.py`).
 
 ## Team: subagents and skills
 
 Project subagents live in `.claude/agents/` and skills in `.claude/skills/`.
-Delegate to them when the task matches. Run independent agents in parallel.
 
 | Subagent | Use it for |
 |----------|-----------|
 | `tui-engineer` | Building or changing screens, widgets, bindings, TCSS layout |
-| `backend-integrator` | Replacing the in-memory store bodies with FastAPI calls (HTTPX, models, errors) |
-| `security-reviewer` | Reviewing scope enforcement, approval gate, role checks, secret handling, safe demo data |
-| `qa-tester` | Writing and running Textual `Pilot` tests, reproducing UI bugs |
-| `code-reviewer` | Final review of a change against the rules above before commit |
+| `backend-integrator` | Replacing store bodies with backend calls |
+| `security-reviewer` | Scope enforcement, approval gate, role checks, secret handling |
+| `qa-tester` | Writing and running Textual `Pilot` tests |
+| `code-reviewer` | Final review against the rules above |
 
 | Skill | Use it for |
 |-------|-----------|
-| `add-screen` | Step-by-step checklist to add a new flow screen correctly |
+| `add-screen` | Checklist to add a flow screen |
 | `add-widget` | Extracting or creating a reusable widget |
-| `wire-backend` | Moving one data source from mock to a real backend endpoint |
-| `theme-tokens` | Adding or changing colors while keeping `theme.py` and `reconix.tcss` in sync |
-| `write-tui-test` | Writing Textual tests with `run_test()` and `Pilot` |
-
-Typical feature workflow: plan, then `tui-engineer` and/or `backend-integrator`
-implement, then `qa-tester` adds tests, then `security-reviewer` (if the change
-touches scope, approval, auth, or execution) and `code-reviewer` check it.
+| `wire-backend` | Moving one data source to a real backend endpoint |
+| `theme-tokens` | Adding or changing colors |
+| `write-tui-test` | Textual tests with `run_test()` and `Pilot` |
 
 ## Style
 
 - Module docstring on every file (screens start with `"""Frame NN — <name>."""`).
-- Type hints on public methods; `from __future__` is not used, so stay 3.9-compatible
-  (`Optional[X]`, not `X | None`, in runtime-evaluated annotations).
-- Section comments use the existing `# --- name ----` style.
-- Match existing Rich markup idioms: `f"[{theme.DIM}]text[/]"`, with `markup=True` on `Static`.
+- Type hints on public methods; stay 3.9-compatible (`Optional[X]`, not `X | None`).
+- Section comments use the existing `# --- name ----` style; lines ≤ 100 characters.

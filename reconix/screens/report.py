@@ -1,4 +1,6 @@
-"""Frame 08 — Security assessment report."""
+"""Frame 08 — Security assessment report: summary, severity, key findings, exports, web."""
+
+from typing import Iterable
 
 from rich.text import Text
 from textual.app import ComposeResult
@@ -8,6 +10,33 @@ from textual.widgets import Button, DataTable, Static
 
 from .base import ReconixScreen
 from .. import store, theme
+from ..widgets.findings import cvss_text, severity_bars, severity_text, triage_text
+
+# (button id, key, label) for the quick export buttons; "more" opens every format.
+QUICK_EXPORTS = (("html", "h", "HTML"), ("pdf", "p", "PDF"), ("docx", "w", "DOCX"),
+                 ("json", "j", "JSON"))
+
+
+def executive_summary() -> str:
+    data = store.report_data()
+    counters = store.counters()
+    who = f" for {data['client']}" if data["client"] else ""
+    return (f"{data['template'] or 'An'} assessment of {data['target']}{who} "
+            f"({data['mode']}). {data['summary'].capitalize()}. {counters['blocked']} "
+            f"out-of-scope request(s) were blocked by the policy engine; "
+            f"{counters['approvals']} risky action(s) ran only after a human approved them.")
+
+
+def retest_line() -> Text:
+    retest = store.retest()
+    if not retest:
+        return Text("First assessment of this target in this session.", style=theme.DIM)
+    counts = retest["counts"]
+    return Text.assemble(
+        (f"vs {retest['previous_label']}:  ", theme.DIM),
+        (f"{counts['new']} new", theme.HIGH), ("  ·  ", theme.DIM),
+        (f"{counts['recurring']} recurring", theme.MEDIUM), ("  ·  ", theme.DIM),
+        (f"{counts['resolved']} resolved", theme.GREEN))
 
 
 class ReportScreen(ReconixScreen):
@@ -15,70 +44,101 @@ class ReportScreen(ReconixScreen):
     mode_name = "REPORT"
 
     BINDINGS = [
-        Binding("p", "export_pdf", "export PDF"),
-        Binding("w", "export_docx", "export DOCX"),
-        Binding("j", "export_json", "export JSON"),
+        Binding("h", "export('html')", "export HTML"),
+        Binding("p", "export('pdf')", "export PDF"),
+        Binding("w", "export('docx')", "export DOCX"),
+        Binding("j", "export('json')", "export JSON"),
+        Binding("e", "more_formats", "more formats"),
+        Binding("b", "web", "web dashboard"),
         Binding("escape", "back", "back", show=False),
     ]
 
+    def view_state(self) -> object:
+        run = store.get_run()
+        return (run.completed, bool(run.stopped), run.report_path,
+                tuple((f.fid, f.status) for f in store.list_findings()))
+
     def compose_body(self) -> ComposeResult:
         assessment = store.get_assessment()
-        yield Static(
-            f"[{theme.CYAN}]◆ reconix[/] [{theme.DIM}]security assessment report · "
-            f"{assessment.assessment_id}[/]",
-            classes="ai-label", markup=True,
-        )
+        ready = store.is_completed()
+        yield Static(Text.assemble(("◆ reconix ", theme.CYAN), (
+            f"security assessment report · {assessment.label}", theme.DIM)), classes="ai-label")
+        if not ready:
+            yield Static(Text(self._not_ready(), style=theme.MEDIUM), classes="panel-note")
         with Vertical(classes="panel") as panel:
             panel.border_title = "▬ SECURITY ASSESSMENT REPORT"
-            panel.border_subtitle = "OWASP WSTG format"
-            yield Static(f"[{theme.TEXT}][b]Executive Summary[/b][/]", markup=True)
-            yield Static(f"[{theme.MUTED}]{assessment.summary}[/]", markup=True)
+            panel.border_subtitle = Text(" · ".join(assessment.methodology)
+                                         or "OWASP WSTG format")
+            yield Static(Text("Executive Summary", style=f"bold {theme.TEXT}"))
+            yield Static(Text(executive_summary() if store.get_scope() else
+                              "No assessment has run yet.", style=theme.MUTED))
             yield Static("")
-            yield Static(f"[{theme.TEXT}][b]Findings by Severity[/b][/]", markup=True)
-            counts = store.severity_counts()
-            peak = max(counts.values()) or 1
-            for sev in store.SEVERITY_ORDER:
-                n = counts[sev]
-                bar_len = int(28 * n / peak)
-                line = Text()
-                line.append(f"{sev.title():<9}", style=theme.MUTED)
-                line.append("█" * bar_len, style=theme.SEVERITY[sev])
-                line.append("░" * (28 - bar_len), style=theme.BORDER)
-                line.append(f"  {n}", style=f"bold {theme.SEVERITY[sev]}")
-                yield Static(line)
+            yield Static(Text("Findings by Severity", style=f"bold {theme.TEXT}"))
+            yield Static(severity_bars(store.severity_counts()))
             yield Static("")
-            yield Static(f"[{theme.TEXT}][b]Key Findings[/b][/]", markup=True)
+            yield Static(Text("Key Findings", style=f"bold {theme.TEXT}"))
             table = DataTable(id="report-table", cursor_type="none", zebra_stripes=True)
-            table.add_columns("ID", "FINDING", "SEVERITY", "VALIDATION", "SOURCE")
+            table.add_columns("ID", "FINDING", "SEVERITY", "CVSS", "VALIDATION", "STATUS",
+                              "SOURCE")
             for f in store.key_findings(limit=4):
-                sev = Text(f"■ {f.severity}", style=f"bold {theme.SEVERITY[f.severity]}")
-                val_color = theme.TEAL if f.status == "CONFIRMED" else theme.MEDIUM
                 table.add_row(
-                    Text(f.fid, style=theme.KEY), f.title, sev,
-                    Text(f.status.title(), style=val_color),
-                    Text(f.tool, style=theme.MUTED),
+                    Text(f.fid, style=theme.KEY), Text(f.title), severity_text(f),
+                    Text(cvss_text(f), style=theme.MUTED),
+                    Text(f.validation.title(),
+                         style=theme.MEDIUM if f.needs_review else theme.TEAL),
+                    triage_text(f), Text(f.tool, style=theme.MUTED),
                 )
             yield table
+            yield Static("")
+            yield Static(Text("Changes since the last assessment", style=f"bold {theme.TEXT}"))
+            yield Static(retest_line())
         with Horizontal(classes="actions"):
-            yield Button("p  Export PDF", classes="primary", id="pdf")
-            yield Button("w  Export DOCX", classes="ghost-cyan", id="docx")
-            yield Button("j  Export JSON", classes="ghost-cyan", id="json")
-            yield Button("Web dashboard (not in demo)", classes="ghost-cyan", id="web", disabled=True)
-        yield Static(
-            f"[{theme.DIM}]report generated · ← back · 1 to restart · ^Q quit[/]",
-            markup=True,
-        )
+            yield from self._buttons(ready)
+        path = store.get_run().report_path
+        footer = (Text.assemble(("✓ report saved: ", theme.GREEN), (path, theme.TEXT),
+                                ("  ·  ", theme.DIM), ("/summary", f"bold {theme.TEAL}"),
+                                (" to open it", theme.DIM))
+                  if path else Text("← back · 1 to restart · ^Q quit", style=theme.DIM))
+        yield Static(footer)
 
-    def _export(self, fmt: str) -> None:
+    @staticmethod
+    def _not_ready() -> str:
+        run = store.get_run()
+        if run.stopped:
+            return (f"The assessment stopped ({run.stopped}), so no report can be exported. "
+                    "Partial findings are listed below.")
+        return "The report can be exported once the assessment completes."
+
+    @staticmethod
+    def _buttons(ready: bool) -> Iterable[Button]:
+        formats = {f.id: f for f in store.list_report_formats()}
+        for i, (fid, key, label) in enumerate(QUICK_EXPORTS):
+            available = formats[fid].available
+            text = f"{key}  {label}" if available else f"{label} (not installed)"
+            yield Button(text, id=fid, classes="primary" if i == 0 else "ghost-cyan",
+                         disabled=not (ready and available))
+        yield Button("e  More…", id="more", classes="ghost-cyan", disabled=not ready)
+        yield Button("b  Web dashboard", id="web", classes="ghost-cyan")
+
+    # --- actions ----------------------------------------------------------------------------
+    def action_export(self, fmt: str) -> None:
         self.app.export_report(fmt)
 
-    def action_export_pdf(self) -> None: self._export("PDF")
-    def action_export_docx(self) -> None: self._export("DOCX")
-    def action_export_json(self) -> None: self._export("JSON")
+    def action_more_formats(self) -> None:
+        self.app.run_command_line("/export")
+
+    def action_web(self) -> None:
+        self.app.open_web_dashboard()
 
     def action_back(self) -> None:
         self.app.go_prev()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        {"pdf": self.action_export_pdf, "docx": self.action_export_docx,
-         "json": self.action_export_json}[event.button.id]()
+        event.stop()
+        button = event.button.id
+        if button == "web":
+            self.action_web()
+        elif button == "more":
+            self.action_more_formats()
+        else:
+            self.action_export(button)

@@ -6,67 +6,71 @@ from rich.text import Text
 from textual.widgets import Static
 
 from .. import store, theme
+from ..flow import phase_style
+
+PHASE_COLOR = {"cyan": theme.CYAN, "amber": theme.MEDIUM, "green": theme.GREEN,
+               "red": theme.CRITICAL, "muted": theme.MUTED}
 
 
 class SessionBar(Static):
-    """Top session bar: brand + assessment context + demo/model/policy status.
+    """Top session bar: brand + assessment context + the run's phase and template.
 
     The right-hand status drops its lower-priority parts on narrow terminals so it
-    never overflows. "demo data" is shown (not "backend") because the data is mocked.
+    never overflows. "demo data" is shown (not "backend") because execution is simulated.
     """
 
     GAP = "   "
 
-    def __init__(self) -> None:
-        super().__init__(markup=True)
-
     def on_mount(self) -> None:
-        # Render both halves; Static justifies left, so build a full-width line.
-        self._refresh_line()
-
-    def _refresh_line(self) -> None:
-        width = self.size.width or 120
-        assessment = store.get_assessment()
-        left_t = Text.from_markup(
-            f"[{theme.CYAN}]◆ [b]reconix[/b][/]  "
-            f"[{theme.BORDER}]│[/]  "
-            f"[{theme.MUTED}]{assessment.assessment_id} · {assessment.target}[/]"
-        )
-        # Most important first; trailing parts are dropped when the width is tight.
-        parts = (
-            f"[{theme.MEDIUM}]◆[/] [{theme.MUTED}]demo data[/]",
-            f"[{theme.DIM}]model:[/] [{theme.MUTED}]{assessment.model}[/]",
-            f"[{theme.DIM}]policy:[/] [{theme.CYAN}]{assessment.policy}[/]",
-        )
-        gap = Text(self.GAP)
-        right_t = Text()
-        for part in parts:
-            piece = Text.from_markup(part)
-            extra = (gap.cell_len if right_t.cell_len else 0) + piece.cell_len
-            if left_t.cell_len + 2 + right_t.cell_len + extra > width:
-                break
-            if right_t.cell_len:
-                right_t = Text.assemble(right_t, gap, piece)
-            else:
-                right_t = piece
-        pad = max(1, width - left_t.cell_len - right_t.cell_len)
-        self.update(Text.assemble(left_t, Text(" " * pad), right_t))
+        self.refresh_line()
 
     def on_resize(self) -> None:
-        self._refresh_line()
+        self.refresh_line()
+
+    def _parts(self) -> List[Text]:
+        """Right-hand parts, most important first."""
+        parts: List[Text] = []
+        if store.get_run().started:
+            style = phase_style(store.display_phase())
+            glyph = "◌" if style.busy else "●"
+            parts.append(Text(f"{glyph} {style.label}",
+                              style=PHASE_COLOR.get(style.tone, theme.MUTED)))
+        parts.append(Text.assemble(("◆ ", theme.MEDIUM), ("demo data", theme.MUTED)))
+        template = store.selected_template()
+        if template:
+            parts.append(Text.assemble(("template: ", theme.DIM), (template.name, theme.MUTED)))
+        parts.append(Text.assemble(("policy: ", theme.DIM), ("enforced", theme.CYAN)))
+        return parts
+
+    def refresh_line(self) -> None:
+        width = self.size.width or 120
+        assessment = store.get_assessment()
+        left = Text.assemble(
+            ("◆ ", theme.CYAN), ("reconix", f"bold {theme.CYAN}"), ("  │  ", theme.BORDER),
+            (f"{assessment.label} · {assessment.target or 'no target yet'}", theme.MUTED),
+        )
+        gap = Text(self.GAP)
+        right = Text()
+        for piece in self._parts():
+            extra = (gap.cell_len if right.cell_len else 0) + piece.cell_len
+            if left.cell_len + 2 + right.cell_len + extra > width:
+                break
+            right = Text.assemble(right, gap, piece) if right.cell_len else piece
+        pad = max(1, width - left.cell_len - right.cell_len)
+        self.update(Text.assemble(left, Text(" " * pad), right))
 
 
 class FlowProgress(Static):
     """The rule under the session bar, showing where you are in the flow.
 
-        ── ✓ Start ─ ✓ Scope ─ ● Plan ─ ○ Approval ─ ○ Execution ─ ○ Findings ─ ○ Report ───
+        ── ✓ Start ─ ✓ Template ─ ● Plan ─ ○ Approval ─ ○ Execution ─ ○ Findings ─ ○ Report ──
 
-    ✓ settled, ✕ stopped, ○ pending; the current step is bold cyan. On narrow
-    terminals only the current step keeps its label.
+    ✓ settled, ✕ stopped, ! waiting for you, ○ pending; the current step is bold cyan. On
+    narrow terminals only the current step keeps its label.
     """
 
     SUB_STEPS = {"detail": "findings"}    # screens shown under another step
-    PASSED_IS_DONE = ("start", "findings")  # no settling event; done once you move past
+    PASSED_IS_DONE = ("findings",)        # no settling event; done once you move past
 
     def __init__(self, flow_name: str) -> None:
         super().__init__()
@@ -88,6 +92,8 @@ class FlowProgress(Static):
         state = states.get(name)
         if state == "stopped":
             return "✕", theme.CRITICAL
+        if state == "waiting":
+            return "!", theme.MEDIUM
         if state == "done" or (name in self.PASSED_IS_DONE and index < current):
             return "✓", theme.GREEN
         if index == current:
@@ -104,6 +110,8 @@ class FlowProgress(Static):
             label = name.title()
             if i == current:
                 label_style = f"bold {theme.CYAN}"
+            elif glyph == "!":
+                label_style = theme.MEDIUM
             else:
                 label_style = theme.MUTED if glyph in ("✓", "✕") else theme.DIM
             if i:

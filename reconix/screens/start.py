@@ -1,18 +1,19 @@
 """Frame 01 — Assessment Start / empty state."""
 
-from typing import Callable
+from typing import Optional
 
 from rich.table import Table
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Center, Vertical
+from textual.timer import Timer
 from textual.widgets import Static
 
 from .base import ReconixScreen
 from .. import store, theme
 from ..commands import COMMANDS
-from ..widgets import PromptBox
+from ..widgets import PromptBox, spinner_line
 
 # Colored by `#logo` in reconix.tcss.
 LOGO = r"""██████╗ ███████╗ ██████╗ ██████╗ ███╗   ██╗██╗██╗  ██╗
@@ -24,10 +25,12 @@ LOGO = r"""██████╗ ███████╗ ██████╗ 
 
 # (number, step, hint) for the "Start an assessment" panel
 QUICKSTART = (
-    ("1", "Define your authorized scope", "/scope init"),
-    ("2", "Describe a task in plain language", '"scan staging.example.com"'),
-    ("3", "Review the plan, approve, and run", "↵ at each gate"),
+    ("1", "Pick a template, type its target", "/template"),
+    ("2", "Or just type a target", '"https://staging.example.com"'),
+    ("3", "Approve scope · run plan · approve risks", "↵ at each gate"),
 )
+
+PLACEHOLDER = "Type a target (URL, IPv4, repo or path), a question, or / for commands"
 
 
 def _quickstart_steps() -> Table:
@@ -41,6 +44,23 @@ def _quickstart_steps() -> Table:
     return grid
 
 
+def _reply_line() -> Text:
+    """The last exchange at the prompt (your line and Reconix's answer), or the hint."""
+    chat = store.list_chat()
+    for i in range(len(chat) - 1, -1, -1):
+        if chat[i].speaker == "you":
+            answer = next((e for e in chat[i + 1:] if e.speaker == "reconix"), None)
+            line = Text.assemble(("› ", theme.MUTED), (chat[i].text, theme.TEXT))
+            if answer is not None:
+                line.append("\n")
+                line.append("◆ reconix  ", style=f"bold {theme.CYAN}")
+                line.append(answer.text, style=theme.MUTED)
+            return line
+    return Text.assemble(("No active scope — type ", theme.MUTED),
+                         ("/template", f"bold {theme.TEAL}"),
+                         (" or a target below to begin.", theme.MUTED))
+
+
 class StartScreen(ReconixScreen):
     flow_name = "start"
     mode_name = "CHAT"
@@ -49,17 +69,12 @@ class StartScreen(ReconixScreen):
     BINDINGS = [
         Binding("enter", "begin", "start assessment"),
         Binding("question_mark", "help", "help", key_display="?"),
-        Binding("escape", "skip_thinking", "skip", show=False),
     ]
-
-    SPINNER = ("✻", "✶", "✽", "✢", "·", "✢", "✽", "✶")
 
     def __init__(self) -> None:
         super().__init__()
-        self._thinking = False
-        self._then: Callable[[], None] = lambda: None
-        self._message = ""
         self._frame = 0
+        self._spin: Optional[Timer] = None
 
     def compose_body(self) -> ComposeResult:
         with Vertical(id="start-center"):
@@ -69,64 +84,53 @@ class StartScreen(ReconixScreen):
                 yield Static(LOGO, id="logo", markup=False)
             yield Static("AI-Powered Security Testing Assistant", id="tagline")
             yield Static(
-                "v0.3.0  ·  terminal interface  ·  authorized assessments only",
+                "v0.4.0  ·  terminal interface  ·  authorized assessments only",
                 id="version-line",
             )
             with Center():
                 with Vertical(id="quickstart", classes="panel") as qs:
                     qs.border_title = "◆ Start an assessment"
                     yield Static(_quickstart_steps(), classes="muted")
-            yield Static(
-                f"[{theme.MUTED}]No active scope — type [/]"
-                f"[{theme.TEAL}][b]/scope[/b][/] "
-                f"[{theme.MUTED}]or a request below to begin.[/]",
-                id="no-scope", markup=True,
-            )
+            yield Static(_reply_line(), id="no-scope")
         yield PromptBox(
-            COMMANDS, store.list_history,
-            placeholder="Describe a security task, or type / for commands",
+            COMMANDS, store.list_history, placeholder=PLACEHOLDER,
             initial=self.app.pending_prompt, id="prompt-box",
         )
 
     def on_mount(self) -> None:
         self.app.pending_prompt = ""
         self.query_one(PromptBox).focus_input()
+        self.refresh_live()
 
     def action_begin(self) -> None:
-        if not self._thinking:          # Enter while thinking must not re-send
+        if not self._working():          # Enter while working must not re-send
             self.app.submit_request("")
 
-    # --- Claude-style "thinking" spinner above the prompt -------------------------
-    def think(self, message: str, seconds: float, then: Callable[[], None]) -> None:
-        self._thinking, self._then, self._message, self._frame = True, then, message, 0
-        self.query_one(PromptBox).set_busy(self._spinner_line())
-        self._spin = self.set_interval(0.12, self._spin_tick)
-        self._done = self.set_timer(seconds, self._finish_thinking)
+    # --- live: Reconix's answer, and a spinner while the run heads for its first gate ------
+    def _working(self) -> bool:
+        run = store.get_run()
+        return (run.started and not store.is_finished() and not store.waiting_gate()
+                and not store.is_scope_approved())
 
-    def _spinner_line(self) -> Text:
-        glyph = self.SPINNER[self._frame % len(self.SPINNER)]
-        return Text.assemble((f"{glyph} ", f"bold {theme.CYAN}"), (self._message, theme.TEXT),
-                             ("   esc to skip", theme.DIM))
+    def refresh_live(self) -> None:
+        self.query_one("#no-scope", Static).update(_reply_line())
+        if self._working() and self._spin is None:
+            self._spin = self.set_interval(0.12, self._spin_tick)
+        elif not self._working() and self._spin is not None:
+            self._spin.stop()
+            self._spin = None
+            self.query_one(PromptBox).set_busy(None)
+        if self._spin is not None:
+            self._draw_spinner()
 
     def _spin_tick(self) -> None:
         self._frame += 1
-        self.query_one(PromptBox).set_busy(self._spinner_line())
+        self._draw_spinner()
 
-    def _finish_thinking(self) -> None:
-        if not self._thinking:
-            return
-        if self.app.screen is not self:  # a dialog is open on top: wait for it
-            self._done = self.set_timer(0.2, self._finish_thinking)
-            return
-        self._thinking = False
-        self._spin.stop()
-        self._done.stop()
-        self.query_one(PromptBox).set_busy(None)
-        self._then()
-
-    def action_skip_thinking(self) -> None:
-        if self._thinking:
-            self._finish_thinking()
+    def _draw_spinner(self) -> None:
+        chat = [e for e in store.list_chat() if e.speaker == "reconix"]
+        message = chat[-1].text if chat else "reconix is reading the target…"
+        self.query_one(PromptBox).set_busy(spinner_line(self._frame, message))
 
     def action_help(self) -> None:
         self.app.action_help()

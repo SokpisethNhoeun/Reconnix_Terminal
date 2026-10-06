@@ -8,7 +8,7 @@ from .errors import StoreValidationError
 
 
 def current_operator() -> str:
-    return lists.ASSESSMENTS[-1].operator
+    return lists.current().operator
 
 
 def log_event(kind: str, detail: str = "") -> AuditEvent:

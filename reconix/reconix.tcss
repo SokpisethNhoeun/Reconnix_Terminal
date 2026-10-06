@@ -1,22 +1,7 @@
 /* Reconix TUI — theme from the Figma design tokens.
    Dark security-tool look, cyan/teal accent, fixed severity scale. */
 
-$bg:            #0B0F12;
-$surface:       #131A1F;
-$surface2:      #0F1519;
-$raised:        #18222A;
-$border:        #1F2A30;
-$border-strong: #2B3A42;
-$text:          #E6EDF0;
-$muted:         #7D8B91;
-$dim:           #4A575D;
-$cyan:          #22D3EE;
-$cyan-dim:      #0E7490;
-$teal:          #2DD4BF;
-$critical:      #F2495C;
-$high:          #F97316;
-$medium:        #FBBF24;
-$low:           #38BDF8;
+/* $variables come from theme.CSS_TOKENS (ReconixApp.get_css_variables). */
 
 Screen {
     background: $bg;
@@ -198,7 +183,7 @@ OptionList > .option-list--option-highlighted {
 }
 
 OptionList:focus > .option-list--option-highlighted {
-    background: #0E2A33;
+    background: $cyan-bg;
     color: $text;
 }
 
@@ -315,7 +300,7 @@ DataTable > .datatable--header {
 }
 
 DataTable > .datatable--cursor {
-    background: #0E2A33;
+    background: $cyan-bg;
     color: $text;
     text-style: bold;
 }
@@ -354,6 +339,10 @@ ProgressBar ETAStatus { color: $dim; }
     margin-top: 1;
 }
 
+.overall > Static {
+    width: auto;
+}
+
 /* --------------------------------------------------------------- log */
 RichLog {
     background: $surface2;
@@ -389,7 +378,8 @@ RichLog {
 #no-scope     { color: $muted; margin-top: 1; }
 
 #quickstart {
-    width: 72;
+    width: 80;
+    max-width: 100%;
     margin-top: 1;
 }
 
@@ -525,3 +515,77 @@ Toast.-error {
     border-left: outer $critical;
 }
 
+
+/* ------------------------------------------------------------- forms */
+FormScreen {
+    align: center middle;
+    background: $bg 70%;
+}
+
+.dialog.form {
+    width: 80;
+}
+
+.dialog.form Input {
+    margin-bottom: 1;
+}
+
+.form-note {
+    color: $muted;
+    margin-bottom: 1;
+    height: auto;
+}
+
+.field-label {
+    color: $muted;
+    text-style: bold;
+}
+
+.field-label.-warn {
+    color: $medium;
+}
+
+#form-error {
+    color: $critical;
+    height: auto;
+}
+
+.form-actions {
+    height: auto;
+    margin-top: 1;
+}
+
+/* ------------------------------------------------- template / plan / approval */
+.spinner {
+    height: 1;
+    margin-bottom: 1;
+}
+
+#target-row {
+    height: auto;
+    margin-top: 1;
+}
+
+#target-row .field-label {
+    margin-bottom: 0;
+}
+
+#target-error {
+    color: $critical;
+    height: auto;
+}
+
+#reason-row {
+    height: auto;
+    margin-top: 1;
+}
+
+.approval-row {
+    height: auto;
+}
+
+/* ------------------------------------------------------------ execution */
+#exec-hint {
+    height: auto;
+    margin-top: 1;
+}

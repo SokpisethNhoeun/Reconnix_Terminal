@@ -12,15 +12,18 @@ if TYPE_CHECKING:
 
 # --- argument choices ----------------------------------------------------------
 def _finding_choices(app: "ReconixApp") -> List[Choice]:
-    return [Choice(f.fid.lower(), f"{f.fid}  {f.title}", f.severity) for f in store.list_findings()]
+    return [Choice(f.fid.lower(), f"{f.fid}  {f.title}", f.effective_severity)
+            for f in store.list_findings()]
+
+
+def _template_choices(app: "ReconixApp") -> List[Choice]:
+    return [Choice(t.id, t.name, t.description, disabled=not t.available)
+            for t in store.list_templates()]
 
 
 def _export_choices(app: "ReconixApp") -> List[Choice]:
-    return [
-        Choice("pdf", "PDF", "printable report"),
-        Choice("docx", "DOCX", "editable document"),
-        Choice("json", "JSON", "machine-readable findings"),
-    ]
+    return [Choice(f.id, f.name, f.description, disabled=not f.available)
+            for f in store.list_report_formats()]
 
 
 # --- handlers --------------------------------------------------------------------
@@ -31,24 +34,38 @@ def _goto(name: str) -> Callable[["ReconixApp", Optional[str]], None]:
 
 
 def _open_finding(app: "ReconixApp", fid: Optional[str]) -> None:
-    ids = [f.fid.lower() for f in store.list_findings()]
-    app.open_finding(ids.index(fid or ""))
+    for finding in store.list_findings():
+        if finding.fid.lower() == (fid or "").lower():
+            app.open_finding(finding.fid)
+            return
 
 
 COMMANDS = (
     Command("help", "Show shortcuts for this screen", lambda app, arg: app.action_help()),
-    Command("new", "Back to the start prompt", _goto("start"), aliases=("start",)),
-    Command("scope", "Review the scope manifest", _goto("scope")),
-    Command("plan", "Review the test plan", _goto("plan")),
+    Command("new", "Start a new assessment (optionally on a target)",
+            lambda app, arg: app.new_assessment(arg), aliases=("start",)),
+    Command("template", "Pick a template, then type its target",
+            lambda app, tid: app.open_template(tid), choices=_template_choices,
+            question="Which kind of target?", aliases=("templates",), ask=False),
+    Command("plan", "Review and run the test plan", _goto("plan")),
     Command("approval", "Open the approval gate", _goto("approval")),
-    Command("status", "Live execution (after approval)",
-            lambda app, arg: app.open_execution(), aliases=("execution",)),
+    Command("status", "Live execution (after the plan runs)", _goto("execution"),
+            aliases=("execution",)),
     Command("findings", "List all findings", _goto("findings")),
     Command("finding", "Open one finding…", _open_finding,
-            choices=_finding_choices, question="Which finding?"),
+            choices=_finding_choices, question="Which finding?",
+            empty="No findings yet. They appear as testing finds them."),
     Command("report", "Open the assessment report", _goto("report")),
-    Command("audit", "Show the audit trail", lambda app, arg: app.show_audit()),
-    Command("export", "Export the report…", lambda app, fmt: app.export_report((fmt or "").upper()),
+    Command("export", "Export the report…", lambda app, fmt: app.export_report(fmt),
             choices=_export_choices, question="Export the report as…"),
+    Command("summary", "Show the assessment summary", lambda app, arg: app.show_summary()),
+    Command("assessments", "List and reopen assessments",
+            lambda app, arg: app.open_assessments(), aliases=("list",)),
+    Command("import", "Import tool output (nuclei / nmap / ZAP)",
+            lambda app, arg: app.open_import()),
+    Command("audit", "Activity log and audit trail", lambda app, arg: app.show_audit(),
+            aliases=("activity", "log")),
+    Command("web", "Open the web dashboard in your browser",
+            lambda app, arg: app.open_web_dashboard(), aliases=("dashboard",)),
     Command("quit", "Quit Reconix", lambda app, arg: app.exit(), aliases=("exit",)),
 )

@@ -1,10 +1,15 @@
-"""Claude-Code-style questions: numbered choices, "Type something.", "Chat about this"."""
+"""Claude-Code-style questions ("Type something.", "Chat about this"), help, and the Start
+screen layout."""
+
+import pytest
+from textual.widgets import Static
 
 from reconix import store
-from reconix.screens import ApprovalScreen, ChoiceScreen, ScopeScreen, StartScreen
+from reconix.app import ReconixApp
+from reconix.screens import ApprovalScreen, HelpScreen, StartScreen, TemplateScreen
 from reconix.widgets import ChoiceMenu, PromptBox
 
-from .support import SIZE, event_kinds, show
+from .support import SIZE, event_kinds, run_ui_to, settle, start_demo
 
 
 def prompt_text(menu: ChoiceMenu, index: int) -> str:
@@ -13,7 +18,7 @@ def prompt_text(menu: ChoiceMenu, index: int) -> str:
 
 async def test_choices_are_numbered_with_descriptions_and_extras(app):
     async with app.run_test(size=SIZE) as pilot:
-        await show(app, pilot, "scope")
+        await start_demo(pilot)
         menu = app.focused
         assert isinstance(menu, ChoiceMenu)
         first = prompt_text(menu, 0)
@@ -24,67 +29,74 @@ async def test_choices_are_numbered_with_descriptions_and_extras(app):
         assert labels[-1].strip().startswith("5. Chat about this")
 
 
-async def test_a_digit_picks_that_choice(app):
-    async with app.run_test(size=SIZE) as pilot:
-        await show(app, pilot, "scope")
-        await pilot.press("3")                                   # Reject
-        await pilot.pause()
-        assert isinstance(app.screen, StartScreen)
-        assert event_kinds() == ["scope.rejected"]
-
-
 async def test_type_something_saves_feedback_and_stays(app):
     async with app.run_test(size=SIZE) as pilot:
-        await show(app, pilot, "scope")
+        await start_demo(pilot)
         await pilot.press("4", "s", "k", "i", "p", "space", "/", "a", "enter")
-        await pilot.pause()
-        assert isinstance(app.screen, ScopeScreen)
+        await settle(pilot)
+        assert isinstance(app.screen, TemplateScreen)
         [feedback] = store.list_feedback()
-        assert (feedback.gate, feedback.text) == ("scope", "skip /a")
-        assert event_kinds() == ["scope.feedback"]
+        assert (feedback.gate, feedback.text) == ("template", "skip /a")
+        assert not store.is_scope_approved()
 
 
 async def test_typing_never_triggers_screen_shortcuts(app):
     async with app.run_test(size=SIZE) as pilot:
-        await show(app, pilot, "approval")
-        await pilot.press("5", "n", "d", "y", "1")               # n/d/y/1 are typed, not run
-        await pilot.pause()
+        await run_ui_to(app, pilot, "approval:approval-001")
+        await pilot.press("5", "d", "y", "1")                    # typed, not run
+        await settle(pilot)
         assert isinstance(app.screen, ApprovalScreen)
         assert store.list_approval_decisions() == []
-        assert "ndy1" in prompt_text(app.focused, 4)
-        await pilot.press("escape")                              # clears the draft first
-        await pilot.pause()
-        assert isinstance(app.screen, ApprovalScreen)
-        assert "Type something." in prompt_text(app.focused, 4)
+        assert "dy1" in prompt_text(app.focused, 4)
 
 
 async def test_chat_about_this_opens_the_prompt_with_context(app):
     async with app.run_test(size=SIZE) as pilot:
-        await show(app, pilot, "approval")
+        await run_ui_to(app, pilot, "approval:approval-001")
         await pilot.press("6")                                   # Chat about this
-        await pilot.pause()
+        await settle(pilot)
         assert isinstance(app.screen, StartScreen)
         box = app.screen.query_one(PromptBox)
-        assert box.input.value == "About web_vuln_scan on staging.example.com: "
-        assert not box.menu_open
+        assert box.input.value == ("About Baseline request (read-only) on "
+                                   "staging.example.com: ")
         assert "approval.chat" in event_kinds()
-
-
-async def test_high_risk_confirmation_ignores_digits(app):
-    async with app.run_test(size=SIZE) as pilot:
-        await show(app, pilot, "approval")
-        await pilot.press("enter")                               # opens the confirmation
-        await pilot.pause()
-        await pilot.press("2")                                   # would be "Yes" if numbered
-        await pilot.pause()
-        assert isinstance(app.screen, ChoiceScreen)
-        assert store.list_approval_decisions() == []
-        assert not prompt_text(app.screen.query_one(ChoiceMenu), 0).strip().startswith("1.")
 
 
 async def test_sent_message_has_a_background_bar(app):
     async with app.run_test(size=SIZE) as pilot:
-        await show(app, pilot, "scope")
+        await start_demo(pilot)
         message = app.screen.query_one(".user-msg")
         body = app.screen.query_one("#body")
         assert message.styles.background != body.styles.background
+
+
+async def test_help_lists_the_keys_of_this_screen(app):
+    async with app.run_test(size=SIZE) as pilot:
+        await run_ui_to(app, pilot, "approval:approval-001")
+        await pilot.press("question_mark")
+        await settle(pilot)
+        assert isinstance(app.screen, HelpScreen)
+        assert "APPROVAL" in app.screen.query_one("#help-box").border_title
+        text = " ".join(str(w.render()) for w in app.screen.query(Static))
+        for phrase in ("pick a numbered choice", "details", "decide later",
+                       "jump to a screen"):
+            assert phrase in text
+
+
+@pytest.mark.parametrize("size", [(200, 50), (140, 45), (80, 24)])
+async def test_logo_and_steps_panel_are_centred(size):
+    app = ReconixApp()
+    async with app.run_test(size=size) as pilot:
+        await pilot.pause()
+        area = app.screen.query_one("#start-center").region
+        for selector in ("#logo", "#quickstart"):
+            region = app.screen.query_one(selector).region
+            left, right = region.x - area.x, area.right - region.right
+            assert abs(left - right) <= 1, f"{selector} is off-centre at {size}"
+
+
+async def test_quickstart_steps_fit_on_one_line_each(app):
+    async with app.run_test(size=(200, 50)) as pilot:
+        await pilot.pause()
+        steps = app.screen.query_one("#quickstart").query("Static").first()
+        assert steps.region.height == 3

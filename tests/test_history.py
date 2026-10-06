@@ -3,7 +3,7 @@
 import pytest
 
 from reconix import store
-from reconix.store.seed import USER_REQUEST
+from reconix.store.seed import DEMO_REQUEST as USER_REQUEST
 
 
 def test_history_is_seeded_with_the_demo_request():

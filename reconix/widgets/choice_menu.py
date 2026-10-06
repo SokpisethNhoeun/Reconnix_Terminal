@@ -177,6 +177,9 @@ class ChoiceMenu(OptionList):
             line.append(label, style=f"bold {accent}")
         else:
             line.append(label, style=theme.CRITICAL if choice.tone == "danger" else theme.TEXT)
+        if choice.tag:
+            line.append("  ")
+            line.append_text(theme.chip(choice.tag, "cyan"))
         if choice.hint:
             line.append("\n" + " " * (2 + len(number)) + choice.hint, style=theme.MUTED)
         return line

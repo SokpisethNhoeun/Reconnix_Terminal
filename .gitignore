@@ -24,3 +24,6 @@ htmlcov/
 # Env files (never commit secrets/config)
 .env
 .env.*
+
+# generated reports
+reports/

@@ -18,6 +18,9 @@ class Command:
     choices: Optional[ChoiceProvider] = None   # selectable values for the argument
     aliases: Tuple[str, ...] = ()
     question: str = ""                         # dialog question when choices are shown
+    empty: str = ""                            # said when there are no choices yet
+    ask: bool = True                           # no argument typed: ask with a menu (False:
+                                               #   run without one; choices only suggest)
 
     @property
     def takes_argument(self) -> bool:

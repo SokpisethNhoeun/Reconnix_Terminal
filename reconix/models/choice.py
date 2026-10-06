@@ -13,3 +13,4 @@ class Choice:
     kind: str = "choice"       # "choice" | "input" (the "Type something." row)
     separated: bool = False    # draw a rule above this choice
     disabled: bool = False     # shown dimmed with "(not in demo)"; cannot be picked
+    tag: str = ""              # small chip after the label, e.g. "AI SUGGESTED"

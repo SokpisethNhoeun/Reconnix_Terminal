@@ -1,15 +1,85 @@
-"""Frame 05 — Live execution (animated progress + streaming log)."""
+"""Frame 05 — Live execution: the plan's tasks, an overall bar, and the live output.
+
+The run plays on its own (the app hosts it). This screen redraws after every step, says
+when the run is paused at a gate (Enter opens it), and offers ^C to stop.
+"""
 
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.widgets import ProgressBar, RichLog, Static
+from textual.widgets import ProgressBar, Static
 
 from .base import ReconixScreen
 from .choice import ChoiceScreen
 from .. import store, theme
-from ..models import Choice, LogLine
+from ..models import GATE_ACCOUNT, GATE_APPROVAL_PREFIX, PROGRESS_BARS, Choice, PlanTask
+from ..widgets import RunLog
+
+TESTING_BARS = tuple(bar for bar in PROGRESS_BARS if bar != "report")
+
+
+def run_state() -> str:
+    """"running" | "approval" | "login" | "complete" | "stopped"."""
+    run = store.get_run()
+    if run.stopped:
+        return "stopped"
+    if run.completed:
+        return "complete"
+    gate = store.waiting_gate()
+    if gate and store.gate_state(gate) == "pending":
+        if gate.startswith(GATE_APPROVAL_PREFIX):
+            return "approval"
+        if gate == GATE_ACCOUNT:
+            return "login"
+    return "running"
+
+
+def overall_percent() -> int:
+    progress = store.phase_progress()
+    return round(sum(progress[bar] for bar in TESTING_BARS) / len(TESTING_BARS))
+
+
+def task_line(task: PlanTask) -> Text:
+    percent = store.phase_progress().get(task.key, 0)
+    color, glyph = theme.STATUS.get(task.status, (theme.DIM, "·"))
+    detail = {"done": "done", "active": f"{percent}%"}.get(task.status, "queued")
+    if task.key == "report" and task.status == "active":
+        detail = "ready · export it from the Report screen"
+    text_color = theme.TEXT if task.status == "active" else theme.MUTED
+    return Text.assemble((f"{glyph} ", color), (f"{task.label:<30}", f"bold {text_color}"),
+                         (detail, theme.CYAN if task.status == "active" else theme.DIM))
+
+
+PANEL_TITLE = {
+    "running": ("◌ RUNNING", theme.CYAN),
+    "approval": ("⏸ WAITING FOR YOUR APPROVAL", theme.MEDIUM),
+    "login": ("⏸ WAITING FOR THE TARGET LOGIN", theme.MEDIUM),
+    "complete": ("✓ COMPLETE", theme.GREEN),
+    "stopped": ("✕ STOPPED", theme.CRITICAL),
+}
+
+
+def hint_line(state: str) -> Text:
+    key = ("Enter", f"bold {theme.TEXT}")
+    if state == "approval":
+        request = store.get_approval(store.waiting_gate()[len(GATE_APPROVAL_PREFIX):])
+        return Text.assemble((f"⏸ paused — {request.action} ({request.risk}) needs your "
+                              "approval. Press ", theme.MEDIUM), key, (" to review it.",
+                                                                       theme.MEDIUM))
+    if state == "login":
+        return Text.assemble(("⏸ paused — testing needs the target login. Press ",
+                              theme.MEDIUM), key, (" to add it securely.", theme.MEDIUM))
+    if state == "complete":
+        return Text.assemble(("✓ assessment complete — press ", theme.GREEN),
+                             ("→", f"bold {theme.TEXT}"), (" or ", theme.GREEN), key,
+                             (" to view findings", theme.GREEN))
+    if state == "stopped":
+        return Text.assemble((f"✕ stopped ({store.get_run().stopped}) — press ", theme.CRITICAL),
+                             ("→", f"bold {theme.TEXT}"), (" or ", theme.CRITICAL), key,
+                             (" to view partial findings", theme.CRITICAL))
+    return Text.assemble(("streaming… findings appear as they are found · ", theme.DIM),
+                         ("^C", f"bold {theme.TEXT}"), (" to stop", theme.DIM))
 
 
 class ExecutionScreen(ReconixScreen):
@@ -17,152 +87,85 @@ class ExecutionScreen(ReconixScreen):
     mode_name = "EXECUTION"
 
     BINDINGS = [
-        Binding("enter", "advance", "view findings"),
-        Binding("ctrl+c", "stop", "stop scan", show=False),
-        Binding("escape", "detach", "detach", show=False),
+        Binding("enter", "advance", "continue"),
+        Binding("ctrl+c", "stop", "stop the run", show=False),
+        Binding("escape", "detach", "back to plan", show=False),
     ]
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._line = 0
-        self._done = False
-        self._tasks = store.list_exec_tasks()
-        self._output = store.list_scan_output()
-
     def compose_body(self) -> ComposeResult:
-        total = len(self._tasks)
-        done = sum(1 for t in self._tasks if t.status == "DONE")
-        running_tool = next((t.tool for t in self._tasks if t.status == "RUNNING"), "")
-        yield Static(
-            f"[{theme.CYAN}]◆ reconix[/] [{theme.DIM}]executing approved plan · {total} steps[/]",
-            classes="ai-label", markup=True,
-        )
-        with Vertical(classes="panel") as panel:
-            panel.border_title = "◌ RUNNING"
-            panel.border_subtitle = f"{done} of {total} complete"
-            for task in self._tasks:
-                running = task.status == "RUNNING"
-                icon = f"[{theme.CYAN}]◌[/]" if running else f"[{theme.GREEN}]✓[/]"
-                color = theme.TEXT if running else theme.MUTED
-                dcolor = theme.CYAN if running else theme.DIM
-                yield Static(
-                    f"{icon} [{color}][b]{task.action:<20}[/b][/] [{dcolor}]{task.detail}[/]",
-                    id=f"task-{task.action}", classes="task-row", markup=True,
-                )
+        tasks = store.plan_tasks()
+        yield Static(Text.assemble(("◆ reconix ", theme.CYAN), (
+            f"executing approved plan · {len(tasks)} tasks · "
+            f"{store.selected_template().name} template", theme.DIM)), classes="ai-label")
+        with Vertical(classes="panel", id="exec-panel"):
+            for task in tasks:
+                yield Static(task_line(task), id=f"task-{task.key}", classes="task-row")
             with Horizontal(classes="overall"):
-                yield Static(f"[{theme.DIM}]overall[/] ", markup=True)
+                yield Static(Text("overall ", style=theme.DIM))
                 yield ProgressBar(total=100, show_eta=False, id="overall-bar")
-        log = RichLog(id="live-log", markup=True, highlight=False, wrap=True)
+        log = RunLog(id="live-log")
         log.border_title = "▤ live output"
-        log.border_subtitle = f"{running_tool} · ^C stop"
         yield log
-        yield Static(
-            f"[{theme.DIM}]streaming… press [/][{theme.TEXT}][b]→[/b][/]"
-            f"[{theme.DIM}] or [/][{theme.TEXT}][b]Enter[/b][/]"
-            f"[{theme.DIM}] when the scan finishes[/]",
-            id="exec-hint", markup=True,
-        )
+        yield Static(id="exec-hint")
 
     def on_mount(self) -> None:
-        self.query_one("#overall-bar", ProgressBar).update(progress=40)
-        self._timer = self.set_interval(0.6, self._tick)
+        self.refresh_live()
 
-    def _tick(self) -> None:
-        log = self.query_one("#live-log", RichLog)
-        bar = self.query_one("#overall-bar", ProgressBar)
-        if self._line < len(self._output):
-            log.write(self._log_text(self._output[self._line]))
-            self._line += 1
-            bar.update(progress=40 + int(60 * self._line / len(self._output)))
-        else:
-            self._finish()
-            self._timer.stop()
-
-    def _finish(self) -> None:
-        if self._done:
-            return
-        self._done = True
-        self._end_log_subtitle("done")
-        self.call_after_refresh(self.refresh_progress)
-        self.query_one("#overall-bar", ProgressBar).update(progress=100)
-        panel = self.query_one(".panel", Vertical)
-        panel.border_title = f"[{theme.GREEN}]✓ COMPLETE[/]"
-        total = len(self._tasks)
-        panel.border_subtitle = (
-            f"{total} of {total} complete · {len(store.list_findings())} findings"
-        )
-        for task in self._tasks:
-            if task.status == "RUNNING":
-                self.query_one(f"#task-{task.action}", Static).update(
-                    f"[{theme.GREEN}]✓[/] [{theme.MUTED}][b]{task.action:<20}[/b][/] "
-                    f"[{theme.DIM}]{task.result}[/]"
-                )
-        self.query_one("#exec-hint", Static).update(
-            f"[{theme.GREEN}]✓ scan complete — press [/][{theme.TEXT}][b]→[/b][/]"
-            f"[{theme.GREEN}] or [/][{theme.TEXT}][b]Enter[/b][/]"
-            f"[{theme.GREEN}] to view findings[/]"
-        )
-        store.log_event("execution.completed")
-
-    def _end_log_subtitle(self, state: str) -> None:
-        """Once the scan has ended, stop advertising ^C."""
-        tool = next((t.tool for t in self._tasks if t.status == "RUNNING"), "scan")
-        self.query_one("#live-log", RichLog).border_subtitle = f"{tool} · {state}"
+    def refresh_live(self) -> None:
+        state = run_state()
+        tasks = store.plan_tasks()
+        for task in tasks:
+            self.query_one(f"#task-{task.key}", Static).update(task_line(task))
+        self.query_one("#overall-bar", ProgressBar).update(progress=overall_percent())
+        panel = self.query_one("#exec-panel", Vertical)
+        title, color = PANEL_TITLE[state]
+        panel.border_title = Text(title, style=f"bold {color}")
+        counters = store.counters()
+        done = sum(1 for t in tasks if t.status == "done")
+        panel.border_subtitle = Text(f"{done} of {len(tasks)} complete · "
+                                     f"{counters['requests']} requests · "
+                                     f"{counters['blocked']} blocked · "
+                                     f"{counters['findings']} finding"
+                                     f"{'' if counters['findings'] == 1 else 's'}")
+        log = self.query_one("#live-log", RunLog)
+        log.sync()
+        log.border_subtitle = self._log_subtitle(state)
+        self.query_one("#exec-hint", Static).update(hint_line(state))
 
     @staticmethod
-    def _log_text(line: LogLine) -> Text:
-        """Color one tool-output line. Built as Text, so tool output is never parsed as markup."""
-        if line.kind == "match":
-            sev_color = theme.SEVERITY.get(line.severity.upper(), theme.MUTED)
-            return Text.assemble(
-                ("[✓]", theme.GREEN), " ", (f"[{line.template}]", theme.KEY),
-                f" {line.target} ", (f"[{line.severity}]", sev_color),
-            )
-        return Text.assemble(("[INF]", theme.LOW), f" {line.message}")
+    def _log_subtitle(state: str) -> Text:
+        """Built as Text: the tools come from the (editable) scope, never markup."""
+        tools = ", ".join(store.get_scope().tools)
+        return Text({"running": f"{tools} · ^C stop", "complete": f"{tools} · done",
+                     "stopped": f"{tools} · stopped"}.get(state, f"{tools} · paused"))
 
+    # --- keys ---------------------------------------------------------------------------------
     def action_advance(self) -> None:
-        self._finish()
-        self.app.go_next()
+        state = run_state()
+        if state in ("approval", "login"):
+            self.app.open_gate(store.waiting_gate())
+        elif state in ("complete", "stopped"):
+            self.app.goto("findings")
+        else:
+            self.notify("Still running. Findings appear as they are found (6).")
 
     def action_stop(self) -> None:
-        if self._done:
+        if run_state() in ("complete", "stopped"):
             return
-        tool = next((t.tool for t in self._tasks if t.status == "RUNNING"), "the scan")
 
         def answer(choice: str) -> None:
             if choice == "stop":
-                self._stop_scan(tool)
+                self.app.stop_run()
 
         self.app.push_screen(ChoiceScreen(
-            "Stop scan", f"Stop {tool}?",
+            "Stop the run", "Stop this assessment?",
             [
-                Choice("keep", "Keep running", "Let the scan finish."),
-                Choice("stop", f"Stop {tool}", "Halt now; partial results are kept.", "danger"),
+                Choice("keep", "Keep running", "Let the plan finish."),
+                Choice("stop", "Stop now", "Nothing else runs; findings so far are kept.",
+                       "danger"),
             ],
             chip="Execution", danger=True,
         ), answer)
 
-    def _stop_scan(self, tool: str) -> None:
-        if self._done:
-            return
-        self._done = True
-        self._timer.stop()
-        self._end_log_subtitle("stopped")
-        store.log_event("execution.stopped", tool)
-        self.refresh_progress()
-        panel = self.query_one(".panel", Vertical)
-        panel.border_title = f"[{theme.CRITICAL}]\u2715 STOPPED[/]"
-        for task in self._tasks:
-            if task.status == "RUNNING":
-                self.query_one(f"#task-{task.action}", Static).update(
-                    f"[{theme.CRITICAL}]\u2715[/] [{theme.MUTED}][b]{task.action:<20}[/b][/] "
-                    f"[{theme.DIM}]stopped by operator[/]"
-                )
-        self.query_one("#exec-hint", Static).update(
-            f"[{theme.CRITICAL}]\u2715 scan stopped — press [/][{theme.TEXT}][b]\u2192[/b][/]"
-            f"[{theme.CRITICAL}] or [/][{theme.TEXT}][b]Enter[/b][/]"
-            f"[{theme.CRITICAL}] to view partial findings[/]"
-        )
-
     def action_detach(self) -> None:
-        self.app.go_prev()
+        self.app.goto("plan")

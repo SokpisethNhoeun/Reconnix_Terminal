@@ -1,5 +1,11 @@
-"""Frame 04 — Human approval gate (↑/↓ choices, second confirmation for HIGH risk)."""
+"""Frame 04 — Human approval gate (MEDIUM: one decision; HIGH: a reason + a second confirmation).
 
+The run stops here when it reaches a gated action. The store is the authority: it re-checks
+the command hash, the single-use confirmation token and the reason; the screen only asks.
+When nothing is waiting, the screen lists the decisions made and the actions still ahead.
+"""
+
+from copy import deepcopy
 from typing import List, Optional
 
 from rich.console import RenderableType
@@ -7,20 +13,27 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
-from textual.widgets import Static
+from textual.widgets import Input, Label, Static
 
 from .base import ReconixScreen
 from .choice import ChoiceScreen, details_body
 from .. import store, theme
-from ..models import Choice
+from ..models import GATE_APPROVAL_PREFIX, ApprovalRequest, Choice
+from ..store.approvals import MAX_REASON_LENGTH, MIN_REASON_LENGTH, clean_reason
 from ..widgets import ChoiceMenu, Question, menu_hint
+from ..widgets.manifest import manifest_fields
 
-# (scope manifest key, label) shown in View details
-SCOPE_LIMITS = (
-    ("targets", "targets"), ("allowed_tools", "tools"), ("allowed_ports", "ports"),
-    ("allowed_http_methods", "methods"), ("allowed_url_patterns", "url patterns"),
-    ("excluded_paths", "excluded"), ("out_of_scope", "out of scope"),
-)
+
+def waiting_request() -> Optional[ApprovalRequest]:
+    """The approval request the run is waiting on right now, if any."""
+    gate = store.waiting_gate()
+    if not gate.startswith(GATE_APPROVAL_PREFIX) or store.gate_state(gate) != "pending":
+        return None
+    return store.get_approval(gate[len(GATE_APPROVAL_PREFIX):])
+
+
+def _row(label: str, *parts) -> Static:
+    return Static(Text.assemble((f"{label:<12}", theme.DIM), *parts), classes="approval-row")
 
 
 class ApprovalScreen(ReconixScreen):
@@ -29,103 +42,165 @@ class ApprovalScreen(ReconixScreen):
 
     BINDINGS = [
         Binding("enter", "choose", "select", show=False),
-        Binding("y", "approve", "approve", show=False),
-        Binding("n", "reject", "reject"),
         Binding("d", "details", "details"),
-        Binding("escape", "cancel", "back to plan", show=False),
+        Binding("escape", "later", "decide later"),
     ]
 
     def __init__(self) -> None:
         super().__init__()
-        self._request = store.get_pending_approval()
-        self._step = store.get_plan_step(self._request.step_num)
+        request = waiting_request()
+        # A copy: what the operator approves is what was shown (the store re-checks the hash).
+        self._request: Optional[ApprovalRequest] = deepcopy(request) if request else None
 
+    def view_state(self) -> object:
+        request = waiting_request()
+        return request.request_id if request else ""
+
+    @property
+    def _high(self) -> bool:
+        return self._request is not None and self._request.risk == "HIGH"
+
+    # --- layout ------------------------------------------------------------------------------
     def compose_body(self) -> ComposeResult:
-        req, step = self._request, self._step
-        total = len(store.list_plan_steps())
-        target = store.get_assessment().target
-        high_risk = store.needs_confirmation(req.request_id)
-        yield Static(
-            f"[{theme.GREEN}]✓[/] [{theme.DIM}][1-{step.num - 1}] recon complete — "
-            f"{req.context}[/]",
-            markup=True,
-        )
-        yield Static(
-            f"[{theme.CYAN}]◆ reconix[/] [{theme.DIM}]step {step.num} of {total} requires your approval[/]",
-            classes="ai-label", markup=True,
-        )
-        with Vertical(classes="panel danger") as panel:
+        if self._request is None:
+            yield from self._compose_idle()
+        else:
+            yield from self._compose_waiting(self._request)
+
+    def _compose_waiting(self, req: ApprovalRequest) -> ComposeResult:
+        approvals = [a.request_id for a in store.get_assessment().approvals]
+        position = approvals.index(req.request_id) + 1 if req.request_id in approvals else 1
+        context = next((e.message for e in reversed(store.list_activity())
+                        if e.source == "AI"), "testing in progress")
+        yield Static(Text.assemble(("✓ ", theme.GREEN), (context, theme.DIM)))
+        yield Static(Text.assemble(("◆ reconix ", theme.CYAN), (
+            f"gated action {position} of {len(approvals)} requires your approval",
+            theme.DIM)), classes="ai-label")
+        risk_color = theme.RISK.get(req.risk, theme.MUTED)
+        with Vertical(classes="panel danger" if self._high else "panel accent") as panel:
             panel.border_title = "◆ HUMAN APPROVAL REQUIRED"
-            panel.border_subtitle = f"[{theme.CRITICAL}]◆ HIGH RISK[/]"
-            yield Static(
-                f"[{theme.DIM}]Action[/]      [{theme.TEXT}][b]{step.action}[/b][/] "
-                f"[{theme.MUTED}]({req.summary})[/]",
-                markup=True,
-            )
-            yield Static(
-                f"[{theme.DIM}]Target[/]      [{theme.TEAL}][b]https://{target}[/b][/] "
-                f"[{theme.GREEN}]✓ in scope[/]",
-                markup=True,
-            )
-            yield Static(
-                f"[{theme.DIM}]Tool[/]        [{theme.TEXT}][b]{step.tool}[/b][/] "
-                f"[{theme.MUTED}]{req.tool_info}[/]",
-                markup=True,
-            )
-            yield Static(
-                f"[{theme.DIM}]Why high[/]    [{theme.MUTED}]{step.why}[/]",
-                markup=True,
-            )
+            panel.border_subtitle = f"[{risk_color}]◆ {req.risk} RISK[/]"
+            yield _row("Action", (req.action, f"bold {theme.TEXT}"))
+            yield _row("Target", (req.target, f"bold {theme.TEAL}"),
+                       ("   ✓ policy check passed", theme.GREEN))
+            yield _row("Purpose", (req.purpose, theme.MUTED))
+            yield _row("Impact", (req.impact, theme.MUTED))
             yield Static("")
-            yield Static(f"[{theme.DIM}]EXACT COMMAND[/]", markup=True)
-            yield Static(
-                f"[{theme.GREEN}][b]$[/b][/] [{theme.TEXT}]{req.command}[/]   "
-                f"[{theme.DIM}]{req.command_hash}[/]",
-                markup=True, classes="panel-note",
-            )
+            yield Static(Text("EXACT REQUEST", style=theme.DIM))
+            yield Static(Text.assemble(("$ ", f"bold {theme.GREEN}"), (req.command, theme.TEXT),
+                                       ("   ", ""), (req.command_hash[:23] + "…", theme.DIM)),
+                         classes="panel-note")
+        if self._high:
+            with Vertical(id="reason-row"):
+                yield Label("Reason (required for HIGH risk)", classes="field-label -warn")
+                yield Input(id="reason", placeholder="Why is this action needed?",
+                            max_length=MAX_REASON_LENGTH)
+                yield Static("", id="target-error")
         yield Question(
-            "Approval", f"Do you want to run {step.action} on {target}?",
+            "Approval", f"Run {req.action} on {store.get_assessment().target}?",
             [
                 Choice("approve", "Approve & run",
-                       "HIGH risk: asks you to confirm once more." if high_risk
-                       else "Runs the step now."),
-                Choice("reject", "Reject", "Stop here and go back to the plan.", "danger"),
-                Choice("details", "View details", "Scope limits, exact command and audit trail."),
+                       "HIGH risk: asks you to confirm once more." if self._high
+                       else "Runs this one request now."),
+                Choice("reject", "Reject",
+                       "Not executed. The assessment stops; nothing else runs.", "danger"),
+                Choice("details", "View details", "Scope limits, exact request and audit trail."),
                 Choice("edit", "Edit params", disabled=True),
             ],
-            hint=menu_hint("go back"), menu_id="approval-menu",
+            default=2, hint=menu_hint("decide later"), menu_id="approval-menu",
         )
-        yield Static(
-            f"[{theme.DIM}]logged to audit · operator: {store.current_operator()}[/]",
-            markup=True,
-        )
+        yield Static(Text(f"logged to audit · operator: {store.current_operator()}",
+                          style=theme.DIM))
+
+    def _compose_idle(self) -> ComposeResult:
+        yield Static(Text.assemble(("◆ reconix ", theme.CYAN), (
+            "no action is waiting for your approval", theme.DIM)), classes="ai-label")
+        with Vertical(classes="panel") as panel:
+            panel.border_title = "◆ GATED ACTIONS"
+            panel.border_subtitle = "the run pauses at each one"
+            approvals = store.get_assessment().approvals
+            if not approvals:
+                yield Static(Text("None yet — they come from the template's plan.",
+                                  style=theme.MUTED))
+            for request in approvals:
+                yield Static(self._decision_line(request))
+        if store.is_plan_started():
+            choices = [Choice("execution", "Back to execution", recommended=True)]
+        else:
+            choices = [Choice("plan", "Review the plan", recommended=True)]
+        yield Question("Approval", "Nothing to decide right now.", choices,
+                       hint=menu_hint("go back"), typing=False, chat=False,
+                       menu_id="approval-menu")
+
+    @staticmethod
+    def _decision_line(request: ApprovalRequest) -> Text:
+        decision = store.decision_for(request.request_id)
+        line = Text.assemble(
+            (f"● {request.risk:<7}", f"bold {theme.RISK.get(request.risk, theme.MUTED)}"),
+            (f"{request.action:<32}", theme.TEXT))
+        if decision is None:
+            line.append("· pending", style=theme.DIM)
+        else:
+            approved = decision.decision == "APPROVED"
+            line.append("✓ approved" if approved else "✕ rejected",
+                        style=theme.GREEN if approved else theme.CRITICAL)
+            line.append(f" by {decision.operator} at {decision.created_at:%H:%M:%S}",
+                        style=theme.DIM)
+            if decision.reason:
+                line.append(f" · “{decision.reason}”", style=theme.MUTED)
+        return line
 
     def on_mount(self) -> None:
-        self.query_one("#approval-menu", ChoiceMenu).focus()
+        if self._high:
+            self.query_one("#reason", Input).focus()
+        else:
+            self.focus_menu("approval-menu")
 
+    # --- choices -----------------------------------------------------------------------------
     def on_choice_menu_chosen(self, event: ChoiceMenu.Chosen) -> None:
         event.stop()
-        {"approve": self.action_approve, "reject": self.action_reject,
-         "details": self.action_details, "chat": self.chat_about}[event.choice_id]()
+        handlers = {"approve": self.action_approve, "reject": self.action_reject,
+                    "details": self.action_details, "chat": self.chat_about,
+                    "execution": lambda: self.app.goto("execution"),
+                    "plan": lambda: self.app.goto("plan")}
+        handlers[event.choice_id]()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        event.stop()
+        self.focus_menu("approval-menu")
 
     def chat_topic(self) -> str:
-        return f"{self._step.action} on {store.get_assessment().target}"
+        if self._request is None:
+            return "the approvals"
+        return f"{self._request.action} on {store.get_assessment().target}"
 
-    # --- approve: one step, or two for HIGH risk -----------------------------------
+    # --- approve: one step, or a reason + two steps for HIGH risk -----------------------------
+    def _reason(self) -> str:
+        return self.query_one("#reason", Input).value if self._high else ""
+
     def action_approve(self) -> None:
         req = self._request
-        if not store.needs_confirmation(req.request_id):
+        if req is None:
+            return
+        if not self._high:
             self._approve(None)
             return
-        token = store.request_confirmation(req.request_id, req.command_hash)
-        target = store.get_assessment().target
+        if len(clean_reason(self._reason())) < MIN_REASON_LENGTH:
+            self.query_one("#target-error", Static).update(Text(
+                f"Type a reason first ({MIN_REASON_LENGTH}+ characters).", style=theme.CRITICAL))
+            self.query_one("#reason", Input).focus()
+            return
+        try:
+            token = store.request_confirmation(req.request_id, req.command_hash)
+        except store.StoreValidationError as exc:
+            self.notify_error(str(exc))
+            return
         dialog = ChoiceScreen(
-            "◆ HIGH-RISK · second confirmation",
-            "Run this HIGH-risk step now?",
+            "◆ HIGH-RISK · second confirmation", "Run this HIGH-risk step now?",
             [
                 Choice("no", "No, go back", "Nothing runs."),
-                Choice("yes", f"Yes, run {self._step.action} on {target}",
-                       "Starts execution now.", "danger"),
+                Choice("yes", f"Yes, run {req.action} on {store.get_assessment().target}",
+                       "Runs this one request now.", "danger"),
             ],
             body=self._confirmation_body(), default=0, danger=True, chip="HIGH RISK",
         )
@@ -140,11 +215,12 @@ class ApprovalScreen(ReconixScreen):
     def _approve(self, token: Optional[str]) -> None:
         req = self._request
         try:
-            store.approve(req.request_id, command_hash=req.command_hash, confirmation_token=token)
+            store.approve(req.request_id, command_hash=req.command_hash,
+                          confirmation_token=token, reason=self._reason())
         except store.StoreValidationError as exc:
-            self.notify(str(exc), severity="error", markup=False)
+            self.notify_error(str(exc))
             return
-        self.app.go_next()
+        self.app.gate_decided("execution")
 
     def _confirmation_body(self) -> List[Text]:
         req = self._request
@@ -152,12 +228,32 @@ class ApprovalScreen(ReconixScreen):
             Text.assemble(("$ ", f"bold {theme.GREEN}"), (req.command, theme.TEXT)),
             Text(req.command_hash, style=theme.DIM),
             Text(""),
-            Text(req.phrase, style=f"bold {theme.MEDIUM}"),
-            Text(self._step.why, style=theme.MUTED),
+            Text.assemble(("Reason  ", theme.DIM), (clean_reason(self._reason()), theme.TEXT)),
+            Text(req.impact, style=theme.MUTED),
         ]
 
-    # --- other choices -------------------------------------------------------------
+    def action_reject(self) -> None:
+        if self._request is None:
+            return
+        try:
+            store.reject(self._request.request_id)
+        except store.StoreValidationError as exc:
+            self.notify_error(str(exc))
+            return
+        self.app.gate_decided("execution")
+
+    def action_later(self) -> None:
+        if self._request is not None:
+            self.notify("Nothing runs until you decide. Come back with 4 or /approval.",
+                        title="Paused")
+            self.app.goto("execution")
+        else:
+            self.app.go_prev()
+
+    # --- details -----------------------------------------------------------------------------
     def action_details(self) -> None:
+        if self._request is None:
+            return
         store.log_event("approval.details_viewed", self._request.request_id)
         self.app.push_screen(ChoiceScreen(
             "▤ APPROVAL DETAILS", "", [Choice("back", "Back to the choices")],
@@ -165,39 +261,32 @@ class ApprovalScreen(ReconixScreen):
         ))
 
     def _details_body(self) -> List[RenderableType]:
-        req, step = self._request, self._step
-        scope = store.get_assessment().scope
+        req = self._request
+        scope = store.get_scope()
         events = [e for e in store.list_events() if req.request_id in e.detail]
+        blocked = [v for v in store.list_verdicts() if not v.allowed]
         return details_body([
-            ("Step", [
-                ("request", req.request_id, theme.KEY),
-                ("step", f"{step.num} of {len(store.list_plan_steps())} · {step.action}", theme.MUTED),
-                ("risk · gate", f"{step.risk} · {step.gate}", theme.RISK.get(step.risk, theme.MUTED)),
-                ("tool", f"{step.tool} · {req.tool_info}", theme.MUTED),
-                ("why", step.why, theme.MUTED),
+            ("Request", [
+                ("id", req.request_id, theme.KEY),
+                ("risk", req.risk, theme.RISK.get(req.risk, theme.MUTED)),
+                ("action", req.action, theme.TEXT),
+                ("purpose", req.purpose, theme.MUTED),
+                ("impact", req.impact, theme.MUTED),
             ]),
-            ("Command", [
-                ("exact", req.command, theme.TEXT),
+            ("Exact request", [
+                ("command", req.command, theme.TEXT),
                 ("hash", req.command_hash, theme.MUTED),
             ]),
             ("Scope limits", [
-                (label, ", ".join(str(v) for v in scope.get(key, [])), theme.MUTED)
-                for key, label in SCOPE_LIMITS
+                (key.replace("_", " "), ", ".join(str(v) for v in value)
+                 if isinstance(value, list) else str(value), theme.MUTED)
+                for key, value in manifest_fields(scope)
             ]),
-            ("Earlier steps", [
-                (task.action, task.detail, theme.MUTED)
-                for task in store.list_exec_tasks() if task.status == "DONE"
-            ]),
+            ("Blocked by policy", [
+                (v.method, f"{v.path} · {v.reason}", theme.CRITICAL) for v in blocked
+            ] or [("", "nothing blocked so far", theme.DIM)]),
             ("Audit trail", [
                 (e.created_at.strftime("%H:%M:%S"), f"{e.kind} · {e.operator}", theme.MUTED)
                 for e in events[-6:]
-            ]),
+            ] or [("", "no events for this request yet", theme.DIM)]),
         ])
-
-    def action_reject(self) -> None:
-        store.reject(self._request.request_id)
-        self.app.goto("plan")
-
-    def action_cancel(self) -> None:
-        store.log_event("approval.cancelled", self._request.request_id)
-        self.app.goto("plan")

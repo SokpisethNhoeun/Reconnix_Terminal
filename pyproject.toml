@@ -1,10 +1,10 @@
 [project]
 name = "reconix-tui"
-version = "0.3.0"
+version = "0.4.0"
 description = "Reconix — AI-Powered Security Testing Assistant (interactive TUI demo)"
 requires-python = ">=3.9"
 dependencies = [
-    "textual>=0.80",
+    "textual>=8.2,<9",
     "rich>=13.7",
 ]
 
@@ -16,7 +16,11 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["reconix", "reconix.commands", "reconix.models", "reconix.screens", "reconix.store", "reconix.widgets"]
+packages = [
+    "reconix", "reconix.commands", "reconix.flow", "reconix.models", "reconix.screens",
+    "reconix.screens.forms", "reconix.shell", "reconix.store", "reconix.store.importers",
+    "reconix.store.templates", "reconix.widgets",
+]
 
 [tool.setuptools.package-data]
 reconix = ["reconix.tcss"]

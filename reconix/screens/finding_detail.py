@@ -1,6 +1,6 @@
-"""Frame 07 — Finding detail (evidence + AI analysis)."""
+"""Frame 07 — Finding detail (evidence + analysis, triage, previous / next)."""
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from rich.text import Text
 from textual.app import ComposeResult
@@ -9,9 +9,17 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Static
 
 from .base import ReconixScreen
-from .choice import ChoiceScreen
 from .. import store, theme
-from ..models import Choice
+from ..models import Finding
+from ..widgets.findings import cvss_text, severity_text, triage_text, validation_text
+
+
+def _heading(text: str, color: str) -> Static:
+    return Static(Text(text, style=f"bold {color}"))
+
+
+def _para(text: str, color: str = theme.MUTED) -> Static:
+    return Static(Text(text, style=color))
 
 
 class FindingDetailScreen(ReconixScreen):
@@ -19,7 +27,7 @@ class FindingDetailScreen(ReconixScreen):
     mode_name = "DETAIL"
 
     BINDINGS = [
-        Binding("v", "validate", "validate (PoC)"),
+        Binding("t", "triage", "triage"),
         Binding("r", "report", "report"),
         Binding("left_square_bracket", "step(-1)", "previous finding", show=False),
         Binding("right_square_bracket", "step(1)", "next finding", show=False),
@@ -27,114 +35,101 @@ class FindingDetailScreen(ReconixScreen):
         Binding("escape", "to_list", "back", show=False),
     ]
 
-    def compose_body(self) -> ComposeResult:
-        f = store.get_finding(self.app.selected_finding)
-        scolor, sglyph = theme.STATUS.get(f.status, (theme.MUTED, "○"))
-        sev = theme.SEVERITY[f.severity]
+    def _finding(self) -> Optional[Finding]:
+        try:
+            return store.get_finding(self.app.selected_finding)
+        except store.StoreValidationError:
+            return None
 
+    def view_state(self) -> object:
+        f = self._finding()
+        return (f.fid, f.status, f.effective_severity, f.triage_note) if f else None
+
+    def compose_body(self) -> ComposeResult:
+        f = self._finding()
+        if f is None:
+            yield Static(Text.assemble(("← findings", theme.CYAN), ("  ·  no finding selected — "
+                                                                    "open one from the list",
+                                                                    theme.DIM)),
+                         id="breadcrumb")
+            return
         order, inside = self._order()
-        position = order.index(self.app.selected_finding) + 1
+        position = order.index(f.fid) + 1
         where = (f"({position} of {len(order)})" if inside
                  else f"(outside filter · {position} of {len(order)})")
         yield Static(Text.assemble(
             ("← findings", theme.CYAN), ("  /  ", theme.BORDER), (f.fid, f"bold {theme.MUTED}"),
             (f"  {where}", theme.DIM), ("  ·  [ prev  ·  ] next", theme.DIM),
         ), id="breadcrumb")
-        with Vertical(classes="panel", id="detail-header") as hdr:
-            yield Static(
-                f"[{sev}]■ {f.severity}[/]   [{theme.TEXT}][b]{f.title}[/b][/]      "
-                f"[{scolor}]● {f.status}[/]",
-                markup=True,
-            )
-            yield Static(
-                f"[{theme.MUTED}]{f.fid} · {f.target} · detected by {f.tool}[/]    "
-                f"[{theme.KEY}]CVSS {f.cvss} · {f.ref}[/]",
-                markup=True,
-            )
+        with Vertical(classes="panel", id="detail-header"):
+            yield Static(Text.assemble(severity_text(f), "   ", (f.title, f"bold {theme.TEXT}"),
+                                       "      ", validation_text(f), "   ", triage_text(f)))
+            refs = " · ".join(f.cve + f.cwe + f.owasp) or "—"
+            yield Static(Text.assemble(
+                (f"{f.fid} · {f.path} · detected by {f.tool}", theme.MUTED), "    ",
+                (f"CVSS {cvss_text(f)} · {refs}", theme.KEY)))
         with Horizontal(id="detail-cols"):
-            with Vertical(classes="panel") as ev:
-                ev.border_title = "▤ EVIDENCE"
-                ev.border_subtitle = f"{f.tool}"
-                for label, text, ckey in f.evidence:
-                    if label:
-                        yield Static(f"[{theme.DIM}]{label}[/]", markup=True)
-                    if text:
-                        color = {
-                            "text": theme.TEXT, "string": theme.STRING,
-                            "green": theme.GREEN, "dim": theme.DIM,
-                        }.get(ckey, theme.TEXT)
-                        yield Static(f"[{color}]{text}[/]", markup=True)
+            with Vertical(classes="panel") as evidence:
+                evidence.border_title = "▤ EVIDENCE"
+                evidence.border_subtitle = Text(f.tool)     # imported text: never markup
+                yield _heading("Affected URL", theme.DIM)
+                yield _para(f.affected_url, theme.CYAN)
                 yield Static("")
-                yield Static(
-                    f"[{theme.TEAL}]✓ Validated via controlled PoC (detection-only) "
-                    f"— status {f.status}[/]"
-                    if f.status == "CONFIRMED" else
-                    f"[{theme.MEDIUM}]○ Not yet validated — press [b]v[/b] "
-                    "to run a controlled PoC[/]",
-                    classes="panel-note", markup=True,
-                )
-            with Vertical(classes="panel") as an:
-                an.border_title = "✦ AI ANALYSIS"
-                an.border_subtitle = "grounded in OWASP · CWE · NVD"
-                yield Static(f"[{theme.HIGH}][b]Impact[/b][/]", markup=True)
-                yield Static(f"[{theme.MUTED}]{f.impact}[/]", markup=True)
+                yield _heading("Evidence (masked)", theme.DIM)
+                for line in f.evidence:
+                    yield _para(line, theme.STRING)
                 yield Static("")
-                yield Static(f"[{theme.TEAL}][b]Remediation[/b][/]", markup=True)
-                yield Static(f"[{theme.MUTED}]{f.remediation}[/]", markup=True)
+                if f.needs_review:
+                    note = (f"○ {f.validation.title()} — needs analyst review. Press t to set "
+                            "its status.", theme.MEDIUM)
+                else:
+                    note = ("✓ Confirmed during the run by the limited validation you "
+                            "approved.", theme.TEAL)
+                yield Static(Text(*note), classes="panel-note")
+            with Vertical(classes="panel") as analysis:
+                analysis.border_title = "✦ AI ANALYSIS"
+                analysis.border_subtitle = "grounded in OWASP · CWE · NVD"
+                yield _heading("Description", theme.TEXT)
+                yield _para(f.description)
                 yield Static("")
-                yield Static(f"[{theme.LOW}][b]References[/b][/]", markup=True)
+                yield _heading("Impact", theme.HIGH)
+                yield _para(f.impact)
+                yield Static("")
+                yield _heading("Remediation", theme.TEAL)
+                yield _para(f.remediation)
+                yield Static("")
+                yield _heading("Classification", theme.LOW)
+                yield _para(f"{f.category or '—'} · {f.cvss_vector or 'not scored'}")
                 for ref in f.references:
-                    yield Static(f"[{theme.DIM}]•[/] [{theme.KEY}]{ref}[/]", markup=True)
+                    yield Static(Text.assemble(("• ", theme.DIM), (ref, theme.KEY)))
+                if f.triage_note:
+                    yield Static("")
+                    yield _heading("Triage note", theme.MEDIUM)
+                    yield _para(f.triage_note)
 
-    def action_validate(self) -> None:
-        index = self.app.selected_finding
-        finding = store.get_finding(index)
-        if finding.status == "CONFIRMED":
-            self.notify(f"{finding.fid} is already validated.", severity="information")
-            return
-        sev = theme.SEVERITY.get(finding.severity, theme.MUTED)
-        body = [
-            Text.assemble((f"{finding.fid}  ", theme.KEY), (finding.title, theme.TEXT)),
-            Text.assemble(("severity  ", theme.DIM),
-                          (f"{finding.severity} · CVSS {finding.cvss}", sev)),
-            Text("A detection-only proof of concept confirms the finding "
-                 "without exploiting it.", style=theme.MUTED),
-        ]
-
-        def answer(choice: str) -> None:
-            if choice == "run":
-                store.validate_finding(index)
-                self.notify(f"{finding.fid} validated (detection-only).",
-                            severity="information")
-                self.app.goto("detail")
-
-        self.app.push_screen(ChoiceScreen(
-            "Validate finding", f"Run a controlled PoC for {finding.fid}?",
-            [
-                Choice("no", "No, don't validate", "Leave the status unchanged."),
-                Choice("run", "Run PoC (detection-only)",
-                       "Confirms the finding; nothing is exploited."),
-            ],
-            body=body, chip="Validate",
-        ), answer)
-
-    # --- previous / next in the Findings list order -----------------------------------
-    def _order(self) -> Tuple[List[int], bool]:
-        """Store indices in the list's filter+sort order, and whether this finding is in it."""
+    # --- previous / next in the Findings list order -----------------------------------------
+    def _order(self) -> Tuple[List[str], bool]:
+        """Finding ids in the list's filter+sort order, and whether this finding is in it."""
         app = self.app
-        order = [i for i, _ in store.find_findings(app.findings_filter, app.findings_sort)]
+        order = [f.fid for f in store.find_findings(app.findings_filter, app.findings_sort)]
         if app.selected_finding in order:
             return order, True
-        # Opened via /finding, or validated out of the filter: walk everything instead.
-        return [i for i, _ in store.find_findings("all", app.findings_sort)], False
+        # Opened via /finding, or triaged out of the filter: walk everything instead.
+        return [f.fid for f in store.find_findings("all", app.findings_sort)], False
 
     def action_step(self, delta: int) -> None:
+        if self._finding() is None:
+            return
         order, _ = self._order()
         position = order.index(self.app.selected_finding) + delta
         if not 0 <= position < len(order):
             self.app.bell()          # at an end: no wrap-around
             return
         self.app.open_finding(order[position])
+
+    def action_triage(self) -> None:
+        if self._finding() is not None:
+            self.app.triage_finding(self.app.selected_finding)
 
     def action_report(self) -> None:
         self.app.goto("report")
