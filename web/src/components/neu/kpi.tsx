@@ -14,7 +14,7 @@ export function Kpi({ label, value, children, compact }: KpiProps) {
   return (
     <div className={cn("kpi", compact && "px-4 py-3.5")}>
       <span className="text-[12.5px] text-muted">{label}</span>
-      <span className={cn("font-semibold tabular-nums tracking-tight", compact ? "text-2xl" : "text-[30px] leading-tight")}>
+      <span className={cn("font-display font-semibold tabular-nums tracking-tight", compact ? "text-2xl" : "text-[30px] leading-tight")}>
         {value}
       </span>
       {children && <span className="flex flex-wrap gap-x-2.5 gap-y-1 text-xs text-muted">{children}</span>}

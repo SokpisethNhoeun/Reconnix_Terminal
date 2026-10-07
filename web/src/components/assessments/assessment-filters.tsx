@@ -1,10 +1,11 @@
-/* Search, template, status and date-range filters for the assessments list. A plain GET
+/* Search, template, status and date-range filters for the assessments list ("Needs
+   attention" is waiting, stopped and interrupted runs together). A plain GET
    form plus links, so every view has a URL. The controls are shadcn/ui (Input, Select,
    Button); the Selects carry a `name`, so they submit like native selects. */
 import { Search } from "lucide-react";
 
 import { STATUSES } from "@/lib/data/schema";
-import type { AssessmentFilter } from "@/lib/data/stats";
+import { ATTENTION, type AssessmentFilter } from "@/lib/data/stats";
 import { query } from "@/lib/utils";
 
 import { SegmentedLinks } from "../neu/segmented";
@@ -50,6 +51,7 @@ export function AssessmentFilters({ filter, templates }: { filter: AssessmentFil
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Any status</SelectItem>
+            <SelectItem value={ATTENTION}>Needs attention</SelectItem>
             {STATUSES.map((s) => (
               <SelectItem key={s} value={s}>
                 {s}

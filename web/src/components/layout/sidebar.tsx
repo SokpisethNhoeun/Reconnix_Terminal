@@ -2,6 +2,7 @@
 import { Eye, Folder, SquareTerminal } from "lucide-react";
 
 import { NavLinks } from "./nav-links";
+import { Wordmark } from "./wordmark";
 
 interface SidebarProps {
   dir: string;
@@ -12,15 +13,7 @@ interface SidebarProps {
 export function Sidebar({ dir, counts, terminal }: SidebarProps) {
   return (
     <aside className="side">
-      <div className="flex items-center gap-2.5 px-2">
-        <span className="brand-mark" aria-hidden>
-          ◆
-        </span>
-        <span>
-          <b className="font-mono text-[15px] font-bold tracking-[0.18em]">RECONIX</b>
-          <small className="block font-mono text-[11px] text-muted">analysis · v0.4.0</small>
-        </span>
-      </div>
+      <Wordmark sub="analysis · v0.4.0" className="px-2 text-base" />
       <NavLinks counts={counts} terminal={terminal} />
       <div className="well mt-auto flex flex-col gap-2.5 p-3.5 text-xs text-muted max-[820px]:hidden">
         <span className="flex items-center gap-2">

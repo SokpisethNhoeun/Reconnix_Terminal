@@ -1,4 +1,5 @@
-/* Findings from every assessment, with severity / validation filters and search. */
+/* Findings from every assessment, with severity / validation filters and search, 10 to a
+   page. The selected finding (`f`) opens in the detail card. */
 import { Search } from "lucide-react";
 import type { Metadata } from "next";
 
@@ -7,11 +8,13 @@ import { FindingDetail } from "@/components/findings/finding-detail";
 import { FindingsTable } from "@/components/findings/findings-table";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/neu/card";
+import { Pager } from "@/components/neu/pager";
 import { SegmentedLinks } from "@/components/neu/segmented";
 import { Input } from "@/components/ui/input";
 import { allFindings, categoryCounts, cvssSummary, isConfirmed } from "@/lib/data/stats";
 import { loadLibrary } from "@/lib/data/store";
 import { plural } from "@/lib/format";
+import { pageNumber, pageParam, paginate } from "@/lib/pagination";
 import { param, query } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Findings" };
@@ -45,8 +48,10 @@ export default async function FindingsPage(props: PageProps<"/findings">) {
       (val === "all" || (val === "confirmed") === isConfirmed(f)) &&
       (!text || `${f.title} ${f.path} ${f.assessment.target} ${f.references.join(" ")} ${f.tool}`.toLowerCase().includes(text)),
   );
-  const selected = rows.find((f) => f.key === param(sp.f)) ?? rows[0];
+  const page = paginate(rows, pageNumber(param(sp.page)));
+  const selected = rows.find((f) => f.key === param(sp.f)) ?? page.items[0];
   const current = { sev, val, q };
+  const onPage = { ...current, page: pageParam(page.page) };
   const withAssessments = new Set(all.map((f) => f.assessment.uid)).size;
   const categories = categoryCounts(all);
   const cvss = cvssSummary(all);
@@ -118,7 +123,8 @@ export default async function FindingsPage(props: PageProps<"/findings">) {
               />
             </form>
           </div>
-          <FindingsTable rows={rows} selected={selected?.key} showAssessment hrefFor={(f) => `/findings${query({ ...current, f: f.key })}`} />
+          <FindingsTable rows={page.items} selected={selected?.key} showAssessment hrefFor={(f) => `/findings${query({ ...onPage, f: f.key })}`} />
+          <Pager page={page} label="Finding pages" hrefFor={(n) => `/findings${query({ ...current, page: pageParam(n) })}`} />
         </Card>
         <FindingDetail finding={selected} />
       </div>

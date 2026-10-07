@@ -3,6 +3,8 @@
    or the browser at CHROMIUM_PATH. The terminal helper runs a stand-in instead of the TUI:
    it prints READY and echoes what is typed (needs the repo's Python with websockets). */
 import { defineConfig, devices } from "@playwright/test";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 export const PORT = 3199;
 export const TOKEN = "e2e-token-0123456789abcdef";
@@ -27,6 +29,8 @@ export default defineConfig({
       RECONIX_TERM_PORT: String(TERM_PORT),
       RECONIX_TERM_TEST: "1",
       RECONIX_TERM_COMMAND: "sh -c 'echo READY; exec cat'",
+      // keep the test server's sign-in link out of ~/.reconix/web.url (a running dashboard's)
+      RECONIX_WEB_URL_FILE: path.join(tmpdir(), `reconix-e2e-${PORT}.url`),
     },
     reuseExistingServer: false,
     timeout: 60_000,

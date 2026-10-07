@@ -1,5 +1,6 @@
 /* The Terminal page: an operator gets a live session on the terminal helper (here a
-   stand-in that prints READY and echoes what is typed), kept while browsing. */
+   stand-in that prints READY and echoes what is typed), kept while browsing, and its
+   controls (restart, expand, copy, clear, latest). */
 import { type Page, expect, test } from "@playwright/test";
 
 import { PORT, TERM_PORT } from "../playwright.config";
@@ -42,13 +43,71 @@ test("the session keeps running while you look at the other pages", async ({ pag
   await expect(status(page, "Connected")).toBeVisible();
 });
 
-test("New session starts over", async ({ page }) => {
+test("Restart asks first, then starts over", async ({ page }) => {
   await openTerminal(page);
   await type(page, "before the restart");
-  await page.getByRole("button", { name: "New session" }).click();
+  await page.getByRole("button", { name: "Restart session" }).click();
+  await page.getByRole("menuitem", { name: "Keep this session" }).click();
+  await expect(screen(page)).toContainText("before the restart");
+
+  await page.getByRole("button", { name: "Restart session" }).click();
+  await page.getByRole("menuitem", { name: "Restart" }).click();
   await expect(status(page, "Connected")).toBeVisible();
   await expect(screen(page)).toContainText("READY");
   await expect(screen(page)).not.toContainText("before the restart");
+});
+
+test("Expand fills the window and Restore brings the page back", async ({ page }) => {
+  await openTerminal(page);
+  const term = page.locator(".term");
+  const before = (await term.boundingBox())!;
+  await page.getByRole("button", { name: "Expand" }).click();
+  await expect(page.locator(".term-full")).toBeVisible();
+  await expect.poll(async () => (await term.boundingBox())!.width).toBeGreaterThan(1380);
+  // the keyboard stays with the terminal
+  await type(page, "typed while expanded");
+  await expect(screen(page)).toContainText("typed while expanded");
+  await page.getByRole("button", { name: "Restore" }).click();
+  await expect(page.locator(".term-full")).toHaveCount(0);
+  await expect.poll(async () => Math.round((await term.boundingBox())!.width)).toBe(Math.round(before.width));
+});
+
+test("Copy output puts the terminal's text on the clipboard", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await openTerminal(page);
+  await type(page, "copy me please");
+  await expect(screen(page)).toContainText("copy me please");
+  await page.getByRole("button", { name: "Copy output" }).click();
+  await expect(page.getByRole("button", { name: "Copied" })).toBeVisible();
+  const text = await page.evaluate(() => navigator.clipboard.readText());
+  expect(text).toContain("READY");
+  expect(text).toContain("copy me please");
+  expect(text).toBe(text.trimEnd());
+});
+
+test("Clear wipes the screen and the session goes on", async ({ page }) => {
+  await openTerminal(page);
+  await type(page, "before the clear");
+  await page.getByRole("button", { name: "Clear terminal" }).click();
+  await expect(screen(page)).not.toContainText("READY");
+  await expect(screen(page)).not.toContainText("before the clear");
+  await expect(status(page, "Connected")).toBeVisible();
+  await type(page, "after the clear");
+  await expect(screen(page)).toContainText("after the clear");
+});
+
+test("Latest shows while scrolled up and jumps back down", async ({ page }) => {
+  await openTerminal(page);
+  for (let i = 1; i <= 40; i++) await type(page, `line ${i}`);
+  await expect(screen(page)).toContainText("line 40");
+  const latest = page.getByRole("button", { name: "Scroll to the latest output" });
+  await expect(latest).toHaveCount(0);
+  await page.locator(".term").hover();
+  await page.mouse.wheel(0, -2000);
+  await expect(latest).toBeVisible();
+  await latest.click();
+  await expect(latest).toHaveCount(0);
+  await expect(screen(page)).toContainText("line 40");
 });
 
 test("tickets are handed out to the dashboard's own pages only", async ({ page }) => {

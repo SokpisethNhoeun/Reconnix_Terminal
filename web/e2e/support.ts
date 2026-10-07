@@ -17,6 +17,7 @@ interface SampleAssessment {
   status: string;
   findings: { severity: string; validation: string; title: string }[];
   verdicts: { allowed: boolean }[];
+  approvals: unknown[];
 }
 
 export function sample(): SampleAssessment[] {

@@ -1,26 +1,34 @@
-/* How the guardrails held: policy checks, blocked requests, and every approval decision. */
+/* How the guardrails held: policy checks, blocked requests, and every approval decision.
+   The two lists page on their own (`?blocked=` and `?decisions=`), 10 to a page. */
 import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/neu/card";
 import { Dot, SeverityChip } from "@/components/neu/chips";
 import { Kpi, KpiGrid, KpiNote } from "@/components/neu/kpi";
+import { Pager } from "@/components/neu/pager";
 import { TableWrap } from "@/components/neu/table-wrap";
 import { ApprovalsTable } from "@/components/policy/approvals-table";
 import { VerdictsTable } from "@/components/policy/verdicts-table";
 import { type DecisionState, approvalRows, blockedVerdicts, overview } from "@/lib/data/stats";
 import { loadLibrary } from "@/lib/data/store";
 import { plural } from "@/lib/format";
+import { pageNumber, pageParam, paginate } from "@/lib/pagination";
+import { param, query } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Policy & approvals" };
 
 const STATES: DecisionState[] = ["APPROVED", "REJECTED", "PENDING"];
 
-export default async function PolicyPage() {
+export default async function PolicyPage(props: PageProps<"/policy">) {
+  const sp = await props.searchParams;
   const { assessments } = await loadLibrary();
   const stats = overview(assessments);
   const approvals = approvalRows(assessments);
   const blocked = assessments.flatMap((a) => blockedVerdicts(a).map((verdict) => ({ assessment: a, verdict })));
+  const blockedPage = paginate(blocked, pageNumber(param(sp.blocked)));
+  const decisionsPage = paginate(approvals, pageNumber(param(sp.decisions)));
+  const pages = { blocked: pageParam(blockedPage.page), decisions: pageParam(decisionsPage.page) };
   const count = (risk: string, state: DecisionState) => approvals.filter((r) => r.approval.risk === risk && r.state === state).length;
 
   return (
@@ -52,7 +60,8 @@ export default async function PolicyPage() {
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <Card title="Blocked requests" hint="stopped by the policy engine">
-          <VerdictsTable rows={blocked} />
+          <VerdictsTable rows={blockedPage.items} />
+          <Pager page={blockedPage} label="Blocked request pages" hrefFor={(n) => `/policy${query({ ...pages, blocked: pageParam(n) })}`} />
         </Card>
         <Card title="Approvals by risk">
           <TableWrap label="Approvals by risk table">
@@ -90,7 +99,8 @@ export default async function PolicyPage() {
       </div>
 
       <Card title="Approval decisions" hint="who approved what, and why">
-        <ApprovalsTable rows={approvals} showAssessment />
+        <ApprovalsTable rows={decisionsPage.items} showAssessment />
+        <Pager page={decisionsPage} label="Approval decision pages" hrefFor={(n) => `/policy${query({ ...pages, decisions: pageParam(n) })}`} />
       </Card>
     </>
   );

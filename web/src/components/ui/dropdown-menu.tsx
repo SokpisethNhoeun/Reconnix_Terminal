@@ -1,6 +1,6 @@
 "use client";
-/* shadcn/ui DropdownMenu (Radix), themed to the dashboard's soft-UI tokens: a raised card
-   for the list, a pressed highlight for the focused item. Owned source — extend here. */
+/* shadcn/ui DropdownMenu (Radix), themed to the dashboard's tokens: a raised card for the
+   list, a teal wash on the focused item. Owned source — extend here. */
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import type * as React from "react";
 
@@ -30,7 +30,7 @@ function DropdownMenuContent({
         sideOffset={sideOffset}
         className={cn(
           "z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-[12rem] overflow-x-hidden overflow-y-auto",
-          "rounded-[14px] bg-bg p-1.5 text-text shadow-[var(--raise)] outline-none",
+          "rounded-[12px] bg-card p-1.5 text-text shadow-[var(--raise)] outline-none",
           "origin-(--radix-dropdown-menu-content-transform-origin)",
           className,
         )}
@@ -50,8 +50,8 @@ function DropdownMenuItem({
       data-slot="dropdown-menu-item"
       data-inset={inset}
       className={cn(
-        "relative flex cursor-pointer items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-[13px] outline-none select-none",
-        "data-[highlighted]:text-accent data-[highlighted]:shadow-[var(--press-sm)]",
+        "relative flex cursor-pointer items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-[13px] outline-none select-none",
+        "data-[highlighted]:bg-accent-wash data-[highlighted]:text-accent",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8",
         "[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-accent",
         className,

@@ -21,7 +21,7 @@ MUTED       = "#7D8B91"
 DIM         = "#4A575D"
 
 CYAN        = "#22D3EE"
-CYAN_DIM    = "#0C6D88"  # 4.9:1 on the light web background (AA)
+CYAN_DIM    = "#0C6D88"
 TEAL        = "#2DD4BF"
 
 # Severity scale
@@ -60,26 +60,27 @@ CSS_TOKENS: Dict[str, str] = {
 # The web Terminal page shows the TUI itself, which is dark in both web themes.
 TERMINAL_WEB_TOKENS: Dict[str, str] = {"term-bg": BG, "term-text": TEXT, "term-cursor": CYAN}
 
-# Web dashboard (web/, neumorphism) — light and dark palettes. scripts/export_tokens.py
-# writes them to web/src/styles/tokens.css; the web code uses only those variables.
-# Surfaces match the background (soft UI): `sd`/`sl` are the dark/light shadow colors.
-# Light-theme accent and severity steps are darker so marks and text clear contrast.
+# Web dashboard (web/) — the landing site's operator-console palette (navy, teal, amber
+# for approval gates) in dark, and a light version of it. scripts/export_tokens.py writes
+# them to web/src/styles/tokens.css; the web code uses only those variables.
+# `card` is a raised surface, `well` a recessed one (inputs, tracks, chips); `sd` is the
+# shadow color. Text colors clear 4.5:1 on bg, card and well in their theme; `faint` is
+# for marks (3:1).
 WEB_TOKENS: Dict[str, Dict[str, str]] = {
     "light": {
-        "bg": "#E4EAF0", "sd": "#BAC5D0", "sl": "#FFFFFF",
-        "text": "#1E2A33", "muted": "#4F616D", "faint": "#8696A1", "line": "#CBD4DD",
-        "accent": CYAN_DIM, "accent-ink": "#FFFFFF", "accent-wash": "#D2E3EA",
-        "critical": "#D42F45", "high": "#C2550A", "medium": "#A86B00", "low": "#0277B6",
-        "info": "#5E6E80", "ok": "#15803D", "warn": "#A86B00", "bad": "#D42F45",
+        "bg": "#F3F6F9", "card": "#FFFFFF", "well": "#EAEFF4", "sd": "#8A9AB0",
+        "text": "#0F1622", "muted": "#4B5A6D", "faint": "#77869A", "line": "#D5DDE6",
+        "accent": "#0F766E", "accent-ink": "#FFFFFF", "accent-wash": "#DCF1EE",
+        "critical": "#C8283E", "high": "#A84808", "medium": "#806600", "low": "#0369A1",
+        "info": "#5E6E80", "ok": "#13773A", "warn": "#806600", "bad": "#C8283E",
         **TERMINAL_WEB_TOKENS,
     },
     "dark": {
-        "bg": "#1C232A", "sd": "#11161A", "sl": "#27313A",
-        "text": TEXT, "muted": "#9AA8B0", "faint": "#62717A", "line": "#2B353E",
-        "accent": CYAN, "accent-ink": BG, "accent-wash": "#17343E",
-        # the web's dark red is a step lighter than the TUI's: 4.9:1 on #1C232A (AA)
-        "critical": "#F4596B", "high": HIGH, "medium": MEDIUM, "low": LOW,
-        "info": INFO, "ok": GREEN, "warn": MEDIUM, "bad": "#F4596B",
+        "bg": "#0A0F17", "card": "#0F1622", "well": "#152032", "sd": "#000000",
+        "text": "#E8EDF5", "muted": "#8E9BB0", "faint": "#67768C", "line": "#1E2A3C",
+        "accent": TEAL, "accent-ink": "#042F2A", "accent-wash": "#0E272B",
+        "critical": "#F4596B", "high": HIGH, "medium": "#F2B544", "low": LOW,
+        "info": INFO, "ok": "#39D353", "warn": "#F2B544", "bad": "#F87171",
         **TERMINAL_WEB_TOKENS,
     },
 }

@@ -1,7 +1,8 @@
 "use client";
 
 /* Findings per day: one series of columns (accent), a hover tooltip, the peak and the
-   latest day labeled, and a table view of the same numbers. */
+   latest day labeled, and a table view of the same numbers. The chart grows to the card's
+   height (at least 220px), so it fills the row next to Findings by severity. */
 import { useState } from "react";
 import {
   Bar,
@@ -26,7 +27,7 @@ function DayTooltip({ point }: { point?: DayPoint }) {
   if (!point) return null;
   const d = point;
   return (
-    <div className="rounded-xl bg-bg px-3 py-2 font-mono text-xs shadow-[var(--raise-sm)]">
+    <div className="rounded-[10px] bg-card px-3 py-2 font-mono text-xs shadow-[var(--raise-sm)]">
       {d.label}: {d.findings} finding{d.findings === 1 ? "" : "s"} from {d.assessments} assessment
       {d.assessments === 1 ? "" : "s"}
     </div>
@@ -40,7 +41,7 @@ export function PerDayChart({ data }: { data: DayPoint[] }) {
   const labeled = data.map((d, i) => ({ ...d, mark: d.findings > 0 && (d.findings === peak || i === data.length - 1) ? d.findings : null }));
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-1 flex-col gap-3">
       <div className="seg self-end" role="group" aria-label="View">
         <button type="button" aria-pressed={!table} onClick={() => setTable(false)}>
           Chart
@@ -71,27 +72,29 @@ export function PerDayChart({ data }: { data: DayPoint[] }) {
           </table>
         </TableWrap>
       ) : (
-        <div className="h-[220px]" role="img" aria-label="Findings per day">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={labeled} margin={{ top: 18, right: 6, bottom: 0, left: -18 }}>
-              <CartesianGrid vertical={false} stroke="var(--line)" />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "var(--muted)", fontSize: 11 }} />
-              <YAxis
-                allowDecimals={false}
-                domain={[0, top]}
-                tickLine={false}
-                axisLine={false}
-                tick={{ fill: "var(--muted)", fontSize: 11 }}
-              />
-              <Tooltip cursor={{ fill: "var(--accent-wash)", opacity: 0.6 }} content={({ active, payload }) => (
-                  <DayTooltip point={active ? (payload?.[0]?.payload as DayPoint | undefined) : undefined} />
-                )}
-              />
-              <Bar dataKey="findings" fill="var(--accent)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false}>
-                <LabelList dataKey="mark" position="top" style={{ fill: "var(--text)", fontSize: 11.5, fontWeight: 600 }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="relative min-h-[220px] flex-1" role="img" aria-label="Findings per day">
+          <div className="absolute inset-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={labeled} margin={{ top: 18, right: 6, bottom: 0, left: -18 }}>
+                <CartesianGrid vertical={false} stroke="var(--line)" />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "var(--muted)", fontSize: 11 }} />
+                <YAxis
+                  allowDecimals={false}
+                  domain={[0, top]}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fill: "var(--muted)", fontSize: 11 }}
+                />
+                <Tooltip cursor={{ fill: "var(--accent-wash)", opacity: 0.6 }} content={({ active, payload }) => (
+                    <DayTooltip point={active ? (payload?.[0]?.payload as DayPoint | undefined) : undefined} />
+                  )}
+                />
+                <Bar dataKey="findings" fill="var(--accent)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false}>
+                  <LabelList dataKey="mark" position="top" style={{ fill: "var(--text)", fontSize: 11.5, fontWeight: 600 }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
     </div>

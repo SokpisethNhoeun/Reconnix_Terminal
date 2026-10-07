@@ -6,7 +6,10 @@ approvals; those pages never change anything. The **Terminal** page runs the TUI
 the browser, so every gate and decision still goes through the TUI's store.
 
 Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind v4 · next-themes ·
-recharts · zod · lucide-react. Soft-UI (neumorphism) in light and dark.
+recharts · zod · lucide-react. The landing site's look (navy, teal, amber for approval
+gates; Space Grotesk headings) in dark, with a light version. The **About** page explains
+the project to a first-time reader. Long lists (assessments, findings, blocked requests,
+approval decisions) show 10 rows a page, with the page in the URL.
 
 ## Run
 
@@ -47,6 +50,10 @@ The page asks `POST /api/terminal/ticket` for a single-use ticket valid for 60 s
 - **Limits:** 2 sessions at once; one closes after 30 minutes without typing. The session
   lives in the dashboard layout (`components/terminal/terminal-dock.tsx`), so it keeps
   running while you browse; closing the tab stops that TUI. Nothing typed is logged.
+- **Controls:** copy (the selection, else the terminal's text), clear (wipes the screen;
+  a same-size resize message has the TUI repaint it), restart (asks first while a session
+  is live), expand (fills the browser window, so Esc still reaches the TUI), and "↓ Latest"
+  while scrolled up. None of them sends keystrokes.
 - **The sign-in link** grants operator control, so `serve.mjs` prints it only to a
   terminal; started by the TUI, it is only in `~/.reconix/web.url` (0600).
 
@@ -72,7 +79,7 @@ src/
 │   ├── layout.tsx           # fonts, theme (nonce), metadata
 │   ├── (dash)/              # signed-in pages: layout (sidebar, terminal dock), page (overview),
 │   │                        #   assessments/, assessments/[uid]/ (+ export/ preview), findings/,
-│   │                        #   policy/, terminal/ (operators)
+│   │                        #   policy/, terminal/ (operators), about/ (the project explained)
 │   ├── login/               # sign-in (token from the link's #fragment)
 │   └── api/                 # session (sign-in), assessments/[uid] (JSON), assessments/[uid]/export,
 │                            #   terminal/ticket (operators)
@@ -81,15 +88,19 @@ src/
 │   ├── data/                # schema.ts (zod), store.ts (server-only reader), stats.ts (pure), export.ts
 │   ├── auth/                # session.ts (launch token, signed cookie, roles, hosts), csp.ts, guard.ts,
 │   │                        #   origin.ts (same-origin check), ticket.ts (terminal tickets)
-│   ├── terminal/            # config.ts (on/off, helper port), protocol.ts (frames, close codes)
-│   └── format.ts, references.ts, utils.ts
+│   ├── terminal/            # config.ts (on/off, helper port), protocol.ts (frames, close codes),
+│   │                        #   screen-text.ts (what Copy output copies)
+│   └── format.ts, pagination.ts (10 a page, from ?page=), references.ts, utils.ts
 ├── components/
 │   ├── ui/                  # shadcn/ui (Button, Input, Select, DropdownMenu), themed to the tokens
-│   ├── neu/                 # Card, Kpi, chips, SegmentedLinks, KeyValues, Notice, TableWrap
+│   ├── neu/                 # Card, Kpi, chips, SegmentedLinks, KeyValues, Notice, TableWrap, Pager
 │   ├── exports/             # the export previews (frame, CSV table, code)
-│   ├── charts/              # HBars, SeverityBars, PerDayChart (with a table view)
-│   ├── layout/              # Sidebar, NavLinks, PageHeader, LiveRefresh, ThemeToggle
-│   ├── terminal/            # TerminalDock, TerminalPanel, useXterm, useTerminalSession, useLeaveWarning
+│   ├── charts/              # HBars, SeverityBars, SeverityTable, PerDayChart (with a table view)
+│   ├── layout/              # Sidebar, NavLinks (+ nav-data.ts), PageHeader, PageSection, Wordmark,
+│   │                        #   LiveRefresh, ThemeToggle
+│   ├── about/               # the About page's sections; content.ts holds what it says
+│   ├── terminal/            # TerminalDock, TerminalPanel, TerminalToolbar, RestartButton, ScrollToLatest,
+│   │                        #   useXterm, useTerminalSession, useTerminalView, useLeaveWarning
 │   └── assessments/, findings/, policy/, timeline/, overview/
 └── styles/tokens.css        # GENERATED from reconix/theme.py (scripts/export_tokens.py)
 ```

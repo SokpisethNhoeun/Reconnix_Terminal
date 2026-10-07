@@ -1,5 +1,5 @@
 "use client";
-/* shadcn/ui Select (Radix), themed to the dashboard's soft-UI tokens: the trigger is a
+/* shadcn/ui Select (Radix), themed to the dashboard's tokens: the trigger is a
    pressed "well" like an input, the list a raised card. With a `name`, Radix renders a hidden
    native <select>, so it works inside the plain GET filter forms. Owned source. */
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
@@ -25,7 +25,7 @@ function SelectTrigger({ className, children, ...props }: React.ComponentProps<t
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "inline-flex h-9 items-center justify-between gap-2 whitespace-nowrap rounded-[13px] bg-transparent",
+        "inline-flex h-9 items-center justify-between gap-2 whitespace-nowrap rounded-[10px] bg-well",
         "px-3.5 text-[13px] text-text shadow-[var(--press-sm)] outline-none transition-shadow",
         "focus-visible:shadow-[var(--press-sm),0_0_0_2px_var(--accent)] disabled:opacity-50",
         "data-[placeholder]:text-muted [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted",
@@ -78,7 +78,7 @@ function SelectContent({
         position={position}
         className={cn(
           "relative z-50 max-h-(--radix-select-content-available-height) min-w-[8rem] overflow-x-hidden overflow-y-auto",
-          "rounded-[14px] bg-bg p-1 text-text shadow-[var(--raise)]",
+          "rounded-[12px] bg-card p-1 text-text shadow-[var(--raise)]",
           position === "popper" &&
             "min-w-(--radix-select-trigger-width) data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",
           className,
@@ -108,8 +108,8 @@ function SelectItem({ className, children, ...props }: React.ComponentProps<type
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "relative flex w-full cursor-default items-center gap-2 rounded-[9px] py-1.5 pr-8 pl-2.5 text-[13px] outline-none select-none",
-        "data-[highlighted]:text-accent data-[highlighted]:shadow-[var(--press-sm)]",
+        "relative flex w-full cursor-default items-center gap-2 rounded-[8px] py-1.5 pr-8 pl-2.5 text-[13px] outline-none select-none",
+        "data-[highlighted]:bg-accent-wash data-[highlighted]:text-accent",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
       )}

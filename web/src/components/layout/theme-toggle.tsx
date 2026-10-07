@@ -1,6 +1,6 @@
 "use client";
 
-/* Switches between the light and dark soft-UI palettes. */
+/* Switches between the light and dark palettes. */
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";

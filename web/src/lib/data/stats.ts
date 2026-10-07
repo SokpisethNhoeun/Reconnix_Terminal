@@ -167,14 +167,29 @@ export function durationMs(a: Assessment): number | null {
   return Number.isFinite(ms) && ms >= 0 ? ms : null;
 }
 
-export function attention(list: Assessment[]) {
-  const findings = list.flatMap((a) => a.findings).filter((f) => !isConfirmed(f));
+/** The Assessments page's "Needs attention" status filter: runs the operator should look at. */
+export const ATTENTION = "attention";
+const ATTENTION_STATUSES: ReadonlySet<Status> = new Set(["Awaiting input", "Stopped", "Interrupted"]);
+
+export type AttentionItem =
+  | { kind: "waiting" | "stopped" | "interrupted"; assessment: Assessment }
+  | { kind: "review"; count: number; bySeverity: Record<Severity, number> };
+
+/** What needs the operator, one of each kind first (waiting, review, stopped, interrupted)
+    so a short list still shows every kind, then the rest. `runs` counts the assessments. */
+export function attentionItems(list: Assessment[]): { items: AttentionItem[]; runs: number } {
+  const review = list.flatMap((a) => a.findings).filter((f) => !isConfirmed(f));
+  const runs = (kind: "waiting" | "stopped" | "interrupted", status: Status): AttentionItem[] =>
+    list.filter((a) => a.status === status).map((assessment) => ({ kind, assessment }));
+  const groups: AttentionItem[][] = [
+    runs("waiting", "Awaiting input"),
+    review.length ? [{ kind: "review", count: review.length, bySeverity: severityCounts(review) }] : [],
+    runs("stopped", "Stopped"),
+    runs("interrupted", "Interrupted"),
+  ];
   return {
-    waiting: list.filter((a) => a.status === "Awaiting input"),
-    stopped: list.filter((a) => a.status === "Stopped"),
-    interrupted: list.filter((a) => a.status === "Interrupted"),
-    review: findings.length,
-    reviewBySeverity: severityCounts(findings),
+    items: [...groups.flatMap((g) => g.slice(0, 1)), ...groups.flatMap((g) => g.slice(1))],
+    runs: list.filter((a) => ATTENTION_STATUSES.has(a.status)).length,
   };
 }
 
@@ -199,7 +214,7 @@ export function filterAssessments(list: Assessment[], f: AssessmentFilter, now: 
     (a) =>
       (!text || `${a.label} ${a.target} ${a.target_url}`.toLowerCase().includes(text)) &&
       (!f.template || f.template === "all" || a.template.name === f.template) &&
-      (!f.status || f.status === "all" || a.status === f.status) &&
+      (!f.status || f.status === "all" || (f.status === ATTENTION ? ATTENTION_STATUSES.has(a.status) : a.status === f.status)) &&
       !(days > 0 && !(now - Date.parse(a.created_at) <= days * 86_400_000)), // unparseable dates drop out
   );
 }

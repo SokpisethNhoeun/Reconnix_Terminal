@@ -5,6 +5,7 @@ import { AssessmentTable } from "@/components/assessments/assessment-table";
 import { HBars } from "@/components/charts/hbars";
 import { PerDayChart } from "@/components/charts/per-day-chart";
 import { SeverityBars } from "@/components/charts/severity-bars";
+import { SeverityTable } from "@/components/charts/severity-table";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/neu/card";
 import { Dot } from "@/components/neu/chips";
@@ -12,12 +13,15 @@ import { Kpi, KpiGrid, KpiNote } from "@/components/neu/kpi";
 import { EmptyState } from "@/components/overview/empty-state";
 import { NeedsAttention } from "@/components/overview/needs-attention";
 import { SkippedFiles } from "@/components/overview/skipped-files";
-import { byTemplate, overview, perDay, topReferences } from "@/lib/data/stats";
+import { ATTENTION, attentionItems, byTemplate, overview, perDay, topReferences } from "@/lib/data/stats";
 import { loadLibrary, shownDir } from "@/lib/data/store";
 import { formatDay, formatNumber, plural } from "@/lib/format";
 import { referenceName } from "@/lib/references";
+import { query } from "@/lib/utils";
 
 const DAYS = 8;
+const RECENT = 5; // rows in Recent assessments
+const ATTENTION_SHOWN = 4; // items in Needs attention: about the height of those rows
 
 export default async function OverviewPage() {
   const { dir, assessments, problems } = await loadLibrary();
@@ -55,6 +59,7 @@ export default async function OverviewPage() {
     tip: `${t.name}: ${plural(t.findings, "finding")} from ${plural(t.assessments, "assessment")}`,
   }));
   const s = stats.byStatus;
+  const attention = attentionItems(assessments);
 
   return (
     <>
@@ -121,6 +126,7 @@ export default async function OverviewPage() {
       <div className="grid gap-6 xl:grid-cols-2">
         <Card title="Findings by severity" hint="all assessments">
           <SeverityBars findings={findings} />
+          <SeverityTable findings={findings} />
         </Card>
         <Card title="Findings per day" hint={`last ${DAYS} days`}>
           <PerDayChart data={days} />
@@ -129,10 +135,19 @@ export default async function OverviewPage() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <Card title="Recent assessments" actions={<Link className="link" href="/assessments">View all</Link>}>
-          <AssessmentTable assessments={assessments.slice(0, 5)} compact />
+          <AssessmentTable assessments={assessments.slice(0, RECENT)} compact />
         </Card>
-        <Card title="Needs attention">
-          <NeedsAttention assessments={assessments} />
+        <Card
+          title="Needs attention"
+          actions={
+            attention.runs > 0 && (
+              <Link className="link" href={`/assessments${query({ status: ATTENTION })}`}>
+                View all ({attention.runs})
+              </Link>
+            )
+          }
+        >
+          <NeedsAttention assessments={assessments} limit={ATTENTION_SHOWN} />
         </Card>
       </div>
 

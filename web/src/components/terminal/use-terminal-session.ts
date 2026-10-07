@@ -3,10 +3,11 @@
 /* One session on the terminal helper: get a ticket, open the socket, check the helper's
    hello, pump bytes both ways, and say why it ended. Nothing is sent or shown before the
    hello matches, so whatever else might sit on the helper's port gets no keystrokes.
-   `restart()` opens a new session (closing the socket stops the old TUI). Keystrokes go
-   out as binary frames, sizes as text frames (lib/terminal/protocol). */
+   `restart()` opens a new session (closing the socket stops the old TUI); `redraw()` has
+   the TUI paint its whole screen again (a size message, which signals SIGWINCH). Keystrokes
+   go out as binary frames, sizes as text frames (lib/terminal/protocol). */
 import type { IDisposable, Terminal } from "@xterm/xterm";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { TICKET_ROUTE } from "@/lib/terminal/paths";
 import { CLOSE_BUSY, CLOSE_ENDED, CLOSE_IDLE, CLOSE_TOO_BIG, MAX_FRAME, proofInHello, resizeMessage } from "@/lib/terminal/protocol";
@@ -27,6 +28,7 @@ export function useTerminalSession(terminal: Terminal | null) {
   const [state, setState] = useState<SessionState>("connecting");
   const [message, setMessage] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const repaint = useRef(() => {});
 
   useEffect(() => {
     if (!terminal) return;
@@ -80,6 +82,7 @@ export function useTerminalSession(terminal: Terminal | null) {
         }
         verified = true;
         send(resizeMessage(term.cols, term.rows));
+        repaint.current = () => send(resizeMessage(term.cols, term.rows));
         finish("connected", "");
         term.focus();
       };
@@ -93,6 +96,7 @@ export function useTerminalSession(terminal: Terminal | null) {
 
     return () => {
       left = true;
+      repaint.current = () => {};
       window.clearTimeout(helloTimer);
       subscriptions.forEach((s) => s.dispose());
       socket?.close(1000);
@@ -105,7 +109,9 @@ export function useTerminalSession(terminal: Terminal | null) {
     setAttempt((n) => n + 1);
   }, []);
 
-  return { state, message, restart };
+  const redraw = useCallback(() => repaint.current(), []);
+
+  return { state, message, restart, redraw };
 }
 
 function isTicket(body: unknown): body is { ticket: string; proof: string; url: string } {

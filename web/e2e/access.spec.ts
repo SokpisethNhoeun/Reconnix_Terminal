@@ -26,6 +26,9 @@ test("a viewer can read the pages but not use the terminal", async ({ page, cont
   await page.goto("/");
   await expect(page.locator(".pill", { hasText: "viewer" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Terminal" })).toHaveCount(0);
+  await page.goto("/about"); // the About page is for every role, without the Terminal
+  await expect(page.getByRole("heading", { name: "About Reconix", level: 1 })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Where to look in this dashboard" }).getByRole("link")).toHaveCount(4);
   const res = await page.request.post("/api/terminal/ticket", { headers: { Origin: `http://127.0.0.1:${PORT}` } });
   expect(res.status()).toBe(403);
   await page.goto("/terminal");

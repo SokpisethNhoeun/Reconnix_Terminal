@@ -1,4 +1,4 @@
-/* A pressed-in message strip (waiting, stopped, skipped files). */
+/* A recessed message strip (waiting, stopped, skipped files). */
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";

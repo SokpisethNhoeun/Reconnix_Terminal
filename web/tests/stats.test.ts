@@ -2,8 +2,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ATTENTION,
   allFindings,
   approvalRows,
+  attentionItems,
   byTemplate,
   categoryCounts,
   cvssSummary,
@@ -112,6 +114,44 @@ describe("time", () => {
     expect(filterAssessments(list, { q: "", template: "", status: "Stopped", range: "all" }, now)).toHaveLength(1);
     const week = filterAssessments(list, { q: "", template: "", status: "", range: "7" }, now);
     expect(week.every((a) => now - Date.parse(a.created_at) <= 7 * 86_400_000)).toBe(true);
+  });
+
+  it("filters to the runs that need attention", () => {
+    const shown = filterAssessments(list, { q: "", template: "", status: ATTENTION, range: "all" });
+    expect(shown.map((a) => a.status).sort()).toEqual(["Awaiting input", "Stopped"]);
+  });
+});
+
+describe("attentionItems", () => {
+  const run = (base: (typeof list)[number], uid: string, status: (typeof list)[number]["status"]) => ({ ...base, uid, status });
+  const base = list[0];
+
+  it("puts one of each kind first, then the rest", () => {
+    const many = [
+      run(base, "w1", "Awaiting input"),
+      run(base, "w2", "Awaiting input"),
+      run(base, "w3", "Awaiting input"),
+      run(base, "s1", "Stopped"),
+      run(base, "i1", "Interrupted"),
+      run(base, "c1", "Completed"),
+    ];
+    const { items, runs } = attentionItems(many);
+    const review = many.flatMap((a) => a.findings).filter((f) => f.validation !== "CONFIRMED").length;
+    expect(runs).toBe(5);
+    const order = items.map((i) => (i.kind === "review" ? "review" : i.assessment.uid));
+    expect(order).toEqual(review ? ["w1", "review", "s1", "i1", "w2", "w3"] : ["w1", "s1", "i1", "w2", "w3"]);
+  });
+
+  it("counts the findings still for review", () => {
+    const item = attentionItems(list).items.find((i) => i.kind === "review");
+    const review = findings.filter((f) => f.validation !== "CONFIRMED");
+    if (!review.length) expect(item).toBeUndefined();
+    else expect(item).toMatchObject({ kind: "review", count: review.length });
+  });
+
+  it("is empty when nothing needs attention", () => {
+    const calm = list.map((a) => ({ ...a, status: "Completed" as const, findings: a.findings.filter((f) => f.validation === "CONFIRMED") }));
+    expect(attentionItems(calm)).toEqual({ items: [], runs: 0 });
   });
 });
 

@@ -1,4 +1,4 @@
-/* Horizontal bars sunk into pressed tracks, drawn to one scale (the largest row fills the
+/* Horizontal bars in recessed tracks, drawn to one scale (the largest row fills the
    track). Every row is labeled in text, and the value sits at the end in text color; the
    bar color only repeats what the label says. */
 import type { Severity } from "@/lib/data/schema";
