@@ -7,7 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Keyboard-first terminal UI for **Reconix**, an AI-powered security-testing
 assistant. Built with **Textual 8.x + Rich**, Python ≥ 3.9. The app runs on an
 **in-memory store** (`reconix/store/`) that plays a realistic, simulated assessment
-and is the seam for the Reconix backend. A read-only Next.js dashboard lives in `web/`.
+and is the seam for the Reconix backend. A Next.js dashboard lives in `web/`: read-only
+pages plus a **Terminal** page that runs this TUI in the browser (`reconix/webterm/`).
 
 Flow: **Start → Template → Plan → Approval → Execution → Findings → Finding Detail → Report**.
 Branch `classic-ui`: the original full-screen UI (53ac746) running version 1's process —
@@ -29,7 +30,8 @@ uvx ruff check --line-length 100 --select E,F,W,B reconix tests   # lint (no con
 python scripts/make_sample_data.py    # regenerate web/sample-data after a process change
 python scripts/export_tokens.py       # theme.WEB_TOKENS → web/src/styles/tokens.css
 
-cd web && npm run dev             # web dashboard; RECONIX_DATA_DIR=sample-data for demo data
+cd web && npm run dev             # web dashboard + terminal helper; RECONIX_DATA_DIR=sample-data
+                                  #   for demo data, `-- --no-terminal` for read-only
 npm test                          # vitest
 npm run lint && npm run typecheck # typecheck needs `npx next typegen` (or a build) first
 npm run build && npm run e2e      # Playwright on sample-data (needs a Chromium)
@@ -45,6 +47,8 @@ drive the store; `run_ui_to(app, pilot, gate)` / `pass_gate()` drive the screens
 `store.DEMO_REQUEST` (a URL) skips the template gate; pass `ASK_REQUEST` to stop at it.
 `TEST_PASSWORD` must never show up in output, logs, reports or saved copies. The
 `web_launches` fixture stubs `web_server` (start/install/stop): no test starts a real dashboard.
+`tests/test_webterm_server.py` runs the terminal server on a free port with a stand-in
+program instead of the TUI.
 
 ## Architecture
 
@@ -70,6 +74,9 @@ reconix/
 ├── reconix.tcss      # Textual stylesheet (no hex values: $variables only)
 ├── browser.py        # open_url / open_path, detached and silent
 ├── web_server.py     # start / stop `npm run dev` in web/ quietly (log: ~/.reconix/web.log)
+├── webterm/          # the web Terminal page's server (python -m reconix.webterm):
+│                     #   settings, ticket (single use), guard (Host/Origin/ticket),
+│                     #   protocol (frames, close codes), session (pty), server (websockets)
 ├── widgets/          # SessionBar/FlowProgress, ChoiceMenu, PromptBox, Question, RunLog,
 │                     #   ScopeManifestView, Spinner/ActivityStatus,
 │                     #   finding cells (widgets/findings.py)
@@ -150,10 +157,21 @@ Key invariants:
 
 ## Web dashboard (`web/`)
 
-Next.js 16 / React 19, **read-only**: no route writes or starts anything; decisions stay in
-the TUI. Read `web/CLAUDE.md` and `web/README.md` (Rules) before changing it. This Next.js
-version differs from older ones, so check `web/node_modules/next/dist/docs/` before writing
-code. Every page and route needs the `viewer` role (`proxy.ts`, and the handlers check again).
+Next.js 16 / React 19, **read-only except the Terminal page**: no route writes or deletes
+anything, and the only thing started is the Terminal page's TUI (the ticket route hands out
+a ticket; `reconix/webterm`, started by `web/scripts/serve.mjs`, runs the TUI), so its gates
+are the store's gates. Minting a ticket needs the operator session cookie **and** the
+terminal key cookie (`Path=/api/terminal`, signed differently); the helper proves itself
+with a hello before the page sends anything; the TUI's pty is its controlling terminal, so
+it dies with the helper. A stand-in command needs `RECONIX_TERM_TEST=1` (tests only).
+Read `web/CLAUDE.md` and `web/README.md` (Rules) before changing it. This Next.js version
+differs from older ones, so check `web/node_modules/next/dist/docs/` before writing code.
+Every page and route needs the `viewer` role; `/terminal` and `/api/terminal/*` need
+`operator` (`proxy.ts`, and the pages / handlers check again). The ticket format lives in
+both `web/src/lib/auth/ticket.ts` and `reconix/webterm/ticket.py` (shared test vector), and
+the frame protocol in `web/src/lib/terminal/protocol.ts` and `reconix/webterm/protocol.py`:
+change each pair together. The helper never logs terminal data (`TEST_PASSWORD` test), and
+the sign-in link (operator control) is printed only to a TTY, never to `~/.reconix/web.log`.
 
 ## Project rules (applied to this TUI)
 

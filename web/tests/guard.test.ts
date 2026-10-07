@@ -1,4 +1,4 @@
-/* The data loader's own role check (behind the proxy). */
+/* The data loader's and the Terminal page's own role checks (behind the proxy). */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { sessionValue } from "@/lib/auth/session";
@@ -15,13 +15,14 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const { requireViewer } = await import("@/lib/auth/guard");
+const { requireTerminalAccess, requireViewer } = await import("@/lib/auth/guard");
 
 beforeEach(() => {
   process.env.RECONIX_WEB_TOKEN = TOKEN;
 });
 afterEach(() => {
   delete process.env.RECONIX_WEB_TOKEN;
+  delete process.env.RECONIX_WEB_TERMINAL;
   cookie = undefined;
 });
 
@@ -40,5 +41,31 @@ describe("requireViewer", () => {
     cookie = sessionValue("viewer", TOKEN);
     delete process.env.RECONIX_WEB_TOKEN;
     await expect(requireViewer()).rejects.toThrow("redirect:/login");
+  });
+});
+
+describe("requireTerminalAccess", () => {
+  beforeEach(() => {
+    process.env.RECONIX_WEB_TERMINAL = "1";
+  });
+
+  it("lets an operator through", async () => {
+    cookie = sessionValue("operator", TOKEN);
+    await expect(requireTerminalAccess()).resolves.toBeUndefined();
+  });
+
+  it("sends a viewer back to the overview", async () => {
+    cookie = sessionValue("viewer", TOKEN);
+    await expect(requireTerminalAccess()).rejects.toThrow("redirect:/");
+  });
+
+  it("sends a visitor without a session to sign-in", async () => {
+    await expect(requireTerminalAccess()).rejects.toThrow("redirect:/login");
+  });
+
+  it("stays shut when the dashboard was started without the terminal", async () => {
+    process.env.RECONIX_WEB_TERMINAL = "0";
+    cookie = sessionValue("operator", TOKEN);
+    await expect(requireTerminalAccess()).rejects.toThrow("redirect:/");
   });
 });

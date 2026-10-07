@@ -118,6 +118,13 @@ def test_files_are_private():
     assert not [p for p in persist.DATA_DIR.iterdir() if p.name.endswith(".tmp")]
 
 
+def test_folders_it_creates_are_private_too(monkeypatch, tmp_path):
+    monkeypatch.setattr(persist, "DATA_DIR", tmp_path / "home" / ".reconix" / "assessments")
+    run_to("scope")
+    store.autosave()
+    assert stat.S_IMODE((tmp_path / "home" / ".reconix").stat().st_mode) == 0o700
+
+
 def test_each_assessment_gets_its_own_file():
     run_to("scope")
     store.autosave()

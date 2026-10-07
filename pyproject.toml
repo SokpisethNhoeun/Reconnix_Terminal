@@ -6,6 +6,7 @@ requires-python = ">=3.9"
 dependencies = [
     "textual>=8.2,<9",
     "rich>=13.7",
+    "websockets>=13",
 ]
 
 [project.scripts]
@@ -19,7 +20,7 @@ build-backend = "setuptools.build_meta"
 packages = [
     "reconix", "reconix.commands", "reconix.flow", "reconix.models", "reconix.screens",
     "reconix.screens.forms", "reconix.shell", "reconix.store", "reconix.store.importers",
-    "reconix.store.templates", "reconix.widgets",
+    "reconix.store.templates", "reconix.webterm", "reconix.widgets",
 ]
 
 [tool.setuptools.package-data]

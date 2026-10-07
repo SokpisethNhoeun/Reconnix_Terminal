@@ -1,2 +1,3 @@
 textual>=8.2,<9
 rich>=13.7
+websockets>=13       # the web dashboard's Terminal page (reconix/webterm)

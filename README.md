@@ -8,7 +8,8 @@ approvals and findings, and a policy engine checks every request against the sco
 approved.
 
 Flow: **Start → Template → Plan → Approval → Execution → Findings → Finding Detail →
-Report**. A read-only **web dashboard** (`web/`) shows the saved assessments.
+Report**. A **web dashboard** (`web/`) shows the saved assessments, and its **Terminal**
+page runs this same TUI in the browser.
 
 ## Run it
 
@@ -36,7 +37,15 @@ started stops when you quit. Needs Node.js. To run it on its own:
 ```bash
 cd web && npm install && npm run dev    # prints a sign-in link; /web opens the same one
 RECONIX_DATA_DIR=sample-data npm run dev   # or browse the bundled sample assessments
+npm run dev -- --no-terminal            # without the Terminal page: the dashboard only reads
 ```
+
+**Terminal page.** The dashboard's sidebar has a **Terminal** link that runs the Reconix TUI
+in the browser, with the same screens, commands and gates. Each browser tab gets its own
+session (`python -m reconix` in a pseudo-terminal, started by `python -m reconix.webterm`
+on `127.0.0.1:3101`). It keeps running while you look at the other pages and ends when you
+close the tab; what it saves shows up on the other pages. It needs Linux or macOS and the
+`websockets` package from `requirements.txt`. See `docs/WEB_TERMINAL_PLAN.md`.
 
 > Requires Python 3.9+. For the intended look, use a terminal with a
 > **JetBrains Mono** (or any Nerd/▮ box-drawing) font and a dark background.
@@ -141,7 +150,9 @@ double check, the single-use token from `store.request_confirmation()`. The poli
 engine checks every request against the approved scope and blocks the rest. Target
 logins live in memory for the session only; one-time codes are never stored; evidence
 is masked; saved copies for the web dashboard (`~/.reconix/assessments`, 0600) never
-contain a secret.
+contain a secret. The browser terminal only opens for the dashboard's own page with a
+single-use ticket that only an operator gets, on 127.0.0.1; the helper proves itself before
+the page sends a keystroke, never logs what is typed, and takes its TUIs down with it.
 
 ## Project layout
 
@@ -151,7 +162,7 @@ reconix-tui/
 ├── requirements*.txt, pyproject.toml
 ├── docs/                   # plans: CLASSIC_UI_PLAN (this branch), LLM integration, web …
 ├── scripts/                # export_tokens.py (web colors), make_sample_data.py
-├── web/                    # read-only Next.js dashboard
+├── web/                    # Next.js dashboard (read-only pages + the Terminal page)
 ├── tests/                  # pytest + Textual Pilot
 └── reconix/
     ├── app.py              # ReconixApp: bindings and the command runner
@@ -171,6 +182,7 @@ reconix-tui/
     ├── reconix.tcss        # Textual stylesheet
     ├── browser.py          # open a URL / saved report without disturbing the TUI
     ├── web_server.py       # /web starts and stops the dashboard (npm run dev in web/)
+    ├── webterm/            # the Terminal page's server: tickets, origin check, pty sessions
     ├── widgets/            # session bar + flow line, menus, prompt, question, run log,
     │                       #   scope manifest view, spinner + activity line, finding cells
     └── screens/

@@ -57,6 +57,9 @@ CSS_TOKENS: Dict[str, str] = {
     "violet-bg": VIOLET_BG,
 }
 
+# The web Terminal page shows the TUI itself, which is dark in both web themes.
+TERMINAL_WEB_TOKENS: Dict[str, str] = {"term-bg": BG, "term-text": TEXT, "term-cursor": CYAN}
+
 # Web dashboard (web/, neumorphism) — light and dark palettes. scripts/export_tokens.py
 # writes them to web/src/styles/tokens.css; the web code uses only those variables.
 # Surfaces match the background (soft UI): `sd`/`sl` are the dark/light shadow colors.
@@ -68,6 +71,7 @@ WEB_TOKENS: Dict[str, Dict[str, str]] = {
         "accent": CYAN_DIM, "accent-ink": "#FFFFFF", "accent-wash": "#D2E3EA",
         "critical": "#D42F45", "high": "#C2550A", "medium": "#A86B00", "low": "#0277B6",
         "info": "#5E6E80", "ok": "#15803D", "warn": "#A86B00", "bad": "#D42F45",
+        **TERMINAL_WEB_TOKENS,
     },
     "dark": {
         "bg": "#1C232A", "sd": "#11161A", "sl": "#27313A",
@@ -76,6 +80,7 @@ WEB_TOKENS: Dict[str, Dict[str, str]] = {
         # the web's dark red is a step lighter than the TUI's: 4.9:1 on #1C232A (AA)
         "critical": "#F4596B", "high": HIGH, "medium": MEDIUM, "low": LOW,
         "info": INFO, "ok": GREEN, "warn": MEDIUM, "bad": "#F4596B",
+        **TERMINAL_WEB_TOKENS,
     },
 }
 

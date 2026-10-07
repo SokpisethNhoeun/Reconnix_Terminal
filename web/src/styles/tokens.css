@@ -18,6 +18,9 @@
   --ok: #15803D;
   --warn: #A86B00;
   --bad: #D42F45;
+  --term-bg: #0B0F12;
+  --term-text: #E6EDF0;
+  --term-cursor: #22D3EE;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -40,6 +43,9 @@
     --ok: #4ADE80;
     --warn: #FBBF24;
     --bad: #F4596B;
+    --term-bg: #0B0F12;
+    --term-text: #E6EDF0;
+    --term-cursor: #22D3EE;
     color-scheme: dark;
   }
 }
@@ -62,5 +68,8 @@
   --ok: #4ADE80;
   --warn: #FBBF24;
   --bad: #F4596B;
+  --term-bg: #0B0F12;
+  --term-text: #E6EDF0;
+  --term-cursor: #22D3EE;
   color-scheme: dark;
 }

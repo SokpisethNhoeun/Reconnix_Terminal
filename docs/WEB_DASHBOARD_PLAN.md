@@ -2,6 +2,9 @@
 
 2026-10-05. Follows `DASHBOARD_PLAN.md`, `REAL_USE_PLAN.md` and `PLAN_LIST_PLAN.md`.
 
+> **2026-10-07:** the read-only rule now has one exception, the **Terminal** page, which
+> runs the TUI itself in the browser. See `WEB_TERMINAL_PLAN.md`.
+
 ## Decisions (from the user)
 
 - **The run stays in the TUI.** Templates, scope, target login, approvals and reports are

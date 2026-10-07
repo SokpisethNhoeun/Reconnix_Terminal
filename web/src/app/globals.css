@@ -241,6 +241,16 @@ body {
     font-size: 13.5px;
   }
 
+  /* --- terminal (the TUI is dark in both themes) ---------------------------------------- */
+  .term {
+    height: max(420px, calc(100vh - 260px));
+    padding: 10px 12px;
+    border-radius: 16px;
+    background: var(--term-bg);
+    box-shadow: var(--press-sm);
+    overflow: hidden;
+  }
+
   /* --- tables -------------------------------------------------------------------------- */
   .table-wrap {
     overflow-x: auto;
@@ -422,7 +432,7 @@ body {
 @media (max-width: 820px) {
   .shell { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 18px; }
   .side { position: static; min-height: 0; padding: 14px; gap: 14px; }
-  /* phone navigation: four tabs, icon over a short label */
+  /* phone navigation: four or five tabs, icon over a short label */
   .nav-link { grid-template-columns: 1fr; justify-items: center; gap: 4px; padding: 8px 4px; font-size: 12px; border-radius: 12px; }
   .hbar, .hbar.wide { grid-template-columns: 96px minmax(0, 1fr) 30px; }
   .tl { grid-template-columns: 52px 18px minmax(0, 1fr); gap: 8px; }

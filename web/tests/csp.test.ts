@@ -1,6 +1,6 @@
 /* The Content-Security-Policy: nonce'd scripts, nothing framed — except the export route,
    which the preview page frames from the same origin. */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { EXPORT_ROUTE, contentSecurityPolicy } from "@/lib/auth/csp";
 
@@ -24,5 +24,24 @@ describe("contentSecurityPolicy", () => {
       expect(EXPORT_ROUTE.test(path)).toBe(false);
       expect(directives(contentSecurityPolicy("n", path))["frame-ancestors"]).toBe("frame-ancestors 'none'");
     }
+  });
+});
+
+describe("the terminal helper", () => {
+  afterEach(() => {
+    delete process.env.RECONIX_WEB_TERMINAL;
+    delete process.env.RECONIX_TERM_PORT;
+  });
+
+  it("may be reached from every page while the terminal is on", () => {
+    process.env.RECONIX_WEB_TERMINAL = "1";
+    process.env.RECONIX_TERM_PORT = "4101";
+    for (const path of ["/", "/terminal", "/findings"]) {
+      expect(directives(contentSecurityPolicy("n", path))["connect-src"]).toContain("ws://127.0.0.1:4101");
+    }
+  });
+
+  it("may not be reached when the terminal is off", () => {
+    expect(directives(contentSecurityPolicy("n", "/terminal"))["connect-src"]).not.toContain("127.0.0.1");
   });
 });

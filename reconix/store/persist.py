@@ -87,8 +87,17 @@ def save(assessment: Assessment, *, session_closed: bool = False) -> bool:
 
 
 def _private_dir(folder: Path) -> None:
-    """Create `folder` (0700) or check it is a directory only this user can write to."""
-    folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+    """Create `folder` (0700) or check it is a directory only this user can write to.
+
+    Missing parents (such as ~/.reconix, which also holds the web log) are created 0700 too.
+    """
+    missing = []
+    parent = folder
+    while not parent.exists():
+        missing.append(parent)
+        parent = parent.parent
+    for created in reversed(missing):
+        created.mkdir(mode=0o700, exist_ok=True)
     info = folder.stat()
     if not stat.S_ISDIR(info.st_mode):
         raise NotADirectoryError(str(folder))

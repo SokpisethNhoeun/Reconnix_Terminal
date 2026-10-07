@@ -1,8 +1,9 @@
-"""/web: open the read-only web dashboard, starting it first if it isn't running.
+"""/web: open the web dashboard, starting it first if it isn't running.
 
 The first /web of a session starts `npm run dev` in web/ in the background (and installs
 its packages if they're missing); the dashboard opens the browser itself once it's
 ready. Later /web calls just open it. A dashboard this TUI started stops when it quits.
+On the dashboard's own Terminal page, /web just says so.
 """
 
 import threading
@@ -26,6 +27,10 @@ class WebDashboardMixin:
         self._web_quit = threading.Event()     # set on quit: stop waiting for it
 
     def open_web_dashboard(self) -> None:
+        if web_server.in_browser_terminal():
+            self._web_note("You're already in the web dashboard: this is its Terminal page. "
+                           "Its other pages are in the sidebar.")
+            return
         url = store.web_dashboard_url()
         if url and web_server.is_listening(url):
             self._open_in_browser(url)

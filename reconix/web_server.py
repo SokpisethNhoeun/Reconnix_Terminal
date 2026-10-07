@@ -7,11 +7,13 @@ first time, and starts or stops that launcher quietly: its output goes to a log 
 never to the terminal the TUI draws on.
 """
 
+import json
 import os
 import shutil
 import signal
 import socket
 import subprocess
+import sys
 from pathlib import Path
 from typing import IO, Optional
 from urllib.parse import urlsplit
@@ -29,14 +31,29 @@ def problem() -> str:
     return ""
 
 
+def in_browser_terminal() -> bool:
+    """This TUI runs on the dashboard's Terminal page (reconix/webterm sets RECONIX_IN_WEB)."""
+    return os.environ.get("RECONIX_IN_WEB") == "1"
+
+
 def needs_install() -> bool:
-    """Its packages aren't installed yet (the first start)."""
-    return not (WEB_DIR / "node_modules" / "next").is_dir()
+    """Some of its packages aren't installed yet (the first start, or new ones were added)."""
+    try:
+        names = json.loads((WEB_DIR / "package.json").read_text(encoding="utf-8"))["dependencies"]
+    except (OSError, ValueError, KeyError, TypeError):
+        names = ["next"]
+    modules = WEB_DIR / "node_modules"
+    return not all((modules / name / "package.json").is_file() for name in names)
 
 
 def _log() -> IO[bytes]:
+    """The log, readable by this user only (it may mention the dashboard's address)."""
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    return open(LOG_FILE, "ab")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(LOG_FILE, flags, 0o600)
+    if hasattr(os, "fchmod"):
+        os.fchmod(fd, 0o600)                       # one made before this change: tighten it
+    return os.fdopen(fd, "ab")
 
 
 def install() -> bool:
@@ -50,9 +67,10 @@ def install() -> bool:
 
 def start(data_dir: Path, url_file: Path) -> subprocess.Popen:
     """`npm run dev` in the background, reading `data_dir` and writing its link to `url_file`
-    (the places the TUI saves to and reads from). It opens the browser when it's ready."""
+    (the places the TUI saves to and reads from). It opens the browser when it's ready.
+    Its Terminal page runs this same Python (RECONIX_PYTHON)."""
     env = {**os.environ, "RECONIX_DATA_DIR": str(data_dir),
-           "RECONIX_WEB_URL_FILE": str(url_file)}
+           "RECONIX_WEB_URL_FILE": str(url_file), "RECONIX_PYTHON": sys.executable}
     url_file.unlink(missing_ok=True)      # a link left by a dashboard that died is stale
     with _log() as out:
         return subprocess.Popen(

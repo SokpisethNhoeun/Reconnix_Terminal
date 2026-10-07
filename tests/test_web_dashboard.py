@@ -1,11 +1,14 @@
 """/web starts the web dashboard when it isn't running (no `cd web && npm run dev`)."""
 
 import socket
+import sys
 
 from reconix import web_server
 from reconix.shell import web as web_shell
 from reconix.store import persist
+from reconix.web_server import needs_install as real_needs_install
 from reconix.web_server import problem as real_problem     # before conftest stubs it
+from reconix.web_server import start as real_start
 
 from .support import SIZE, settle
 
@@ -63,6 +66,51 @@ async def test_a_dashboard_it_started_stops_when_the_tui_quits(app, web_launches
         [dashboard] = web_launches
         assert not dashboard.stopped
     assert dashboard.stopped
+
+
+async def test_on_the_terminal_page_it_says_you_are_already_there(app, opened, web_launches,
+                                                                  monkeypatch):
+    monkeypatch.setenv("RECONIX_IN_WEB", "1")              # set by reconix/webterm
+    persist.WEB_URL_FILE.write_text(LINK)
+    async with app.run_test(size=SIZE) as pilot:
+        app.run_command_line("/web")
+        await settle(pilot)
+        assert opened == [] and web_launches == []
+        assert "already in the web dashboard" in _notes(app)
+
+
+def test_a_newly_added_package_triggers_an_install(monkeypatch, tmp_path):
+    (tmp_path / "package.json").write_text('{"dependencies": {"next": "1", "@xterm/xterm": "6"}}')
+    (tmp_path / "node_modules" / "next").mkdir(parents=True)
+    (tmp_path / "node_modules" / "next" / "package.json").write_text("{}")
+    monkeypatch.setattr(web_server, "WEB_DIR", tmp_path)
+    assert real_needs_install()                         # @xterm/xterm is missing
+    (tmp_path / "node_modules" / "@xterm" / "xterm").mkdir(parents=True)
+    (tmp_path / "node_modules" / "@xterm" / "xterm" / "package.json").write_text("{}")
+    assert not real_needs_install()
+
+
+def test_its_log_is_private(monkeypatch, tmp_path):
+    log = tmp_path / "web.log"
+    log.write_text("old\n")
+    log.chmod(0o644)                                     # from before: tightened
+    monkeypatch.setattr(web_server, "LOG_FILE", log)
+    with web_server._log() as out:
+        out.write(b"new\n")
+    assert (log.stat().st_mode & 0o777) == 0o600 and log.read_text() == "old\nnew\n"
+
+
+def test_the_dashboard_runs_its_terminal_with_this_python(monkeypatch, tmp_path):
+    seen = {}
+
+    class Popen:
+        def __init__(self, args, **kwargs):
+            seen.update(kwargs["env"])
+
+    monkeypatch.setattr(web_server.subprocess, "Popen", Popen)
+    monkeypatch.setattr(web_server, "LOG_FILE", tmp_path / "web.log")
+    real_start(tmp_path / "data", tmp_path / "web.url")
+    assert seen["RECONIX_PYTHON"] == sys.executable
 
 
 async def test_a_stale_link_is_not_opened(app, opened, web_launches):

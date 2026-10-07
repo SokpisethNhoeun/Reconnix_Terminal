@@ -1,9 +1,9 @@
 # Reconix analysis dashboard (web)
 
-A **read-only** local dashboard for what the Reconix terminal app did. The run, every gate
-and every decision stay in the TUI; this app reads the assessments the TUI saves to
-`~/.reconix/assessments/` and shows findings, timelines, policy checks and approvals. It
-never changes anything.
+A local dashboard for what the Reconix terminal app did. It reads the assessments the TUI
+saves to `~/.reconix/assessments/` and shows findings, timelines, policy checks and
+approvals; those pages never change anything. The **Terminal** page runs the TUI itself in
+the browser, so every gate and decision still goes through the TUI's store.
 
 Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind v4 · next-themes ·
 recharts · zod · lucide-react. Soft-UI (neumorphism) in light and dark.
@@ -16,13 +16,39 @@ npm run build
 npm start                          # http://127.0.0.1:3100, prints and opens the sign-in link
 RECONIX_DATA_DIR=sample-data npm start   # the sample assessments instead of your own
 npm start -- --no-open             # don't open a browser
+npm start -- --no-terminal         # no Terminal page; the sign-in grants viewer only
 ```
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `RECONIX_DATA_DIR` | `~/.reconix/assessments` | the folder the TUI saves to |
 | `RECONIX_WEB_PORT` | `3100` | port on 127.0.0.1 |
+| `RECONIX_TERM_PORT` | `3101` | the terminal helper's port on 127.0.0.1 |
+| `RECONIX_PYTHON` | repo `.venv`, else `python3` | the Python that runs the terminal helper and the TUI |
 | `RECONIX_WEB_TOKEN` | random per start | only for tests; normally `scripts/serve.mjs` makes one |
+
+## Terminal page
+
+`scripts/serve.mjs` starts `python -m reconix.webterm` (from the repo root) next to Next.js.
+The page asks `POST /api/terminal/ticket` for a single-use ticket valid for 60 s, then opens
+`ws://127.0.0.1:3101/?ticket=…`.
+
+- **Ticket route:** same origin, the operator session cookie **and** the terminal key
+  cookie (`reconix_term`, `Path=/api/terminal`, signed differently, so a session cookie
+  seen by another server on 127.0.0.1 can't mint tickets). It returns the ticket, the
+  socket URL and the `proof` the real helper will send.
+- **Helper:** checks the `Host` (loopback), the `Origin` (this dashboard) and the ticket
+  (signed with the launch token, used once). Its first frame is `{"type":"hello","proof"}`;
+  the page sends nothing and shows nothing until it matches, so another program holding
+  port 3101 gets no keystrokes. Then it runs `python -m reconix` on a pseudo-terminal that
+  is the TUI's controlling terminal: if the helper dies, so does the TUI.
+- **Frames:** binary for terminal bytes (pastes split into 32 KiB), text for
+  `{"type":"resize","cols","rows"}` (at most 256 characters).
+- **Limits:** 2 sessions at once; one closes after 30 minutes without typing. The session
+  lives in the dashboard layout (`components/terminal/terminal-dock.tsx`), so it keeps
+  running while you browse; closing the tab stops that TUI. Nothing typed is logged.
+- **The sign-in link** grants operator control, so `serve.mjs` prints it only to a
+  terminal; started by the TUI, it is only in `~/.reconix/web.url` (0600).
 
 ## Develop
 
@@ -44,14 +70,18 @@ src/
 ├── proxy.ts                 # Host allowlist, viewer role on every route, nonce CSP
 ├── app/
 │   ├── layout.tsx           # fonts, theme (nonce), metadata
-│   ├── (dash)/              # signed-in pages: layout (sidebar), page (overview),
-│   │                        #   assessments/, assessments/[uid]/ (+ export/ preview), findings/, policy/
+│   ├── (dash)/              # signed-in pages: layout (sidebar, terminal dock), page (overview),
+│   │                        #   assessments/, assessments/[uid]/ (+ export/ preview), findings/,
+│   │                        #   policy/, terminal/ (operators)
 │   ├── login/               # sign-in (token from the link's #fragment)
-│   └── api/                 # session (sign-in), assessments/[uid] (JSON), assessments/[uid]/export
+│   └── api/                 # session (sign-in), assessments/[uid] (JSON), assessments/[uid]/export,
+│                            #   terminal/ticket (operators)
 ├── lib/
 │   ├── report/              # formats.ts (the export registry), html.ts (report), pdf.ts (Chrome), render.ts
 │   ├── data/                # schema.ts (zod), store.ts (server-only reader), stats.ts (pure), export.ts
-│   ├── auth/                # session.ts (launch token, signed cookie, roles, hosts), csp.ts, guard.ts
+│   ├── auth/                # session.ts (launch token, signed cookie, roles, hosts), csp.ts, guard.ts,
+│   │                        #   origin.ts (same-origin check), ticket.ts (terminal tickets)
+│   ├── terminal/            # config.ts (on/off, helper port), protocol.ts (frames, close codes)
 │   └── format.ts, references.ts, utils.ts
 ├── components/
 │   ├── ui/                  # shadcn/ui (Button, Input, Select, DropdownMenu), themed to the tokens
@@ -59,6 +89,7 @@ src/
 │   ├── exports/             # the export previews (frame, CSV table, code)
 │   ├── charts/              # HBars, SeverityBars, PerDayChart (with a table view)
 │   ├── layout/              # Sidebar, NavLinks, PageHeader, LiveRefresh, ThemeToggle
+│   ├── terminal/            # TerminalDock, TerminalPanel, useXterm, useTerminalSession, useLeaveWarning
 │   └── assessments/, findings/, policy/, timeline/, overview/
 └── styles/tokens.css        # GENERATED from reconix/theme.py (scripts/export_tokens.py)
 ```
@@ -76,12 +107,16 @@ and the route share.
 
 ## Rules
 
-- **Read-only.** No route writes, deletes or starts anything; decisions belong in the TUI.
+- **Read-only, except the Terminal page.** No route writes, deletes or starts anything;
+  decisions belong in the TUI. The one exception is the Terminal page, which runs the TUI
+  itself (its ticket route only hands out a ticket; the helper starts the session).
 - **One data source.** Pages read through `lib/data/store.ts` only; it accepts regular files
   named `<YYYYMMDD-HHMMSS-xxxx>_<id>.json` up to 5 MB that pass `AssessmentSchema`.
   Change `schema.ts` together with `reconix/store/snapshot.py`.
-- **Access.** Every page and route needs the `viewer` role (`proxy.ts`, and route handlers
-  check again). The dashboard binds to 127.0.0.1 and refuses other Host headers.
+- **Access.** Every page and route needs the `viewer` role, and `/terminal` and
+  `/api/terminal/*` need `operator` (`proxy.ts`, and pages / handlers check again). The
+  sign-in link grants `operator` while the terminal is on (`--no-terminal`: `viewer`). The
+  dashboard binds to 127.0.0.1 and refuses other Host headers; so does the terminal helper.
 - **Text is text.** Saved values (targets, evidence, chat) are rendered by React as text;
   never use `dangerouslySetInnerHTML`.
 - **Colors** come only from `tokens.css`; add a token in `reconix/theme.py` (`WEB_TOKENS`)
