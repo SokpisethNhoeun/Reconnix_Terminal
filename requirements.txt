@@ -1,3 +1,4 @@
 textual>=8.2,<9
 rich>=13.7
 websockets>=13       # the web dashboard's Terminal page (reconix/webterm)
+pywinpty>=2.0.14; sys_platform == "win32"   # the Terminal page on Windows (ConPTY)

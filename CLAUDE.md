@@ -76,7 +76,8 @@ reconix/
 ├── web_server.py     # start / stop `npm run dev` in web/ quietly (log: ~/.reconix/web.log)
 ├── webterm/          # the web Terminal page's server (python -m reconix.webterm):
 │                     #   settings, ticket (single use), guard (Host/Origin/ticket),
-│                     #   protocol (frames, close codes), session (pty), server (websockets)
+│                     #   protocol (frames, close codes), session (+ pty_posix: pty,
+│                     #   pty_windows: ConPTY via pywinpty), server (websockets)
 ├── widgets/          # SessionBar/FlowProgress, ChoiceMenu, PromptBox, Question, RunLog,
 │                     #   ScopeManifestView, Spinner/ActivityStatus,
 │                     #   finding cells (widgets/findings.py)
@@ -163,7 +164,8 @@ a ticket; `reconix/webterm`, started by `web/scripts/serve.mjs`, runs the TUI), 
 are the store's gates. Minting a ticket needs the operator session cookie **and** the
 terminal key cookie (`Path=/api/terminal`, signed differently); the helper proves itself
 with a hello before the page sends anything; the TUI's pty is its controlling terminal, so
-it dies with the helper. A stand-in command needs `RECONIX_TERM_TEST=1` (tests only).
+it dies with the helper (on Windows the TUI runs in a ConPTY console the helper owns, see
+`docs/WEB_WINDOWS_PLAN.md`; keep both backends behind `webterm/session.py`'s `spawn()`). A stand-in command needs `RECONIX_TERM_TEST=1` (tests only).
 Read `web/CLAUDE.md` and `web/README.md` (Rules) before changing it. This Next.js version
 differs from older ones, so check `web/node_modules/next/dist/docs/` before writing code.
 Every page and route needs the `viewer` role; `/terminal` and `/api/terminal/*` need

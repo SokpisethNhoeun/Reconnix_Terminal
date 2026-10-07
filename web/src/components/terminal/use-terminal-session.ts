@@ -15,9 +15,9 @@ import { CLOSE_BUSY, CLOSE_ENDED, CLOSE_IDLE, CLOSE_TOO_BIG, MAX_FRAME, proofInH
 export type SessionState = "connecting" | "connected" | "ended" | "failed";
 
 const UNREACHABLE =
-  "Couldn't open a session. Try New session. If that fails too, the terminal service isn't running: it starts with " +
-  "the dashboard (npm run dev / npm start) and needs Python with the packages from requirements.txt, on Linux or " +
-  "macOS. The dashboard's output says what went wrong.";
+  "Couldn't open a session. Try Restart session (↻). If that fails too, the terminal service isn't running: it " +
+  "starts with the dashboard (npm run dev / npm start) and needs Python with the packages from requirements.txt, on " +
+  "Linux, macOS or Windows 10+. The dashboard's output says what went wrong.";
 const EXPIRED = "Your sign-in has expired. Open the dashboard's sign-in link again.";
 const IMPOSTOR =
   "Something other than the Reconix terminal service answered on its port, so nothing was sent to it. " +

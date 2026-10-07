@@ -2,7 +2,8 @@
 
 Every handshake is checked by `guard.check` (Host, Origin, single-use ticket) before it
 completes. An accepted connection is first sent the hello that proves this is the real
-helper, then gets its own TUI in a pseudo-terminal, sized by the browser's first resize.
+helper, then gets its own TUI in a pseudo-terminal (a pty, or ConPTY on Windows), sized by
+the browser's first resize.
 Bytes then flow both ways until the TUI exits, the browser goes away, or nothing is typed
 for `idle_seconds`. At most `max_sessions` run at once; every TUI stops with the server.
 
@@ -15,6 +16,7 @@ import logging
 import os
 import signal
 import sys
+import threading
 from dataclasses import replace
 from http import HTTPStatus
 from typing import Callable, Optional, Set, Tuple
@@ -24,7 +26,8 @@ from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Request, Response
 
 from . import guard, protocol
-from .session import PtySession, child_env
+from . import session as terminal
+from .session import Session, child_env
 from .settings import Settings
 from .ticket import TicketBook, hello_proof
 
@@ -44,7 +47,7 @@ class TerminalServer:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.tickets = TicketBook(settings.token)
-        self.sessions: Set[PtySession] = set()
+        self.sessions: Set[Session] = set()
         self._server: Optional[Server] = None
         self._active = 0               # connections holding a slot (spawned or about to)
         self._started = 0
@@ -103,7 +106,7 @@ class TerminalServer:
         try:
             size, early = await self._first_size(ws)
             try:
-                session = PtySession.spawn(self.settings.command, child_env(os.environ), size)
+                session = terminal.spawn(self.settings.command, child_env(os.environ), size)
             except OSError as error:
                 log.error("Session %d: couldn't start the terminal app: %s", number, error)
                 await ws.close(protocol.CLOSE_ENDED, "The terminal app couldn't start. "
@@ -135,7 +138,7 @@ class TerminalServer:
             return protocol.parse_resize(message) or DEFAULT_SIZE, b""
         return DEFAULT_SIZE, message
 
-    async def _pump(self, ws: ServerConnection, session: PtySession) -> Closing:
+    async def _pump(self, ws: ServerConnection, session: Session) -> Closing:
         output = asyncio.ensure_future(self._output(ws, session))
         keys = asyncio.ensure_future(self._input(ws, session))
         done, pending = await asyncio.wait({output, keys}, return_when=asyncio.FIRST_COMPLETED)
@@ -144,7 +147,7 @@ class TerminalServer:
         await asyncio.gather(*pending, return_exceptions=True)
         return (output if output in done else keys).result()
 
-    async def _output(self, ws: ServerConnection, session: PtySession) -> Closing:
+    async def _output(self, ws: ServerConnection, session: Session) -> Closing:
         try:
             while True:
                 data = await session.read()
@@ -154,7 +157,7 @@ class TerminalServer:
         except ConnectionClosed:
             return None
 
-    async def _input(self, ws: ServerConnection, session: PtySession) -> Closing:
+    async def _input(self, ws: ServerConnection, session: Session) -> Closing:
         """Keystrokes and resizes in. Only keystrokes count as activity: a resize comes
         from the window, and the TUI's output never stops (its cursor blinks)."""
         loop = asyncio.get_running_loop()
@@ -188,8 +191,7 @@ async def run(settings: Settings) -> None:
         if not done.done():
             done.set_result(None)
 
-    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT):
-        loop.add_signal_handler(sig, finish)
+    _on_signals(loop, finish)
     if settings.watch_stdin:
         _watch_stdin(loop, finish)
     server = TerminalServer(settings)
@@ -204,9 +206,42 @@ async def run(settings: Settings) -> None:
         log.info("Stopped")
 
 
+def _on_signals(loop: asyncio.AbstractEventLoop, finish: Callable[[], None]) -> None:
+    """Stop on SIGINT, SIGTERM, SIGHUP, SIGQUIT (Windows: Ctrl+C and Ctrl+Break)."""
+    for name in ("SIGINT", "SIGTERM", "SIGHUP", "SIGQUIT", "SIGBREAK"):
+        sig = getattr(signal, name, None)
+        if sig is None:
+            continue
+        try:
+            loop.add_signal_handler(sig, finish)
+        except NotImplementedError:      # Windows: the event loop has no signal handlers
+            try:
+                signal.signal(sig, lambda *_: _call_soon(loop, finish))
+            except (OSError, ValueError):
+                pass
+
+
+def _call_soon(loop: asyncio.AbstractEventLoop, callback: Callable[[], None]) -> None:
+    try:
+        loop.call_soon_threadsafe(callback)
+    except RuntimeError:                 # the loop already closed
+        pass
+
+
 def _watch_stdin(loop: asyncio.AbstractEventLoop, finish: Callable[[], None]) -> None:
     """The launcher keeps our stdin open; end of file means it died, so stop too."""
     fd = sys.stdin.fileno()
+    if sys.platform == "win32":          # no add_reader on a pipe there: wait in a thread
+        def wait() -> None:
+            try:
+                while os.read(fd, 1024):
+                    pass
+            except OSError:
+                pass
+            _call_soon(loop, finish)
+
+        threading.Thread(target=wait, name="webterm-stdin", daemon=True).start()
+        return
 
     def readable() -> None:
         try:

@@ -27,7 +27,7 @@ npm start -- --no-terminal         # no Terminal page; the sign-in grants viewer
 | `RECONIX_DATA_DIR` | `~/.reconix/assessments` | the folder the TUI saves to |
 | `RECONIX_WEB_PORT` | `3100` | port on 127.0.0.1 |
 | `RECONIX_TERM_PORT` | `3101` | the terminal helper's port on 127.0.0.1 |
-| `RECONIX_PYTHON` | repo `.venv`, else `python3` | the Python that runs the terminal helper and the TUI |
+| `RECONIX_PYTHON` | repo `.venv`, else `python3` (`python` on Windows) | the Python that runs the terminal helper and the TUI |
 | `RECONIX_WEB_TOKEN` | random per start | only for tests; normally `scripts/serve.mjs` makes one |
 
 ## Terminal page
@@ -44,7 +44,8 @@ The page asks `POST /api/terminal/ticket` for a single-use ticket valid for 60 s
   (signed with the launch token, used once). Its first frame is `{"type":"hello","proof"}`;
   the page sends nothing and shows nothing until it matches, so another program holding
   port 3101 gets no keystrokes. Then it runs `python -m reconix` on a pseudo-terminal that
-  is the TUI's controlling terminal: if the helper dies, so does the TUI.
+  is the TUI's controlling terminal: if the helper dies, so does the TUI. On Windows it is
+  a ConPTY pseudo console (`pywinpty`) the helper owns; closing it ends the TUI.
 - **Frames:** binary for terminal bytes (pastes split into 32 KiB), text for
   `{"type":"resize","cols","rows"}` (at most 256 characters).
 - **Limits:** 2 sessions at once; one closes after 30 minutes without typing. The session

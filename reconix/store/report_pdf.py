@@ -19,11 +19,20 @@ from .report_html import render_html
 
 HAS_WEASYPRINT = importlib.util.find_spec("weasyprint") is not None
 
-_CHROME_NAMES = ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome")
+_CHROME_NAMES = ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome",
+                 "msedge")
 _CHROME_PATHS = (
     "/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser",
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 )
+
+
+def _windows_paths() -> list:
+    """Where Chrome and Edge (Chromium, on every Windows 10+) install on Windows."""
+    bases = (os.environ.get(name) for name in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"))
+    return [str(Path(base, *parts)) for base in bases if base
+            for parts in (("Google", "Chrome", "Application", "chrome.exe"),
+                          ("Microsoft", "Edge", "Application", "msedge.exe"))]
 
 
 def chrome_binary() -> Optional[str]:
@@ -35,7 +44,8 @@ def chrome_binary() -> Optional[str]:
         found = shutil.which(name)
         if found:
             return found
-    return next((path for path in _CHROME_PATHS if Path(path).exists()), None)
+    return next((path for path in (*_CHROME_PATHS, *_windows_paths()) if Path(path).exists()),
+                None)
 
 
 def pdf_available() -> bool:

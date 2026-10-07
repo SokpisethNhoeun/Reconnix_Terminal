@@ -11,12 +11,23 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-const NAMES = ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome"];
+const WINDOWS = process.platform === "win32";
+const NAMES = WINDOWS
+  ? ["chrome.exe", "msedge.exe"]
+  : ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome"];
+/* Where Chrome and Edge (Chromium, on every Windows 10+) install on Windows. */
+const WINDOWS_PATHS = [process.env.PROGRAMFILES, process.env["PROGRAMFILES(X86)"], process.env.LOCALAPPDATA]
+  .filter((base): base is string => Boolean(base))
+  .flatMap((base) => [
+    path.join(base, "Google", "Chrome", "Application", "chrome.exe"),
+    path.join(base, "Microsoft", "Edge", "Application", "msedge.exe"),
+  ]);
 const PATHS = [
   "/usr/bin/google-chrome",
   "/usr/bin/chromium",
   "/usr/bin/chromium-browser",
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  ...WINDOWS_PATHS,
 ];
 const TIMEOUT_MS = 90_000;
 

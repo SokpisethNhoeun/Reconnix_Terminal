@@ -13,13 +13,28 @@ page runs this same TUI in the browser.
 
 ## Run it
 
+Needs **Python 3.9+** and, for the web dashboard, **Node.js 20+** (with npm) and Git.
+
+**Linux / macOS**
+
 ```bash
-git clone git@github.com:SokpisethNhoeun/Reconnix_Terminal.git
-cd reconix-tui
+git clone https://github.com/SokpisethNhoeun/Reconnix_Terminal.git
+cd Reconnix_Terminal
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python -m reconix          # or: python run.py
+```
+
+**Windows 10 / 11** (PowerShell; use Windows Terminal for the TUI)
+
+```powershell
+git clone https://github.com/SokpisethNhoeun/Reconnix_Terminal.git
+cd Reconnix_Terminal
+py -m venv .venv               # or: python -m venv .venv
+.venv\Scripts\Activate.ps1     # if scripts are blocked: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+pip install -r requirements.txt
+python -m reconix
 ```
 
 Tests (Textual Pilot, no terminal needed):
@@ -32,7 +47,8 @@ pytest -q
 Web dashboard (Next.js, reads `~/.reconix/assessments`). Type `/web` in the TUI: the first
 time it installs the dashboard's packages and starts it in the background (`npm run dev`,
 output in `~/.reconix/web.log`), then your browser opens on it. A dashboard the TUI
-started stops when you quit. Needs Node.js. To run it on its own:
+started stops when you quit. To run it on its own (from the repository folder, with the
+`.venv` above created: the Terminal page runs the TUI with it):
 
 ```bash
 cd web && npm install && npm run dev    # prints a sign-in link; /web opens the same one
@@ -40,12 +56,16 @@ RECONIX_DATA_DIR=sample-data npm run dev   # or browse the bundled sample assess
 npm run dev -- --no-terminal            # without the Terminal page: the dashboard only reads
 ```
 
+On Windows (PowerShell) the sample data is `$env:RECONIX_DATA_DIR = "sample-data"; npm run dev`.
+
 **Terminal page.** The dashboard's sidebar has a **Terminal** link that runs the Reconix TUI
 in the browser, with the same screens, commands and gates. Each browser tab gets its own
 session (`python -m reconix` in a pseudo-terminal, started by `python -m reconix.webterm`
 on `127.0.0.1:3101`). It keeps running while you look at the other pages and ends when you
-close the tab; what it saves shows up on the other pages. It needs Linux or macOS and the
-`websockets` package from `requirements.txt`. See `docs/WEB_TERMINAL_PLAN.md`.
+close the tab; what it saves shows up on the other pages. It runs on Linux, macOS and
+Windows 10+ (there in a ConPTY pseudo console, through `pywinpty`, which
+`requirements.txt` installs on Windows only). See `docs/WEB_TERMINAL_PLAN.md` and
+`docs/WEB_WINDOWS_PLAN.md`.
 
 > Requires Python 3.9+. For the intended look, use a terminal with a
 > **JetBrains Mono** (or any Nerd/▮ box-drawing) font and a dark background.
@@ -182,7 +202,8 @@ reconix-tui/
     ├── reconix.tcss        # Textual stylesheet
     ├── browser.py          # open a URL / saved report without disturbing the TUI
     ├── web_server.py       # /web starts and stops the dashboard (npm run dev in web/)
-    ├── webterm/            # the Terminal page's server: tickets, origin check, pty sessions
+    ├── webterm/            # the Terminal page's server: tickets, origin check, sessions
+    │                       #   (a pty on Linux/macOS, ConPTY on Windows)
     ├── widgets/            # session bar + flow line, menus, prompt, question, run log,
     │                       #   scope manifest view, spinner + activity line, finding cells
     └── screens/

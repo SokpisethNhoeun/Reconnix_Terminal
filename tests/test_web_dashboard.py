@@ -114,7 +114,10 @@ def test_the_dashboard_runs_its_terminal_with_this_python(monkeypatch, tmp_path)
 
 
 async def test_a_stale_link_is_not_opened(app, opened, web_launches):
-    persist.WEB_URL_FILE.write_text(LINK)                  # nothing listens on its port
+    with socket.socket() as free:                          # a port nothing listens on
+        free.bind(("127.0.0.1", 0))
+        port = free.getsockname()[1]
+    persist.WEB_URL_FILE.write_text(LINK.replace(":3100/", f":{port}/"))
     async with app.run_test(size=SIZE) as pilot:
         app.run_command_line("/web")
         await settle(pilot)

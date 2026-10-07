@@ -76,7 +76,14 @@ def start(data_dir: Path, url_file: Path) -> subprocess.Popen:
         return subprocess.Popen(
             [shutil.which("npm") or "npm", "run", "dev", "--silent"], cwd=WEB_DIR, env=env,
             stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT,
-            start_new_session=True)       # its own process group: stopped as one, never ^C'd
+            **_own_group())               # stopped as one, never ^C'd with the TUI
+
+
+def _own_group() -> dict:
+    """Popen options for a process group of its own (Windows: a new console group)."""
+    if sys.platform == "win32":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
 
 
 def is_listening(url: Optional[str]) -> bool:
@@ -93,20 +100,33 @@ def is_listening(url: Optional[str]) -> bool:
 
 
 def _signal(process: subprocess.Popen, sig: int) -> None:
-    if hasattr(os, "killpg"):
-        os.killpg(process.pid, sig)               # npm, the launcher and Next.js together
-    else:                                         # pragma: no cover - Windows
-        process.terminate()
+    os.killpg(process.pid, sig)                   # npm, the launcher and Next.js together
+
+
+def _kill_tree(process: subprocess.Popen) -> None:
+    """Windows: end npm and everything it started (terminating npm.cmd alone would leave
+    Node, Next.js and the terminal helper running)."""
+    subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                   stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL, check=False)
 
 
 def stop(process: subprocess.Popen) -> None:
-    """Stop a dashboard this TUI started (the launcher removes its sign-in link)."""
+    """Stop a dashboard this TUI started (the launcher removes its sign-in link; on
+    Windows it is ended at once, and /web treats the link it leaves as stale)."""
     if process.poll() is not None:
         return
     try:
+        if sys.platform == "win32":
+            _kill_tree(process)
+            process.wait(timeout=5)
+            return
         _signal(process, signal.SIGTERM)
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
-        _signal(process, getattr(signal, "SIGKILL", signal.SIGTERM))
+        if sys.platform == "win32":
+            process.kill()
+        else:
+            _signal(process, signal.SIGKILL)
     except OSError:
         pass                                      # already gone

@@ -254,7 +254,8 @@ async def test_only_typing_keeps_a_session_open(make_server):
 
 
 async def test_cancelling_close_still_stops_the_program():
-    from reconix.webterm.session import PtySession, STOP_GRACE
+    from reconix.webterm.pty_posix import PtySession
+    from reconix.webterm.session import STOP_GRACE
 
     stubborn = "import signal, time; signal.signal(signal.SIGHUP, signal.SIG_IGN); time.sleep(60)"
     session = PtySession.spawn((sys.executable, "-c", stubborn), dict(os.environ), (80, 24))

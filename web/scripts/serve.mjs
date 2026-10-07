@@ -9,7 +9,8 @@
      npm start -- --no-terminal    # no Terminal page: the dashboard only reads
 
    Env: RECONIX_WEB_PORT (3100), RECONIX_TERM_PORT (3101), RECONIX_DATA_DIR
-        (~/.reconix/assessments), RECONIX_PYTHON (the repo's .venv, else python3),
+        (~/.reconix/assessments), RECONIX_PYTHON (the repo's .venv, else python3; python on
+        Windows),
         RECONIX_WEB_TOKEN (only for tests; normally a new random token each start). */
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -48,8 +49,9 @@ const child = spawn(process.execPath, [require.resolve("next/dist/bin/next"), mo
    and stops when that closes, so it never outlives this launcher. If it can't start, the
    dashboard still runs; the Terminal page says it can't connect. */
 function startTerminal() {
-  const venv = path.join(repoRoot, ".venv", process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
-  const python = process.env.RECONIX_PYTHON || (existsSync(venv) ? venv : "python3");
+  const windows = process.platform === "win32";
+  const venv = path.join(repoRoot, ".venv", windows ? "Scripts/python.exe" : "bin/python");
+  const python = process.env.RECONIX_PYTHON || (existsSync(venv) ? venv : windows ? "python" : "python3");
   const proc = spawn(python, ["-m", "reconix.webterm"], {
     cwd: repoRoot,
     stdio: ["pipe", "inherit", "inherit"],
@@ -72,9 +74,13 @@ function startTerminal() {
 
 let stopping = false;
 
+/* On Windows, kill() is a hard kill, so the helper is told by closing its stdin instead:
+   it then closes its sessions (and their TUIs) itself. */
 function stopTerminal() {
   stopping = true;
-  if (helper && helper.exitCode === null && helper.signalCode === null) helper.kill("SIGTERM");
+  if (!helper || helper.exitCode !== null || helper.signalCode !== null) return;
+  if (process.platform === "win32") helper.stdin.end();
+  else helper.kill("SIGTERM");
 }
 
 let announced = false;

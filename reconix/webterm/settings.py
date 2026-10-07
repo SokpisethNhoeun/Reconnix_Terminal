@@ -10,6 +10,7 @@
 | `RECONIX_TERM_COMMAND` | `python -m reconix` | with RECONIX_TERM_TEST=1: a stand-in TUI |
 """
 
+import importlib.util
 import os
 import shlex
 import sys
@@ -29,13 +30,18 @@ class SettingsError(ValueError):
 
 def problem() -> str:
     """Why the browser terminal can't run here ("" when it can)."""
-    try:
-        import fcntl  # noqa: F401
-        import termios  # noqa: F401
-    except ImportError:
-        return "The browser terminal needs Linux or macOS."
-    if not hasattr(os, "openpty") or not hasattr(os, "killpg"):
-        return "The browser terminal needs Linux or macOS."
+    if sys.platform == "win32":
+        if importlib.util.find_spec("winpty") is None:
+            return ("The browser terminal on Windows needs the pywinpty package: "
+                    "pip install -r requirements.txt")
+    else:
+        try:
+            import fcntl  # noqa: F401
+            import termios  # noqa: F401
+        except ImportError:
+            return "The browser terminal needs Linux, macOS or Windows."
+        if not hasattr(os, "openpty") or not hasattr(os, "killpg"):
+            return "The browser terminal needs Linux, macOS or Windows."
     try:
         import websockets.asyncio.server  # noqa: F401
     except ImportError:

@@ -7,6 +7,7 @@ dependencies = [
     "textual>=8.2,<9",
     "rich>=13.7",
     "websockets>=13",
+    "pywinpty>=2.0.14; sys_platform == 'win32'",
 ]
 
 [project.scripts]
