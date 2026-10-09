@@ -65,6 +65,12 @@ def _answer(replies: List[ChatEntry]) -> Text:
     return Text.assemble(("◆ reconix  ", f"bold {theme.CYAN}"), (replies[-1].text, theme.MUTED))
 
 
+def _reconix_line(entry: ChatEntry) -> Text:
+    """A past Reconix line in the scrollback (tone-colored, plain text)."""
+    return Text.assemble(("◆ reconix  ", f"bold {theme.CYAN}"),
+                         (entry.text, theme.TONE.get(entry.tone, theme.MUTED)))
+
+
 class StartScreen(ReconixScreen):
     flow_name = "start"
     mode_name = "CHAT"
@@ -119,15 +125,33 @@ class StartScreen(ReconixScreen):
     def _compose_conversation(self) -> ComposeResult:
         request, replies = store.last_exchange()
         with VerticalScroll(id="start-conversation"):
+            # Earlier exchanges, scrollable; the current one stays live below.
+            yield from self._history_rows(request.seq)
             yield UserMessage(request.text)
             yield ActivityStatus([e.text for e in replies], READING,
                                  expanded=self.app.activity_expanded,
                                  id="start-activity", classes="activity")
             yield Static(_answer(replies), id="start-reply")
 
+    @staticmethod
+    def _history_rows(current_seq: int) -> ComposeResult:
+        """Every chat line before the current exchange, so you can scroll back through it."""
+        for entry in store.list_chat():
+            if entry.seq >= current_seq:
+                break
+            if entry.kind != "text" or not entry.text:
+                continue
+            if entry.speaker == "you":
+                yield UserMessage(entry.text)
+            elif entry.speaker == "reconix":
+                yield Static(_reconix_line(entry), classes="history-reply")
+
     def on_mount(self) -> None:
         self.app.pending_prompt = ""
         self.query_one(PromptBox).focus_input()
+        conversation = self.query("#start-conversation")
+        if conversation:
+            conversation.first().scroll_end(animate=False)   # latest shown; scroll up for history
         self.refresh_live()
 
     # --- live: Reconix's answer, or the spinner while the run heads for its first gate ----

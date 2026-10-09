@@ -84,6 +84,29 @@ def triage_finding(fid: str, *, status: str = None, severity: str = None,
 MAX_IMPORT_BYTES = 5_000_000
 
 
+def ingest_external(findings, prefix: str = "IMP") -> int:
+    """Add externally-produced findings to the current assessment, deduped and revealed.
+
+    Each is given a `<prefix>-NNN` id and shown at once; duplicates (same severity/title/path)
+    are skipped. Shared by file import (`IMP-`) and the AI agent (`AI-`).
+    """
+    assessment = lists.current()
+    existing = {(f.severity, f.title, f.path) for f in assessment.findings}
+    n = sum(1 for f in assessment.findings if f.fid.startswith(f"{prefix}-"))
+    added = 0
+    for f in findings:
+        key = (f.severity, f.title, f.path)
+        if key in existing:
+            continue
+        existing.add(key)
+        n += 1
+        added += 1
+        f.fid = f"{prefix}-{n:03d}"
+        assessment.findings.append(f)
+        assessment.run.revealed.append(f.fid)
+    return added
+
+
 def import_findings(path_text: str):
     """Read a nuclei/nmap/ZAP output file and add its findings to the current assessment.
 
@@ -110,18 +133,7 @@ def import_findings(path_text: str):
         raise StoreValidationError("Couldn't read that file.") from None
 
     tool, parsed = parse_auto(content)
-    assessment = lists.current()
-    existing = {(f.severity, f.title, f.path) for f in assessment.findings}
-    n = sum(1 for f in assessment.findings if f.fid.startswith("IMP-"))
-    added = 0
-    for f in parsed:
-        if (f.severity, f.title, f.path) in existing:    # skip ones already present
-            continue
-        n += 1
-        added += 1
-        f.fid = f"IMP-{n:03d}"
-        assessment.findings.append(f)
-        assessment.run.revealed.append(f.fid)       # imported findings show at once
+    added = ingest_external(parsed, prefix="IMP")
     add_activity("USER", f"Imported {added} finding(s) from {tool} output", tone="ok")
     add_chat("text", "reconix",
              f"Imported {added} finding(s) from {tool} output ({path.name}).", tone="ok")

@@ -19,13 +19,14 @@ from . import store, theme
 from .commands import COMMANDS, Command, find, parse
 from .screens import ChoiceScreen, CommandBarScreen, HelpScreen, StartScreen
 from .shell import (
-    ActionsMixin, DialogsMixin, NavigationMixin, RunHostMixin, WebDashboardMixin,
+    ActionsMixin, AgentMixin, DialogsMixin, LlmMixin, NavigationMixin, RunHostMixin,
+    WebDashboardMixin,
 )
 from .widgets import ActivityStatus
 
 
-class ReconixApp(NavigationMixin, RunHostMixin, ActionsMixin, DialogsMixin, WebDashboardMixin,
-                 App):
+class ReconixApp(NavigationMixin, RunHostMixin, ActionsMixin, AgentMixin, DialogsMixin,
+                 LlmMixin, WebDashboardMixin, App):
     """Reconix — AI-Powered Security Testing Assistant (demo)."""
 
     CSS_PATH = "reconix.tcss"
@@ -61,6 +62,7 @@ class ReconixApp(NavigationMixin, RunHostMixin, ActionsMixin, DialogsMixin, WebD
         self.activity_expanded = False           # Ctrl+O: list the steps Reconix finished
         self._init_run_host()
         self._init_web()
+        self._init_agent()
 
     def get_css_variables(self) -> Dict[str, str]:
         # The stylesheet's $variables come from theme.py, the one place colors are defined.

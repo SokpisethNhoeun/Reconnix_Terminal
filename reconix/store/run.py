@@ -124,8 +124,8 @@ def _start(text: str, parsed: ParsedTarget, *, picked: bool) -> None:
         apply_template(parsed.template_id, auto=not picked)
 
 
-def say_to_assistant(text: str) -> None:
-    """A message typed while the run is going; the demo assistant points to what it can do."""
+def say_operator_line(text: str) -> str:
+    """Record the operator's chat line and return it. Raises before any model is called."""
     if not get_run().started:
         raise StoreValidationError("Start an assessment first.")
     if get_run().waiting_gate in (GATE_ACCOUNT, GATE_CODE):
@@ -135,7 +135,33 @@ def say_to_assistant(text: str) -> None:
                                    "paste credentials into the chat.")
     request = add_request(text)
     add_chat("text", "you", request.text)
-    add_chat("text", "reconix", reply_while_running(request.text), tone="muted")
+    return request.text
+
+
+def llm_answer(text: str) -> None:
+    """Add Reconix's reply: the active model when one is set, else the built-in reply.
+
+    Blocks on the network, so the app runs it in a worker (see `shell/actions.py`). Any
+    model failure falls back to the scripted reply so the offline demo keeps working.
+    """
+    from . import llm_chat, providers
+    from ..llm import LLMError
+
+    active = providers.active_model()
+    if active is not None:
+        try:
+            llm_chat.reply(text, active)
+            return
+        except LLMError as exc:
+            add_chat("text", "reconix",
+                     f"LLM unavailable ({exc}). Showing the built-in reply.", tone="muted")
+    add_chat("text", "reconix", reply_while_running(text), tone="muted")
+
+
+def say_to_assistant(text: str) -> None:
+    """A message typed while the run is going: record it, then answer (model or built-in)."""
+    answer = say_operator_line(text)
+    llm_answer(answer)
 
 
 def new_assessment() -> None:

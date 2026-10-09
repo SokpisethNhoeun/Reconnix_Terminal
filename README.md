@@ -44,6 +44,46 @@ pip install -r requirements-dev.txt     # + python-docx for the DOCX export
 pytest -q
 ```
 
+## Model integration — quick start (`feature/model-integration`)
+
+This branch adds **real, AI-driven assessments**: configure LLM providers, switch model
+mid-run with preserved context, and have an agent run real Kali tools through an MCP server.
+Without a model configured, the scripted demo above still runs.
+
+```bash
+# 1. TUI deps (as above) + the backend pentest harness
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e backend            # installs the harness (adds litellm, mcp, pyyaml)
+
+# 2. one .env at the repo root for the whole app
+cp .env.example .env              # set LLM_BASE_URL / LLM_MODEL (the default "reconix" provider)
+                                  # and KALI_MCP_URL / KALI_MCP_AUTH_TOKEN (your Kali MCP server)
+                                  # the provider API key is entered in the TUI, never in .env
+
+# 3. run
+python -m reconix
+```
+
+Then, in the TUI:
+
+```
+/provider set reconix     # enter the API key → test → REACHABLE
+/model reconix/<model>    # the top bar shows: llm: Reconix · <model> ●
+```
+
+- **Chat** in natural language — just type a question; the agent answers (scrolls back).
+- **Assess a target** — type a target or `/assess http://<host>`: you go through the
+  Template/scope frames, approve the scope, and the agent runs real tools via the Kali MCP
+  server, streaming progress on the Execution screen; findings land in `/findings`.
+- **Switch model mid-run** — `/model <provider>/<model>` anytime; conversation context,
+  findings and approvals are preserved. Add more with `/provider` (OpenAI, Anthropic,
+  DeepSeek, Ollama, or a custom OpenAI-compatible endpoint).
+
+Real scans need a reachable **Kali MCP server** (`DansPK/kali-mcp-server`); set its URL/token
+in `.env`. See `docs/FLEXIBLE_LLM_PLAN.md`, `docs/HARNESS_INTEGRATION_PLAN.md` and
+`docs/AGENT_FLOW_PARITY_PLAN.md` for the design, and `backend/README.md` for the harness.
+
 Web dashboard (Next.js, reads `~/.reconix/assessments`). Type `/web` in the TUI: the first
 time it installs the dashboard's packages and starts it in the background (`npm run dev`,
 output in `~/.reconix/web.log`), then your browser opens on it. A dashboard the TUI
@@ -156,10 +196,52 @@ Type `/`, keep typing to filter, `↑`/`↓` to pick, `Tab` to complete, `Enter`
 | `/assessments` | list and reopen this session's assessments (alias `/list`) |
 | `/import` | add findings from a nuclei / nmap / ZAP output file |
 | `/audit` | activity log, audit trail and your feedback (aliases `/activity`, `/log`) |
+| `/provider [set\|update\|test\|unset <id>]` | manage LLM providers; no argument opens a menu (alias `/providers`) |
+| `/model [provider/model]` | pick the active LLM model; no argument opens a menu (alias `/models`) |
+| `/assess <target>` | run a real assessment with the AI agent (needs a `/model`; alias `/agent`) |
 | `/web` | open the web dashboard (it starts it first if needed; alias `/dashboard`) |
 | `/quit` | quit (alias `/exit`) |
 
 `/scope` is now `/template`.
+
+## LLM providers (flexible model integration)
+
+Chat lines typed **during a run** go to a real LLM; everything else stays scripted. Set a
+provider with `/provider`, test it, then `/model` to make one active — the top bar shows
+`llm: <provider> · <model> ●`. You can switch provider or model mid-run; the run, findings
+and approvals are unchanged, and the model never decides a gate. Reconix, Ollama and OpenAI
+work for real; Anthropic, DeepSeek and a custom OpenAI-compatible endpoint are wired through
+LiteLLM the same way. Cloud providers (OpenAI, Anthropic, DeepSeek) need **only an API key** —
+their endpoint and models are built in; Ollama takes a model name, and the custom endpoint a
+URL + model. Providers and chat history live in one SQLite file
+(`~/.reconix/llm.db`) with API keys Fernet-encrypted (key in `~/.reconix/llm.key`, 0600).
+
+Copy `.env.example` to `.env` and set the default model — this `LLM_*` block defines the
+built-in `reconix` provider shared by the TUI and the harness agent (its API key is entered
+in the TUI, never in `.env`):
+
+```dotenv
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_MODEL=your-model-id
+# optional: LLM_TIMEOUT, LLM_DB, LLM_KEY_FILE
+```
+
+## Agent mode — real assessments (backend/ harness)
+
+When a `/model` is active, `/assess <target>` (or just typing a target) hands the **whole
+assessment** to the AI agent in `backend/` instead of the scripted demo. The agent plans,
+runs real Kali tools through the MCP server, and analyzes findings; its progress streams
+into the chat and `/audit` (a reasoning model's chain-of-thought shows muted as "thinking…").
+The agent's LLM is Reconix's active `/model`, so you can switch
+provider or model **mid-assessment** and its conversation context is preserved (one `Agent`
+keeps its history; only the client is swapped). When the agent needs a login it pops a
+secure-input modal (password/token/cookie masked); the login runs host-side so the raw
+password never reaches the model. Configure the Kali MCP server and point the `LLM_*` block
+at your model in `.env` (see `.env.example`); `backend/` must be installed
+(`pip install -e backend`). Without a model or the harness, the scripted demo runs instead.
+
+With no active model (or if a call fails) the built-in reply is used, so the demo runs
+offline.
 
 ## Safety model
 
@@ -188,6 +270,7 @@ reconix-tui/
     ├── app.py              # ReconixApp: bindings and the command runner
     ├── shell/              # app behaviour: navigation, run_host (gates), actions, dialogs
     ├── flow/               # RunController (plays the run), gates → screens, phases
+    ├── llm/                # flexible LLM: config, crypto, sqlite db, catalog, LiteLLM client, guardrail
     ├── commands/           # slash commands: registry + built-ins
     ├── models/             # dataclasses (Assessment, RunStep, ScopeManifest, Finding, …)
     ├── store/              # in-memory store — the only data the UI reads

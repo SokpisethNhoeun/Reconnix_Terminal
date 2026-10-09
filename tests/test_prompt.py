@@ -6,7 +6,7 @@ from reconix.screens import (
     ChoiceScreen, CommandBarScreen, FindingsListScreen, HelpScreen, PlanScreen, StartScreen,
     TemplateScreen,
 )
-from reconix.widgets import PromptBox
+from reconix.widgets import PromptBox, UserMessage
 
 from .support import SIZE, settle, show
 
@@ -54,6 +54,19 @@ async def test_tab_completes_and_enter_asks_for_the_argument(app):
         await pilot.press("escape")
         await settle(pilot)
         assert isinstance(app.screen, StartScreen)
+
+
+async def test_conversation_history_is_scrollable(app):
+    # Earlier exchanges stay on screen (above the current one) so you can scroll back.
+    async with app.run_test(size=SIZE) as pilot:
+        app.submit_request("my first question")
+        await settle(pilot)
+        app.submit_request("my second question")
+        await settle(pilot)
+        shown = [str(w.render()) for w in app.screen.query(UserMessage)]
+        assert any("my first question" in m for m in shown)    # scrollback kept
+        assert any("my second question" in m for m in shown)   # current exchange
+        assert app.screen.query("#start-conversation")         # in the scrollable container
 
 
 async def test_a_question_gets_an_answer_and_nothing_starts(app):

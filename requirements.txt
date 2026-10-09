@@ -2,3 +2,6 @@ textual>=8.2,<9
 rich>=13.7
 websockets>=13       # the web dashboard's Terminal page (reconix/webterm)
 pywinpty>=2.0.14; sys_platform == "win32"   # the Terminal page on Windows (ConPTY)
+litellm>=1.40        # flexible LLM: unified model interface
+cryptography>=42     # flexible LLM: Fernet-encrypted API keys
+python-dotenv>=1.0   # flexible LLM: load .env

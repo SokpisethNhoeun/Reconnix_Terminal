@@ -26,6 +26,10 @@ from .findings_view import (
 from .history import add_history, list_history
 from .persist import autosave, close_session, web_dashboard_url
 from .plan import gated_count, plan_overview
+from .providers import (
+    activate, active_llm_settings, active_model, get_provider, list_providers, set_provider,
+    test_provider, unset_provider,
+)
 from .progress import step_states
 from .report import (
     assessment_summary, generate_report, list_report_formats, list_report_sections,
@@ -34,9 +38,9 @@ from .report import (
 from .retest import compare_findings, previous_assessment, retest, severity_trend
 from .run import (
     advance, counters, display_phase, elapsed, gate_state, get_run, is_completed, is_finished,
-    is_plan_started, new_assessment, peek, phase_progress, pipeline_stage, plan_tasks,
-    reject_scope, run_plan, say_to_assistant, start_run, stop_run, submit_prompt, time_limit,
-    waiting_gate,
+    is_plan_started, llm_answer, new_assessment, peek, phase_progress, pipeline_stage,
+    plan_tasks, reject_scope, run_plan, say_operator_line, say_to_assistant, start_run,
+    stop_run, submit_prompt, time_limit, waiting_gate,
 )
 from .scope import (
     approve_scope, blocked_count, check_request, edit_scope, get_scope, is_scope_approved,
@@ -63,7 +67,8 @@ __all__ = [
     "get_assessment", "assessment_label", "list_requests", "add_request",
     "list_assessments", "switch_assessment", "assessment_status", "AssessmentCard",
     # the run
-    "submit_prompt", "start_run", "check_target", "say_to_assistant", "new_assessment",
+    "submit_prompt", "start_run", "check_target", "say_to_assistant", "say_operator_line",
+    "llm_answer", "new_assessment",
     "advance", "peek", "gate_state", "stop_run",
     "waiting_gate", "get_run", "display_phase", "is_completed", "is_finished", "counters",
     "phase_progress", "plan_tasks", "plan_overview", "gated_count", "step_states",
@@ -92,6 +97,9 @@ __all__ = [
     "list_chat", "last_exchange", "list_activity",
     "current_operator", "log_event", "list_events", "add_feedback", "list_feedback",
     "add_history", "list_history",
+    # flexible LLM: providers and the active model
+    "list_providers", "get_provider", "set_provider", "unset_provider", "test_provider",
+    "activate", "active_model", "active_llm_settings",
     # the saved copy the web dashboard reads
     "autosave", "close_session", "web_dashboard_url",
 ]

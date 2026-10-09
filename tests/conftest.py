@@ -7,6 +7,7 @@ import pytest
 from reconix import browser, store, web_server
 from reconix.app import ReconixApp
 from reconix.flow import RunController
+from reconix.llm import config as llm_config
 from reconix.store import persist, report
 
 
@@ -26,6 +27,19 @@ def instant_ui(monkeypatch, tmp_path):
     monkeypatch.setattr(persist, "DATA_DIR", tmp_path / "assessments")
     monkeypatch.setattr(persist, "WEB_URL_FILE", tmp_path / "web.url")
     monkeypatch.setattr(persist, "_written", {})
+
+
+@pytest.fixture(autouse=True)
+def llm_paths(monkeypatch, tmp_path):
+    """Keep the LLM/harness databases and key file in temp, never in ~/.reconix."""
+    from reconix.store import agent_run
+
+    monkeypatch.setattr(llm_config, "DB_PATH", tmp_path / "llm.db")
+    monkeypatch.setattr(llm_config, "KEY_FILE", tmp_path / "llm.key")
+    monkeypatch.setenv("HARNESS_DB_PATH", str(tmp_path / "harness.db"))
+    agent_run.reset()
+    yield
+    agent_run.reset()
 
 
 @pytest.fixture(autouse=True)
