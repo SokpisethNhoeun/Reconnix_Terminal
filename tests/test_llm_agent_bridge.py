@@ -101,6 +101,17 @@ def test_ingest_scan_findings_maps_harness_to_store():
     assert agent_run.ingest_scan_findings({"target": {"id": 1}}) == 0   # deduped
 
 
+def test_widen_scope_tools_lists_the_agent_toolset():
+    from .support import run_to
+
+    run_to("scope")                                  # a DRAFT scope awaits approval
+    before = list(store.get_scope().tools)
+    agent_run.widen_scope_tools()
+    tools = store.get_scope().tools
+    assert {"nmap", "nuclei", "sqlmap"} <= set(tools)   # many tools now allowed
+    assert len(tools) >= len(before)
+
+
 def test_reasoning_event_renders_as_muted_thinking():
     agent_run.record_event({"type": "reasoning", "text": "step 1 recon, step 2 decide"})
     last = store.list_chat()[-1]

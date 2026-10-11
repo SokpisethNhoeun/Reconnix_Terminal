@@ -50,6 +50,63 @@ async def _collect(agent: Agent, text: str) -> list[dict]:
     return events
 
 
+class _FakeResp:
+    status_code = 200
+    text = "{\"id\":1,\"owner\":\"alice\",\"total\":999}"
+    content = b"x" * 40
+    headers = {"content-type": "application/json"}
+
+
+class _FakeClient:
+    def __init__(self, **kw):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def request(self, method, url, **kw):
+        return _FakeResp()
+
+
+async def test_http_poc_records_verified_finding(tmp_path, monkeypatch):
+    import httpx
+
+    from harness.models import Target, TargetType
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeClient)
+    agent = Agent(_settings(tmp_path))
+    tid = agent.db.add_target(
+        Target(name="shop", type=TargetType.WEB, value="http://10.0.0.5:8081", authorized=True))
+    res = await agent._http_poc({
+        "method": "GET", "url": "http://10.0.0.5:8081/api/orders/1",
+        "title": "IDOR: read another user's order", "severity": "high",
+        "description": "returns alice's order with no authz"})
+    assert res.get("ok") and res["verified"] and res["target"]["id"] == tid
+    findings = agent.db.findings_for_target(tid)
+    assert any(f.verified and f.title.startswith("IDOR") for f in findings)
+
+
+async def test_http_poc_refuses_off_scope_or_unauthorized(tmp_path):
+    from harness.models import Target, TargetType
+
+    agent = Agent(_settings(tmp_path))
+    agent.db.add_target(
+        Target(name="shop", type=TargetType.WEB, value="http://10.0.0.5:8081", authorized=True))
+    # Different host -> refused.
+    off = await agent._http_poc({"method": "GET", "url": "http://evil.example/x",
+                                 "title": "x", "severity": "high"})
+    assert "error" in off
+    # Unauthorized target -> refused.
+    agent.db.add_target(
+        Target(name="other", type=TargetType.WEB, value="http://10.0.0.9:80", authorized=False))
+    un = await agent._http_poc({"method": "GET", "url": "http://10.0.0.9:80/x",
+                                "title": "x", "severity": "high"})
+    assert "error" in un
+
+
 async def test_ask_operator_prompts_and_returns_answer(tmp_path):
     agent = Agent(_settings(tmp_path))
     captured = {}

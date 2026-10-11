@@ -31,6 +31,24 @@ AskInput = Callable[[dict[str, Any]], Awaitable[dict[str, Any] | None]]
 _TOKEN_KEYS = ("token", "access_token", "accesstoken", "jwt", "id_token", "auth_token")
 
 
+def _poc_evidence(method: str, url: str, headers: dict, body: Any, status: int,
+                  resp_headers: dict, resp_text: str) -> str:
+    """A compact request+response record for a PoC finding (capped)."""
+    req = f"REQUEST: {method} {url}"
+    if headers:
+        req += "\n  headers: " + " ".join(f"{k}: {v}" for k, v in headers.items())[:400]
+    if body:
+        req += "\n  body: " + str(body)[:400]
+    keep = ("content-type", "content-length", "location", "set-cookie", "server",
+            "www-authenticate")
+    rh = " ".join(f"{k}: {v}" for k, v in (resp_headers or {}).items() if k.lower() in keep)
+    resp = f"RESPONSE: {status}"
+    if rh:
+        resp += "\n  headers: " + rh[:300]
+    resp += "\n  body: " + str(resp_text)[:1200]
+    return f"{req}\n{resp}"
+
+
 def _find_token(obj: Any) -> str | None:
     """First JWT/session token found in a JSON login response (nested-aware)."""
     if isinstance(obj, dict):
@@ -105,6 +123,12 @@ Credentials (ask when — and only when — you need them):
   either/or choice), call the ask_operator tool — it pops a dialog in the UI and returns their answer.
   NEVER ask a yes/no or either/or question in plain text and stop: that stalls the run. Keep working once
   they reply; if the tool reports no interactive prompt, choose the safe default and continue.
+- To PROVE a vulnerability rather than just report a hint, use the http_poc tool: craft the request that
+  demonstrates it on the authorized target (a SQLi payload that returns data, another user's token/id for
+  IDOR/BOLA, an auth-bypass body, an admin endpoint without a session) and it records the request+response
+  as a VERIFIED finding. Prefer a concrete http_poc proof for access-control, IDOR/BOLA, auth bypass,
+  excessive-data-exposure and business-logic issues the signature scanners can't confirm. It only hits
+  authorized in-scope targets.
 - Never invent, guess, or brute-force credentials unless the user explicitly asks you to test default/weak
   creds. Handle whatever the user gives you:
     · a token or cookie directly → pass it into the next run_scan via its `options` map, one entry per tool
@@ -243,6 +267,32 @@ TOOLS: list[dict[str, Any]] = [
                     },
                 },
                 "required": ["question"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "http_poc",
+            "description": "Prove a vulnerability with a crafted HTTP request (host-side). Send a "
+            "payload, another user's token/cookie, an IDOR id, an auth-bypass body, etc., to an "
+            "AUTHORIZED in-scope target; the request and response are captured as evidence and "
+            "recorded as a VERIFIED finding. Use this to confirm SQLi data exposure, IDOR/BOLA, "
+            "access-control bypass, excessive data exposure, price tampering, etc. — things the "
+            "signature scanners only hint at. HTTP(S) only; it refuses any host that is not an "
+            "authorized target.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "method": {"type": "string", "description": "GET, POST, PUT, DELETE, …"},
+                    "url": {"type": "string", "description": "full URL on an authorized target"},
+                    "headers": {"type": "object", "description": "request headers (e.g. Authorization, Cookie)"},
+                    "body": {"type": "string", "description": "request body, if any"},
+                    "title": {"type": "string", "description": "short finding title, e.g. 'IDOR: read another user's order'"},
+                    "severity": {"type": "string", "enum": ["critical", "high", "medium", "low", "info"]},
+                    "description": {"type": "string", "description": "what this proves and why it matters"},
+                },
+                "required": ["method", "url", "title", "severity"],
             },
         },
     },
@@ -439,6 +489,8 @@ class Agent:
             return await self._request_credentials(args)
         if name == "ask_operator":
             return await self._ask_operator(args)
+        if name == "http_poc":
+            return await self._http_poc(args)
         if name == "login":
             return await self._login(args)
         if name == "run_scan":
@@ -490,6 +542,58 @@ class Agent:
             conn.execute("UPDATE targets SET authorized = 1 WHERE id = ?", (t.id,))
         t.authorized = True
         return self._target_dict(t)
+
+    def _poc_in_scope(self, url: str) -> Target | None:
+        """Return the authorized target whose host:port matches the URL, or None."""
+        from urllib.parse import urlparse
+
+        u = urlparse(url)
+        if u.scheme not in ("http", "https") or not u.hostname:
+            return None
+        port = u.port or (443 if u.scheme == "https" else 80)
+        for t in self.db.list_targets():
+            if not t.authorized:
+                continue
+            tv = urlparse(t.value if "://" in t.value else f"http://{t.value}")
+            tport = tv.port or (443 if tv.scheme == "https" else 80)
+            if tv.hostname == u.hostname and tport == port:
+                return t
+        return None
+
+    async def _http_poc(self, args: dict[str, Any]) -> dict[str, Any]:
+        import httpx
+
+        from .models import Finding, Severity
+
+        url = str(args.get("url", "")).strip()
+        method = str(args.get("method", "GET")).upper()
+        target = self._poc_in_scope(url)
+        if target is None or target.id is None:
+            return {"error": "url is not an authorized in-scope target; only authorized targets "
+                    "may be probed. add_target + authorize it, or correct the URL."}
+        headers = {str(k): str(v) for k, v in (args.get("headers") or {}).items()}
+        body = args.get("body")
+        content = body.encode("utf-8", "replace") if isinstance(body, str) else None
+        try:
+            async with httpx.AsyncClient(follow_redirects=False, timeout=15.0,
+                                         verify=False) as client:  # noqa: S501 (test target)
+                resp = await client.request(method, url, headers=headers or None, content=content)
+                text = resp.text
+        except Exception as exc:  # noqa: BLE001
+            return {"error": f"request failed: {exc!r}"[:300]}
+
+        sev = Severity.coerce(str(args.get("severity", "medium")))
+        title = str(args.get("title") or f"PoC: {method} {url}")[:200]
+        evidence = _poc_evidence(method, url, headers, body, resp.status_code,
+                                 dict(resp.headers), text)
+        scan_id = self.db.create_scan(target.id, "http_poc", status="completed")
+        self.db.add_finding(Finding(
+            scan_id=scan_id, severity=sev, title=title,
+            description=str(args.get("description") or ""),
+            evidence=evidence, location=url, verified=True))
+        return {"ok": True, "target": {"id": target.id}, "status": resp.status_code,
+                "length": len(resp.content), "body_snippet": text[:800],
+                "recorded_finding": title, "verified": True}
 
     async def _ask_operator(self, args: dict[str, Any]) -> dict[str, Any]:
         if not self._on_ask:

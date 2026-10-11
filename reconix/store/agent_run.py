@@ -102,6 +102,34 @@ def reset() -> None:
 _PCT = {"done": 100, "completed": 100, "running": 50, "active": 50, "in_progress": 50}
 
 
+def _agent_tools() -> list:
+    """The tools the agent can actually pick (the harness scanner set)."""
+    try:
+        from harness.scanners import SCANNERS
+        return sorted(SCANNERS)
+    except Exception:
+        return ["gobuster", "httpprobe", "nikto", "nmap", "nuclei", "sqlmap", "whatweb", "zap"]
+
+
+def widen_scope_tools() -> None:
+    """List the full agent toolset on the Scope Manifest the operator approves.
+
+    The scripted templates allow only a few tools; the agent plans dynamically and may use
+    many, so in agent mode the scope the operator reviews should permit them. Only applies
+    while the scope awaits approval.
+    """
+    from ..models import GATE_SCOPE
+
+    current = lists.current()
+    scope = current.scope
+    if scope is None or scope.status == "APPROVED" or current.run.waiting_gate != GATE_SCOPE:
+        return
+    tools = _agent_tools()
+    if tools and list(scope.tools) != tools:
+        scope.tools = tools
+        add_activity("SYS", "Scope set for the AI agent · tools: " + ", ".join(tools))
+
+
 def begin_execution() -> None:
     """Mark the run live and enterable so the Execution screen shows the agent working."""
     run = lists.current().run
@@ -176,7 +204,7 @@ def record_event(ev: Dict[str, Any]) -> None:
         add_activity("TOOL", str(ev.get("text", ""))[:300])
     elif kind == "tool_end":
         add_activity("TOOL", f"{ev.get('name')}: {_short(ev.get('result'))}")
-        if ev.get("name") == "run_scan":
+        if ev.get("name") in ("run_scan", "http_poc"):   # scanners and ad-hoc PoC proofs
             ingest_scan_findings(ev.get("result"))
 
 
