@@ -84,7 +84,7 @@ reconix/
 └── screens/
     ├── base.py       # ReconixScreen: chrome + body + footer; view_state / refresh_live
     ├── <frame>.py    # one file per flow frame (template.py replaced scope.py)
-    ├── forms/        # FormScreen (+ LoginForm, ScopeEditForm, ImportForm)
+    ├── forms/        # FormScreen (+ LoginForm, ScopeEditForm, ApprovalEditForm, ImportForm)
     ├── choice.py     # ChoiceScreen dialog (+ details_body())
     ├── command_bar.py, help.py
 ```
@@ -194,7 +194,9 @@ behind scope checks and human approval. Do not weaken the gates: testing starts 
 the scope is approved and the plan is run; HIGH-risk actions need a double check, the
 single-use token from `request_confirmation()` and the matching command hash
 (`approve()` enforces both; no typed reason, by the owner's decision); the confirmation
-dialog defaults to "No, go back". The target login comes from the approved tools
+dialog defaults to "No, go back". "Edit params" / "Edit steps" change only where an
+undecided action runs, through `edit_approval()` (policy-checked, hash rebuilt, open
+tokens voided; risk and method never change). The target login comes from the approved tools
 (`store/tools.py`); a one-time code is its own step (`GATE_CODE`) right after the
 password, validated and never stored; secrets never reach chat, logs, reports or the
 saved copies (`snapshot.py` + `redact.py`).

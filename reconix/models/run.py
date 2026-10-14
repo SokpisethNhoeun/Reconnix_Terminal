@@ -35,6 +35,8 @@ class RunStep:
     `pause` is the delay in seconds before the step plays (the controller scales it).
     `when` makes a step conditional: "login" plays only if the approved tools need a
     target login, "code" only if that login is followed by a one-time code.
+    `tool` (say, card, log) is the tool `$tool` names in the text; when the approved scope
+    dropped it, the run names an approved tool instead (`store.tools.approved_tool`).
     """
 
     kind: str
@@ -50,6 +52,7 @@ class RunStep:
     path: str = ""
     pause: float = 0.6
     when: str = ""             # "" (always) | "login" | "code"
+    tool: str = ""             # the tool `$tool` stands for in the text
 
 
 @dataclass

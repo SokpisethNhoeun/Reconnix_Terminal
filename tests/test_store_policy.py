@@ -77,3 +77,58 @@ def test_approve_rechecks_the_policy():
     with pytest.raises(store.StoreValidationError, match="Blocked by policy"):
         store.approve("approval-001", command_hash=request.command_hash)
     assert not store.is_approved("approval-001")
+
+
+# --- network targets: one parse, exclusions by meaning -----------------------------------------
+def _network_scope_with_exclusions():
+    store.start_run("scan 10.0.0.0/24 for open ports")
+    assert play_until_gate() == "scope"
+    store.edit_scope(allowed_ports=["22", "443"],
+                     excluded_paths=["10.0.0.5", "10.0.0.6:22", "10.0.0.16/28"])
+    store.approve_scope()
+
+
+@pytest.mark.parametrize("target", [
+    "10.0.0.5:22", "10.0.0.5 :22", "10.0.0.5",            # an excluded host, however written
+    "10.0.0.6:22", "10.0.0.6:022",                         # an excluded host:port
+    "10.0.0.6:+22", "10.0.0.6:2_2", "10.0.0.6: 22",        # ports int() would accept
+    "10.0.0.6:٢٢",                               # non-ASCII digits
+    "10.0.0.0/24:22", "10.0.0.0/24",                       # a range is not a host
+    "10.0.0.20:22",                                        # inside the excluded /28
+    "10.0.0.7:8080", "10.9.9.9:22", "",                    # port, host, nothing
+])
+def test_network_targets_that_must_be_blocked(target):
+    _network_scope_with_exclusions()
+    assert not store.check_request("TCP", target).allowed, target
+
+
+@pytest.mark.parametrize("target", ["10.0.0.6:443", "10.0.0.7:22", "10.0.0.7"])
+def test_network_targets_that_stay_allowed(target):
+    _network_scope_with_exclusions()
+    assert store.check_request("TCP", target).allowed, target
+
+
+@pytest.mark.parametrize("entry", ["10.0.0.0/33", "10.0.0.5:abc", "10.0.0.5 22", "10.0.0.5:0"])
+def test_a_network_exclusion_must_be_readable(entry):
+    store.start_run("scan 10.0.0.0/24 for open ports")
+    assert play_until_gate() == "scope"
+    with pytest.raises(store.StoreValidationError):
+        store.edit_scope(excluded_paths=[entry])
+
+
+# --- source targets: the path that runs must stay in the repository ----------------------------
+@pytest.mark.parametrize("target", [
+    "../../etc/passwd", "app/../../x", "app\\..\\..\\x", "~/.ssh/id_rsa",
+    "https://evil.example.net/x", "C:/Windows/win.ini",
+])
+def test_a_source_path_that_leaves_the_repository_is_blocked(target):
+    store.start_run("review repo https://git.example.com/acme/app.git")
+    decide(play_until_gate())                        # scope (the repo picked Source Code)
+    verdict = store.check_request("read", target)
+    assert not verdict.allowed and verdict.reason == "Path leaves the repository"
+
+
+def test_a_source_file_name_with_dots_is_fine():
+    store.start_run("review repo https://git.example.com/acme/app.git")
+    decide(play_until_gate())
+    assert store.check_request("read", "app/..hidden/x.py").allowed

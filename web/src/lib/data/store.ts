@@ -5,7 +5,8 @@
    regular files with the expected name, size-limits and validates each one, and never
    writes anything. Each file is opened without following symlinks and checked through the
    open handle (a regular file, at most 5 MB), so a swapped-in FIFO or device can't hang or
-   flood it. Loading requires the viewer role (a second lock behind src/proxy.ts) and calls
+   flood it. An unfinished run whose file has not changed for RECONIX_STALE_AFTER_HOURS
+   (default 12; 0 turns it off) reads as interrupted (`markIdle`). Loading requires the viewer role (a second lock behind src/proxy.ts) and calls
    `connection()`, so pages render per request and always show the latest files. */
 import "server-only";
 
@@ -17,6 +18,7 @@ import { cache } from "react";
 
 import { requireViewer } from "../auth/guard";
 import { type Assessment, AssessmentSchema } from "./schema";
+import { markIdle, STALE_AFTER_HOURS } from "./stats";
 
 export const FILE_NAME = /^\d{8}-\d{6}-[0-9a-f]{4}_[A-Za-z0-9-]{1,64}\.json$/;
 export const UID = /^\d{8}-\d{6}-[0-9a-f]{4}_[A-Za-z0-9-]{1,64}$/;
@@ -40,6 +42,13 @@ export function dataDir(): string {
   if (!configured) return path.join(homedir(), ".reconix", "assessments");
   const expanded = configured.startsWith("~/") ? path.join(homedir(), configured.slice(2)) : configured;
   return path.resolve(expanded);
+}
+
+/** How long an unfinished run may go without a save before it reads as interrupted (0: never). */
+export function staleAfterMs(): number {
+  const configured = process.env.RECONIX_STALE_AFTER_HOURS?.trim();
+  const hours = configured ? Number(configured) : NaN;
+  return (Number.isFinite(hours) && hours >= 0 ? hours : STALE_AFTER_HOURS) * 3_600_000;
 }
 
 /** The file's text, read through one handle that never follows a symlink, or why not. */
@@ -103,12 +112,14 @@ export const loadLibrary = cache(async (): Promise<Library> => {
   }
   const assessments: Assessment[] = [];
   const problems: Problem[] = [];
+  const now = Date.now();
+  const staleAfter = staleAfterMs();
   const candidates = names.filter((n) => n.endsWith(".json") && !n.startsWith(".")).sort().reverse();
   const results = await Promise.all(candidates.slice(0, MAX_FILES).map((n) => readAssessmentFile(dir, n)));
   for (const result of results) {
     if (result === null) continue;
     if ("reason" in result) problems.push(result);
-    else assessments.push(result);
+    else assessments.push(markIdle(result, now, staleAfter));
   }
   if (candidates.length > MAX_FILES) {
     problems.push({ file: `${candidates.length - MAX_FILES} older files`, reason: `not shown (only the newest ${MAX_FILES} are read)` });

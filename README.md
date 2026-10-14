@@ -84,7 +84,8 @@ Windows 10+ (there in a ConPTY pseudo console, through `pywinpty`, which
    will never touch, its tools): approve it, edit it (methods, excluded paths, ports,
    tools, time limit), or reject it (nothing is tested; a fresh assessment starts).
 3. **Plan** — every phase, the target login it may need, and each risky action with its
-   exact request. **Run plan** starts testing.
+   exact request. **Run plan** starts testing; **Edit steps** changes where a risky
+   action runs (see Approval).
 4. **Execution** — the live run: each task queued, running, paused or done (no
    percentages: a backend can't know how far a scan has got), a spinner with what
    Reconix is on and for how long, and the live output (time · who · message). The
@@ -97,7 +98,10 @@ Windows 10+ (there in a ConPTY pseudo console, through `pywinpty`, which
    login covers them all (a test account covers the cookie tools). If the target then
    asks for a one-time code, a second form asks for just the code. It is never stored.
 5. **Approval** — MEDIUM: approve or reject. HIGH: approve, then double-check the exact
-   request ("No, go back" is selected). Rejecting stops the assessment.
+   request ("No, go back" is selected). Rejecting stops the assessment. **Edit params**
+   changes where the action runs (a path, host:port or repository file) before you
+   decide: the policy engine checks the new value, the exact request and its hash are
+   rebuilt, and the risk stays the same.
 6. **Findings / Detail** — filter, sort, triage (open, fixed, accepted risk, false
    positive) and import nuclei / nmap / ZAP output.
 7. **Report** — export HTML, PDF, DOCX, JSON, SARIF, CSV or Markdown to `./reports/`,
@@ -166,7 +170,9 @@ Type `/`, keep typing to filter, `↑`/`↓` to pick, `Tab` to complete, `Enter`
 The store is the authority; the screens only ask. Testing starts only after the scope
 is approved **and** the plan is run. Each risky action waits for a human decision bound
 to the exact request (`store.approve()` checks the command hash); HIGH risk also needs a
-double check, the single-use token from `store.request_confirmation()`. The policy
+double check, the single-use token from `store.request_confirmation()`. Editing an
+action (`store.edit_approval()`) is policy-checked, rebuilds the request and its hash,
+and voids any open confirmation, so you approve exactly what is shown. The policy
 engine checks every request against the approved scope and blocks the rest. Target
 logins live in memory for the session only; one-time codes are never stored; evidence
 is masked; saved copies for the web dashboard (`~/.reconix/assessments`, 0600) never
@@ -213,7 +219,7 @@ reconix-tui/
         ├── approval.py     # 04 Approval gate
         ├── execution.py    # 05 Live execution
         ├── findings_list.py, finding_detail.py, report.py   # 06–08
-        ├── forms/          # FormScreen: target login, scope edit, import
+        ├── forms/          # FormScreen: target login, scope edit, action params, import
         ├── choice.py       # ↑/↓ dialog: confirmations, details, pickers
         ├── command_bar.py  # `/` command bar
         └── help.py         # ? contextual shortcuts

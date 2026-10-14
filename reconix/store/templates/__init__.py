@@ -14,6 +14,7 @@ from .. import lists
 from ..activity import log_event
 from ..errors import StoreValidationError
 from ..scenario import log
+from ..tools import approved_tool
 from . import api, network, source, web_url
 from .base import RunBundle
 
@@ -94,6 +95,24 @@ def apply_template(template_id: str, *, auto: bool = False) -> Template:
         log_event("template.selected", template_id)
     assessment.script.extend(_with_intent(assessment, bundle.script))
     return spec
+
+
+def align_to_scope(assessment) -> None:
+    """Fit the demo findings and approvals still to come to the scope just approved.
+
+    The operator may have named or edited tools and ports before approving, and nothing has
+    been revealed yet. Each template finding names an approved tool, and a template with its
+    own `align_to_scope` (network: the approved ports) rebuilds its findings and approvals,
+    command hashes included, before any is shown. Imported findings keep their source tool.
+    Demo data only: a backend reports what its tools actually found.
+    """
+    module = MODULES.get(assessment.selected_template)
+    rebuild = getattr(module, "align_to_scope", None)
+    if rebuild is not None:
+        rebuild(assessment)
+    for finding in assessment.findings:
+        if not finding.fid.startswith("IMP-"):
+            finding.tool = approved_tool(finding.tool, assessment.scope.tools)
 
 
 def _with_intent(assessment, script: List[RunStep]) -> List[RunStep]:

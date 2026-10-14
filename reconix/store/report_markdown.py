@@ -53,6 +53,10 @@ def render_markdown(data: Dict[str, Any]) -> str:
         f"- Allowed actions: {md(', '.join(scope['allowed_actions']))}",
         f"- Allowed methods: {md(', '.join(scope['allowed_methods']))}",
         f"- Excluded paths: {md(', '.join(scope['excluded_paths']))}",
+    ]
+    if scope.get("allowed_ports"):
+        lines.append(f"- Allowed ports: {md(', '.join(str(p) for p in scope['allowed_ports']))}")
+    lines += [
         f"- Time limit: {scope['time_limit_minutes']} minutes",
         f"- Tools: {md(', '.join(scope['tools']))}",
         "",

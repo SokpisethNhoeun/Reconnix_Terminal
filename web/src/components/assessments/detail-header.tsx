@@ -4,8 +4,8 @@ import { ArrowLeft, CircleSlash, SquareTerminal, TriangleAlert } from "lucide-re
 import Link from "next/link";
 
 import type { Assessment } from "@/lib/data/schema";
-import { durationMs } from "@/lib/data/stats";
-import { formatDateTime, formatDuration } from "@/lib/format";
+import { durationMs, idleInterrupted } from "@/lib/data/stats";
+import { formatDateTime, formatDuration, formatShort } from "@/lib/format";
 
 import { StatusChip } from "../neu/chips";
 import { Notice } from "../neu/notice";
@@ -68,8 +68,11 @@ export function DetailHeader({ assessment: a, tabs }: { assessment: Assessment; 
       )}
       {a.status === "Interrupted" && (
         <Notice icon={<CircleSlash size={18} />} tone="faint">
-          <b className="font-semibold">Interrupted:</b> the terminal app closed before this run finished. It cannot continue;
-          start a new assessment in the TUI.
+          <b className="font-semibold">Interrupted:</b>{" "}
+          {idleInterrupted(a)
+            ? `no activity since ${formatShort(a.saved_at)}; the terminal app probably closed.`
+            : "the terminal app closed before this run finished."}{" "}
+          It cannot continue; start a new assessment in the TUI.
         </Notice>
       )}
       <div className="self-start">

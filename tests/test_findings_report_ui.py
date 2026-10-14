@@ -40,9 +40,9 @@ async def test_filter_and_sort(app):
         await pilot.press("f")
         await settle(pilot)
         assert isinstance(app.screen, ChoiceScreen)
-        await pilot.press("down", "enter")                             # Critical & High
+        await pilot.press("down", "down", "enter")                     # Medium
         await settle(pilot)
-        assert row_ids(app) == ["001"]
+        assert row_ids(app) == ["001", "002"]
         app.findings_filter = "all"
         await pilot.press("s")                                         # → CVSS
         await settle(pilot)

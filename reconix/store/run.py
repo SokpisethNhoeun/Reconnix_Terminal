@@ -7,6 +7,7 @@ approval), so no step past a gate can play early, whatever the UI does. Steps ma
 """
 
 from datetime import timedelta
+from pathlib import PurePath
 from string import Template as TextTemplate
 from typing import Dict, List, Optional
 
@@ -28,9 +29,10 @@ from .scope import (
     blocked_count, check_request, get_scope, is_scope_approved, time_limit_reached,
 )
 from .scope_view import join_and
-from .targets import check_target
+from .targets import as_network, check_target
 from .templates import apply_template, selected_template, template_name
 from .templates.base import build_plan
+from .tools import approved_tool
 from .transcript import add_activity, add_chat, list_activity
 from .vault import code_needed, is_authenticated, is_code_verified, login_kind, login_tools
 
@@ -49,7 +51,16 @@ PIPELINE_SOURCES = {"AI": "ai", "POLICY": "policy", "TOOL": "tool"}
 
 
 def _client_label(target: str) -> str:
-    """A readable client name from the target host (staging.example.com -> Example)."""
+    """A readable client name from the target (staging.example.com -> Example).
+
+    An address or range stays as typed (192.0.2.10), and a local folder gives its own
+    name (/home/me/shop-app -> Shop App): neither has a domain to take a name from.
+    """
+    if as_network(target) is not None:
+        return target.strip()
+    if target.startswith(("/", "~", ".")) or (len(target) > 2 and target[1:3] in (":\\", ":/")):
+        name = PurePath(target.replace("\\", "/").rstrip("/")).name
+        return name.replace("-", " ").replace("_", " ").title() or target
     host = target.split("//")[-1].split("/")[0].split(":")[0]
     labels = [part for part in host.split(".") if part]
     core = labels[-2] if len(labels) >= 2 else (labels[0] if labels else target)
@@ -269,8 +280,10 @@ def advance() -> Optional[RunStep]:
     return step
 
 
-def _fill(text: str) -> str:
+def _fill(text: str, tool: str = "") -> str:
+    """Step text with its $names filled in. `tool` is what the step names as `$tool`."""
     assessment = get_assessment()
+    tools = _approved_tools()
     return TextTemplate(text).safe_substitute(
         assessment=assessment.assessment_id or assessment.planned_id,
         target=assessment.target,
@@ -278,7 +291,14 @@ def _fill(text: str) -> str:
         picked="auto-selected" if assessment.template_auto else "selected",
         findings=findings_line(),
         login_need=_login_need(),
+        tools=join_and(tools) if tools else "none",
+        tool=approved_tool(tool, tools) if tool else "",
     )
+
+
+def _approved_tools() -> List[str]:
+    scope = get_scope()
+    return list(scope.tools) if scope else []
 
 
 def _login_need() -> str:
@@ -290,11 +310,11 @@ def _apply(step: RunStep) -> None:
     run = get_run()
     kind = step.kind
     if kind == "say":
-        add_chat(step.entry, step.speaker, _fill(step.text), step.tone)
+        add_chat(step.entry, step.speaker, _fill(step.text, step.tool), step.tone)
     elif kind == "card":
-        add_chat("card", step.speaker, _fill(step.text), rows=step.rows)
+        add_chat("card", step.speaker, _fill(step.text, step.tool), rows=step.rows)
     elif kind == "log":
-        add_activity(step.source, _fill(step.text), step.tone)
+        add_activity(step.source, _fill(step.text, step.tool), step.tone)
     elif kind == "phase":
         run.phase = step.name
     elif kind == "parse":

@@ -6,22 +6,27 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { dataDir, loadLibrary, readAssessmentFile, shownDir } from "@/lib/data/store";
+import { dataDir, loadLibrary, readAssessmentFile, shownDir, staleAfterMs } from "@/lib/data/store";
 
-import { SAMPLE_DIR, sampleNames } from "./fixtures";
+import { SAMPLE_DIR, sampleAssessments, sampleNames } from "./fixtures";
 
 vi.mock("next/server", () => ({ connection: async () => undefined }));
 vi.mock("@/lib/auth/guard", () => ({ requireViewer: async () => undefined }));
 
 let dir: string;
 const saved = process.env.RECONIX_DATA_DIR;
+const savedStale = process.env.RECONIX_STALE_AFTER_HOURS;
 
 beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), "reconix-web-"));
   process.env.RECONIX_DATA_DIR = dir;
+  delete process.env.RECONIX_STALE_AFTER_HOURS;
 });
 afterEach(() => {
   process.env.RECONIX_DATA_DIR = saved;
+  if (savedStale === undefined) delete process.env.RECONIX_STALE_AFTER_HOURS;
+  else process.env.RECONIX_STALE_AFTER_HOURS = savedStale;
+  vi.useRealTimers();
 });
 
 describe("dataDir", () => {
@@ -100,5 +105,33 @@ describe("loadLibrary", () => {
     const library = await loadLibrary();
     expect(library.assessments).toEqual([]);
     expect(library.problems).toEqual([]);
+  });
+});
+
+describe("stale runs", () => {
+  const HOUR = 3_600_000;
+
+  it("reads the limit from RECONIX_STALE_AFTER_HOURS (default 12, 0 turns it off)", () => {
+    expect(staleAfterMs()).toBe(12 * HOUR);
+    for (const [value, hours] of [["0", 0], ["1.5", 1.5], [" 24 ", 24], ["soon", 12], ["-3", 12], ["", 12]] as const) {
+      process.env.RECONIX_STALE_AFTER_HOURS = value;
+      expect(staleAfterMs()).toBe(hours * HOUR);
+    }
+  });
+
+  it("loads a run that went quiet as interrupted, unless that is turned off", async () => {
+    for (const name of sampleNames()) copyFileSync(path.join(SAMPLE_DIR, name), path.join(dir, name));
+    const waiting = sampleAssessments().find((a) => a.status === "Awaiting input")!;
+    const savedAt = Date.parse(waiting.saved_at);
+    const statusAt = async (now: number) => {
+      vi.useFakeTimers({ toFake: ["Date"], now });
+      const library = await loadLibrary();
+      vi.useRealTimers();
+      return library.assessments.find((a) => a.uid === waiting.uid)!.status;
+    };
+    expect(await statusAt(savedAt + HOUR)).toBe("Awaiting input");
+    expect(await statusAt(savedAt + 13 * HOUR)).toBe("Interrupted");
+    process.env.RECONIX_STALE_AFTER_HOURS = "0";
+    expect(await statusAt(savedAt + 13 * HOUR)).toBe("Awaiting input");
   });
 });

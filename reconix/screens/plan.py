@@ -137,7 +137,7 @@ class PlanScreen(ReconixScreen):
                 Choice("run", "Run plan",
                        f"{steps} steps · {gated} need{'s' if gated == 1 else ''} your approval "
                        "while it runs.", recommended=True),
-                Choice("edit", "Edit steps", disabled=True),
+                self._edit_choice(),
                 Choice("cancel", "Cancel", "Back to the scope. Nothing runs.", "danger"),
             ],
             hint=menu_hint("go back", "Tab to browse steps"), menu_id="plan-menu",
@@ -145,6 +145,14 @@ class PlanScreen(ReconixScreen):
         yield Static(Text.assemble(("↻ ", theme.CYAN), (
             "Risky steps pause the run and ask you first; the policy engine checks every "
             "request against the approved scope.", theme.MUTED)), classes="panel-note")
+
+    @staticmethod
+    def _edit_choice() -> Choice:
+        editable = [a for a in store.get_assessment().approvals if store.can_edit(a.request_id)]
+        if not editable:
+            return Choice("edit", "Edit steps", disabled=True)
+        return Choice("edit", "Edit steps",
+                      "Change where a gated step runs; the policy checks it again.")
 
     def _question_running(self) -> ComposeResult:
         finished = store.is_finished()
@@ -193,6 +201,8 @@ class PlanScreen(ReconixScreen):
         choice = event.choice_id
         if choice == "run":
             self.app.run_plan()
+        elif choice == "edit":
+            self.app.edit_plan_steps()
         elif choice in ("template", "cancel"):
             self.app.goto("template")
         elif choice in ("execution", "findings"):

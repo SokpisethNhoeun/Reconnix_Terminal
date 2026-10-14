@@ -7,7 +7,8 @@ import { z } from "zod";
 
 export const SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
 export const STATUSES = ["New", "Running", "Awaiting input", "Completed", "Stopped", "Interrupted"] as const;
-const UNFINISHED = new Set(["New", "Running", "Awaiting input"]);
+/** Statuses of a run that has not ended (it can still move, unless its TUI is gone). */
+export const UNFINISHED: ReadonlySet<string> = new Set(["New", "Running", "Awaiting input"]);
 
 const text = z.string().max(20_000);
 const isoTime = z.string().max(40);

@@ -20,6 +20,12 @@ class ApprovalRequest:
     impact: str
     command: str       # the exact request that will run
     command_hash: str  # sha256 of `command`; binds the approval to that request
+    # "Edit params": the one value the operator may change (where the action runs) and the
+    # patterns `target` and `command` are rebuilt from ("{path}" is the value). Store-only:
+    # not in the saved copy or the reports.
+    param_label: str = ""      # "Path" | "Host:port" | "File"; "" = nothing to edit
+    target_pattern: str = ""
+    command_pattern: str = ""
 
 
 @dataclass

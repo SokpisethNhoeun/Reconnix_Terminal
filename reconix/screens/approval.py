@@ -51,8 +51,8 @@ class ApprovalScreen(ReconixScreen):
         self._request: Optional[ApprovalRequest] = deepcopy(request) if request else None
 
     def view_state(self) -> object:
-        request = waiting_request()
-        return request.request_id if request else ""
+        request = waiting_request()       # an edit changes the hash: rebuild with the new one
+        return (request.request_id, request.command_hash) if request else ""
 
     @property
     def _high(self) -> bool:
@@ -97,12 +97,19 @@ class ApprovalScreen(ReconixScreen):
                 Choice("reject", "Reject",
                        "Not executed. The assessment stops; nothing else runs.", "danger"),
                 Choice("details", "View details", "Scope limits, exact request and audit trail."),
-                Choice("edit", "Edit params", disabled=True),
+                self._edit_choice(req),
             ],
             default=2, hint=menu_hint("decide later"), menu_id="approval-menu",
         )
         yield Static(Text(f"logged to audit · operator: {store.current_operator()}",
                           style=theme.DIM))
+
+    @staticmethod
+    def _edit_choice(req: ApprovalRequest) -> Choice:
+        if not req.param_label:
+            return Choice("edit", "Edit params", disabled=True)
+        return Choice("edit", "Edit params",
+                      f"Change the {req.param_label.lower()} first; the policy checks it again.")
 
     def _compose_idle(self) -> ComposeResult:
         yield Static(Text.assemble(("◆ reconix ", theme.CYAN), (
@@ -149,7 +156,8 @@ class ApprovalScreen(ReconixScreen):
     def on_choice_menu_chosen(self, event: ChoiceMenu.Chosen) -> None:
         event.stop()
         handlers = {"approve": self.action_approve, "reject": self.action_reject,
-                    "details": self.action_details, "chat": self.chat_about,
+                    "details": self.action_details, "edit": self.action_edit,
+                    "chat": self.chat_about,
                     "execution": lambda: self.app.goto("execution"),
                     "plan": lambda: self.app.goto("plan")}
         handlers[event.choice_id]()
@@ -208,6 +216,10 @@ class ApprovalScreen(ReconixScreen):
             Text.assemble(("Purpose  ", theme.DIM), (req.purpose, theme.TEXT)),
             Text.assemble(("Impact   ", theme.DIM), (req.impact, theme.MUTED)),
         ]
+
+    def action_edit(self) -> None:
+        if self._request is not None:
+            self.app.edit_approval(self._request.request_id)
 
     def action_reject(self) -> None:
         if self._request is None:

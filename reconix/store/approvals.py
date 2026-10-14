@@ -8,12 +8,23 @@ import hashlib
 import secrets
 from typing import List, Optional
 
-from ..models import GATE_APPROVAL_PREFIX, ApprovalDecision, ApprovalRequest, Confirmation
+from ..models import (
+    GATE_APPROVAL_PREFIX, GATE_PLAN, ApprovalDecision, ApprovalRequest, Confirmation,
+)
 from . import lists
 from .activity import current_operator, log_event
 from .errors import StoreValidationError
-from .scope import check_request
+from .scope import check_request, policy_reason
 from .transcript import add_activity
+
+MAX_PARAM_LENGTH = 200
+# What each editable parameter must look like before the policy engine sees it.
+_PARAM_SHAPES = {
+    "Path": (lambda v: v.startswith("/"), "Give a path on the target, e.g. /api/orders/10483."),
+    "Host:port": (lambda v: ":" in v, "Give a host and a port, e.g. 10.0.0.1:8443."),
+    "File": (lambda v: not v.startswith(("/", "~", "\\")),
+             "Give a file in the repository, e.g. app/config/settings.py."),
+}
 
 
 def command_digest(command: str) -> str:
@@ -70,6 +81,61 @@ def _check_hash(request: ApprovalRequest, command_hash: str) -> None:
         raise StoreValidationError("This approval is for a different request.")
     if command_digest(request.command) != request.command_hash:
         raise StoreValidationError("The request changed after it was shown. Review it again.")
+
+
+# --- "Edit params": where a gated action runs, changed before it is decided ---------------
+def can_edit(request_id: str) -> bool:
+    """True when the operator may edit this action right now (see `edit_approval`)."""
+    request = get_approval(request_id)
+    gate = lists.current().run.waiting_gate
+    return (bool(request.param_label) and decision_for(request_id) is None
+            and gate in (GATE_PLAN, GATE_APPROVAL_PREFIX + request_id))
+
+
+def edit_approval(request_id: str, value: str) -> ApprovalRequest:
+    """Change where an undecided gated action runs (its path, host:port or file).
+
+    Only while the run waits at the plan or at this action's gate. The policy engine must
+    allow the new value. The target, the exact command and its hash are rebuilt, and any
+    open HIGH confirmation is voided, so the operator approves exactly what is shown next.
+    Risk, method and the gates don't change.
+    """
+    request = get_approval(request_id)
+    if not request.param_label:
+        raise StoreValidationError("This action has nothing to edit.")
+    if decision_for(request_id) is not None:
+        raise StoreValidationError("This action was already decided.")
+    if not can_edit(request_id):
+        raise StoreValidationError(
+            "Edit an action on the plan, or when Reconix asks you to approve it.")
+    label = request.param_label.lower()
+    value = (value or "").strip()
+    if not value:
+        raise StoreValidationError(f"Enter the {label}.")
+    if len(value) > MAX_PARAM_LENGTH or any(c.isspace() or ord(c) < 32 or ord(c) == 127
+                                            for c in value):
+        raise StoreValidationError(f"That {label} can't be used: one value, no spaces, "
+                                   f"at most {MAX_PARAM_LENGTH} characters.")
+    shape = _PARAM_SHAPES.get(request.param_label)
+    if shape and not shape[0](value):
+        raise StoreValidationError(shape[1])
+    reason = policy_reason(request.method, value)
+    if reason:
+        log_event("approval.edit_refused", f"{request_id} · {value} · {reason}")
+        raise StoreValidationError(f"Blocked by policy: {reason}.")
+    old = request.path
+    if value == old:
+        return request
+    request.path = value
+    request.target = request.target_pattern.replace("{path}", value)
+    request.command = request.command_pattern.replace("{path}", value)
+    request.command_hash = command_digest(request.command)
+    for confirmation in lists.current().confirmations:     # approve what is shown next
+        if confirmation.request_id == request_id:
+            confirmation.used = True
+    add_activity("USER", f"Edited {request.action}: {old} → {value}", tone="warn")
+    log_event("approval.edited", f"{request_id} · {old} → {value}")
+    return request
 
 
 # --- the HIGH-risk second step ----------------------------------------------------------

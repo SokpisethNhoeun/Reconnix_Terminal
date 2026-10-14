@@ -1,7 +1,7 @@
-/* Findings per severity as numbers: how many, how many confirmed, how many still for
-   review. Sits under the severity bars on the overview. */
+/* Findings per severity (the analyst's) as numbers: how many, how many confirmed, how many
+   still for review (open and not confirmed). Sits under the severity bars on the overview. */
 import { type Finding, SEVERITIES } from "@/lib/data/schema";
-import { isConfirmed } from "@/lib/data/stats";
+import { effectiveSeverity, isConfirmed, needsReview } from "@/lib/data/stats";
 import { cn } from "@/lib/utils";
 
 import { SeverityChip } from "../neu/chips";
@@ -9,9 +9,8 @@ import { TableWrap } from "../neu/table-wrap";
 
 export function SeverityTable({ findings }: { findings: Finding[] }) {
   const rows = SEVERITIES.map((severity) => {
-    const of = findings.filter((f) => f.severity === severity);
-    const confirmed = of.filter(isConfirmed).length;
-    return { severity, total: of.length, confirmed, review: of.length - confirmed };
+    const of = findings.filter((f) => effectiveSeverity(f) === severity);
+    return { severity, total: of.length, confirmed: of.filter(isConfirmed).length, review: of.filter(needsReview).length };
   });
   return (
     <TableWrap label="Findings by severity table" className="mt-auto">

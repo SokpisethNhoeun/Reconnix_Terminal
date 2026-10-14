@@ -56,3 +56,9 @@ def test_scope_is_now_template_and_web_is_added():
     assert find(COMMANDS, "scope") is None
     assert find(COMMANDS, "templates").name == "template"
     assert find(COMMANDS, "web").description.startswith("Open the web dashboard")
+
+
+def test_an_exact_name_or_alias_ranks_first():
+    names = [c.name for c in match(COMMANDS, "/finding")]
+    assert names[:2] == ["finding", "findings"]
+    assert match(COMMANDS, "log")[0].name == "audit"          # "log" is /audit's alias

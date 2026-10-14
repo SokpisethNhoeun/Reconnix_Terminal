@@ -30,3 +30,15 @@ def tools_login(tools: Sequence[str]) -> Tuple[str, List[str]]:
     needs = [(tool, tool_login(tool)) for tool in tools]
     kind = max((login for _, login in needs), key=LOGIN_RANK.index, default="")
     return kind, [tool for tool, login in needs if login]
+
+
+def approved_tool(preferred: str, tools: Sequence[str]) -> str:
+    """`preferred` if the approved `tools` include it, else the first approved tool.
+
+    Run text and findings name the template's usual tool; when the operator narrowed the
+    scope to other tools, they name one the operator approved instead.
+    """
+    for tool in tools:
+        if tool.strip().casefold() == preferred.strip().casefold():
+            return tool
+    return tools[0] if tools else preferred

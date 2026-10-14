@@ -22,12 +22,19 @@ Row = Tuple[str, str]
 
 
 def approval(request_id: str, *, risk: str, action: str, target: str, method: str, path: str,
-             purpose: str, impact: str, command: str) -> ApprovalRequest:
-    """An ApprovalRequest with its command hash filled in."""
+             purpose: str, impact: str, command: str, param: str = "") -> ApprovalRequest:
+    """An ApprovalRequest with its command hash filled in.
+
+    With `param` ("Path", "Host:port", "File") the operator may edit `path` before deciding
+    (`approvals.edit_approval`); `target` and `command` are then patterns where "{path}"
+    stands for it, filled in here.
+    """
+    fill = (lambda pattern: pattern.replace("{path}", path)) if param else (lambda text: text)
     return ApprovalRequest(
-        request_id=request_id, risk=risk, action=action, target=target, method=method,
-        path=path, purpose=purpose, impact=impact, command=command,
-        command_hash=command_digest(command),
+        request_id=request_id, risk=risk, action=action, target=fill(target), method=method,
+        path=path, purpose=purpose, impact=impact, command=fill(command),
+        command_hash=command_digest(fill(command)), param_label=param,
+        target_pattern=target if param else "", command_pattern=command if param else "",
     )
 
 
@@ -38,6 +45,7 @@ class RunProfile:
     target_kind: str                       # "web application", "network range", …
     tools: List[str]
     discovery_tool: str                    # "OWASP ZAP", "nmap", "httpx", …
+    # Card titles may name "$tool" (the discovery or scan tool) or "$tools" (all approved).
     discovery_card: Tuple[str, Tuple[Row, ...]]
     discovery_requests: Tuple[int, ...]    # request bursts counted during discovery
     blocked: Tuple[str, str]               # (method, target) the policy engine will block
@@ -140,22 +148,23 @@ def build_rest(profile: RunProfile) -> List[RunStep]:
         # Test
         say("Plan approved. Starting the permitted checks.", tone="ok", pause=0.4),
         RunStep("phase", name="testing", pause=0.0),
-        say(f"Selected tools: {', '.join(profile.tools)}. Preparing requests with sample "
-            "test data. Public surface first."),
+        say("Selected tools: $tools. Preparing requests with sample test data. Public "
+            "surface first."),
         log("POLICY", "Scope check: passed", tone="ok"),
-        log("TOOL", f"Executing permitted scan · {profile.discovery_tool}"),
+        log("TOOL", "Executing permitted scan · $tool", tool=profile.discovery_tool),
     ]
     steps += _progress("discovery", 45, disc_bursts[0])
     steps += [log("TOOL", line) for line in profile.extra_discovery]
     steps += _progress("discovery", 100, disc_bursts[min(1, len(disc_bursts) - 1)])
-    steps.append(card(profile.discovery_card[0], *profile.discovery_card[1]))
+    steps.append(card(profile.discovery_card[0], *profile.discovery_card[1],
+                      tool=profile.discovery_tool))
 
-    steps += [log("TOOL", f"{profile.scan_tool}: checks on the permitted surface")]
+    steps += [log("TOOL", "$tool: checks on the permitted surface", tool=profile.scan_tool)]
     steps += _progress("scanning", 30, scan_bursts[0])
     steps.append(RunStep("propose", method=blocked_method, path=blocked_target, pause=0.8))
     steps.append(log("TOOL", "Continuing on permitted targets"))
     steps += _progress("scanning", 70, scan_bursts[min(1, len(scan_bursts) - 1)])
-    steps.append(card(profile.scan_card[0], *profile.scan_card[1]))
+    steps.append(card(profile.scan_card[0], *profile.scan_card[1], tool=profile.scan_tool))
 
     # The target login the approved tools need ($login_need), then the code on its own
     steps += only(

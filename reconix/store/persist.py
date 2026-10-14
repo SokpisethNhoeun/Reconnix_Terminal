@@ -16,6 +16,7 @@ import stat
 import tempfile
 from pathlib import Path
 from typing import Dict, Optional
+from urllib.parse import urlsplit
 
 from ..models import Assessment
 from ..models.base import utc_now
@@ -27,6 +28,8 @@ ENABLED = os.environ.get("RECONIX_SAVE", "1").strip().lower() not in {"0", "fals
 
 # Where `web/scripts/serve.mjs` drops its sign-in link so the TUI can open the dashboard.
 WEB_URL_FILE = Path(os.environ.get("RECONIX_WEB_URL_FILE") or "~/.reconix/web.url").expanduser()
+
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost"})
 
 _written: Dict[str, str] = {}     # file path -> digest of the content last written there
 
@@ -41,7 +44,21 @@ def web_dashboard_url() -> Optional[str]:
         url = WEB_URL_FILE.read_text(encoding="utf-8").strip()
     except OSError:
         return None
-    return url if url.startswith(("http://127.0.0.1:", "http://localhost:")) else None
+    return url if _is_loopback_link(url) else None
+
+
+def _is_loopback_link(url: str) -> bool:
+    """http on 127.0.0.1 or localhost with a port, and nothing that could name another host
+    (`http://127.0.0.1:1@evil.example/` really points at evil.example)."""
+    if any(c.isspace() or ord(c) < 32 for c in url) or "\\" in url:
+        return False
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError:
+        return False
+    return (parts.scheme == "http" and parts.hostname in _LOOPBACK_HOSTS
+            and port is not None and "@" not in parts.netloc)
 
 
 def file_for(assessment: Assessment) -> Path:

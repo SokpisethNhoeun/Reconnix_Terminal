@@ -12,7 +12,9 @@ from ..models.base import utc_now
 from . import lists
 from .activity import log_event
 from .errors import StoreValidationError
-from .policy import TargetError, canonical_path, host_port_reason, is_under, repo_path_reason
+from .policy import (
+    TargetError, canonical_path, host_port_reason, is_under, network_entry, repo_path_reason,
+)
 from .transcript import add_activity, add_chat
 
 
@@ -34,8 +36,11 @@ def approve_scope() -> ScopeManifest:
     scope = get_scope()
     if scope.status == "APPROVED":
         raise StoreValidationError("The scope is already approved.")
+    from .templates import align_to_scope   # templates import the policy, so not at the top
+
     scope.status = "APPROVED"
     assessment = lists.current()
+    align_to_scope(assessment)
     assessment.assessment_id = assessment.planned_id
     run.started_at = utc_now()
     add_activity("USER", "Scope approved", tone="ok")
@@ -88,6 +93,11 @@ def edit_scope(*, allowed_methods=None, excluded_paths=None, time_limit_minutes=
             bad = [p for p in paths if not p.startswith("/")]
             if bad:
                 raise StoreValidationError(f"Excluded paths start with '/': {', '.join(bad)}.")
+        if scope.kind == "network":
+            bad = [p for p in paths if network_entry(p) is None]
+            if bad:
+                raise StoreValidationError(
+                    f"Exclude a host, range or host:port (e.g. 10.0.0.5:22): {', '.join(bad)}.")
         scope.excluded_paths = paths
 
     if allowed_ports is not None:
@@ -161,6 +171,12 @@ def _decide(method: str, target: str) -> str:
     if any(is_under(path, excluded) for excluded in scope.excluded_paths):
         return "Path outside approved scope"
     return ""
+
+
+def policy_reason(method: str, target: str) -> str:
+    """"" when the policy would let the request run, else why not. Records nothing: for
+    checking an operator's edit before it becomes a request (`approvals.edit_approval`)."""
+    return _decide(method.strip().upper(), target)
 
 
 def check_request(method: str, target: str) -> PolicyVerdict:

@@ -16,6 +16,7 @@ from .approvals import get_approval, list_approval_decisions
 from .assessment import get_assessment
 from .errors import StoreValidationError
 from .findings import confirmed_count, findings_line, list_findings, review_count
+from .redact import redact_all
 from .report_csv import render_csv
 from .report_docx import HAS_DOCX, write_docx
 from .report_html import render_html
@@ -70,7 +71,11 @@ def _iso(moment) -> str:
 
 
 def report_data() -> Dict[str, Any]:
-    """Everything a report shows, as plain data (the JSON export is exactly this)."""
+    """Everything a report shows, as plain data (the JSON export is exactly this).
+
+    Every string goes through `redact_all`, like the saved copy, so free text the operator
+    typed (a triage note, a tool or path in the scope) can't carry a secret into a report.
+    """
     assessment = get_assessment()
     run = lists.current().run
     scope = get_scope()
@@ -83,7 +88,7 @@ def report_data() -> Dict[str, Any]:
             "decision": decision.decision, "operator": decision.operator,
             "reason": decision.reason, "at": decision.created_at.isoformat(timespec="seconds"),
         })
-    return {
+    return redact_all({
         "assessment_id": assessment.assessment_id,
         "target": assessment.target_url,
         "template": template.name if template else "",
@@ -97,9 +102,11 @@ def report_data() -> Dict[str, Any]:
         "summary": findings_line(),
         "scope": {
             "approved": is_scope_approved(),
+            "kind": scope.kind,
             "allowed_actions": list(scope.allowed_actions),
             "allowed_methods": list(scope.allowed_methods),
             "excluded_paths": list(scope.excluded_paths),
+            "allowed_ports": list(scope.allowed_ports),   # network scopes only
             "time_limit_minutes": scope.time_limit_minutes,
             "tools": list(scope.tools),
         },
@@ -124,7 +131,7 @@ def report_data() -> Dict[str, Any]:
         ],
         "retest": retest(),
         "sections": list(REPORT_SECTIONS),
-    }
+    })
 
 
 def _display_path(path: Path) -> str:

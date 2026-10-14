@@ -44,7 +44,7 @@ export function ValidationChip({ validation }: { validation: string }) {
   );
 }
 
-const TRIAGE_TONE: Record<string, Tone> = {
+export const TRIAGE_TONE: Record<string, Tone> = {
   open: "faint",
   fixed: "ok",
   accepted: "warn",

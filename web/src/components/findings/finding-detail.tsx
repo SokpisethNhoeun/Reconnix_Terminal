@@ -1,6 +1,6 @@
 /* One finding in full. The TUI masks evidence before saving it; it is shown as plain text
    (React escapes it), never as HTML. */
-import type { FindingRow } from "@/lib/data/stats";
+import { effectiveSeverity, type FindingRow } from "@/lib/data/stats";
 
 import { Card } from "../neu/card";
 import { Chip, SeverityChip, TriageChip, ValidationChip } from "../neu/chips";
@@ -22,7 +22,7 @@ export function FindingDetail({ finding }: { finding?: FindingRow }) {
         </span>
         <h3 className="text-[17px] leading-snug font-semibold text-balance">{finding.title}</h3>
         <div className="flex flex-wrap items-center gap-2">
-          <SeverityChip severity={finding.severity} />
+          <SeverityChip severity={effectiveSeverity(finding)} />
           <ValidationChip validation={finding.validation} />
           <TriageChip status={finding.status} />
           {finding.cvss_score > 0 && <Chip>CVSS {finding.cvss_score.toFixed(1)}</Chip>}
@@ -30,6 +30,7 @@ export function FindingDetail({ finding }: { finding?: FindingRow }) {
       </div>
       <KeyValues
         items={[
+          ...(effectiveSeverity(finding) !== finding.severity ? [{ label: "Detected severity", value: finding.severity }] : []),
           ...(finding.category ? [{ label: "Category", value: finding.category }] : []),
           ...(finding.cvss_vector ? [{ label: "CVSS vector", value: finding.cvss_vector, mono: true }] : []),
           { label: "Description", value: finding.description },

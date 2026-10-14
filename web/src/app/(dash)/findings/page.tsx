@@ -1,5 +1,6 @@
 /* Findings from every assessment, with severity / validation filters and search, 10 to a
-   page. The selected finding (`f`) opens in the detail card. */
+   page. The selected finding (`f`) opens in the detail card. Severity is the analyst's when
+   set, and "For review" means open and not confirmed, the same rules as the overview. */
 import { Search } from "lucide-react";
 import type { Metadata } from "next";
 
@@ -11,7 +12,7 @@ import { Card } from "@/components/neu/card";
 import { Pager } from "@/components/neu/pager";
 import { SegmentedLinks } from "@/components/neu/segmented";
 import { Input } from "@/components/ui/input";
-import { allFindings, categoryCounts, cvssSummary, isConfirmed } from "@/lib/data/stats";
+import { allFindings, categoryCounts, cvssSummary, effectiveSeverity, isConfirmed, isFalsePositive, needsReview } from "@/lib/data/stats";
 import { loadLibrary } from "@/lib/data/store";
 import { plural } from "@/lib/format";
 import { pageNumber, pageParam, paginate } from "@/lib/pagination";
@@ -40,12 +41,12 @@ export default async function FindingsPage(props: PageProps<"/findings">) {
   const q = param(sp.q).slice(0, 100);
   const { assessments } = await loadLibrary();
   const all = allFindings(assessments);
-  const present = new Set(all.map((f) => f.severity));
+  const present = new Set(all.map(effectiveSeverity));
   const text = q.trim().toLowerCase();
   const rows = all.filter(
     (f) =>
-      (sev === "all" || f.severity === sev) &&
-      (val === "all" || (val === "confirmed") === isConfirmed(f)) &&
+      (sev === "all" || effectiveSeverity(f) === sev) &&
+      (val === "all" || (val === "confirmed" ? isConfirmed(f) : needsReview(f))) &&
       (!text || `${f.title} ${f.path} ${f.assessment.target} ${f.references.join(" ")} ${f.tool}`.toLowerCase().includes(text)),
   );
   const page = paginate(rows, pageNumber(param(sp.page)));
@@ -55,12 +56,18 @@ export default async function FindingsPage(props: PageProps<"/findings">) {
   const withAssessments = new Set(all.map((f) => f.assessment.uid)).size;
   const categories = categoryCounts(all);
   const cvss = cvssSummary(all);
+  // counted like the overview's Findings tile (false positives left out), though still listed
+  const falsePositives = all.filter(isFalsePositive).length;
+  const real = all.filter((f) => !isFalsePositive(f));
 
   return (
     <>
       <PageHeader
         title="Findings"
-        sub={`${plural(all.length, "finding")} from ${plural(withAssessments, "assessment")} · ${all.filter(isConfirmed).length} confirmed`}
+        sub={
+          `${plural(real.length, "finding")} from ${plural(withAssessments, "assessment")} · ${real.filter(isConfirmed).length} confirmed` +
+          (falsePositives ? ` · ${plural(falsePositives, "false positive")} also listed` : "")
+        }
       />
       {all.length > 0 && (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(260px,1fr)]">

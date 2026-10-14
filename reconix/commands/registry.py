@@ -45,16 +45,21 @@ def find(commands: Sequence[Command], name: str) -> Optional[Command]:
 
 
 def match(commands: Sequence[Command], query: str) -> List[Command]:
-    """Commands ranked: name starts with `query`, then an alias does, then either contains it."""
+    """Commands ranked: the exact name or alias first (so Enter on "/finding" runs /finding,
+    not /findings), then name starts with `query`, then an alias does, then either contains it.
+    """
     query = query.lower().lstrip("/")
+    exact: List[Command] = []
     by_name: List[Command] = []
     by_alias: List[Command] = []
     contains: List[Command] = []
     for command in commands:
-        if command.name.startswith(query):
+        if query and (query == command.name or query in command.aliases):
+            exact.append(command)
+        elif command.name.startswith(query):
             by_name.append(command)
         elif any(alias.startswith(query) for alias in command.aliases):
             by_alias.append(command)
         elif any(query in name for name in (command.name,) + command.aliases):
             contains.append(command)
-    return by_name + by_alias + contains
+    return exact + by_name + by_alias + contains

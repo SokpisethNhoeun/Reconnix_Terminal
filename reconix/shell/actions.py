@@ -9,7 +9,9 @@ from typing import Optional
 
 from .. import store
 from ..flow import screen_for
-from ..screens.forms import ScopeEditForm
+from ..models import Choice
+from ..screens.choice import ChoiceScreen
+from ..screens.forms import ApprovalEditForm, ScopeEditForm
 
 
 class ActionsMixin:
@@ -104,6 +106,33 @@ class ActionsMixin:
 
     def edit_scope(self) -> None:
         self.open_dialog(ScopeEditForm(), lambda _result: self.refresh_view())
+
+    # --- editing where a gated action runs ("Edit params", the plan's "Edit steps") --------
+    def edit_approval(self, request_id: str) -> None:
+        if not store.can_edit(request_id):
+            self.notify("This action can't be edited now.", severity="warning")
+            return
+        self.open_dialog(ApprovalEditForm(request_id), lambda _result: self.refresh_view())
+
+    def edit_plan_steps(self) -> None:
+        """Ask which gated action to edit, then open its form."""
+        choices = [
+            Choice(request.request_id, request.action,
+                   f"{request.risk} · {request.param_label}: {request.path}")
+            for request in store.get_assessment().approvals
+            if store.can_edit(request.request_id)
+        ]
+        if not choices:
+            self.notify("No step can be edited now.", severity="warning")
+            return
+        choices.append(Choice("back", "Back to the plan", "Nothing changes."))
+        dialog = ChoiceScreen("✎ EDIT STEPS", "Which gated step do you want to change?",
+                              choices, default=len(choices) - 1, chip="Plan")
+        self.open_dialog(dialog, self._plan_step_chosen)
+
+    def _plan_step_chosen(self, answer: Optional[str]) -> None:
+        if answer and answer != "back":
+            self.edit_approval(answer)
 
     def reject_scope(self) -> None:
         try:

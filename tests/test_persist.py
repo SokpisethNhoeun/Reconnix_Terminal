@@ -246,3 +246,22 @@ def test_web_dashboard_url_only_accepts_a_loopback_link(tmp_path, monkeypatch):
     assert store.web_dashboard_url() == "http://127.0.0.1:3100/login#token=abc"
     url_file.write_text("https://evil.example.com/login\n")       # non-loopback is refused
     assert store.web_dashboard_url() is None
+
+
+def test_web_dashboard_url_refuses_links_that_only_look_local(tmp_path, monkeypatch):
+    url_file = tmp_path / "web.url"
+    monkeypatch.setattr(persist, "WEB_URL_FILE", url_file)
+    for link in (
+        "http://127.0.0.1:1@evil.example.com/login",          # userinfo: the host is evil
+        "http://127.0.0.1:3100@evil.example.com/",
+        "http://localhost:x@evil.example.com/",
+        "http://127.0.0.1/login",                             # no port
+        "https://127.0.0.1:3100/login",                       # not the helper's http
+        "http://127.0.0.1:3100\\@evil.example.com/",
+        "http://127.0.0.1:99999/login",                       # not a port
+        "javascript:alert(1)//http://127.0.0.1:3100/",
+    ):
+        url_file.write_text(link + "\n")
+        assert store.web_dashboard_url() is None, link
+    url_file.write_text("http://localhost:3100/login#token=abc\n")
+    assert store.web_dashboard_url() == "http://localhost:3100/login#token=abc"

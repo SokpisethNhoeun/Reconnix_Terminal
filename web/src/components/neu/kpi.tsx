@@ -22,8 +22,13 @@ export function Kpi({ label, value, children, compact }: KpiProps) {
   );
 }
 
-export function KpiGrid({ children }: { children: ReactNode }) {
-  return <section className="grid grid-cols-2 gap-[18px] md:grid-cols-3 xl:grid-cols-5 xl:gap-[22px]">{children}</section>;
+/** Tiles in a row: five across on wide screens, or six (`cols={6}`) for a longer row. */
+export function KpiGrid({ children, cols = 5 }: { children: ReactNode; cols?: 5 | 6 }) {
+  return (
+    <section className={cn("grid grid-cols-2 gap-[18px] md:grid-cols-3 xl:gap-[22px]", cols === 6 ? "xl:grid-cols-6" : "xl:grid-cols-5")}>
+      {children}
+    </section>
+  );
 }
 
 /** One "● 4 completed" item inside a tile's detail line. */

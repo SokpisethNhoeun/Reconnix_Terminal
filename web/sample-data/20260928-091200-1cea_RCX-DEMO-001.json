@@ -124,14 +124,14 @@
     },
     {
       "method": "READ",
-      "path": "app/db/queries.py",
+      "path": "app/config/settings.py",
       "allowed": true,
       "reason": "Within approved scope",
       "at": "2026-09-28T09:19:09+00:00"
     },
     {
       "method": "READ",
-      "path": "app/db/queries.py",
+      "path": "app/config/settings.py",
       "allowed": true,
       "reason": "Within approved scope",
       "at": "2026-09-28T09:19:29+00:00"
@@ -154,13 +154,13 @@
       "request_id": "approval-002",
       "risk": "HIGH",
       "action": "secret_validation",
-      "target": "check credential against a test endpoint",
+      "target": "check the credential in app/config/settings.py against a test endpoint",
       "method": "read",
-      "path": "app/db/queries.py",
+      "path": "app/config/settings.py",
       "purpose": "Check whether the flagged credential still authenticates",
       "impact": "One authentication attempt against a test database",
-      "command": "use flagged credential against the test database once",
-      "command_hash": "sha256:e72d0e4205a6c27b656712b4db84eb821ddfcf5e78bab595ac83c5bfc0f5b862"
+      "command": "use the credential flagged in app/config/settings.py against the test database once",
+      "command_hash": "sha256:dddfd0b8468dcf94774bd1025697ced391796ee116fb015de5e7a860b95435f9"
     }
   ],
   "decisions": [
@@ -177,7 +177,7 @@
       "decision": "APPROVED",
       "operator": "analyst",
       "reason": "",
-      "command_hash": "sha256:e72d0e4205a6c27b656712b4db84eb821ddfcf5e78bab595ac83c5bfc0f5b862",
+      "command_hash": "sha256:dddfd0b8468dcf94774bd1025697ced391796ee116fb015de5e7a860b95435f9",
       "at": "2026-09-28T09:19:35+00:00"
     }
   ],
@@ -436,7 +436,7 @@
       "type": "chat",
       "who": "reconix",
       "kind": "text",
-      "text": "Selected tools: Semgrep, gitleaks, pip-audit. Preparing requests with sample test data. Public surface first.",
+      "text": "Selected tools: Semgrep, gitleaks and pip-audit. Preparing requests with sample test data. Public surface first.",
       "tone": "default",
       "rows": []
     },
@@ -539,7 +539,7 @@
       "type": "chat",
       "who": "reconix",
       "kind": "card",
-      "text": "Scan · Semgrep + gitleaks",
+      "text": "Scan · Semgrep, gitleaks and pip-audit",
       "tone": "default",
       "rows": [
         [

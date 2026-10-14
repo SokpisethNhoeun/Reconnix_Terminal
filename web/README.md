@@ -25,6 +25,7 @@ npm start -- --no-terminal         # no Terminal page; the sign-in grants viewer
 | Variable | Default | Meaning |
 |---|---|---|
 | `RECONIX_DATA_DIR` | `~/.reconix/assessments` | the folder the TUI saves to |
+| `RECONIX_STALE_AFTER_HOURS` | `12` | an unfinished run whose file has not changed for this long reads as Interrupted (its TUI was killed before it could say so); `0` turns this off, e.g. for the old sample data |
 | `RECONIX_WEB_PORT` | `3100` | port on 127.0.0.1 |
 | `RECONIX_TERM_PORT` | `3101` | the terminal helper's port on 127.0.0.1 |
 | `RECONIX_PYTHON` | repo `.venv`, else `python3` (`python` on Windows) | the Python that runs the terminal helper and the TUI |

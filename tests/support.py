@@ -1,5 +1,6 @@
 """Helpers shared by the tests: driving the store's run, and driving the UI."""
 
+import io
 from typing import List, Optional
 
 from reconix import store
@@ -73,7 +74,29 @@ def run_to(target: Optional[str], request: str = store.DEMO_REQUEST) -> None:
         decide(gate)
 
 
+def run_to_end() -> None:
+    """Decide every gate of a run that has already started, until it ends."""
+    while True:
+        gate = play_until_gate()
+        if gate is None:
+            return
+        decide(gate)
+
+
 # --- driving the UI ------------------------------------------------------------------------
+def screen_text(screen) -> str:
+    """Everything a screen or dialog shows in its Static widgets, as plain text."""
+    from rich.console import Console
+    from textual.widgets import Static
+
+    out = []
+    for static in screen.query(Static):
+        console = Console(file=io.StringIO(), width=120, force_terminal=False)
+        console.print(static.content)
+        out.append(console.file.getvalue())
+    return "\n".join(out)
+
+
 async def settle(pilot, rounds: int = 4) -> None:
     """Let screen switches, dialogs (pushed on the app's next turn) and redraws land."""
     for _ in range(rounds):
@@ -88,6 +111,17 @@ async def show(app, pilot, name: str) -> None:
 
 async def start_demo(pilot) -> None:
     """Enter on the empty Start prompt runs the demo request; it stops at the scope."""
+    await pilot.press("enter")
+    await settle(pilot)
+
+
+async def type_request(pilot, text: str) -> None:
+    """Type `text` into the prompt on screen and submit it with Enter."""
+    from reconix.widgets import PromptBox
+
+    box = pilot.app.screen.query_one(PromptBox)
+    box.input.value = text
+    box.input.focus()
     await pilot.press("enter")
     await settle(pilot)
 
@@ -124,9 +158,16 @@ async def pass_gate(app, pilot) -> str:
     return gate
 
 
-async def run_ui_to(app, pilot, target: Optional[str]) -> None:
-    """Start the demo run and pass gates with the keyboard until `target` is waiting."""
-    await start_demo(pilot)
+async def run_ui_to(app, pilot, target: Optional[str], request: Optional[str] = None) -> None:
+    """Start a run and pass gates with the keyboard until `target` is waiting.
+
+    No `request`: Enter on the empty Start prompt runs the demo. Otherwise `request` is typed
+    into the Start prompt and submitted.
+    """
+    if request is None:
+        await start_demo(pilot)
+    else:
+        await type_request(pilot, request)
     while store.waiting_gate() and store.waiting_gate() != target and not store.is_finished():
         await pass_gate(app, pilot)
     assert store.waiting_gate() == (target or "") or (target is None and store.is_finished())

@@ -7,7 +7,8 @@ whitespace, another host or port) is refused rather than guessed at.
 
 import ipaddress
 import posixpath
-from typing import Optional
+import re
+from typing import Optional, Tuple
 from urllib.parse import unquote, urlsplit
 
 DEFAULT_PORTS = {"http": 80, "https": 443}
@@ -66,33 +67,79 @@ def is_under(path: str, prefix: str) -> bool:
 
 
 # --- network and source targets (scope kinds other than HTTP) ----------------------------
+# A network request target is one host, optionally with a port: "192.0.2.10", "10.0.0.7:443",
+# "scanme.example.com:22". Excluded entries may also be a range ("10.0.0.0/28") and may name
+# a port. Ports are plain ASCII digits; anything else (spaces, "+22", "2_2", a range used
+# as a host) is malformed, so the text checked is the text that would run.
+_HOST_PORT = re.compile(r"(?P<host>[A-Za-z0-9.-]+)(?::(?P<port>[0-9]{1,5}))?", re.ASCII)
+_EXCLUDED = re.compile(r"(?P<host>[A-Za-z0-9.-]+(?:/[0-9]{1,2})?)(?::(?P<port>[0-9]{1,5}))?",
+                       re.ASCII)
+
+
+def _split(pattern, text: str) -> Optional[Tuple[str, Optional[int]]]:
+    """(host, port or None) when `text` is a well-formed entry, else None."""
+    found = pattern.fullmatch(text.strip())
+    if not found:
+        return None
+    port = int(found["port"]) if found["port"] else None
+    if port is not None and not 1 <= port <= 65535:
+        return None
+    return found["host"], port
+
+
+def network_entry(text: str) -> Optional[Tuple[str, Optional[int]]]:
+    """An excluded network entry as (host or range, port or None); None if malformed."""
+    entry = _split(_EXCLUDED, text)
+    if entry is None:
+        return None
+    host = entry[0]
+    if "/" in host:
+        try:
+            ipaddress.ip_network(host, strict=False)
+        except ValueError:
+            return None
+    return entry
+
+
 def host_port_reason(target: str, scope_target: str, allowed_ports: list, excluded: list) -> str:
-    """"" when a network target (host or host:port) is in scope, else why it is blocked."""
-    item = target.strip()
-    if any(item == e.strip() or item.startswith(e.strip() + ":") for e in excluded):
+    """"" when a network target (host or host:port) is in scope, else why it is blocked.
+
+    A target with no port (host discovery) only needs its host in scope.
+    """
+    parsed = _split(_HOST_PORT, target)
+    if parsed is None:
+        return "Malformed target"
+    host, port = parsed
+    if any(_excluded(entry, host, port) for entry in excluded):
         return "Host or port outside approved scope"
-    host, _, port_text = item.partition(":")
     if not _host_in_scope(host, scope_target):
         return "Host outside approved scope"
-    if port_text:
-        try:
-            port = int(port_text)
-        except ValueError:
-            return "Malformed target"
-        if allowed_ports and port not in allowed_ports:
-            return f"Port {port} not in the approved list"
+    if port is not None and allowed_ports and port not in allowed_ports:
+        return f"Port {port} not in the approved list"
     return ""
 
 
+def _excluded(entry: str, host: str, port: Optional[int]) -> bool:
+    """True when the excluded `entry` covers this host (and port, if the entry names one)."""
+    parsed = network_entry(entry)
+    if parsed is None:
+        return entry.strip().casefold() == host.casefold()   # unreadable: exact text only
+    spec, entry_port = parsed
+    if entry_port is not None and entry_port != port:
+        return False
+    return _host_in_scope(host, spec)
+
+
 def _host_in_scope(host: str, scope_target: str) -> bool:
+    """True when `host` (an address or hostname, never a range) is or is inside the target."""
     host = host.strip()
     base = scope_target.strip()
-    if not host:
+    if not host or "/" in host:
         return False
     try:
         address = ipaddress.ip_address(host)
     except ValueError:
-        return host.casefold() == base.casefold()   # a hostname: exact match
+        return "/" not in base and host.casefold() == base.casefold()   # a hostname: exact
     try:
         if "/" in base:
             return address in ipaddress.ip_network(base, strict=False)
@@ -102,7 +149,15 @@ def _host_in_scope(host: str, scope_target: str) -> bool:
 
 
 def repo_path_reason(target: str, excluded: list) -> str:
-    """"" when a repo-relative path is in scope, else why it is blocked."""
+    """"" when a repo-relative path is in scope, else why it is blocked.
+
+    The text is what a tool would open, so it must stay in the repository as written: no
+    "..", no "~" or drive/URL colon, no backslash. Normalizing "../../etc/passwd" to
+    "/etc/passwd" would judge a path that isn't the one that runs.
+    """
+    if (".." in target.replace("\\", "/").split("/") or ":" in target or "\\" in target
+            or target.strip().startswith("~")):
+        return "Path leaves the repository"
     try:
         path = canonical_path("/" + target.lstrip("/"), "file://repo")
     except TargetError as exc:

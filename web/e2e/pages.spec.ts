@@ -16,11 +16,25 @@ test("the overview counts what the files hold", async ({ page }) => {
   await expect(tile("Assessments")).toHaveText(String(data.length));
   await expect(tile("Findings")).toHaveText(String(findings.length));
   await expect(tile("Blocked by policy")).toHaveText(String(blocked));
-  for (const title of ["Findings by severity", "Findings per day", "Recent assessments", "Needs attention", "Top weakness categories", "Findings by template"]) {
+  const scores = findings.filter((f) => f.status === "open" && f.cvss_score > 0).map((f) => f.cvss_score);
+  await expect(tile("Highest CVSS")).toHaveText(scores.length ? Math.max(...scores).toFixed(1) : "—");
+  for (const title of [
+    "Live now",
+    "Findings by severity",
+    "Findings per day",
+    "Recent assessments",
+    "Needs attention",
+    "Top weakness categories",
+    "Findings by category",
+    "Findings by template",
+  ]) {
     await expect(page.getByRole("heading", { name: title })).toBeVisible();
   }
   const waiting = data.find((a) => a.status === "Awaiting input")!;
   await expect(page.getByText(`${waiting.label} waits for you`)).toBeVisible();
+  const live = page.getByRole("region", { name: "Live now" });
+  await expect(live.getByRole("link", { name: waiting.label })).toBeVisible();
+  await expect(live.getByText(`Waits for: ${waiting.waiting_for}`)).toBeVisible();
 });
 
 test("needs attention opens the runs that need it", async ({ page }) => {

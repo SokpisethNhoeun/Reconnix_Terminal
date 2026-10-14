@@ -382,6 +382,10 @@ def _scope_block(data: Dict[str, Any]) -> str:
     methods = "".join(f'<span class="chip">{esc(m)}</span>'
                       for m in scope.get("allowed_methods", []))
     tools = "".join(f'<span class="chip plain">{esc(t)}</span>' for t in scope.get("tools", []))
+    ports = "".join(f'<span class="chip">{esc(p)}</span>'
+                    for p in scope.get("allowed_ports", []))
+    ports_row = (f'<dt>Allowed ports</dt><dd><div class="chips">{ports}</div></dd>'
+                 if ports else "")
     return (
         '<dl class="kv">'
         f'<dt>Approval status</dt><dd>{approved}</dd>'
@@ -389,6 +393,7 @@ def _scope_block(data: Dict[str, Any]) -> str:
         f'<dt>Allowed actions</dt><dd><div class="chips">{actions}</div></dd>'
         f'<dt>Allowed methods</dt><dd><div class="chips">{methods}</div></dd>'
         f'<dt>Excluded paths</dt><dd><div class="chips">{excluded}</div></dd>'
+        + ports_row +
         f'<dt>Time limit</dt><dd>{esc(scope.get("time_limit_minutes", 0))} minutes</dd>'
         f'<dt>Tools</dt><dd><div class="chips">{tools}</div></dd>'
         '</dl>'

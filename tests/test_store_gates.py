@@ -130,7 +130,7 @@ def test_the_scope_tools_decide_the_login(tools, kind):
         assert store.current_auth_challenge().kind == expected
 
 
-def test_an_otp_only_challenge_stores_nothing():
+def test_a_cookie_login_is_stored_for_the_api_host():
     from .support import play_until_gate as _p
     store.start_run("test the API at https://api.example.com/v1")   # api → cookie
     assert _p() == "scope"                            # the URL picked the API template

@@ -9,7 +9,7 @@ value (an IPv4 octet over 255, a range wider than /16, a URL without a host) rai
 
 import ipaddress
 import re
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Union
 from urllib.parse import urlsplit
 
 from ..models.parser import ParsedTarget
@@ -39,6 +39,14 @@ def _clean(token: str) -> str:
 
 
 # --- single values -------------------------------------------------------------------------
+def as_network(text: str) -> Optional[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]]:
+    """`text` as an address range (a single address is a /32), or None for anything else."""
+    try:
+        return ipaddress.ip_network(text.strip(), strict=False)
+    except ValueError:
+        return None
+
+
 def ipv4(token: str) -> str:
     """A normalized IPv4 address or range ("10.0.0.5/24" -> "10.0.0.0/24"); raises if invalid."""
     if "/" in token:

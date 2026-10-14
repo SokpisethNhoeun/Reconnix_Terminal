@@ -6,8 +6,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { type Assessment, SEVERITIES } from "@/lib/data/schema";
-import { attentionItems } from "@/lib/data/stats";
-import { plural } from "@/lib/format";
+import { attentionItems, idleInterrupted } from "@/lib/data/stats";
+import { formatShort, plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 function Item({ icon, tone, title, children, href }: { icon: ReactNode; tone: string; title: string; children: string; href?: string }) {
@@ -64,7 +64,9 @@ export function NeedsAttention({ assessments, limit }: { assessments: Assessment
         }
         return (
           <Item key={a.uid} icon={<CircleSlash size={16} />} tone="tone-faint" title={`${a.label} was interrupted`} href={href}>
-            {`${a.target}: the terminal app closed before this run finished.`}
+            {idleInterrupted(a)
+              ? `${a.target}: no activity since ${formatShort(a.saved_at)}; the terminal app probably closed.`
+              : `${a.target}: the terminal app closed before this run finished.`}
           </Item>
         );
       })}

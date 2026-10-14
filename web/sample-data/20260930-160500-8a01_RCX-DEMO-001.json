@@ -183,7 +183,7 @@
   "findings": [
     {
       "id": "001",
-      "severity": "HIGH",
+      "severity": "MEDIUM",
       "title": "Broken object-level authorization",
       "path": "/v1/orders/{id}",
       "validation": "CONFIRMED",
@@ -200,7 +200,7 @@
         "GET /v1/orders/8842 as token A → HTTP 200",
         "owner: tenant_••7 · email: b•••@example.com"
       ],
-      "cvss_score": 7.1,
+      "cvss_score": 6.5,
       "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N",
       "category": "API",
       "cwe": [
@@ -212,7 +212,7 @@
       "cve": [],
       "status": "open",
       "severity_override": "",
-      "effective_severity": "HIGH",
+      "effective_severity": "MEDIUM",
       "triage_note": ""
     },
     {
@@ -439,7 +439,7 @@
       "type": "chat",
       "who": "reconix",
       "kind": "text",
-      "text": "Selected tools: Nuclei, Postman, ZAP API scan. Preparing requests with sample test data. Public surface first.",
+      "text": "Selected tools: Nuclei, Postman and ZAP API scan. Preparing requests with sample test data. Public surface first.",
       "tone": "default",
       "rows": []
     },
@@ -542,7 +542,7 @@
       "type": "chat",
       "who": "reconix",
       "kind": "card",
-      "text": "Scan · Nuclei + ZAP",
+      "text": "Scan · Nuclei, Postman and ZAP API scan",
       "tone": "default",
       "rows": [
         [

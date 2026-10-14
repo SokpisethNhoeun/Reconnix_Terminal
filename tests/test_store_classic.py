@@ -107,12 +107,15 @@ def test_filters_sorts_and_counts():
     run_to(None)
     ids = lambda rows: [f.fid for f in rows]                 # noqa: E731
     assert ids(store.find_findings()) == ["001", "002", "003"]
-    assert ids(store.find_findings("high_up")) == ["001"]
+    assert ids(store.find_findings("high_up")) == []       # the web demo has no HIGH finding
+    assert ids(store.find_findings("medium")) == ["001", "002"]
+    assert ids(store.find_findings("low")) == ["003"]
     assert ids(store.find_findings("confirmed")) == ["001"]
     assert ids(store.find_findings("needs_review")) == ["002", "003"]
     assert ids(store.find_findings("all", "cvss")) == ["001", "002", "003"]
     assert ids(store.find_findings("all", "validation")) == ["001", "002", "003"]
-    assert store.severity_counts() == {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 1, "LOW": 1,
+    assert ids(store.find_findings("all", "id")) == ["001", "002", "003"]
+    assert store.severity_counts() == {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 2, "LOW": 1,
                                        "INFO": 0}
     assert store.filter_counts()["all"] == 3
     with pytest.raises(store.StoreValidationError):

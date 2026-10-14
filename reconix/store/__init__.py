@@ -7,8 +7,9 @@ their bodies to call the API; the screens do not need to change.
 
 from .activity import add_feedback, current_operator, list_events, list_feedback, log_event
 from .approvals import (
-    approvals_count, approve, decision_for, decline_confirmation, get_approval, is_approved,
-    list_approval_decisions, needs_confirmation, reject, request_confirmation,
+    approvals_count, approve, can_edit, decision_for, decline_confirmation, edit_approval,
+    get_approval, is_approved, list_approval_decisions, needs_confirmation, reject,
+    request_confirmation,
 )
 from .assessment import (
     AssessmentCard, add_request, assessment_label, assessment_status, get_assessment,
@@ -78,7 +79,7 @@ __all__ = [
     "login_kind", "login_tools", "login_done", "code_needed", "tool_login", "tools_login",
     "get_approval", "needs_confirmation", "request_confirmation", "decline_confirmation",
     "approve", "reject", "is_approved", "decision_for", "list_approval_decisions",
-    "approvals_count",
+    "approvals_count", "can_edit", "edit_approval",
     # results
     "list_findings", "get_finding", "confirmed_count", "review_count",
     "findings_line", "import_findings", "SEVERITY_ORDER",

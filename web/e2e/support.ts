@@ -15,7 +15,8 @@ interface SampleAssessment {
   uid: string;
   label: string;
   status: string;
-  findings: { severity: string; validation: string; title: string }[];
+  waiting_for: string;
+  findings: { severity: string; validation: string; title: string; status: string; cvss_score: number }[];
   verdicts: { allowed: boolean }[];
   approvals: unknown[];
 }

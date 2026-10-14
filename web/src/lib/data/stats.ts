@@ -10,6 +10,7 @@ import {
   type Status,
   STATUSES,
   type TimelineEntry,
+  UNFINISHED,
 } from "./schema";
 
 export interface FindingRow extends Finding {
@@ -28,11 +29,41 @@ export interface ApprovalRow {
 
 export const isConfirmed = (f: Finding) => f.validation === "CONFIRMED";
 
+// --- analyst triage ----------------------------------------------------------------------
+
+const isSeverity = (s: string): s is Severity => (SEVERITIES as readonly string[]).includes(s);
+
+/** The analyst's severity when one was set, else the detected one (older files have neither). */
+export function effectiveSeverity(f: Finding): Severity {
+  const chosen = f.effective_severity || f.severity_override;
+  return isSeverity(chosen) ? chosen : f.severity;
+}
+
+/** Triage statuses that take a finding out of the open risk; anything else counts as open. */
+const CLOSED_TRIAGE: ReadonlySet<string> = new Set(["fixed", "accepted", "false-positive"]);
+
+export const isFalsePositive = (f: Finding) => f.status === "false-positive";
+export const isOpen = (f: Finding) => !CLOSED_TRIAGE.has(f.status);
+/** Still open and not confirmed: what the analyst has left to look at. */
+export const needsReview = (f: Finding) => isOpen(f) && !isConfirmed(f);
+
+export function triageCounts(findings: Finding[]): { open: number; fixed: number; accepted: number; falsePositive: number } {
+  return {
+    open: findings.filter(isOpen).length,
+    fixed: findings.filter((f) => f.status === "fixed").length,
+    accepted: findings.filter((f) => f.status === "accepted").length,
+    falsePositive: findings.filter(isFalsePositive).length,
+  };
+}
+
+/** The findings that were real (every one but the false positives). */
+const realFindings = (a: Assessment) => a.findings.filter((f) => !isFalsePositive(f));
+
 export function allFindings(list: Assessment[]): FindingRow[] {
   const rows = list.flatMap((a) => a.findings.map((f) => ({ ...f, key: `${a.uid}~${f.id}`, assessment: a })));
   return rows.sort(
     (x, y) =>
-      SEVERITIES.indexOf(x.severity) - SEVERITIES.indexOf(y.severity) ||
+      SEVERITIES.indexOf(effectiveSeverity(x)) - SEVERITIES.indexOf(effectiveSeverity(y)) ||
       y.assessment.created_at.localeCompare(x.assessment.created_at) ||
       x.id.localeCompare(y.id),
   );
@@ -40,7 +71,7 @@ export function allFindings(list: Assessment[]): FindingRow[] {
 
 export function severityCounts(findings: Finding[]): Record<Severity, number> {
   const counts = Object.fromEntries(SEVERITIES.map((s) => [s, 0])) as Record<Severity, number>;
-  for (const f of findings) counts[f.severity] += 1;
+  for (const f of findings) counts[effectiveSeverity(f)] += 1;
   return counts;
 }
 
@@ -72,8 +103,10 @@ export function approvalRows(list: Assessment[]): ApprovalRow[] {
   return rows;
 }
 
+/** The overview's numbers. Findings leave out false positives; review and CVSS count open ones. */
 export function overview(list: Assessment[]) {
-  const findings = list.flatMap((a) => a.findings);
+  const all = list.flatMap((a) => a.findings);
+  const findings = all.filter((f) => !isFalsePositive(f));
   const confirmed = findings.filter(isConfirmed).length;
   const approvals = approvalRows(list);
   return {
@@ -81,7 +114,10 @@ export function overview(list: Assessment[]) {
     byStatus: statusCounts(list),
     findings: findings.length,
     confirmed,
-    review: findings.length - confirmed,
+    review: all.filter(needsReview).length,
+    ...triageCounts(all),
+    cvss: cvssSummary(all.filter(isOpen)),
+    avgTestingMs: averageTestingMs(list),
     checks: list.reduce((n, a) => n + a.verdicts.length, 0),
     blocked: list.reduce((n, a) => n + blockedVerdicts(a).length, 0),
     granted: approvals.filter((r) => r.state === "APPROVED").length,
@@ -105,13 +141,14 @@ export interface DayCount {
   assessments: number;
 }
 
-/** Findings and assessments per day for the `days` days ending on `today` (oldest first). */
+/** Findings (false positives left out) and assessments per day for the `days` days ending
+    on `today` (oldest first). */
 export function perDay(list: Assessment[], days: number, today: Date): DayCount[] {
   const out: DayCount[] = [];
   for (let i = days - 1; i >= 0; i -= 1) {
     const key = localDay(new Date(today.getFullYear(), today.getMonth(), today.getDate() - i));
     const onDay = list.filter((a) => dayKey(a.created_at) === key);
-    out.push({ day: key, assessments: onDay.length, findings: onDay.reduce((n, a) => n + a.findings.length, 0) });
+    out.push({ day: key, assessments: onDay.length, findings: onDay.reduce((n, a) => n + realFindings(a).length, 0) });
   }
   return out;
 }
@@ -145,13 +182,14 @@ export function cvssSummary(findings: Finding[]): { max: number; avg: number; sc
   return { max: Math.max(...scores), avg: Math.round(avg * 10) / 10, scored: scores.length };
 }
 
+/** Assessments and their findings (false positives left out) per template. */
 export function byTemplate(list: Assessment[]): { name: string; assessments: number; findings: number }[] {
   const groups = new Map<string, { assessments: number; findings: number }>();
   for (const a of list) {
     const name = a.template.name || "Not chosen";
     const g = groups.get(name) ?? { assessments: 0, findings: 0 };
     g.assessments += 1;
-    g.findings += a.findings.length;
+    g.findings += realFindings(a).length;
     groups.set(name, g);
   }
   return [...groups.entries()]
@@ -167,6 +205,38 @@ export function durationMs(a: Assessment): number | null {
   return Number.isFinite(ms) && ms >= 0 ? ms : null;
 }
 
+/** Mean testing time of the completed runs, or null when none can be timed. */
+export function averageTestingMs(list: Assessment[]): number | null {
+  const times = list
+    .filter((a) => a.status === "Completed")
+    .map(durationMs)
+    .filter((ms): ms is number => ms !== null);
+  return times.length ? times.reduce((a, b) => a + b, 0) / times.length : null;
+}
+
+// --- run liveness ------------------------------------------------------------------------
+
+/** A run the TUI is playing now: it moves, or it waits for the operator. */
+export const isLive = (a: Assessment) => a.status === "Running" || a.status === "Awaiting input";
+
+/** How long an unfinished run may go without a save before it reads as interrupted. */
+export const STALE_AFTER_HOURS = 12;
+
+/** The TUI saves on every change, so an unfinished run whose file has not changed for
+    `afterMs` belongs to a TUI that was killed before it could mark the file closed (its
+    in-memory run can never continue). Read it as interrupted, like a closed session; if
+    the TUI is in fact still open, its next save brings the run back. `afterMs <= 0` turns
+    this off. */
+export function markIdle(a: Assessment, now: number, afterMs: number): Assessment {
+  if (afterMs <= 0 || a.session_closed || !UNFINISHED.has(a.status)) return a;
+  const saved = Date.parse(a.saved_at);
+  if (!Number.isFinite(saved) || now - saved <= afterMs) return a;
+  return { ...a, status: "Interrupted", waiting_gate: "", waiting_request_id: "", waiting_for: "" };
+}
+
+/** Interrupted because it went quiet (`markIdle`), not because the TUI quit during it. */
+export const idleInterrupted = (a: Assessment) => a.status === "Interrupted" && !a.session_closed;
+
 /** The Assessments page's "Needs attention" status filter: runs the operator should look at. */
 export const ATTENTION = "attention";
 const ATTENTION_STATUSES: ReadonlySet<Status> = new Set(["Awaiting input", "Stopped", "Interrupted"]);
@@ -178,7 +248,7 @@ export type AttentionItem =
 /** What needs the operator, one of each kind first (waiting, review, stopped, interrupted)
     so a short list still shows every kind, then the rest. `runs` counts the assessments. */
 export function attentionItems(list: Assessment[]): { items: AttentionItem[]; runs: number } {
-  const review = list.flatMap((a) => a.findings).filter((f) => !isConfirmed(f));
+  const review = list.flatMap((a) => a.findings).filter(needsReview);
   const runs = (kind: "waiting" | "stopped" | "interrupted", status: Status): AttentionItem[] =>
     list.filter((a) => a.status === status).map((assessment) => ({ kind, assessment }));
   const groups: AttentionItem[][] = [

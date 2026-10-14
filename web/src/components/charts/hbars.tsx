@@ -1,6 +1,7 @@
-/* Horizontal bars in recessed tracks, drawn to one scale (the largest row fills the
-   track). Every row is labeled in text, and the value sits at the end in text color; the
-   bar color only repeats what the label says. */
+/* Horizontal bars in recessed tracks, drawn to one scale: the largest row fills the track,
+   or `max` does (e.g. 100 for percentages, with `unit="%"`). Every row is labeled in text,
+   and the value sits at the end in text color; the bar color only repeats what the label
+   says. */
 import type { Severity } from "@/lib/data/schema";
 import { cn } from "@/lib/utils";
 
@@ -15,8 +16,16 @@ export interface BarRow {
   tip: string;
 }
 
-export function HBars({ rows, wide, label }: { rows: BarRow[]; wide?: boolean; label: string }) {
-  const max = Math.max(1, ...rows.map((r) => r.value));
+interface HBarsProps {
+  rows: BarRow[];
+  wide?: boolean;
+  label: string;
+  max?: number;
+  unit?: string;
+}
+
+export function HBars({ rows, wide, label, max: fixed, unit = "" }: HBarsProps) {
+  const max = Math.max(1, fixed ?? Math.max(...rows.map((r) => r.value)));
   return (
     <ul className="m-0 flex list-none flex-col gap-3 p-0" aria-label={label}>
       {rows.map((row) => (
@@ -32,11 +41,14 @@ export function HBars({ rows, wide, label }: { rows: BarRow[]; wide?: boolean; l
             {row.value > 0 && (
               <span
                 className={cn(row.severity ? `fill-tone sev-${row.severity}` : "fill-tone tone-accent")}
-                style={{ width: `${(row.value / max) * 100}%` }}
+                style={{ width: `${Math.min(1, row.value / max) * 100}%` }}
               />
             )}
           </span>
-          <span className="text-right font-mono text-[13px] font-semibold tabular-nums">{row.value}</span>
+          <span className="text-right font-mono text-[13px] font-semibold tabular-nums">
+            {row.value}
+            {unit}
+          </span>
         </li>
       ))}
     </ul>

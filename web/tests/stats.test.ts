@@ -6,16 +6,25 @@ import {
   allFindings,
   approvalRows,
   attentionItems,
+  averageTestingMs,
   byTemplate,
   categoryCounts,
   cvssSummary,
   durationMs,
+  effectiveSeverity,
   filterAssessments,
+  idleInterrupted,
+  isConfirmed,
+  isLive,
+  isOpen,
   labelTimeline,
+  markIdle,
+  needsReview,
   overview,
   perDay,
   severityCounts,
   topReferences,
+  triageCounts,
   waitingApproval,
 } from "@/lib/data/stats";
 import { readFileSync } from "node:fs";
@@ -207,5 +216,110 @@ describe("weakness categories and CVSS", () => {
     } else {
       expect(summary).toEqual({ max: 0, avg: 0, scored: 0 });
     }
+  });
+});
+
+describe("analyst triage", () => {
+  // the sample findings with three of them triaged: a false positive, a fixed and an accepted one
+  const [fp, fixed, accepted] = findings;
+  const triaged = list.map((a) => ({
+    ...a,
+    findings: a.findings.map((f) =>
+      f === fp ? { ...f, status: "false-positive" } : f === fixed ? { ...f, status: "fixed" } : f === accepted ? { ...f, status: "accepted" } : f,
+    ),
+  }));
+  const all = triaged.flatMap((a) => a.findings);
+
+  it("uses the analyst's severity when one is set", () => {
+    const f = findings.find((x) => x.severity !== "CRITICAL")!;
+    expect(effectiveSeverity({ ...f, effective_severity: "CRITICAL" })).toBe("CRITICAL");
+    expect(effectiveSeverity({ ...f, effective_severity: "", severity_override: "CRITICAL" })).toBe("CRITICAL");
+    expect(effectiveSeverity({ ...f, effective_severity: "", severity_override: "" })).toBe(f.severity); // older files
+    expect(effectiveSeverity({ ...f, effective_severity: "SEVERE" })).toBe(f.severity);
+  });
+
+  it("sorts and counts by the analyst's severity", () => {
+    const low = findings.find((x) => x.severity === "LOW")!;
+    const raised = list.map((a) => ({ ...a, findings: a.findings.map((f) => (f === low ? { ...f, effective_severity: "CRITICAL" } : f)) }));
+    expect(allFindings(raised)[0].id).toBe(low.id);
+    expect(severityCounts(raised.flatMap((a) => a.findings)).CRITICAL).toBe(severityCounts(findings).CRITICAL + 1);
+  });
+
+  it("counts triage statuses; unknown ones count as open", () => {
+    expect(triageCounts(all)).toEqual({ open: findings.length - 3, fixed: 1, accepted: 1, falsePositive: 1 });
+    expect(isOpen({ ...fp, status: "in-progress" })).toBe(true);
+  });
+
+  it("leaves triaged findings out of review", () => {
+    expect(needsReview({ ...fp, validation: "UNCONFIRMED", status: "fixed" })).toBe(false);
+    expect(needsReview({ ...fp, validation: "UNCONFIRMED", status: "open" })).toBe(true);
+    expect(needsReview({ ...fp, validation: "CONFIRMED", status: "open" })).toBe(false);
+  });
+
+  it("overview: false positives left out, review and CVSS from open findings", () => {
+    const stats = overview(triaged);
+    const open = all.filter(isOpen);
+    expect(stats.findings).toBe(findings.length - 1);
+    expect(stats.confirmed).toBe(all.filter((f) => f.status !== "false-positive" && isConfirmed(f)).length);
+    expect(stats.open).toBe(findings.length - 3);
+    expect(stats.review).toBe(open.filter((f) => !isConfirmed(f)).length);
+    expect(stats.cvss).toEqual(cvssSummary(open));
+  });
+
+  it("per day and per template leave false positives out", () => {
+    const today = new Date(2026, 9, 5, 18);
+    const sum = (rows: { findings: number }[]) => rows.reduce((n, r) => n + r.findings, 0);
+    expect(sum(byTemplate(triaged))).toBe(findings.length - 1);
+    expect(sum(perDay(triaged, 30, today))).toBe(sum(perDay(list, 30, today)) - 1);
+  });
+
+  it("needs attention counts the findings still for review", () => {
+    const review = attentionItems(triaged).items.find((i) => i.kind === "review");
+    expect(review && review.kind === "review" && review.count).toBe(all.filter(needsReview).length);
+  });
+});
+
+describe("stale runs", () => {
+  const HOURS_12 = 12 * 3_600_000;
+  const waiting = list.find((a) => a.status === "Awaiting input")!;
+  const saved = Date.parse(waiting.saved_at);
+
+  it("keeps a run that saved within the limit", () => {
+    expect(markIdle(waiting, saved + HOURS_12, HOURS_12)).toBe(waiting);
+  });
+
+  it("reads a run that went quiet as interrupted, with nothing left pending", () => {
+    const idle = markIdle(waiting, saved + HOURS_12 + 1, HOURS_12);
+    expect(idle.status).toBe("Interrupted");
+    expect([idle.waiting_gate, idle.waiting_request_id, idle.waiting_for]).toEqual(["", "", ""]);
+    expect(waitingApproval(idle)).toBeNull();
+    expect(approvalRows([idle]).some((r) => r.state === "PENDING")).toBe(false);
+    expect(idleInterrupted(idle)).toBe(true);
+    expect(isLive(idle)).toBe(false);
+  });
+
+  it("leaves finished, closed and undated runs alone, and can be turned off", () => {
+    const later = saved + 30 * HOURS_12;
+    for (const done of list.filter((a) => a.status === "Completed" || a.status === "Stopped")) {
+      expect(markIdle(done, later, HOURS_12)).toBe(done);
+    }
+    const closed = { ...waiting, session_closed: true };
+    expect(markIdle(closed, later, HOURS_12)).toBe(closed);
+    const undated = { ...waiting, saved_at: "not a date" };
+    expect(markIdle(undated, later, HOURS_12)).toBe(undated);
+    expect(markIdle(waiting, later, 0)).toBe(waiting);
+  });
+
+  it("tells a quiet run from one the TUI quit during", () => {
+    expect(idleInterrupted({ ...waiting, status: "Interrupted", session_closed: true })).toBe(false);
+    expect(list.filter(isLive).every((a) => a.status === "Running" || a.status === "Awaiting input")).toBe(true);
+  });
+});
+
+describe("average testing time", () => {
+  it("averages the completed runs only", () => {
+    const done = list.filter((a) => a.status === "Completed").map(durationMs) as number[];
+    expect(averageTestingMs(list)).toBe(done.reduce((a, b) => a + b, 0) / done.length);
+    expect(averageTestingMs(list.filter((a) => a.status !== "Completed"))).toBeNull();
   });
 });

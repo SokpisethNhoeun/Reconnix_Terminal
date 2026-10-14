@@ -13,7 +13,7 @@
     "confirmed": true
   },
   "operator": "analyst",
-  "client": "2",
+  "client": "192.0.2.10",
   "mode": "Grey-box, Authorized",
   "methodology": [
     "NIST SP 800-115",
@@ -435,7 +435,7 @@
       "type": "chat",
       "who": "reconix",
       "kind": "text",
-      "text": "Selected tools: nmap, testssl.sh. Preparing requests with sample test data. Public surface first.",
+      "text": "Selected tools: nmap and testssl.sh. Preparing requests with sample test data. Public surface first.",
       "tone": "default",
       "rows": []
     },
@@ -561,7 +561,7 @@
       "type": "chat",
       "who": "reconix",
       "kind": "text",
-      "text": "Management console on 8443 may accept weak credentials. Proposing a single, controlled login check.",
+      "text": "The management console may accept weak credentials. Proposing a single, controlled login check.",
       "tone": "default",
       "rows": []
     },

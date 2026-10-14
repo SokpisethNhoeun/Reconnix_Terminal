@@ -3,7 +3,8 @@
 These make `RunStep`s readable. The generic run is assembled in `templates/base.py`
 from a per-template `RunProfile`; each template module (`templates/<kind>.py`) fills
 that profile. No real scanning happens — the steps are illustrative. Step text may use
-`$assessment`, `$target`, `$template` and `$findings` (substituted in `run._fill`).
+`$assessment`, `$target`, `$template`, `$picked`, `$findings`, `$login_need`, `$tools` (the
+approved tools) and `$tool` (the step's `tool`, or an approved one); `run._fill` fills them.
 """
 
 from dataclasses import replace
@@ -25,12 +26,14 @@ def check(text: str, first: bool = False) -> RunStep:
                    entry="check", pause=0.5)
 
 
-def card(title: str, *rows: Tuple[str, str]) -> RunStep:
-    return RunStep("card", speaker="reconix", text=title, rows=tuple(rows), pause=0.6)
+def card(title: str, *rows: Tuple[str, str], tool: str = "") -> RunStep:
+    return RunStep("card", speaker="reconix", text=title, rows=tuple(rows), pause=0.6,
+                   tool=tool)
 
 
-def log(source: str, text: str, tone: str = "default", pause: float = 0.4) -> RunStep:
-    return RunStep("log", source=source, text=text, tone=tone, pause=pause)
+def log(source: str, text: str, tone: str = "default", pause: float = 0.4,
+        tool: str = "") -> RunStep:
+    return RunStep("log", source=source, text=text, tone=tone, pause=pause, tool=tool)
 
 
 def gate(name: str) -> RunStep:
