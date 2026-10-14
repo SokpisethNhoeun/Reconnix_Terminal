@@ -8,6 +8,9 @@ dependencies = [
     "rich>=13.7",
     "websockets>=13",
     "pywinpty>=2.0.14; sys_platform == 'win32'",
+    "litellm>=1.40",          # flexible LLM: unified model interface
+    "cryptography>=42",       # flexible LLM: Fernet-encrypted API keys
+    "python-dotenv>=1.0",     # flexible LLM: load .env
 ]
 
 [project.scripts]
@@ -19,9 +22,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = [
-    "reconix", "reconix.commands", "reconix.flow", "reconix.models", "reconix.screens",
-    "reconix.screens.forms", "reconix.shell", "reconix.store", "reconix.store.importers",
-    "reconix.store.templates", "reconix.webterm", "reconix.widgets",
+    "reconix", "reconix.commands", "reconix.flow", "reconix.llm", "reconix.models",
+    "reconix.screens", "reconix.screens.forms", "reconix.shell", "reconix.store",
+    "reconix.store.importers", "reconix.store.templates", "reconix.webterm", "reconix.widgets",
 ]
 
 [tool.setuptools.package-data]

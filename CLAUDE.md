@@ -60,14 +60,21 @@ reconix/
 │   ├── run_host.py   # hosts RunController; refresh_view, open_gate (deferral), resume_run
 │   ├── actions.py    # submit_request, template/scope/plan decisions, new / switch assessment
 │   ├── dialogs.py    # assessments, triage, import, export, audit, summary
+│   ├── llm.py        # /provider and /model: menus, ProviderForm, tests in a worker
+│   ├── agent.py      # agent mode: /assess drives the backend harness, streams events
 │   └── web.py        # /web: open the dashboard, starting it in the background if needed
 ├── flow/             # RunController (plays store steps), gates.py (gate → screen), phases
+├── llm/              # flexible LLM (no UI, no store.lists): config, crypto (Fernet),
+│                     #   db (sqlite3), catalog (6 providers), client (LiteLLM), guardrail
 ├── commands/         # registry.py (Command: choices, ask, empty) + builtin.py (COMMANDS)
 ├── models/           # dataclasses: Assessment, RunState/RunStep/PlanRow, ScopeManifest, …
 ├── store/            # the only backend seam; public functions in store/__init__.py
 │   ├── run.py        # start, advance (gates), run_plan, reject_scope, stop_run, phases
 │   ├── templates/    # per-template scope, plan, approvals, findings, script (base.py builds)
 │   ├── scope.py / policy.py / approvals.py / vault.py    # enforcement lives here
+│   ├── providers.py / llm_chat.py    # the LLM seam: configure/test/pick a model (providers.py);
+│   │                                 #   turn a chat line into a model reply (llm_chat.py)
+│   ├── agent_run.py  # the harness seam: drive backend/ Agent.chat; switch_model keeps history
 │   ├── plan.py / progress.py / findings_view.py          # what the classic screens show
 │   └── report*.py / snapshot.py / persist.py             # exports; saved copies for web/
 ├── theme.py          # color tokens; CSS_TOKENS feed the stylesheet's $variables
@@ -102,6 +109,22 @@ How the pieces connect:
 - **`RunController`** (`flow/controller.py`) holds no data: it `peek()`s the next step,
   waits `step.pause × SPEED`, calls `store.advance()`, then asks its host to redraw or
   open a gate. With the backend wired, `advance()` becomes the server's event stream.
+- **The LLM seam** (`store/providers.py`, `store/llm_chat.py` over `reconix/llm/`): a chat
+  line typed *during a run* goes to the active model (LiteLLM), with a fixed `SYSTEM_PROMPT`,
+  the assessment state as context and the full history — all redacted. The model proposes
+  narrative only; it has no tools and no path to a decision function. Providers, the active
+  model and chat history live in one Fernet-encrypted SQLite file (`~/.reconix/llm.db`); the
+  key lives in `~/.reconix/llm.key` (0600) and never enters env/logs/snapshots. With no
+  active model, or on any `LLMError`, `run.llm_answer` falls back to the built-in reply, so
+  the offline demo and existing tests keep working.
+- **The harness seam** (`store/agent_run.py` over `backend/harness/`): when a `/model` is
+  active, `/assess <target>` hands the whole assessment to the harness `Agent` (plan → real
+  Kali-MCP scans → analyze), run in a worker; its streamed events render into the chat and
+  activity log. The agent's LLM is Reconix's active provider (LiteLLM), set before each turn;
+  `switch_model()` swaps only the client and keeps `Agent.history`, so a mid-assessment model
+  switch preserves context. `/provider` + `/model` are the whole app's LLM control plane (the
+  unified `LLM_*` env seeds the default `reconix` provider). Without a model/harness, the
+  scripted demo runs — so the existing tests and offline demo are unaffected.
 - **Saved copies for `web/`**: `persist.autosave` writes `snapshot()` (secrets removed) to
   `~/.reconix/assessments/` (`RECONIX_DATA_DIR`). The dashboard validates those files with
   `web/src/lib/data/schema.ts`: change it together with `store/snapshot.py`, then rerun
