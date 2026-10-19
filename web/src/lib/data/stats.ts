@@ -12,6 +12,7 @@ import {
   type TimelineEntry,
   UNFINISHED,
 } from "./schema";
+import { matchesTemplateType } from "../templates";
 
 export interface FindingRow extends Finding {
   key: string; // unique across assessments: "<uid>~<finding id>"
@@ -263,6 +264,33 @@ export function attentionItems(list: Assessment[]): { items: AttentionItem[]; ru
   };
 }
 
+/** The dashboard "Needs attention" feed: decisions the operator owes first (runs waiting in
+    the TUI), then the open critical and high findings still to review, worst first. */
+export type FeedItem = { kind: "decision"; assessment: Assessment } | { kind: "finding"; finding: FindingRow };
+
+const REVIEW_SEVERITIES: ReadonlySet<Severity> = new Set(["CRITICAL", "HIGH"]);
+
+export function attentionFeed(list: Assessment[]): FeedItem[] {
+  const decisions: FeedItem[] = list
+    .filter((a) => a.status === "Awaiting input")
+    .map((a) => ({ kind: "decision", assessment: a }));
+  const reviews: FeedItem[] = allFindings(list)
+    .filter((f) => needsReview(f) && REVIEW_SEVERITIES.has(effectiveSeverity(f)))
+    .map((f) => ({ kind: "finding", finding: f }));
+  return [...decisions, ...reviews];
+}
+
+/** The strongest severity present in an assessment's real findings (false positives left
+    out), with how many sit at it; null when nothing real was found yet. */
+export function highestSeverity(a: Assessment): { severity: Severity; count: number } | null {
+  const real = realFindings(a);
+  for (const severity of SEVERITIES) {
+    const count = real.filter((f) => effectiveSeverity(f) === severity).length;
+    if (count) return { severity, count };
+  }
+  return null;
+}
+
 /** The timeline with one who-label per entry (an empty chat speaker continues the one above). */
 export function labelTimeline(entries: TimelineEntry[]): { entry: TimelineEntry; who: string }[] {
   const out: { entry: TimelineEntry; who: string }[] = [];
@@ -283,7 +311,7 @@ export function filterAssessments(list: Assessment[], f: AssessmentFilter, now: 
   return list.filter(
     (a) =>
       (!text || `${a.label} ${a.target} ${a.target_url}`.toLowerCase().includes(text)) &&
-      (!f.template || f.template === "all" || a.template.name === f.template) &&
+      (!f.template || f.template === "all" || a.template.name === f.template || matchesTemplateType(a.template.name, f.template)) &&
       (!f.status || f.status === "all" || (f.status === ATTENTION ? ATTENTION_STATUSES.has(a.status) : a.status === f.status)) &&
       !(days > 0 && !(now - Date.parse(a.created_at) <= days * 86_400_000)), // unparseable dates drop out
   );

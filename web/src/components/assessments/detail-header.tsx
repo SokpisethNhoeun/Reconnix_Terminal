@@ -1,11 +1,12 @@
 /* The head of one assessment: id, status, the Export menu, facts, the waiting/stopped notice
    and the tabs. */
-import { ArrowLeft, CircleSlash, SquareTerminal, TriangleAlert } from "lucide-react";
+import { ArrowLeft, CircleSlash, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
 import type { Assessment } from "@/lib/data/schema";
 import { durationMs, idleInterrupted } from "@/lib/data/stats";
 import { formatDateTime, formatDuration, formatShort } from "@/lib/format";
+import { templateLabel } from "@/lib/templates";
 
 import { StatusChip } from "../neu/chips";
 import { Notice } from "../neu/notice";
@@ -23,7 +24,7 @@ const LOGIN: Record<string, string> = {
 export function DetailHeader({ assessment: a, tabs }: { assessment: Assessment; tabs: Segment[] }) {
   const facts: [string, string, boolean?][] = [
     ["Target", a.target || "—", true],
-    ["Template", a.template.name || "not chosen"],
+    ["Template", a.template.name ? templateLabel(a.template.name) : "not chosen"],
     ["Started", formatDateTime(a.created_at)],
     ["Duration", formatDuration(durationMs(a))],
     ["Operator", a.operator],
@@ -55,12 +56,6 @@ export function DetailHeader({ assessment: a, tabs }: { assessment: Assessment; 
           ))}
         </dl>
       </div>
-      {a.status === "Awaiting input" && (
-        <Notice icon={<SquareTerminal size={18} />} tone="warn">
-          <b className="font-semibold">Waiting in the terminal app:</b> {a.waiting_for || "a decision"}. Decide it there; this
-          page updates by itself.
-        </Notice>
-      )}
       {a.status === "Stopped" && (
         <Notice icon={<TriangleAlert size={18} />} tone="bad">
           <b className="font-semibold">Stopped:</b> {a.stopped_reason || "the run ended early"}. Nothing ran after that.

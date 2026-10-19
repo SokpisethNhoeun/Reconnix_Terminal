@@ -1,18 +1,17 @@
-/* Findings from every assessment, with severity / validation filters and search, 10 to a
-   page. The selected finding (`f`) opens in the detail card. Severity is the analyst's when
-   set, and "For review" means open and not confirmed, the same rules as the overview. */
+/* Findings from every assessment: severity tiles that double as filters, a status filter and
+   search, then the table, 10 to a page. Each row opens the finding's own page. Severity is
+   the analyst's when set; "Need review" means open and not confirmed, as on the dashboard. */
 import { Search } from "lucide-react";
 import type { Metadata } from "next";
 
-import { HBars } from "@/components/charts/hbars";
-import { FindingDetail } from "@/components/findings/finding-detail";
 import { FindingsTable } from "@/components/findings/findings-table";
+import { SeverityCards } from "@/components/findings/severity-cards";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/neu/card";
 import { Pager } from "@/components/neu/pager";
 import { SegmentedLinks } from "@/components/neu/segmented";
 import { Input } from "@/components/ui/input";
-import { allFindings, categoryCounts, cvssSummary, effectiveSeverity, isConfirmed, isFalsePositive, needsReview } from "@/lib/data/stats";
+import { allFindings, effectiveSeverity, isConfirmed, isFalsePositive, needsReview, severityCounts } from "@/lib/data/stats";
 import { loadLibrary } from "@/lib/data/store";
 import { plural } from "@/lib/format";
 import { pageNumber, pageParam, paginate } from "@/lib/pagination";
@@ -20,121 +19,84 @@ import { param, query } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Findings" };
 
-const SEVERITY_FILTERS = [
+type View = "all" | "review" | "confirmed" | "false-positive" | "fixed";
+
+const VIEWS: { id: View; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "CRITICAL", label: "Critical" },
-  { id: "HIGH", label: "High" },
-  { id: "MEDIUM", label: "Medium" },
-  { id: "LOW", label: "Low" },
-  { id: "INFO", label: "Info" },
-];
-const VALIDATION_FILTERS = [
-  { id: "all", label: "Any" },
+  { id: "review", label: "Need review" },
   { id: "confirmed", label: "Confirmed" },
-  { id: "review", label: "For review" },
+  { id: "false-positive", label: "False positive" },
+  { id: "fixed", label: "Fixed" },
 ];
+
+const matchesView = (f: Parameters<typeof isConfirmed>[0], view: View): boolean => {
+  if (view === "review") return needsReview(f);
+  if (view === "confirmed") return isConfirmed(f);
+  if (view === "false-positive") return isFalsePositive(f);
+  if (view === "fixed") return f.status === "fixed";
+  return true;
+};
 
 export default async function FindingsPage(props: PageProps<"/findings">) {
   const sp = await props.searchParams;
   const sev = param(sp.sev) || "all";
-  const val = param(sp.val) || "all";
+  const view = (VIEWS.some((v) => v.id === param(sp.view)) ? param(sp.view) : "all") as View;
   const q = param(sp.q).slice(0, 100);
   const { assessments } = await loadLibrary();
   const all = allFindings(assessments);
-  const present = new Set(all.map(effectiveSeverity));
   const text = q.trim().toLowerCase();
   const rows = all.filter(
     (f) =>
       (sev === "all" || effectiveSeverity(f) === sev) &&
-      (val === "all" || (val === "confirmed" ? isConfirmed(f) : needsReview(f))) &&
-      (!text || `${f.title} ${f.path} ${f.assessment.target} ${f.references.join(" ")} ${f.tool}`.toLowerCase().includes(text)),
+      matchesView(f, view) &&
+      (!text || `${f.title} ${f.path} ${f.assessment.target} ${f.assessment.label} ${f.references.join(" ")} ${f.tool}`.toLowerCase().includes(text)),
   );
   const page = paginate(rows, pageNumber(param(sp.page)));
-  const selected = rows.find((f) => f.key === param(sp.f)) ?? page.items[0];
-  const current = { sev, val, q };
-  const onPage = { ...current, page: pageParam(page.page) };
+  const current = { sev, view, q };
+
   const withAssessments = new Set(all.map((f) => f.assessment.uid)).size;
-  const categories = categoryCounts(all);
-  const cvss = cvssSummary(all);
-  // counted like the overview's Findings tile (false positives left out), though still listed
-  const falsePositives = all.filter(isFalsePositive).length;
   const real = all.filter((f) => !isFalsePositive(f));
+  const confirmed = all.filter(isConfirmed).length;
+  const review = all.filter(needsReview).length;
+  const viewCount = (v: View) => all.filter((f) => matchesView(f, v)).length;
 
   return (
     <>
       <PageHeader
         title="Findings"
-        sub={
-          `${plural(real.length, "finding")} from ${plural(withAssessments, "assessment")} · ${real.filter(isConfirmed).length} confirmed` +
-          (falsePositives ? ` · ${plural(falsePositives, "false positive")} also listed` : "")
-        }
+        sub={`${plural(real.length, "finding")} from ${plural(withAssessments, "assessment")} · ${confirmed} confirmed · ${review} need review · most severe first`}
       />
+
       {all.length > 0 && (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(260px,1fr)]">
-          <Card title="Weakness categories" hint={plural(all.length, "finding")}>
-            <HBars
-              label="Findings by weakness category"
-              rows={categories.map((c) => ({ key: c.name, label: c.name, value: c.count, tip: `${c.count} · ${c.name}` }))}
-            />
-          </Card>
-          <Card title="CVSS" hint="base scores">
-            <div className="flex flex-wrap gap-x-8 gap-y-3">
-              {[
-                ["highest", cvss.max],
-                ["average", cvss.avg],
-                ["scored", cvss.scored],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <div className="text-[30px] font-semibold leading-tight tabular-nums">
-                    {label === "scored" ? value : (value as number).toFixed(1)}
-                  </div>
-                  <div className="text-xs text-muted">{label}</div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
+        <SeverityCards counts={severityCounts(all)} current={sev} hrefFor={(s) => `/findings${query({ ...current, sev: s, page: undefined })}`} />
       )}
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">
-        <Card>
-          <div className="flex flex-wrap items-center gap-3">
-            <SegmentedLinks
-              label="Severity"
-              items={SEVERITY_FILTERS.filter((s) => s.id === "all" || present.has(s.id as never)).map((s) => ({
-                label: s.label,
-                href: `/findings${query({ ...current, sev: s.id })}`,
-                current: sev === s.id,
-              }))}
-            />
-            <SegmentedLinks
-              label="Validation"
-              items={VALIDATION_FILTERS.map((v) => ({ label: v.label, href: `/findings${query({ ...current, val: v.id })}`, current: val === v.id }))}
-            />
-            <form method="get" action="/findings" className="relative">
-              {sev !== "all" && <input type="hidden" name="sev" value={sev} />}
-              {val !== "all" && <input type="hidden" name="val" value={val} />}
-              <label htmlFor="finding-search" className="sr-only-x">
-                Search findings
-              </label>
-              <Search
-                size={16}
-                aria-hidden
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-              />
-              <Input
-                id="finding-search"
-                name="q"
-                defaultValue={q}
-                placeholder="Search title, path, CWE"
-                className="w-56 pl-9"
-              />
-            </form>
-          </div>
-          <FindingsTable rows={page.items} selected={selected?.key} showAssessment hrefFor={(f) => `/findings${query({ ...onPage, f: f.key })}`} />
-          <Pager page={page} label="Finding pages" hrefFor={(n) => `/findings${query({ ...current, page: pageParam(n) })}`} />
-        </Card>
-        <FindingDetail finding={selected} />
-      </div>
+
+      <Card>
+        <div className="flex flex-wrap items-center gap-3">
+          <form method="get" action="/findings" className="relative grow sm:max-w-sm">
+            {sev !== "all" && <input type="hidden" name="sev" value={sev} />}
+            {view !== "all" && <input type="hidden" name="view" value={view} />}
+            <label htmlFor="finding-search" className="sr-only-x">
+              Search findings
+            </label>
+            <Search size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+            <Input id="finding-search" name="q" defaultValue={q} placeholder="Search title, target, CWE or CVE" className="pl-9" />
+          </form>
+          <SegmentedLinks
+            label="Status"
+            items={VIEWS.map((v) => ({
+              label: `${v.label} ${viewCount(v.id)}`,
+              href: `/findings${query({ ...current, view: v.id, page: undefined })}`,
+              current: view === v.id,
+            }))}
+          />
+        </div>
+        <FindingsTable rows={page.items} />
+        <Pager page={page} label="Finding pages" hrefFor={(n) => `/findings${query({ ...current, page: pageParam(n) })}`} />
+        <p className="text-[12.5px] text-muted">
+          Showing {page.items.length} of {plural(rows.length, "finding")} · click a row to open the finding details · duplicates are merged into one finding
+        </p>
+      </Card>
     </>
   );
 }

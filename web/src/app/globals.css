@@ -312,6 +312,201 @@ h3 {
     font-size: 13.5px;
   }
 
+  /* --- dashboard: stat cards, badges, attention feed, severity donut ------------------- */
+  .kpi-link {
+    position: relative;
+    text-decoration: none;
+    transition: box-shadow 0.2s ease;
+  }
+  .kpi-link:hover {
+    box-shadow: var(--raise), 0 0 0 1px color-mix(in oklab, var(--accent) 45%, var(--line));
+  }
+  .kpi-urgent {
+    background:
+      radial-gradient(75% 85% at 100% 0%, color-mix(in oklab, var(--high) 14%, transparent), transparent 70%),
+      var(--card);
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--high) 45%, transparent),
+      0 0 32px -10px color-mix(in oklab, var(--high) 45%, transparent);
+  }
+  .kpi-urgent::before {
+    background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--high) 60%, transparent), transparent);
+    opacity: 0.6;
+  }
+  .kpi-urgent:hover {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--high) 60%, transparent),
+      0 0 36px -8px color-mix(in oklab, var(--high) 55%, transparent);
+  }
+  .kpi-urgent .kpi-value {
+    color: var(--high);
+  }
+  .kpi-go {
+    position: absolute;
+    right: 16px;
+    bottom: 15px;
+    color: var(--faint);
+    transition: color 0.2s ease, transform 0.2s ease;
+  }
+  .kpi-link:hover .kpi-go {
+    color: var(--accent);
+    transform: translateX(2px);
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font: 600 10px var(--font-code), monospace;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background: color-mix(in oklab, var(--tone, var(--accent)) 20%, transparent);
+    color: var(--tone, var(--accent));
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tone, var(--accent)) 35%, transparent);
+  }
+  .badge.badge-solid {
+    background: var(--tone, var(--accent));
+    color: var(--bg);
+    box-shadow: none;
+  }
+  .feed-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 11px 14px;
+  }
+  .feed-badge {
+    flex: none;
+    display: inline-flex;
+    min-width: 76px;
+  }
+  /* --- AI Assistant (mock chat) -------------------------------------------------------- */
+  .ring-accent {
+    box-shadow: var(--raise), 0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent);
+  }
+  .chat-you {
+    align-self: flex-end;
+    max-width: 80%;
+    padding: 11px 16px;
+    border-radius: 14px 14px 4px 14px;
+    background: var(--accent-wash);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent);
+    font-size: 13.5px;
+  }
+  .flow-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    white-space: nowrap;
+  }
+  .flow-step > i {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    flex: none;
+    font: 600 11px var(--font-code), monospace;
+    color: var(--faint);
+    box-shadow: inset 0 0 0 1.5px var(--line);
+  }
+  .flow-step.done > i {
+    color: var(--accent-ink);
+    background: var(--accent);
+    box-shadow: none;
+  }
+  .flow-step.active > i {
+    color: var(--warn);
+    box-shadow: inset 0 0 0 1.5px var(--warn), 0 0 0 4px color-mix(in oklab, var(--warn) 18%, transparent);
+    background: color-mix(in oklab, var(--warn) 20%, transparent);
+  }
+  .flow-line {
+    flex: 1 1 14px;
+    min-width: 14px;
+    height: 1px;
+    background: var(--line);
+  }
+  .banner-warn {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 18px;
+    border-radius: 12px;
+    background:
+      radial-gradient(60% 120% at 0% 0%, color-mix(in oklab, var(--warn) 12%, transparent), transparent 70%),
+      color-mix(in oklab, var(--warn) 6%, var(--card));
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--warn) 40%, transparent);
+    color: var(--text);
+    font-size: 13.5px;
+  }
+  .banner-warn > svg {
+    flex: none;
+    color: var(--warn);
+  }
+  .sev-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: var(--card);
+    box-shadow: var(--raise);
+    text-decoration: none;
+    isolation: isolate;
+    transition: box-shadow 0.2s ease, background-color 0.2s ease;
+  }
+  .sev-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: var(--edge);
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  .sev-card:hover {
+    box-shadow: var(--raise), 0 0 0 1px color-mix(in oklab, var(--accent) 45%, var(--line));
+  }
+  .sev-card[aria-current="true"] {
+    background: color-mix(in oklab, var(--tone, var(--accent)) 8%, var(--card));
+    box-shadow: var(--raise), 0 0 0 1px color-mix(in oklab, var(--tone, var(--accent)) 55%, transparent);
+  }
+  .donut {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    flex: none;
+  }
+  .donut-center {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    text-align: center;
+    pointer-events: none;
+  }
+  .legend-row {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr) auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 5px 8px;
+    border-radius: 8px;
+  }
+  .legend-row:hover {
+    background: color-mix(in oklab, var(--text) 4%, transparent);
+  }
+  .legend-swatch {
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
+    background: var(--tone, var(--faint));
+  }
+
   /* --- terminal (the TUI is dark in both themes), framed like the landing's app window --- */
   .term {
     position: relative;

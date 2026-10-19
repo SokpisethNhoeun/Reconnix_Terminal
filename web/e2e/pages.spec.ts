@@ -7,42 +7,27 @@ test.beforeEach(async ({ page }) => {
   await signIn(page);
 });
 
-test("the overview counts what the files hold", async ({ page }) => {
+test("the dashboard counts what the files hold", async ({ page }) => {
   const data = sample();
-  const findings = data.flatMap((a) => a.findings);
+  const vulns = data.flatMap((a) => a.findings).filter((f) => f.status !== "false-positive");
   const blocked = data.flatMap((a) => a.verdicts).filter((v) => !v.allowed).length;
-  const tile = (label: string) => page.locator(".kpi").filter({ hasText: label }).locator("span").nth(1);
+  const tile = (label: string) => page.locator(".kpi").filter({ hasText: label }).locator(".kpi-value");
 
   await expect(tile("Assessments")).toHaveText(String(data.length));
-  await expect(tile("Findings")).toHaveText(String(findings.length));
+  await expect(tile("Findings")).toHaveText(String(vulns.length));
   await expect(tile("Blocked by policy")).toHaveText(String(blocked));
-  const scores = findings.filter((f) => f.status === "open" && f.cvss_score > 0).map((f) => f.cvss_score);
-  await expect(tile("Highest CVSS")).toHaveText(scores.length ? Math.max(...scores).toFixed(1) : "—");
-  for (const title of [
-    "Live now",
-    "Findings by severity",
-    "Findings per day",
-    "Recent assessments",
-    "Needs attention",
-    "Top weakness categories",
-    "Findings by category",
-    "Findings by template",
-  ]) {
+  await expect(page.locator(".kpi").filter({ hasText: "Critical & High" })).toBeVisible();
+  for (const title of ["Needs attention", "Findings by severity", "Findings per day", "Recent assessments"]) {
     await expect(page.getByRole("heading", { name: title })).toBeVisible();
   }
-  const waiting = data.find((a) => a.status === "Awaiting input")!;
-  await expect(page.getByText(`${waiting.label} waits for you`)).toBeVisible();
-  const live = page.getByRole("region", { name: "Live now" });
-  await expect(live.getByRole("link", { name: waiting.label })).toBeVisible();
-  await expect(live.getByText(`Waits for: ${waiting.waiting_for}`)).toBeVisible();
 });
 
-test("needs attention opens the runs that need it", async ({ page }) => {
-  const runs = sample().filter((a) => ["Awaiting input", "Stopped", "Interrupted"].includes(a.status));
+test("needs attention lists decisions and findings to review", async ({ page }) => {
+  const waiting = sample().find((a) => a.status === "Awaiting input");
   const card = page.getByRole("region", { name: "Needs attention" });
-  await card.getByRole("link", { name: `View all (${runs.length})` }).click();
-  await expect(page).toHaveURL(/\/assessments\?status=attention$/);
-  await expect(page.locator("tbody tr")).toHaveCount(runs.length);
+  if (waiting) await expect(card.getByText(`${waiting.label} needs your decision`)).toBeVisible();
+  // every row carries a button into the place that acts on it
+  await expect(card.getByRole("link", { name: /Continue in AI|View/ }).first()).toBeVisible();
 });
 
 test("the chart has a table view", async ({ page }) => {
@@ -52,7 +37,8 @@ test("the chart has a table view", async ({ page }) => {
 
 test("assessments open into their sections", async ({ page }) => {
   const data = sample();
-  await page.getByRole("link", { name: "Assessments" }).click();
+  // scope to the sidebar: the dashboard also has an "Assessments" stat-card link
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Assessments" }).click();
   await expect(page.locator("tbody tr")).toHaveCount(data.length);
 
   const done = data.find((a) => a.status === "Completed" && a.findings.length)!;
@@ -65,7 +51,8 @@ test("assessments open into their sections", async ({ page }) => {
   await expect(page.locator("ol.m-0 li").first()).toContainText("POLICY");
 
   await page.getByRole("link", { name: /^Findings \(/ }).click();
-  await expect(page.getByRole("heading", { name: done.findings[0].title, level: 3 })).toBeVisible();
+  // the findings tab lists the run's findings; each row links to the finding's own page
+  await expect(page.getByRole("link", { name: done.findings[0].title }).first()).toBeVisible();
 
   await page.getByRole("link", { name: "Scope & policy" }).click();
   await expect(page.getByText("BLOCKED").first()).toBeVisible();
@@ -74,10 +61,10 @@ test("assessments open into their sections", async ({ page }) => {
   await expect(page.getByText("APPROVED").first()).toBeVisible();
 });
 
-test("a waiting assessment says to decide in the terminal", async ({ page }) => {
+test("a waiting assessment asks for a decision in the AI Assistant", async ({ page }) => {
   const waiting = sample().find((a) => a.status === "Awaiting input")!;
   await page.goto(`/assessments/${waiting.uid}`);
-  await expect(page.getByText("Waiting in the terminal app:")).toBeVisible();
+  await expect(page.getByText("Needs your decision:")).toBeVisible();
 });
 
 test("findings filter by severity and search", async ({ page }) => {
@@ -85,13 +72,15 @@ test("findings filter by severity and search", async ({ page }) => {
   const onePage = (n: number) => Math.min(n, 10);
   await page.goto("/findings");
   await expect(page.locator("tbody tr")).toHaveCount(onePage(findings.length));
-  await page.getByRole("link", { name: "High", exact: true }).click();
+  const severity = page.getByRole("region", { name: "Filter by severity" });
+  await severity.getByRole("link", { name: "High" }).click(); // the tile reads "High <count>"
+  await expect(page).toHaveURL(/[?&]sev=HIGH/);
   await expect(page.locator("tbody tr")).toHaveCount(onePage(findings.filter((f) => f.severity === "HIGH").length));
   await page.goto("/findings?q=cookie");
   await expect(page.locator("tbody tr")).toHaveCount(onePage(findings.filter((f) => f.title.toLowerCase().includes("cookie")).length) || 1);
 });
 
-test("findings page through 10 at a time", async ({ page }) => {
+test("findings page through 10 at a time, and a row opens the finding", async ({ page }) => {
   const total = sample().flatMap((a) => a.findings).length;
   expect(total).toBeGreaterThan(10); // the sample data has a second page
   await page.goto("/findings");
@@ -102,11 +91,10 @@ test("findings page through 10 at a time", async ({ page }) => {
   await expect(page).toHaveURL(/[?&]page=2/);
   await expect(page.locator("tbody tr")).toHaveCount(Math.min(total - 10, 10));
   await expect(pager).toContainText(`11–${Math.min(total, 20)} of ${total}`);
-  // choosing a finding keeps the page; a filter goes back to page 1
+  // a row opens the finding on its own page
   await page.locator("tbody tr a").first().click();
-  await expect(page).toHaveURL(/page=2.*f=|f=.*page=2/);
-  await page.getByRole("link", { name: "Confirmed", exact: true }).click();
-  await expect(page).not.toHaveURL(/page=/);
+  await expect(page).toHaveURL(/\/findings\/.+/);
+  await expect(page.getByRole("link", { name: "← All findings" })).toBeVisible();
 });
 
 test("policy shows blocked requests and decisions", async ({ page }) => {
@@ -138,16 +126,17 @@ test("the theme toggle switches to dark and back", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 });
 
-test("the about page explains the project", async ({ page }) => {
-  await page.getByRole("link", { name: "About" }).click();
+test("the documentation page explains the project", async ({ page }) => {
+  await page.getByRole("link", { name: "Documentation" }).click();
   await expect(page).toHaveURL(/\/about$/);
-  await expect(page.getByRole("heading", { name: "About Reconix", level: 1 })).toBeVisible();
-  for (const title of ["How an assessment runs", "Safety gates", "How the pieces fit", "Code map and commands", "Words you'll see"]) {
-    await expect(page.getByRole("heading", { name: title, level: 2 })).toBeVisible();
-  }
-  await expect(page.getByRole("list", { name: "Assessment steps" }).getByRole("listitem")).toHaveCount(8);
-  // "Where to look" links to the pages this operator can open, the Terminal included
-  await expect(page.getByRole("region", { name: "Where to look in this dashboard" }).getByRole("link")).toHaveCount(5);
+  await expect(page.getByRole("heading", { name: "Documentation", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Overview", level: 2 })).toBeVisible();
+  // the sub-nav moves between the four sections
+  const nav = page.getByRole("navigation", { name: "Documentation sections" });
+  await nav.getByRole("link", { name: "Architecture" }).click();
+  await expect(page).toHaveURL(/\/about\?s=architecture/);
+  await expect(page.getByRole("heading", { name: "Architecture", level: 2 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Findings explained", level: 2 })).toHaveCount(0);
 });
 
 test("an unknown assessment is a 404 page", async ({ page }) => {

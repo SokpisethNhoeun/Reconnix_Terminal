@@ -5,20 +5,22 @@ import { notFound } from "next/navigation";
 import { DetailHeader } from "@/components/assessments/detail-header";
 import { PlanList } from "@/components/assessments/plan-list";
 import { ScopeDetails } from "@/components/assessments/scope-details";
+import { WaitingBanner } from "@/components/assessments/waiting-banner";
 import { SeverityBars } from "@/components/charts/severity-bars";
-import { FindingDetail } from "@/components/findings/finding-detail";
 import { FindingsTable } from "@/components/findings/findings-table";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/neu/card";
-import { Chip } from "@/components/neu/chips";
-import { Kpi, KpiGrid } from "@/components/neu/kpi";
+import { Chip, Dot } from "@/components/neu/chips";
+import { Kpi } from "@/components/neu/kpi";
 import { SegmentedLinks } from "@/components/neu/segmented";
 import { ApprovalsTable } from "@/components/policy/approvals-table";
 import { VerdictsTable } from "@/components/policy/verdicts-table";
 import { TIMELINE_FILTERS, Timeline } from "@/components/timeline/timeline";
+import { currentRole } from "@/lib/auth/guard";
+import { mayUseTerminal } from "@/lib/auth/session";
 import { allFindings, approvalRows, blockedVerdicts, isConfirmed } from "@/lib/data/stats";
 import { loadAssessment } from "@/lib/data/store";
-import { formatDateTime, formatNumber } from "@/lib/format";
+import { formatDateTime, plural } from "@/lib/format";
 import { param, query } from "@/lib/utils";
 
 const TABS = ["summary", "timeline", "findings", "scope", "approvals"] as const;
@@ -32,13 +34,16 @@ export async function generateMetadata(props: PageProps<"/assessments/[uid]">): 
 export default async function AssessmentPage(props: PageProps<"/assessments/[uid]">) {
   const { uid } = await props.params;
   const sp = await props.searchParams;
-  const a = await loadAssessment(uid);
+  const [a, role] = await Promise.all([loadAssessment(uid), currentRole()]);
   if (!a) notFound();
+  const operator = mayUseTerminal(role);
 
   const tab: Tab = (TABS as readonly string[]).includes(param(sp.tab)) ? (param(sp.tab) as Tab) : "summary";
   const base = `/assessments/${a.uid}`;
   const findings = allFindings([a]);
   const approvals = approvalRows([a]);
+  const granted = approvals.filter((r) => r.state === "APPROVED").length;
+  const pending = approvals.filter((r) => r.state === "PENDING").length;
   const tabs = [
     { id: "summary", label: "Summary" },
     { id: "timeline", label: "Timeline" },
@@ -52,15 +57,35 @@ export default async function AssessmentPage(props: PageProps<"/assessments/[uid
       <PageHeader title={a.label} sub={`${a.target || "target not set"} · ${formatDateTime(a.created_at)}`} />
       <DetailHeader assessment={a} tabs={tabs} />
 
+      {a.status === "Awaiting input" && <WaitingBanner assessment={a} operator={operator} context="detail" />}
+
       {tab === "summary" && (
         <>
-          <KpiGrid>
-            <Kpi compact label="Findings" value={findings.length} />
-            <Kpi compact label="Confirmed" value={findings.filter(isConfirmed).length} />
-            <Kpi compact label="Blocked" value={blockedVerdicts(a).length} />
-            <Kpi compact label="Approvals" value={approvals.filter((r) => r.state === "APPROVED").length} />
-            <Kpi compact label="Requests" value={formatNumber(a.run.requests)} />
-          </KpiGrid>
+          <section className="grid grid-cols-1 gap-[18px] sm:grid-cols-3">
+            <Kpi label="Findings" value={findings.length}>
+              {findings.length ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Dot tone="ok" />
+                  {findings.filter(isConfirmed).length} confirmed
+                </span>
+              ) : (
+                <span>Severity breakdown appears after validation</span>
+              )}
+            </Kpi>
+            <Kpi label="Blocked by policy" value={blockedVerdicts(a).length}>
+              <span>{a.verdicts.length ? `of ${plural(a.verdicts.length, "action")} checked` : "No actions checked yet"}</span>
+            </Kpi>
+            <Kpi label="Approvals" value={granted}>
+              {pending > 0 ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Dot tone="warn" />
+                  {pending} waiting · plan review
+                </span>
+              ) : (
+                <span>{granted ? "granted" : "none needed yet"}</span>
+              )}
+            </Kpi>
+          </section>
           <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
             <Card title="Plan" hint={`${a.plan.filter((t) => t.status === "done").length}/${a.plan.length} done`}>
               <PlanList assessment={a} />
@@ -94,23 +119,11 @@ export default async function AssessmentPage(props: PageProps<"/assessments/[uid
         </Card>
       )}
 
-      {tab === "findings" &&
-        (findings.length ? (
-          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
-            <Card>
-              <FindingsTable
-                rows={findings}
-                selected={(findings.find((f) => f.id === param(sp.f)) ?? findings[0]).key}
-                hrefFor={(f) => `${base}${query({ tab: "findings", f: f.id })}`}
-              />
-            </Card>
-            <FindingDetail finding={findings.find((f) => f.id === param(sp.f)) ?? findings[0]} />
-          </div>
-        ) : (
-          <Card>
-            <p className="text-[13px] text-muted">No findings yet.</p>
-          </Card>
-        ))}
+      {tab === "findings" && (
+        <Card>
+          {findings.length ? <FindingsTable rows={findings} /> : <p className="text-[13px] text-muted">No findings yet.</p>}
+        </Card>
+      )}
 
       {tab === "scope" && (
         <div className="grid items-start gap-6 xl:grid-cols-2">

@@ -21,6 +21,22 @@ export function Dot({ tone, severity, className }: { tone?: Tone; severity?: Sev
   return <i aria-hidden className={cn("dot", tone && `tone-${tone}`, severity && `sev-${severity}`, className)} />;
 }
 
+/** A small uppercase tag carrying a tone or severity color: soft-filled, or `solid` for the
+    high-contrast chips in the attention feed. */
+export function Badge({
+  tone,
+  severity,
+  solid,
+  children,
+}: {
+  tone?: Tone;
+  severity?: Severity;
+  solid?: boolean;
+  children: ReactNode;
+}) {
+  return <span className={cn("badge", solid && "badge-solid", tone && `tone-${tone}`, severity && `sev-${severity}`)}>{children}</span>;
+}
+
 export function Chip({ tone, severity, children }: { tone?: Tone; severity?: Severity; children: ReactNode }) {
   return (
     <span className="chip">
@@ -61,6 +77,16 @@ const TRIAGE_LABEL: Record<string, string> = {
 export const TriageChip = ({ status }: { status: string }) => (
   <Chip tone={TRIAGE_TONE[status] ?? "faint"}>{TRIAGE_LABEL[status] ?? status}</Chip>
 );
+
+/** One line for where a finding stands: its triage (fixed / accepted / false positive) when
+    it has left the open set, otherwise whether a person has confirmed it. */
+export function FindingStatus({ status, validation }: { status: string; validation: string }) {
+  if (status === "false-positive") return <Chip tone="faint">False positive</Chip>;
+  if (status === "fixed") return <Chip tone="ok">Fixed</Chip>;
+  if (status === "accepted") return <Chip tone="warn">Accepted</Chip>;
+  if (validation === "CONFIRMED") return <Chip tone="ok">Confirmed</Chip>;
+  return <Chip tone="warn">Need review</Chip>;
+}
 
 /** A CVSS base score, or an em dash when the finding is not scored. */
 export function Cvss({ score }: { score: number }) {

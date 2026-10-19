@@ -1,13 +1,14 @@
-/* The dashboard's pages, in sidebar order: the sidebar (NavLinks) and the About page's
-   "Where to look" list are both built from this. Plain data, so server and client code can
-   import it. `operator` pages are only listed for operators. */
+/* The dashboard's pages, in sidebar order: the sidebar (NavLinks) and the Documentation
+   page's "Where to look" list are both built from this. Plain data, so server and client
+   code can import it. `operator` pages are only listed for operators; a `bottom` page is
+   pinned to the foot of the sidebar (Settings). */
 import {
   BookOpen,
   LayoutDashboard,
   List,
   type LucideIcon,
-  ShieldCheck,
-  SquareTerminal,
+  Settings,
+  Sparkles,
   TriangleAlert,
 } from "lucide-react";
 
@@ -20,16 +21,25 @@ export interface NavPage {
   icon: LucideIcon;
   count?: "assessments" | "findings";
   operator?: boolean;
-  about: string; // one line for the About page
+  bottom?: boolean; // pinned to the foot of the sidebar
+  about: string; // one line for the Documentation page
 }
 
 export const NAV_PAGES: NavPage[] = [
   {
     href: "/",
-    label: "Overview",
-    short: "Overview",
+    label: "Dashboard",
+    short: "Dashboard",
     icon: LayoutDashboard,
     about: "Counts and charts across every saved assessment, and what waits for you.",
+  },
+  {
+    href: TERMINAL_PAGE,
+    label: "AI Assistant",
+    short: "AI",
+    icon: Sparkles,
+    operator: true,
+    about: "Run and talk to Reconix in this browser tab, with the same gates (operators only).",
   },
   {
     href: "/assessments",
@@ -48,26 +58,19 @@ export const NAV_PAGES: NavPage[] = [
     about: "Every finding from every run, filtered by severity or searched.",
   },
   {
-    href: "/policy",
-    label: "Policy & approvals",
-    short: "Policy",
-    icon: ShieldCheck,
-    about: "How the guardrails held: blocked requests and every approval decision.",
-  },
-  {
-    href: TERMINAL_PAGE,
-    label: "Terminal",
-    short: "Terminal",
-    icon: SquareTerminal,
-    operator: true,
-    about: "The Reconix terminal app in this browser tab, with the same gates (operators only).",
-  },
-  {
     href: "/about",
-    label: "About",
-    short: "About",
+    label: "Documentation",
+    short: "Docs",
     icon: BookOpen,
-    about: "This page: the project explained.",
+    about: "This page: the project explained, the safety gates, and how the pieces fit.",
+  },
+  {
+    href: "/settings",
+    label: "Settings",
+    short: "Settings",
+    icon: Settings,
+    bottom: true,
+    about: "The theme, where the data is read from, and the role you are signed in with.",
   },
 ];
 

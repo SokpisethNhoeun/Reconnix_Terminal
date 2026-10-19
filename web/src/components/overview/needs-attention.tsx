@@ -1,76 +1,105 @@
-/* What the operator should look at next: runs waiting in the TUI, findings to review,
-   stopped and interrupted runs. Shows the first `limit` (one of each kind first) and says
-   how many more there are; the overview's "View all" opens the rest. */
-import { CircleSlash, Clock, ShieldX, TriangleAlert } from "lucide-react";
+/* What the operator should look at next: decisions a run is waiting on in the TUI first,
+   then the open critical and high findings still to review, worst first. Each row carries a
+   tag, one line of context, and a button to the place that acts on it. */
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { type Assessment, SEVERITIES } from "@/lib/data/schema";
-import { attentionItems, idleInterrupted } from "@/lib/data/stats";
-import { formatShort, plural } from "@/lib/format";
+import { buttonVariants } from "@/components/ui/button";
+import type { Assessment } from "@/lib/data/schema";
+import { attentionFeed, effectiveSeverity } from "@/lib/data/stats";
+import { formatDay, timeAgo } from "@/lib/format";
+import { TERMINAL_PAGE } from "@/lib/terminal/paths";
 import { cn } from "@/lib/utils";
 
-function Item({ icon, tone, title, children, href }: { icon: ReactNode; tone: string; title: string; children: string; href?: string }) {
-  // one line of detail each, so the list keeps the height of the recent assessments next to it
+import { Badge } from "../neu/chips";
+
+function Row({
+  tag,
+  title,
+  sub,
+  action,
+}: {
+  tag: ReactNode;
+  title: string;
+  sub: string;
+  action: ReactNode;
+}) {
   return (
-    <li className="well relative flex items-center gap-3 px-3.5 py-3" title={`${title}: ${children}`}>
-      <span className={cn("grid size-[30px] flex-none place-items-center rounded-[10px] text-tone shadow-[var(--raise-sm)]", tone)} aria-hidden>
-        {icon}
-      </span>
+    <li className="well feed-row" title={`${title} — ${sub}`}>
+      <span className="feed-badge">{tag}</span>
       <div className="min-w-0 flex-1">
-        {href ? (
-          <Link href={href} className="stretch block truncate text-[13px] font-semibold">
-            {title}
-          </Link>
-        ) : (
-          <b className="block truncate text-[13px] font-semibold">{title}</b>
-        )}
-        <span className="block truncate text-[12.5px] text-muted">{children}</span>
+        <b className="block truncate text-[13.5px] font-semibold">{title}</b>
+        <span className="block truncate text-[12.5px] text-muted">{sub}</span>
       </div>
+      {action}
     </li>
   );
 }
 
-export function NeedsAttention({ assessments, limit }: { assessments: Assessment[]; limit: number }) {
-  const { items } = attentionItems(assessments);
-  if (!items.length) return <p className="text-[13px] text-muted">Nothing is waiting. Every finding is confirmed.</p>;
+export function NeedsAttention({ assessments, limit, operator }: { assessments: Assessment[]; limit: number; operator: boolean }) {
+  const items = attentionFeed(assessments);
+  if (!items.length) {
+    return <p className="text-[13px] text-muted">Nothing is waiting, and every critical and high finding is confirmed.</p>;
+  }
   const more = items.length - limit;
   return (
     <ul className="m-0 flex flex-1 list-none flex-col gap-2.5 p-0">
       {items.slice(0, limit).map((item) => {
-        if (item.kind === "review") {
-          const parts = SEVERITIES.filter((s) => item.bySeverity[s]).map((s) => `${item.bySeverity[s]} ${s.toLowerCase()}`);
+        if (item.kind === "decision") {
+          const a = item.assessment;
+          const what = a.waiting_for ? `${a.waiting_for[0].toUpperCase()}${a.waiting_for.slice(1)}` : "Approve the scan plan";
           return (
-            <Item key="review" icon={<TriangleAlert size={16} />} tone="tone-accent" title={`${plural(item.count, "finding")} need review`} href="/findings?val=review">
-              {`${parts.join(", ")} not confirmed yet.`}
-            </Item>
+            <Row
+              key={`d-${a.uid}`}
+              tag={
+                <Badge tone="warn" solid>
+                  Decision
+                </Badge>
+              }
+              title={`${a.label} needs your decision`}
+              sub={`${what} for ${a.target} · ${timeAgo(a.saved_at)}`}
+              action={
+                operator ? (
+                  <Link href={TERMINAL_PAGE} className={cn(buttonVariants({ variant: "accent", size: "sm" }), "flex-none")}>
+                    Continue in AI
+                    <ArrowRight size={15} aria-hidden />
+                  </Link>
+                ) : (
+                  <Link href={`/assessments/${a.uid}`} className={cn(buttonVariants({ variant: "default", size: "sm" }), "flex-none")}>
+                    View
+                  </Link>
+                )
+              }
+            />
           );
         }
-        const a = item.assessment;
-        const href = `/assessments/${a.uid}`;
-        if (item.kind === "waiting") {
-          return (
-            <Item key={a.uid} icon={<Clock size={16} />} tone="tone-warn" title={`${a.label} waits for you`} href={href}>
-              {`${a.waiting_for ? `${a.waiting_for[0].toUpperCase()}${a.waiting_for.slice(1)}` : "A decision"} on ${a.target}. Decide it in the terminal app.`}
-            </Item>
-          );
-        }
-        if (item.kind === "stopped") {
-          return (
-            <Item key={a.uid} icon={<ShieldX size={16} />} tone="tone-bad" title={`${a.label} stopped`} href={href}>
-              {`${a.target}: ${a.stopped_reason || "the run stopped early"}.`}
-            </Item>
-          );
-        }
+        const f = item.finding;
+        const a = f.assessment;
+        const sev = effectiveSeverity(f);
         return (
-          <Item key={a.uid} icon={<CircleSlash size={16} />} tone="tone-faint" title={`${a.label} was interrupted`} href={href}>
-            {idleInterrupted(a)
-              ? `${a.target}: no activity since ${formatShort(a.saved_at)}; the terminal app probably closed.`
-              : `${a.target}: the terminal app closed before this run finished.`}
-          </Item>
+          <Row
+            key={`f-${f.key}`}
+            tag={
+              <Badge severity={sev} solid>
+                {sev}
+              </Badge>
+            }
+            title={f.title}
+            sub={`${a.label} · ${a.target} · found ${formatDay(a.created_at)} · need review`}
+            action={
+              <Link href={`/assessments/${a.uid}`} className={cn(buttonVariants({ variant: "default", size: "sm" }), "flex-none")}>
+                View
+              </Link>
+            }
+          />
         );
       })}
-      {more > 0 && <li className="mt-auto px-1 text-[12.5px] text-muted">and {more} more</li>}
+      {more > 0 && (
+        <li className="mt-auto px-1 pt-0.5 text-[12.5px] text-muted">
+          and {more} more to review
+        </li>
+      )}
     </ul>
   );
 }

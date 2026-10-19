@@ -51,6 +51,20 @@ export function formatDuration(ms: number | null): string {
 
 export const plural = (n: number, one: string, many = `${one}s`) => `${formatNumber(n)} ${n === 1 ? one : many}`;
 
+/** A short relative time: "just now", "12 min ago", "3 h ago", "2 d ago", else a date. */
+export function timeAgo(iso: string | null | undefined, now: Date = new Date()): string {
+  if (!valid(iso)) return "—";
+  const secs = Math.round((now.getTime() - Date.parse(iso)) / 1000);
+  if (secs < 45) return "just now";
+  const mins = Math.round(secs / 60);
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.round(hours / 24);
+  if (days <= 7) return `${days} d ago`;
+  return formatDay(iso);
+}
+
 /** A byte count for humans: "812 B", "24.1 KB", "1.3 MB". */
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;

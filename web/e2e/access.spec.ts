@@ -24,11 +24,9 @@ test("the terminal needs a session too", async ({ page, request }) => {
 test("a viewer can read the pages but not use the terminal", async ({ page, context }) => {
   await context.addCookies([{ name: "reconix_view", value: sessionValue("viewer", TOKEN), domain: "127.0.0.1", path: "/" }]);
   await page.goto("/");
-  await expect(page.locator(".pill", { hasText: "viewer" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Terminal" })).toHaveCount(0);
-  await page.goto("/about"); // the About page is for every role, without the Terminal
-  await expect(page.getByRole("heading", { name: "About Reconix", level: 1 })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Where to look in this dashboard" }).getByRole("link")).toHaveCount(4);
+  await expect(page.getByRole("link", { name: "AI Assistant" })).toHaveCount(0);
+  await page.goto("/about"); // the Documentation page is for every role
+  await expect(page.getByRole("heading", { name: "Documentation", level: 1 })).toBeVisible();
   const res = await page.request.post("/api/terminal/ticket", { headers: { Origin: `http://127.0.0.1:${PORT}` } });
   expect(res.status()).toBe(403);
   await page.goto("/terminal");

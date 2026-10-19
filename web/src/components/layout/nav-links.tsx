@@ -1,6 +1,7 @@
 "use client";
 
-/* The sidebar links; the current section is lit teal. Terminal only for operators. */
+/* The sidebar links; the current section is lit teal. The AI Assistant is only for
+   operators. `slot="bottom"` renders the pinned pages (Settings) at the foot. */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -11,14 +12,15 @@ import { navPages } from "./nav-data";
 interface NavLinksProps {
   counts: { assessments: number; findings: number };
   terminal: boolean;
+  slot?: "main" | "bottom";
 }
 
-export function NavLinks({ counts, terminal }: NavLinksProps) {
+export function NavLinks({ counts, terminal, slot = "main" }: NavLinksProps) {
   const pathname = usePathname();
-  const links = navPages(terminal);
+  const links = navPages(terminal).filter((p) => (slot === "bottom" ? p.bottom : !p.bottom));
   return (
     <nav
-      aria-label="Main"
+      aria-label={slot === "bottom" ? "Settings" : "Main"}
       className={cn(
         "flex flex-col gap-1 max-[820px]:grid max-[820px]:gap-1",
         // phones: one row of five, or two rows of three

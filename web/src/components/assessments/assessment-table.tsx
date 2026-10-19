@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Assessment } from "@/lib/data/schema";
 import { approvalRows, blockedVerdicts, durationMs } from "@/lib/data/stats";
 import { formatDuration, formatShort } from "@/lib/format";
+import { templateLabel } from "@/lib/templates";
 
 import { SeverityMix } from "../findings/severity-mix";
 import { Chip, DecisionChip, StatusChip } from "../neu/chips";
@@ -38,7 +39,7 @@ export function AssessmentTable({ assessments, compact }: { assessments: Assessm
               </td>
               <td className="min-w-[180px]">
                 <span className="font-medium [overflow-wrap:anywhere]">{a.target || "—"}</span>
-                <span className="cell-sub">{a.template.name || "template not chosen"}</span>
+                <span className="cell-sub">{a.template.name ? templateLabel(a.template.name) : "template not chosen"}</span>
               </td>
               <td>
                 <StatusChip status={a.status} />
