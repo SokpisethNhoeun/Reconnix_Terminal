@@ -7,8 +7,8 @@
 
    Conversations are kept by the dashboard's server (lib/assistant/history-store.ts): a
    question carries only the open conversation's id and the question, never the conversation
-   so far. This tab keeps only which conversation is open and the unsent draft (masked), in
-   sessionStorage, so a reload reopens it. Questions are masked as they are asked
+   so far. This tab keeps only which conversation is open (and for which view) and the unsent
+   draft (masked), in sessionStorage, so a reload reopens it. Questions are masked as they are asked
    (lib/assistant/redact.ts). A conversation stays about the run it was started on; when the
    dashboard moves to another run, the next question starts a new conversation about that one
    (the old one stays in History). */
@@ -21,7 +21,7 @@ import { redact } from "@/lib/assistant/redact";
 import { MAX_QUESTION } from "@/lib/assistant/request";
 import type { AssistantInfo, ChatMessage } from "./types";
 
-const STORE_KEY = "reconix.assistant.v2"; // { openId, draft }
+const STORE_KEY = "reconix.assistant.v2"; // { openId, pageUid, draft }
 const OLD_KEY = "reconix.assistant.v1"; // the earlier copy of whole conversations: removed
 const MAX_SHOWN = 40_000; // characters of one streamed reply kept on screen
 
@@ -72,23 +72,30 @@ export function useAssistant(): Assistant {
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
-function load(): { openId: string | null; draft: string } {
+interface Kept {
+  openId: string | null; // the open conversation
+  pageUid: string | null | undefined; // what the dashboard showed then (a reload of it reopens it)
+  draft: string;
+}
+
+function load(): Kept {
   try {
     window.sessionStorage.removeItem(OLD_KEY);
     const raw = window.sessionStorage.getItem(STORE_KEY);
-    const data = raw ? (JSON.parse(raw) as { openId?: unknown; draft?: unknown }) : {};
+    const data = raw ? (JSON.parse(raw) as { openId?: unknown; pageUid?: unknown; draft?: unknown }) : {};
     return {
       openId: typeof data.openId === "string" ? data.openId : null,
+      pageUid: typeof data.pageUid === "string" || data.pageUid === null ? data.pageUid : undefined,
       draft: typeof data.draft === "string" ? data.draft.slice(0, MAX_QUESTION) : "",
     };
   } catch {
-    return { openId: null, draft: "" };
+    return { openId: null, pageUid: undefined, draft: "" };
   }
 }
 
-function save(openId: string | null, draft: string): void {
+function save({ openId, pageUid, draft }: Kept): void {
   try {
-    window.sessionStorage.setItem(STORE_KEY, JSON.stringify({ openId, draft: redact(draft) }));
+    window.sessionStorage.setItem(STORE_KEY, JSON.stringify({ openId, pageUid, draft: redact(draft) }));
   } catch {
     // storage blocked or full: the page still works, a reload just starts fresh
   }
@@ -196,14 +203,16 @@ export function AssistantProvider({ info, children }: { info: AssistantInfo; chi
     const id = requestAnimationFrame(() => {
       const saved = load();
       setDraftState((now) => now || saved.draft);
-      if (saved.openId && latest.current.info.operator && !latest.current.opened && !latest.current.messages.length) openConversation(saved.openId);
+      const { info: now, opened: open, messages: shown } = latest.current;
+      // a reload of the same view reopens its conversation; another run's page starts fresh
+      if (saved.openId && saved.pageUid === now.scope.uid && now.operator && !open && !shown.length) openConversation(saved.openId);
       restored.current = true;
     });
     return () => cancelAnimationFrame(id);
   }, [openConversation]);
   useEffect(() => {
-    if (restored.current) save(opened?.id ?? null, draft);
-  }, [opened, draft]);
+    if (restored.current) save({ openId: opened?.id ?? null, pageUid: info.scope.uid, draft });
+  }, [opened, draft, info.scope.uid]);
   useEffect(() => halt, [halt]);
 
   // the dashboard moved to another run: the next question starts a conversation about it

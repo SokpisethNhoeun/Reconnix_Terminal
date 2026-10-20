@@ -39,7 +39,7 @@ export const AssistantView = forwardRef<HTMLTextAreaElement, { onMinimize: () =>
   // the welcome reads from the top (the scroller otherwise starts at its end)
   const welcome = messages.length === 0 && !opening;
   useEffect(() => {
-    if (welcome && scroller.current) scroller.current.scrollTop = 0;
+    if (welcome) scroller.current?.scrollTo({ top: 0 });
   }, [welcome, scroller]);
 
   const reason = !info.operator

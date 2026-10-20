@@ -52,7 +52,7 @@ function Row({ c, now, active, onOpen }: { c: ConversationSummary; now: number; 
             }}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
-                e.stopPropagation();
+                e.preventDefault(); // ends the rename only; the menu stays open
                 setMode("idle");
               }
             }}
@@ -144,17 +144,31 @@ export function ConversationMenu() {
     if (refocus) button.current?.focus({ preventScroll: true });
   };
 
+  // a click outside closes it; so does Escape wherever focus is (a rename that just ended
+  // leaves it on the page), handing focus back to the button
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: PointerEvent) => {
-      const t = e.target as Node;
-      if (panel.current?.contains(t) || button.current?.contains(t)) return;
+    const shut = () => {
       setOpen(false);
       setConfirmAll(false);
       setAllError(null);
     };
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!panel.current?.contains(t) && !button.current?.contains(t)) shut();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      e.preventDefault();
+      shut();
+      button.current?.focus({ preventScroll: true });
+    };
     document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   const toggle = () => {
@@ -191,12 +205,6 @@ export function ConversationMenu() {
           role="dialog"
           aria-label="Conversation history"
           className="ai-menu"
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.stopPropagation();
-              close();
-            }
-          }}
         >
           <div className="ai-menu-head">
             <p className="ai-menu-heading">Conversations</p>
