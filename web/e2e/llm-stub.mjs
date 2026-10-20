@@ -8,6 +8,7 @@
 //                    60 s pass), so Stop never races the end of the answer
 //   [stub:fail]      HTTP 500 the first time each such question is asked, a normal answer after
 //                    (so Retry can succeed)
+//   [stub:empty]     a well-formed stream with no text at all (the model "answered" nothing)
 import { createServer } from "node:http";
 
 const port = Number(process.env.LLM_STUB_PORT || 3195);
@@ -53,7 +54,9 @@ createServer((req, res) => {
       ? MARKDOWN
       : long
         ? LONG
-        : ["Stub answer:", ` I saw ${runs} runs.`, ` Earlier turns: ${earlier}.`, " You asked:", ` ${question}`];
+        : question.includes("[stub:empty]")
+          ? []
+          : ["Stub answer:", ` I saw ${runs} runs.`, ` Earlier turns: ${earlier}.`, " You asked:", ` ${question}`];
     res.writeHead(200, { "Content-Type": "text/event-stream" });
     let i = 0;
     const next = () => {

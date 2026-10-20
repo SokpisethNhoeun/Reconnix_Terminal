@@ -1,6 +1,7 @@
 /* The cards a reply shows, picked from the question with fixed rules (intent.ts) and built from
-   the saved files only: findings, plan progress, approvals, policy blocks, tool steps, report
-   downloads, and notices for what the assistant can't do. The model never writes these; it
+   the saved files only: findings, plan progress, approvals (each recorded decision), policy blocks
+   (each with its reason), tool steps, report downloads, and notices for what the assistant can't
+   do or what the data doesn't hold (errors). The model never writes these; it
    only explains around them, so a finding, a count or a state on a card is always the saved
    one. Free text from the files is masked again (redact.ts) and cut to one line. Nothing here
    runs, approves or changes anything. Pure: the route calls it, and the unit tests drive it on
@@ -62,6 +63,15 @@ export const NOTICES = {
     steps: [],
     action: "terminal",
   },
+  // "the data doesn't contain that": the saved files hold no error log and no failed state
+  errors: {
+    kind: "notice",
+    tone: "info",
+    title: "The saved data records no errors",
+    body: "A saved run holds its activity log, policy checks, approvals and findings, and a state: not started, running, waiting for you, completed, stopped or interrupted. It has no error log and no failed state, so the assistant can't report one.",
+    steps: ["The progress card below shows each run's real state.", "A run that ended early is Stopped (by you) or Interrupted (the TUI closed)."],
+    action: null,
+  },
 } satisfies Record<string, CardOf<"notice">>;
 
 // --- builders ------------------------------------------------------------------------------
@@ -114,25 +124,28 @@ export function progressCard(views: AssessmentView[]): CardOf<"progress"> {
   };
 }
 
-const STATE_ORDER = ["PENDING", "NOT REACHED", "APPROVED", "REJECTED"];
+export const STATE_ORDER = ["PENDING", "NOT REACHED", "APPROVED", "REJECTED"] as const;
 
 export function approvalsCard(views: AssessmentView[]): CardOf<"approvals"> {
   const all = views
     .flatMap((v, i) => v.approvals.map((a) => ({ a, v, i })))
     .sort((x, y) => STATE_ORDER.indexOf(x.a.state) - STATE_ORDER.indexOf(y.a.state) || x.i - y.i);
   const { approvals, inputs } = waitingOn(views);
+  const counts = { APPROVED: 0, REJECTED: 0, PENDING: 0, "NOT REACHED": 0 };
+  for (const { a } of all) counts[a.state] += 1;
   return {
     kind: "approvals",
     items: all.slice(0, APPROVALS_SHOWN).map(({ a, v }) => ({
       run: runRef(v),
       id: cut(a.id, 120),
       action: safe(a.action, 120),
-      risk: cut(a.risk, 120),
+      risk: safe(a.risk, 120),
       target: safe(a.target, 400),
       state: a.state,
     })),
     waiting: inputs.slice(0, RUNS_SHOWN).map((v) => ({ run: runRef(v), text: safe(v.gate?.text ?? "", 400) })),
     pending: approvals,
+    counts,
     more: Math.max(0, all.length - APPROVALS_SHOWN),
   };
 }
@@ -143,7 +156,14 @@ export function policyCard(runs: { a: Assessment; v: AssessmentView }[]): CardOf
       .filter((x) => !x.allowed)
       .map((x) => {
         const at = parseTime(x.at);
-        return { run: runRef(v), time: at === null ? "—" : clock(at), text: safe(`${x.method} ${x.path} · ${x.reason}`, 400) };
+        return {
+          run: runRef(v),
+          time: at === null ? "—" : clock(at),
+          text: safe(`${x.method} ${x.path} · ${x.reason}`, 400),
+          method: safe(x.method, 120),
+          path: safe(x.path, 400),
+          reason: safe(x.reason, 400),
+        };
       }),
   );
   return {
@@ -159,7 +179,7 @@ export function policyCard(runs: { a: Assessment; v: AssessmentView }[]): CardOf
 function toolOf(text: string, tools: string[]): string {
   const lower = text.toLowerCase();
   const named = [...tools].sort((a, b) => b.length - a.length).find((t) => t && lower.includes(t.toLowerCase()));
-  return named ? cut(named, 120) : "—";
+  return named ? safe(named, 120) : "—";
 }
 
 export function toolsCard(views: AssessmentView[]): CardOf<"tools"> {
@@ -176,6 +196,16 @@ export function toolsCard(views: AssessmentView[]): CardOf<"tools"> {
     }),
     more: Math.max(0, views.length - TOOL_RUNS_SHOWN),
   };
+}
+
+/** The shown tool steps grouped by tool, most steps first ("—" for lines that name no tool,
+    last). A reading of the card's own rows: it counts the steps shown, not the run's total. */
+export function toolGroups(steps: { tool: string }[]): { tool: string; steps: number }[] {
+  const counts = new Map<string, number>();
+  for (const s of steps) counts.set(s.tool, (counts.get(s.tool) ?? 0) + 1);
+  return [...counts]
+    .map(([tool, steps]) => ({ tool, steps }))
+    .sort((a, b) => (a.tool === "—" ? 1 : 0) - (b.tool === "—" ? 1 : 0) || b.steps - a.steps || a.tool.localeCompare(b.tool));
 }
 
 export function reportCard(views: AssessmentView[]): CardOf<"report"> {
@@ -212,6 +242,7 @@ export function pickCards(library: Assessment[], uid: string | null, question: s
   if (has("plan")) return [NOTICES.plan];
   if (has("run")) cards.push(NOTICES.run);
   if (has("act")) cards.push(NOTICES.act);
+  if (has("errors")) cards.push(NOTICES.errors); // the data has none: say so first
 
   // findings named by id (false positives too: the operator asked for them), then the top one
   const named: Located[] = [];
@@ -234,6 +265,7 @@ export function pickCards(library: Assessment[], uid: string | null, question: s
   if (has("tools")) cards.push(toolsCard(views));
   if (has("policy")) cards.push(policyCard(views.map((v) => byUid.get(v.uid)!).filter(Boolean)));
   if (has("report")) cards.push(reportCard(views));
+  if (has("errors") && !has("progress")) cards.push(progressCard(views)); // the runs' real states
 
   return cards.filter((c) => CardSchema.safeParse(c).success).slice(0, MAX_CARDS);
 }

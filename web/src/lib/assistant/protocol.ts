@@ -87,12 +87,16 @@ const ProgressCardSchema = z
   })
   .strict();
 
+// Fields marked optional came later: conversations saved before them still read back (the
+// history store drops a file that fails this schema). The server always sends them.
 const ApprovalsCardSchema = z
   .object({
     kind: z.literal("approvals"),
     items: z.array(z.object({ run: RunRefSchema, id: short, action: short, risk: short, target: line, state: ApprovalState }).strict()).max(10),
     waiting: z.array(z.object({ run: RunRefSchema, text: line }).strict()).max(8), // runs paused on another input
     pending: count,
+    // every recorded decision counted over all the approvals, before the rows were cut
+    counts: z.object({ APPROVED: count, REJECTED: count, PENDING: count, "NOT REACHED": count }).strict().optional(),
     more: count,
   })
   .strict();
@@ -102,7 +106,9 @@ const PolicyCardSchema = z
     kind: z.literal("policy"),
     checks: count,
     blocked: count,
-    items: z.array(z.object({ run: RunRefSchema, time: short, text: line }).strict()).max(8),
+    // text: "METHOD path · reason" (older saved cards have only this); method, path and reason
+    // are the same, each masked on its own
+    items: z.array(z.object({ run: RunRefSchema, time: short, text: line, method: short.optional(), path: line.optional(), reason: line.optional() }).strict()).max(8),
     more: count,
   })
   .strict();

@@ -2,8 +2,9 @@
    the shared draft; answers streamed by the stand-in model (e2e/llm-stub.mjs) with the cards the
    server built from the sample data; conversations the dashboard's server keeps (they survive
    a reload and a new browser; open, rename, delete); Markdown with Copy; Stop and "New
-   messages"; Retry; what a viewer can't do; and the routes' locks. The chat panel breathes (it
-   never holds still), so clicks inside it are forced outside the reduced-motion tests. The
+   messages"; Retry; an answer with nothing in it; what a viewer can't do; and the routes' locks.
+   The chat panel holds still (text never moves), but the welcome's globe and the sidebar's icon
+   breathe, so clicks are forced outside the reduced-motion tests all the same. The
    stand-in model changes its answer only for explicit [stub:…] tokens. Conversations go to a
    test folder, and the e2e server allows more questions a minute (playwright.config.ts). */
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
@@ -257,6 +258,30 @@ test.describe("with reduced motion", () => {
 
 test.describe("when the model fails", () => {
   test.use({ reducedMotion: "reduce" });
+
+  test("an answer with nothing in it is said plainly, with Retry, and stays so after a reload", async ({ page }) => {
+    await signIn(page);
+    await page.goto("/?view=assistant");
+    await ask(page, "Say nothing at all [stub:empty]");
+    const empty = log(page).getByRole("region", { name: "The model returned nothing" });
+    await expect(empty).toBeVisible();
+    await expect(empty).toContainText("Try asking again");
+    await expect(log(page).getByRole("region", { name: "The assistant couldn't answer" })).toHaveCount(0);
+    await expect(log(page)).toHaveAttribute("aria-busy", "false");
+    await empty.getByRole("button", { name: "Retry" }).click(); // the stub answers nothing again
+    await expect(log(page).getByRole("region", { name: "The model returned nothing" })).toBeVisible();
+    await expect(log(page).locator(".ai-bubble")).toHaveCount(1); // replaced, not kept twice
+    await page.reload();
+    await expect(log(page).getByRole("region", { name: "The model returned nothing" })).toBeVisible();
+    await expect(log(page).getByRole("button", { name: "Retry" })).toBeVisible();
+    // a question with cards gets them; the empty text under them is "no explanation", with Retry
+    await ask(page, "Analyze the findings [stub:empty]");
+    await expect(log(page).getByRole("region", { name: "Findings" })).toBeVisible();
+    const none = log(page).getByRole("region", { name: "The model added no explanation" });
+    await expect(none).toBeVisible();
+    await expect(none.getByRole("button", { name: "Retry" })).toBeVisible();
+    await expect(log(page).getByRole("region", { name: "The assistant couldn't answer" })).toHaveCount(0);
+  });
 
   test("the reply says why, keeps its cards, and Retry replaces the failed turn", async ({ page }) => {
     await signIn(page);

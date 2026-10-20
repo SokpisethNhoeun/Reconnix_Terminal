@@ -72,6 +72,8 @@ export function Sidebar({
               type="button"
               onClick={() => onSelect(item.view)}
               data-view={item.view}
+              // the active marker (.dash-navbtn::after, motion.css) slides in once on this
+              // attribute: no loop, nothing on the icon or the label
               data-active={active === item.view ? "true" : undefined}
               aria-current={active === item.view ? "page" : undefined}
               aria-label={label}
