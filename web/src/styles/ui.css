@@ -1,0 +1,76 @@
+/* Shared controls (components/ui): the pager, the checkbox and the list/detail split. Colours
+   only from the tokens. Owner: the main agent (shared by every view). */
+
+/* ---- Pager (pagination.tsx) ---- */
+.ui-pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ui-pager-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--foreground);
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.ui-pager-btn:hover:not(:disabled) { border-color: color-mix(in oklab, var(--primary) 40%, var(--border)); color: var(--primary); }
+.ui-pager-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.ui-pager-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.ui-pager-label { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); text-align: center; }
+
+/* ---- Checkbox (checkbox.tsx) ---- */
+.ui-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--foreground); cursor: pointer; }
+.ui-check.is-disabled { color: var(--muted-foreground); cursor: not-allowed; }
+.ui-check-input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.ui-check-box {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.ui-check-input:checked + .ui-check-box { border-color: var(--primary); background: var(--primary); }
+.ui-check-input:checked + .ui-check-box::after {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid var(--primary-foreground);
+  border-bottom: 2px solid var(--primary-foreground);
+  transform: translateY(-1px) rotate(-45deg);
+}
+.ui-check-input:focus-visible + .ui-check-box { outline: 2px solid var(--ring); outline-offset: 2px; }
+.ui-check-input:disabled + .ui-check-box { opacity: 0.5; }
+
+/* ---- List / detail split (list-detail.tsx) ----
+   ≥1024 wide: two columns, both shown. Below: one pane at a time (data-pane). On the fixed
+   desktop frame (frame.css) the split fills the content area and each pane scrolls on its own;
+   elsewhere the window scrolls and the panes grow with their content. */
+.ui-split { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.ui-split-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.ui-split-back:hover { color: var(--primary); }
+.ui-split-back:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
+@media (max-width: 1023.98px) {
+  .ui-split[data-pane="list"] .ui-split-detail { display: none; }
+  .ui-split[data-pane="detail"] .ui-split-list { display: none; }
+}
+@media (min-width: 1024px) {
+  .ui-split { grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); align-items: start; }
+  .ui-split-back { display: none; }
+}
+@media (min-width: 1280px) and (min-height: 760px) {
+  .ui-split { height: 100%; min-height: 0; align-items: stretch; }
+  .ui-split-list, .ui-split-detail { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin; }
+}

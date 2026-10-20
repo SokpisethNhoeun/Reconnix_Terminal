@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   BookOpen,
   FileText,
+  Layers,
   LayoutGrid,
   Settings,
   Sparkles,
@@ -20,6 +21,7 @@ type DocItem = { icon: LucideIcon; label: string; href: string };
 const VIEWS: NavItem[] = [
   { icon: LayoutGrid, label: "Overview", view: "overview" },
   { icon: Sparkles, label: "AI Assistant", view: "assistant" },
+  { icon: Layers, label: "Assessments", view: "assessments" },
   { icon: TriangleAlert, label: "Findings", view: "findings" },
   { icon: FileText, label: "Reports", view: "reports" },
   { icon: Target, label: "Scope", view: "scope" },

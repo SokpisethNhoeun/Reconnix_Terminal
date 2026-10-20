@@ -16,6 +16,11 @@
 @import "../styles/terminal.css";
 @import "../styles/site.css";
 @import "../styles/assistant.css";
+@import "../styles/ui.css";
+@import "../styles/findings.css";
+@import "../styles/assessments.css";
+@import "../styles/reports.css";
+@import "../styles/docs.css";
 
 :root {
   /* Easing curves — the GSAP equivalents are noted so CSS and JS stay in step. */

@@ -1,7 +1,7 @@
 /* A code block in a reply: its language as a label, Copy, and the code itself, which scrolls
    sideways inside the message instead of widening it. Plain text: nothing is highlighted or
    run. */
-import { CopyButton } from "./copy-button";
+import { CopyButton } from "@/components/ui/copy-button";
 
 export function CodeBlock({ lang, code }: { lang: string; code: string }) {
   return (

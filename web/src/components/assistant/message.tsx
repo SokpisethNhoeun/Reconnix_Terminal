@@ -8,7 +8,7 @@ import { CircleStop } from "lucide-react";
 import type { CardOf } from "@/lib/assistant/protocol";
 import { AssistantOrb } from "./assistant-orb";
 import { CardView, NoticeCard } from "./cards";
-import { CopyButton } from "./copy-button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { MessageText } from "./message-text";
 import type { ChatMessage } from "./types";
 
