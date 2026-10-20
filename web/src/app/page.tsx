@@ -41,10 +41,7 @@ export default async function Home({ searchParams }: Props) {
   const terminal = access === "operator";
   const model = modelSummary();
   const assistant: AssistantInfo = {
-    scope: {
-      ...scopeOf(chosen),
-      detail: chosen ? [chosen.template, chosen.target].join(" · ") : views.length ? `${views.length} saved ${views.length === 1 ? "run" : "runs"}` : "nothing saved yet",
-    },
+    scope: scopeOf(chosen),
     runs: scopedViews(views, null).map((v) => ({ ...runRef(v), status: v.status })),
     prompts: welcomePrompts(scopedViews(views, chosen?.uid ?? null)),
     operator: hasRole(role, "operator"),

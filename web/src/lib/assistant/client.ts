@@ -1,11 +1,41 @@
 /* The page's side of the AI Assistant's routes (browser only): ask a question and read the
-   NDJSON answer frame by frame, and list, read, rename and delete saved conversations. Every
-   answer is checked against the shared schemas before the page uses it. */
+   NDJSON answer frame by frame, list, read, rename and delete saved conversations, and turn a
+   saved conversation into the messages the page shows. Every answer is checked against the
+   shared schemas before the page uses it. */
 import { z } from "zod";
 
 import { type Conversation, ConversationSchema, type ConversationSummary, ConversationSummarySchema } from "./history-schema";
 import { conversationRoute, CONVERSATIONS_ROUTE, ASSISTANT_ROUTE } from "./paths";
-import { createFrameReader, type Frame } from "./protocol";
+import { type Card, createFrameReader, type Frame, isConversationId } from "./protocol";
+
+/** A message of the open conversation, as the page holds it. */
+export type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  cards?: Card[]; // verified cards shown with a reply (built by the server from the saved data)
+  state?: "streaming" | "error" | "stopped"; // none: answered
+  detail?: string; // what went wrong (state "error")
+  question?: string; // the question a failed reply answers (for Retry)
+};
+
+/** A saved conversation as the page shows it. */
+export function toMessages(c: Conversation): ChatMessage[] {
+  const questions = new Map(c.messages.filter((m) => m.role === "user").map((m) => [m.id, m.content]));
+  return c.messages.map((m) =>
+    m.role === "user"
+      ? { id: m.id, role: "user", content: m.content }
+      : {
+          id: m.id,
+          role: "assistant",
+          content: m.content,
+          cards: m.cards,
+          state: m.state === "done" ? undefined : m.state,
+          detail: m.detail,
+          question: questions.get(m.replyTo),
+        },
+  );
+}
 
 export type Failure = { ok: false; status: number; detail: string };
 
@@ -37,11 +67,20 @@ export interface AskBody {
   retry?: boolean;
 }
 
-/** Asks and calls `onFrame` for each frame as it arrives. Resolves when the answer ends
-    (`complete`: its "done" frame came); rejects when `signal` aborts it (Stop). */
-export async function askQuestion(body: AskBody, signal: AbortSignal, onFrame: (frame: Frame) => void): Promise<{ ok: true; complete: boolean } | Failure> {
+/** Asks and calls `onFrame` for each frame as it arrives. `onStart` gets the conversation's id
+    from the response header, before any frame (a Stop right away still knows it). Resolves when
+    the answer ends (`complete`: its "done" frame came); rejects when `signal` aborts it (Stop)
+    or the connection breaks. */
+export async function askQuestion(
+  body: AskBody,
+  signal: AbortSignal,
+  onFrame: (frame: Frame) => void,
+  onStart?: (conversationId: string) => void,
+): Promise<{ ok: true; complete: boolean } | Failure> {
   const response = await fetch(ASSISTANT_ROUTE, { method: "POST", headers: json, body: JSON.stringify(body), signal });
   if (!response.ok || !response.body) return failure(response);
+  const id = response.headers.get("x-conversation-id");
+  if (isConversationId(id)) onStart?.(id);
   let complete = false;
   const frames = createFrameReader((frame) => {
     if (frame.t === "done") complete = true;
@@ -97,7 +136,8 @@ export async function deleteConversation(id: string): Promise<{ ok: true } | Fai
   return result.ok ? { ok: true } : result;
 }
 
-export async function deleteAllConversations(): Promise<{ ok: true } | Failure> {
-  const result = await call(CONVERSATIONS_ROUTE, { method: "DELETE" }, z.object({ deleted: z.number() }));
-  return result.ok ? { ok: true } : result;
+/** Deletes every conversation; `deleted` is how many the server removed. */
+export async function deleteAllConversations(): Promise<{ ok: true; deleted: number } | Failure> {
+  const result = await call(CONVERSATIONS_ROUTE, { method: "DELETE" }, z.object({ deleted: z.number().int().min(0) }));
+  return result.ok ? { ok: true, deleted: result.value.deleted } : result;
 }
