@@ -1,2 +1,65 @@
 /* The findings view. Owner: the findings workstream (docs/WEB_REDESIGN_V3_PLAN.md). Colours only from the
-   tokens (tokens.css); meanings from lib/status.ts. */
+   tokens (tokens.css); meanings from lib/status.ts.
+
+   The view is a column: the header, the filters, a notice, then the list / detail split
+   (components/ui/list-detail.tsx, styles/ui.css .ui-split) and the footnote. The list pane holds
+   ten rows and the pager; the detail pane the chosen finding with its header first.
+
+   Scrolling (the README's rule): below the fixed desktop frame the window scrolls and nothing
+   here scrolls inside. On the fixed frame (≥1280×760) the view fills the content area, so the
+   page never scrolls because of the list: the rows scroll under the filters with the pager kept
+   in reach, and the detail keeps its header in view and scrolls its body only when the finding
+   is taller than the frame. */
+
+/* ---- The column ---- */
+.dash-findings { display: flex; flex-direction: column; min-height: 0; }
+.dash-findings > * { flex: none; }
+.dash-findings > .ui-split { flex: 1 1 auto; min-height: 0; }
+
+/* ---- The list pane: the rows, then the pager ---- */
+.dash-findings-list { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.dash-findings-rows { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.dash-findings-pager { flex: none; }
+.dash-finding-row {
+  width: 100%;
+  text-align: left;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--card), var(--card-2));
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.dash-finding-row:hover { border-color: color-mix(in oklab, var(--primary) 30%, var(--border)); }
+.dash-finding-row[aria-current="true"] {
+  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+  background: color-mix(in oklab, var(--primary) 6%, var(--card));
+}
+
+/* ---- The detail pane: the header, then the body ---- */
+.dash-finding { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+.dash-finding-head { display: flex; flex-direction: column; gap: 8px; flex: none; }
+.dash-finding-body { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+
+/* ---- Phones and tablets (<1024): one pane at a time; the filters belong to the list ---- */
+@media (max-width: 1023.98px) {
+  .dash-findings[data-pane="detail"] .dash-findings-filters,
+  .dash-findings[data-pane="detail"] .dash-findings-notice { display: none; }
+}
+
+/* ---- The fixed desktop frame: the view fills the content area and the panes scroll inside ---- */
+@media (min-width: 1280px) and (min-height: 760px) {
+  .dash-content > div:has(> .dash-findings) { height: 100%; }
+  .dash-findings { height: 100%; }
+  .dash-findings-list { height: 100%; }
+  .dash-findings-rows {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-width: thin;
+    /* room for the rows' focus ring and hover border inside the scroller's clip */
+    padding: 2px;
+    margin: -2px;
+    scroll-padding-block: 2px;
+  }
+  .dash-finding { max-height: 100%; }
+  .dash-finding-body { flex: 1 1 auto; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin; }
+}

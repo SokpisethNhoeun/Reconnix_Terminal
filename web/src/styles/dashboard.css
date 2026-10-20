@@ -498,22 +498,7 @@
 }
 .dash-target-row:hover { background: color-mix(in oklab, var(--foreground) 4%, transparent); }
 
-/* Findings view rows */
-.dash-findings { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); align-items: start; }
-@media (min-width: 1024px) { .dash-findings { grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); } }
-.dash-finding-row {
-  width: 100%;
-  text-align: left;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: linear-gradient(180deg, var(--card), var(--card-2));
-  transition: border-color 0.2s ease, background-color 0.2s ease;
-}
-.dash-finding-row:hover { border-color: color-mix(in oklab, var(--primary) 30%, var(--border)); }
-.dash-finding-row[aria-current="true"] {
-  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
-  background: color-mix(in oklab, var(--primary) 6%, var(--card));
-}
+/* (the Findings view's rows live in findings.css) */
 
 /* ---- Reduced motion: the dashboard's loops and enter animations off, nothing hidden ---- */
 @media (prefers-reduced-motion: reduce) {
