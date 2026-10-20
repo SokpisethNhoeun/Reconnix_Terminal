@@ -27,8 +27,20 @@ const CLOSED_AS: Record<string, string> = { fixed: "Fixed", accepted: "Accepted"
 /** A finding's review badge label: Confirmed, Needs review, or why it is closed. */
 export function reviewLabel(f: FindingRow): string {
   const v = validationOf(f);
-  return v === "closed" ? (CLOSED_AS[f.status] ?? FINDING_REVIEW.closed.label) : FINDING_REVIEW[v].label;
+  // hasOwn: a saved status is data, and "constructor" must not find Object's
+  return v === "closed" ? (Object.hasOwn(CLOSED_AS, f.status) ? CLOSED_AS[f.status] : FINDING_REVIEW.closed.label) : FINDING_REVIEW[v].label;
 }
+
+/** The view's first line: how many findings, across how many assessments when every run is shown. */
+export function findingsHeadline(total: number, across: number | null): string {
+  if (total === 0) return across !== null ? "No findings in any saved assessment yet." : "No findings in this assessment yet.";
+  const runs = across !== null ? ` across ${across} ${across === 1 ? "assessment" : "assessments"}` : "";
+  return `${total} ${total === 1 ? "finding" : "findings"}${runs} · select one to see its evidence and remediation.`;
+}
+
+/** Whether an address's `finding` value looks like a key the view hands out (`F-001`, or
+    `<uid>~F-001` across runs), so a notice may repeat it; anything else is never echoed. */
+export const safeFindingKey = (value: string): boolean => /^[\w.-]{1,48}(~[\w.-]{1,48})?$/.test(value);
 
 export interface FindingFilter {
   sev: string[]; // severities to keep (empty: all)

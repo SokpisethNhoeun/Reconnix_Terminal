@@ -20,7 +20,7 @@ export function FindingsList({
   onPage,
 }: {
   rows: FindingRow[];
-  currentKey: string | null;
+  currentKey: string | null; // the highlighted row (the selection, or the row a phone opened last)
   paging: Paging;
   onOpen: (key: string) => void;
   onPage: (page: number) => void;
@@ -49,6 +49,9 @@ export function FindingsList({
             <li key={f.key}>
               <button
                 type="button"
+                data-finding-key={f.key}
+                data-finding-id={f.id}
+                data-severity={f.severity}
                 aria-current={f.key === currentKey ? "true" : undefined}
                 onClick={() => onOpen(f.key)}
                 className="dash-finding-row flex items-start gap-3 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

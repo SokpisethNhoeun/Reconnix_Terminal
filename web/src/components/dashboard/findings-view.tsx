@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 
 import type { FindingRow } from "@/components/dashboard/derive";
@@ -14,10 +14,12 @@ import {
   filterActive,
   filterPatch,
   findingMatches,
+  findingsHeadline,
   neighbours,
   pagePatch,
   parseFindingFilter,
   resolveFindingsPage,
+  safeFindingKey,
   sortFindings,
   validationOf,
 } from "@/components/dashboard/filters";
@@ -31,12 +33,30 @@ const NARROW = "(max-width: 1023.98px)"; // one pane at a time (components/ui/li
 const LINK = "rounded-sm text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const NOTICE_BTN = "rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-/** Adds a history entry that names the finding (a phone's detail pane: Back returns to the list). */
-function pushFinding(key: string): void {
+const narrow = () => window.matchMedia(NARROW).matches;
+
+// --- the phone's history entry -------------------------------------------------------------
+// A row opens the detail pane as a history entry marked in history.state, so Back (the
+// browser's or the pane's) returns to the list; Forward lands on the marked entry again, and
+// its Back still goes back rather than replacing. Next.js keeps its own keys beside ours.
+
+interface FindingState {
+  rxFinding?: boolean; // this page pushed the entry for the detail pane
+}
+
+const pushedHere = (): boolean => (window.history.state as FindingState | null)?.rxFinding === true;
+
+/** Names `key` in the address: as a new history entry (`push`), or in place keeping the mark. */
+function writeFinding(key: string, mode: "push" | "replace"): void {
   const params = new URLSearchParams(window.location.search);
   params.set("finding", key);
-  window.history.pushState(null, "", `?${params.toString()}`);
+  const state: FindingState = { rxFinding: mode === "push" || pushedHere() };
+  window.history[mode === "push" ? "pushState" : "replaceState"](state, "", `?${params.toString()}`);
 }
+
+// Hydrated or not, without an effect: the server snapshot says no, the browser's says yes.
+const subscribeNever = () => () => {};
+const useHydrated = () => useSyncExternalStore(subscribeNever, () => true, () => false);
 
 /**
  * Findings: search and filter chips (severity, validation) over a list of ten rows a page, and
@@ -48,12 +68,15 @@ function pushFinding(key: string): void {
  */
 export function FindingsView({ findings, across = null }: { findings: FindingRow[]; across?: number | null }) {
   const [p, update] = useQueryParams(KEYS);
+  const root = useRef<HTMLDivElement>(null);
   const detail = useRef<HTMLElement>(null);
-  const pushed = useRef(false); // this page pushed the entry the phone's detail pane sits on
-  // The buttons take clicks once the view has mounted: a click replayed from before hydration
-  // would change the address before the router listens for it, and the view would not follow.
-  const [ready, setReady] = useState(false);
-  useEffect(() => setReady(true), []);
+  // The controls act once the view has hydrated: a click replayed from before that would change
+  // the address before the router listens for it, and the view would not follow. Until then
+  // the buttons also take no pointer events (findings.css), so a tester's click waits.
+  const ready = useHydrated();
+  const guard = <A extends unknown[]>(fn: (...args: A) => void) => (...args: A) => { if (ready) fn(...args); };
+  // The row a phone opened last: highlighted and focused again when Back returns to the list.
+  const [lastOpened, setLastOpened] = useState<string | null>(null);
 
   const filter = parseFindingFilter(p);
   const active = filterActive(filter);
@@ -61,39 +84,52 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
   const page = resolveFindingsPage(sorted, findings, p.finding, p.page);
   const { prev, next } = neighbours(sorted, page.index);
   const pane = page.explicit ? "detail" : "list";
+  const highlight = !page.explicit && lastOpened && page.rows.some((f) => f.key === lastOpened) ? lastOpened : page.current?.key ?? null;
 
   // A row: on a phone or tablet the detail pane replaces the list, as a history entry.
-  const open = (key: string) => {
-    if (!window.matchMedia(NARROW).matches) return update({ finding: key });
-    pushFinding(key);
-    pushed.current = true;
-  };
-  const back = () => {
-    if (pushed.current) {
-      pushed.current = false;
-      window.history.back();
-      return;
-    }
+  const open = guard((key: string) => {
+    if (!narrow()) return update({ finding: key });
+    setLastOpened(key);
+    writeFinding(key, "push");
+  });
+  const select = guard((key: string) => {
+    if (narrow() && page.explicit) return writeFinding(key, "replace"); // the pane stays, and so does its mark
+    update({ finding: key, page: "" });
+  });
+  const back = guard(() => {
+    if (pushedHere()) return window.history.back();
     update({ finding: "" }); // a link or a reload opened the detail: nothing to go back to
-  };
-  useEffect(() => {
-    const onPop = () => (pushed.current = false);
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, []);
-  // The phone's detail pane starts at its top (the list may have been scrolled far down). The
-  // window scrolls there (never scrollIntoView: it would move where the keyboard's Tab starts).
-  useEffect(() => {
-    const top = detail.current?.getBoundingClientRect().top;
-    if (pane !== "detail" || top === undefined || !window.matchMedia(NARROW).matches) return;
-    const margin = 12; // the content area's scroll padding
-    if (top < 0 || top > margin) window.scrollTo({ top: Math.max(0, window.scrollY + top - margin), behavior: "instant" });
-  }, [pane, page.current?.key]);
+  });
 
-  const setFilter = (patch: Partial<Record<"sev" | "val" | "q", string>>) => {
+  // The phone's panes and the keyboard: the detail pane takes focus and starts at its top (the
+  // list may have been scrolled far down); back on the list, the row opened last takes focus
+  // again, which brings it into view. The window is scrolled by hand, never with scrollIntoView
+  // (that would also move where the keyboard's Tab starts from).
+  const wasPane = useRef(pane);
+  useEffect(() => {
+    const was = wasPane.current;
+    wasPane.current = pane;
+    if (!narrow()) return;
+    if (pane === "detail") {
+      const el = detail.current;
+      if (!el) return;
+      el.focus({ preventScroll: true });
+      const top = el.getBoundingClientRect().top;
+      const margin = 12; // the content area's scroll padding
+      if (top < 0 || top > margin) window.scrollTo({ top: Math.max(0, window.scrollY + top - margin), behavior: "instant" });
+    } else if (was === "detail" && lastOpened) {
+      const el = root.current?.querySelector<HTMLElement>(`[data-finding-key="${CSS.escape(lastOpened)}"]`);
+      if (!el) return;
+      el.focus({ preventScroll: true });
+      const r = el.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > window.innerHeight) window.scrollTo({ top: Math.max(0, window.scrollY + r.top - (window.innerHeight - r.height) / 2), behavior: "instant" });
+    }
+  }, [pane, page.current?.key, lastOpened]);
+
+  const setFilter = guard((patch: Partial<Record<"sev" | "val" | "q", string>>) => {
     const nextFilter = parseFindingFilter({ ...p, ...patch });
     update({ ...patch, ...filterPatch(findings, nextFilter, p.finding) });
-  };
+  });
   const clearFilters = () => setFilter({ sev: "", val: "", q: "" });
 
   const sevChips = countBy(findings, (f) => f.severity, SEVERITY_ORDER)
@@ -103,18 +139,14 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
     const meaning = FINDING_REVIEW[c.value as keyof typeof FINDING_REVIEW];
     return { ...c, label: meaning?.label ?? c.value, color: meaning ? toneColor(meaning.tone) : undefined, hint: meaning?.hint };
   });
+  // the address's finding is repeated only when it looks like a key (it is untrusted input)
+  const named = safeFindingKey(p.finding) ? <span className="font-mono text-foreground">{p.finding}</span> : null;
 
   return (
-    <div className="dash-view dash-findings" data-pane={pane} data-ready={ready ? "" : undefined}>
+    <div ref={root} className="dash-view dash-findings" data-pane={pane} data-ready={ready ? "" : undefined}>
       <header className="mb-3">
         <h1 className="text-[20px] font-medium text-foreground">Findings</h1>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">
-          {findings.length
-            ? `${findings.length} ${findings.length === 1 ? "finding" : "findings"}${across !== null ? ` across ${across} ${across === 1 ? "assessment" : "assessments"}` : ""} · select one to see its evidence and remediation.`
-            : across !== null
-              ? "No findings in any saved assessment yet."
-              : "No findings in this assessment yet."}
-        </p>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">{findingsHeadline(findings.length, across)}</p>
       </header>
 
       {findings.length > 0 && (
@@ -151,21 +183,21 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
         <p role="status" className="dash-findings-notice mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
           <span className="min-w-0 break-all">
             {page.missing === "filtered" ? (
+              <>{named ?? "The finding this link names"} is hidden by the filters.</>
+            ) : named ? (
               <>
-                <span className="font-mono text-foreground">{p.finding}</span> is hidden by the filters.
+                No finding {named} in {across !== null ? "the saved assessments" : "this assessment"}.
               </>
             ) : (
-              <>
-                No finding <span className="font-mono text-foreground">{p.finding.slice(0, 48)}</span> in {across !== null ? "the saved assessments" : "this assessment"}.
-              </>
+              "This link names a finding that isn't here."
             )}
           </span>
           {page.missing === "filtered" && (
-            <button type="button" onClick={() => update({ sev: "", val: "", q: "", page: "" })} className={NOTICE_BTN}>
+            <button type="button" onClick={guard(() => update({ sev: "", val: "", q: "", page: "" }))} className={NOTICE_BTN}>
               Show it
             </button>
           )}
-          <button type="button" onClick={() => update({ finding: "" })} className={NOTICE_BTN}>
+          <button type="button" onClick={guard(() => update({ finding: "" }))} className={NOTICE_BTN}>
             Dismiss
           </button>
         </p>
@@ -177,19 +209,8 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
           onBack={back}
           backLabel="Back to the findings"
           listLabel="Findings list"
-          list={
-            <FindingsList rows={page.rows} currentKey={page.current.key} paging={page.paging} onOpen={open} onPage={(n) => update(pagePatch(sorted, n, p.finding))} />
-          }
-          detail={
-            <FindingDetail
-              ref={detail}
-              finding={page.current}
-              position={{ index: page.index, total: sorted.length }}
-              prev={prev}
-              next={next}
-              onSelect={(key) => update({ finding: key, page: "" })}
-            />
-          }
+          list={<FindingsList rows={page.rows} currentKey={highlight} paging={page.paging} onOpen={open} onPage={guard((n: number) => update(pagePatch(sorted, n, p.finding)))} />}
+          detail={<FindingDetail ref={detail} finding={page.current} position={{ index: page.index, total: sorted.length }} prev={prev} next={next} onSelect={select} />}
         />
       )}
 

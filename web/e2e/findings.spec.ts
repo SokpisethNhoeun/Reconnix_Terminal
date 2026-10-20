@@ -14,9 +14,11 @@ const rows = (page: Page) => list(page).getByRole("listitem");
 const selected = (page: Page) => list(page).locator('button[aria-current="true"]');
 const pager = (page: Page) => page.getByRole("navigation", { name: "Finding pages" });
 const detail = (page: Page) => page.getByRole("article", { name: /^Finding / });
-/** A row's finding ID and severity, as the row shows them. */
-const rowId = (page: Page, i: number) => rows(page).nth(i).locator("button span span span").first().innerText();
-const rowSeverity = async (page: Page, i: number) => (await rows(page).nth(i).locator("button span span span").nth(1).innerText()).toUpperCase();
+const row = (page: Page, i: number) => rows(page).nth(i).locator("button");
+/** A row's finding ID and severity (the row's data hooks). */
+const rowId = async (page: Page, i: number) => (await row(page, i).getAttribute("data-finding-id"))!;
+const rowSeverity = async (page: Page, i: number) => (await row(page, i).getAttribute("data-severity"))!;
+const notice = (page: Page) => page.locator(".dash-findings-notice");
 const param = (page: Page, key: string) => new URL(page.url()).searchParams.get(key);
 /** Open an address and wait for the page to settle: a click before hydration is replayed, but the
     address change it makes can then slip past the router (the view would not follow it). */
@@ -105,7 +107,7 @@ test("a finding the address names but the list lacks falls back to the first row
   await signIn(page);
   // unknown: nothing by that name in any run
   await go(page, "/?view=findings&finding=no-such-finding");
-  await expect(page.getByRole("status").filter({ hasText: "No finding" })).toContainText("no-such-finding");
+  await expect(notice(page)).toContainText("No finding no-such-finding");
   await expect(selected(page)).toHaveCount(1);
   await expect(detail(page)).toBeVisible();
   await page.getByRole("button", { name: "Dismiss" }).click();
@@ -118,12 +120,17 @@ test("a finding the address names but the list lacks falls back to the first row
   const sev = await rowSeverity(page, 0);
   const other = a.findings.find((x) => x.severity !== sev)!.severity;
   await go(page, `/?uid=${a.uid}&view=findings&sev=${other}&finding=${fid}`);
-  await expect(page.getByRole("status").filter({ hasText: "hidden by the filters" })).toContainText(fid);
+  await expect(notice(page)).toContainText(`${fid} is hidden by the filters`);
   await page.getByRole("button", { name: "Show it" }).click();
   await expect(page).not.toHaveURL(/sev=/);
   await expect(page).toHaveURL(new RegExp(`finding=${fid}`));
   await expect(selected(page)).toContainText(fid);
-  await expect(page.getByRole("status")).toHaveCount(0);
+  await expect(notice(page)).toHaveCount(0);
+
+  // a value that is no key is never repeated
+  await go(page, `/?uid=${a.uid}&view=findings&finding=${encodeURIComponent("<b>x</b> y")}`);
+  await expect(notice(page)).toHaveText(/This link names a finding that isn't here\./);
+  await expect(notice(page)).not.toContainText("<b>");
 });
 
 test.describe("on the fixed frame (1366×768)", () => {
@@ -163,14 +170,24 @@ test.describe("on the fixed frame (1366×768)", () => {
     const pagerBox = (await pager(page).boundingBox())!;
     expect(pagerBox.y + pagerBox.height).toBeLessThanOrEqual(768);
 
-    // the detail: its header (ID, severity, CVSS, title) stays in view when its body scrolls
+    // the detail: its header (ID, severity, CVSS, title) stays in view when its body scrolls.
+    // The finding: the first on the page whose body is taller than its pane.
+    const body = page.locator(".dash-finding-body");
+    const bodyScroll = () => body.evaluate((el) => ({ top: el.scrollTop, range: el.scrollHeight - el.clientHeight }));
+    let tall = false;
+    for (let i = 0; i < PER_PAGE && !tall; i++) {
+      await row(page, i).click();
+      await expect(selected(page)).toHaveAttribute("data-finding-key", (await row(page, i).getAttribute("data-finding-key"))!);
+      tall = (await bodyScroll()).range > 20;
+    }
+    expect(tall, "a finding whose detail is taller than the pane").toBe(true);
     const head = detail(page).locator("header").first();
     const headBefore = (await head.boundingBox())!;
     expect(headBefore.y).toBeGreaterThanOrEqual(0);
-    const body = (await detail(page).boundingBox())!;
-    await page.mouse.move(body.x + body.width / 2, body.y + body.height - 40);
+    const bodyBox = (await body.boundingBox())!;
+    await page.mouse.move(bodyBox.x + bodyBox.width / 2, bodyBox.y + bodyBox.height / 2);
     await page.mouse.wheel(0, 600);
-    await page.waitForTimeout(200);
+    await expect.poll(async () => (await bodyScroll()).top, { message: "the body scrolls inside the detail" }).toBeGreaterThan(0);
     const headAfter = (await head.boundingBox())!;
     expect(Math.round(headAfter.y)).toBe(Math.round(headBefore.y));
     expect(await main.evaluate((el) => el.scrollTop)).toBe(0);
@@ -207,8 +224,6 @@ test.describe("on a phone (390×844)", () => {
     await expect(page).not.toHaveURL(/finding=/);
 
     // a link straight to a finding: Back has nothing behind it and still returns to the list
-    const key = await rows(page).first().locator("button").evaluate(() => new URL(location.href).searchParams.get("finding"));
-    expect(key).toBeNull();
     await rows(page).first().locator("button").tap();
     const direct = page.url();
     await go(page, direct);
@@ -221,5 +236,42 @@ test.describe("on a phone (390×844)", () => {
     await expect(page).toHaveURL(/page=2/);
     await expect(rows(page)).toHaveCount(Math.min(PER_PAGE, TOTAL - PER_PAGE));
     await expect(list(page)).toBeVisible();
+  });
+
+  test("the detail takes focus; Back returns to the opened row, highlighted and focused; Forward keeps a Back", async ({ page }) => {
+    await signIn(page);
+    await go(page, "/?view=findings");
+    const back = page.getByRole("button", { name: "Back to the findings" });
+    const focusedKey = () => page.evaluate(() => (document.activeElement as HTMLElement | null)?.closest<HTMLElement>("[data-finding-key], article")?.getAttribute("data-finding-key") ?? document.activeElement?.tagName);
+    const eighth = (await row(page, 7).getAttribute("data-finding-key"))!;
+
+    // row 8 (well down the list): the detail takes focus
+    await row(page, 7).tap();
+    await expect(detail(page)).toBeVisible();
+    await expect.poll(focusedKey).toBe("ARTICLE");
+    await expect(detail(page)).toContainText(`8 of ${TOTAL}`);
+    // Back: row 8 is highlighted and focused again (and so in view)
+    await back.tap();
+    await expect(list(page)).toBeVisible();
+    await expect(selected(page)).toHaveAttribute("data-finding-key", eighth);
+    await expect.poll(focusedKey).toBe(eighth);
+    await expect.poll(async () => {
+      const box = (await row(page, 7).boundingBox())!;
+      return box.y >= 0 && box.y + box.height <= 844;
+    }, { message: "row 8 is in view" }).toBe(true);
+
+    // Back then Forward: the pane's Back still goes back (Forward reaches the detail again)
+    await row(page, 2).tap();
+    await expect(detail(page)).toBeVisible();
+    await page.goBack();
+    await expect(list(page)).toBeVisible();
+    await page.goForward();
+    await expect(detail(page)).toBeVisible();
+    await back.tap();
+    await expect(list(page)).toBeVisible();
+    await expect(page).not.toHaveURL(/finding=/);
+    await page.goForward();
+    await expect(detail(page)).toBeVisible(); // the entry was left behind, not replaced
+    await expect(page).toHaveURL(/finding=/);
   });
 });

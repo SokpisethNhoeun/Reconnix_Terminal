@@ -13,7 +13,8 @@
 
 /* ---- The column ---- */
 .dash-findings { display: flex; flex-direction: column; min-height: 0; }
-/* until the view has mounted (data-ready) its buttons take no clicks: see findings-view.tsx */
+/* until the view has hydrated (data-ready) its buttons take no pointer events (the handlers
+   ignore the keyboard themselves until then): see findings-view.tsx */
 .dash-findings:not([data-ready]) button { pointer-events: none; }
 .dash-findings > * { flex: none; }
 .dash-findings > .ui-split { flex: 1 1 auto; min-height: 0; }
@@ -47,7 +48,11 @@
   .dash-findings[data-pane="detail"] .dash-findings-notice { display: none; }
 }
 
-/* ---- The fixed desktop frame: the view fills the content area and the panes scroll inside ---- */
+/* ---- The fixed desktop frame: the view fills the content area and the panes scroll inside ----
+   The breakpoint is the frame's (frame.css) and ui.css's .ui-split uses the same one: change
+   them together. The first rule reaches the plain <div hidden={…}> the viewer (viewer.tsx)
+   wraps each view in, which has no class of its own: the height chain from .dash-content down
+   to the panes needs it to be 100% tall too. */
 @media (min-width: 1280px) and (min-height: 760px) {
   .dash-content > div:has(> .dash-findings) { height: 100%; }
   .dash-findings { height: 100%; }

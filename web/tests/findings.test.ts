@@ -4,7 +4,18 @@
 import { describe, expect, it } from "vitest";
 
 import { deriveDashboard, findingRow } from "@/components/dashboard/derive";
-import { filterActive, filterPatch, neighbours, pagePatch, pageParam, parseFindingFilter, resolveFindingsPage, sortFindings } from "@/components/dashboard/filters";
+import {
+  filterActive,
+  filterPatch,
+  findingsHeadline,
+  neighbours,
+  pagePatch,
+  pageParam,
+  parseFindingFilter,
+  resolveFindingsPage,
+  safeFindingKey,
+  sortFindings,
+} from "@/components/dashboard/filters";
 import { assessmentView } from "@/lib/data/adapt";
 import { PER_PAGE } from "@/lib/paging";
 
@@ -112,5 +123,24 @@ describe("neighbours", () => {
     expect(neighbours(many, 9)).toEqual({ prev: many[8], next: many[10] }); // page 1 → page 2
     expect(neighbours(many, 29)).toEqual({ prev: many[28], next: null });
     expect(neighbours(many, -1)).toEqual({ prev: null, next: null });
+  });
+});
+
+describe("findingsHeadline", () => {
+  it("counts the findings, and the assessments when every run is shown", () => {
+    expect(findingsHeadline(18, 6)).toBe("18 findings across 6 assessments · select one to see its evidence and remediation.");
+    expect(findingsHeadline(1, 1)).toBe("1 finding across 1 assessment · select one to see its evidence and remediation.");
+    expect(findingsHeadline(3, null)).toBe("3 findings · select one to see its evidence and remediation.");
+    expect(findingsHeadline(0, null)).toBe("No findings in this assessment yet.");
+    expect(findingsHeadline(0, 4)).toBe("No findings in any saved assessment yet.");
+  });
+});
+
+describe("safeFindingKey", () => {
+  it("accepts the keys the view hands out and nothing else", () => {
+    expect(safeFindingKey("F-001")).toBe(true);
+    expect(safeFindingKey("IMP-002")).toBe(true);
+    expect(safeFindingKey("20261005-140300-9f76_RCX-DEMO-002~F-001")).toBe(true);
+    for (const bad of ["", "<script>", "F-001 ", "a~b~c", "x".repeat(49), "F-001?x=1", "run~F-001\n"]) expect(safeFindingKey(bad)).toBe(false);
   });
 });

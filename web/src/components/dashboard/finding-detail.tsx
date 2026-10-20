@@ -3,7 +3,9 @@
 /* The chosen finding: its header (ID, severity, rating, CVSS, title, Previous / Next in the
    filtered order) and, under it, the facts, description, masked evidence (scrolls sideways
    inside), remediation and validation. On the fixed desktop frame the header stays put and only
-   the body scrolls, and only when the finding is taller than the frame (styles/findings.css). */
+   the body scrolls, and only when the finding is taller than the frame (styles/findings.css).
+   Focusable (a phone's detail pane takes focus when a row opens it); a screen reader hears which
+   finding is selected and where it sits, not the whole article. */
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { forwardRef } from "react";
@@ -17,6 +19,9 @@ import { cn } from "@/lib/utils";
 
 const WRAP = "[overflow-wrap:anywhere]"; // saved text may hold long unbroken tokens (URLs, payloads)
 const LINK = "rounded-sm font-mono text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+// at the ends the buttons stay focusable (aria-disabled), so focus is never dropped
+const NAV_BTN = "size-7 aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent aria-disabled:hover:text-muted-foreground";
 
 const EV_STYLE: Record<string, string> = {
   request: "text-muted-foreground",
@@ -37,7 +42,15 @@ const runHref = (f: FindingRow) => (f.run ? `/?uid=${encodeURIComponent(f.run.ui
 
 export const FindingDetail = forwardRef<HTMLElement, FindingDetailProps>(function FindingDetail({ finding: f, position, prev, next, onSelect }, ref) {
   return (
-    <article ref={ref} className="dash-card dash-finding scroll-mt-4 p-4" aria-live="polite" aria-label={`Finding ${f.id}`}>
+    <article
+      ref={ref}
+      tabIndex={-1}
+      className="dash-card dash-finding scroll-mt-4 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label={`Finding ${f.id}`}
+    >
+      <p role="status" className="sr-only">
+        Finding {f.id} selected
+      </p>
       <header className="dash-finding-head">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-xs text-muted-foreground">{f.id}</span>
@@ -45,13 +58,13 @@ export const FindingDetail = forwardRef<HTMLElement, FindingDetailProps>(functio
           <span className="font-mono text-xs text-muted-foreground">{f.rating}</span>
           {f.score != null && <span className="ml-auto text-[26px] leading-none tabnums text-foreground">{f.score.toFixed(1)}</span>}
           <nav aria-label="Finding order" className={cn("flex items-center gap-0.5", f.score == null && "ml-auto")}>
-            <IconButton label="Previous finding" className="size-7" disabled={!prev} onClick={() => prev && onSelect(prev.key)}>
+            <IconButton label="Previous finding" className={NAV_BTN} aria-disabled={!prev || undefined} onClick={() => prev && onSelect(prev.key)}>
               <ChevronLeft aria-hidden />
             </IconButton>
             <span className="min-w-[4.5em] text-center font-mono text-[11px] tabnums text-muted-foreground" aria-live="polite">
               {position.index + 1} of {position.total}
             </span>
-            <IconButton label="Next finding" className="size-7" disabled={!next} onClick={() => next && onSelect(next.key)}>
+            <IconButton label="Next finding" className={NAV_BTN} aria-disabled={!next || undefined} onClick={() => next && onSelect(next.key)}>
               <ChevronRight aria-hidden />
             </IconButton>
           </nav>
