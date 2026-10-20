@@ -189,8 +189,8 @@ export const terminalGuide: GroupContent = {
           <p>
             A command whose argument is picked from a list asks with a menu when you leave it out:{" "}
             <Mono>/finding</Mono> asks &quot;Which finding?&quot; and <Mono>/export</Mono> &quot;Export the report as…&quot;.
-            If there is nothing to choose from yet, it says so (&quot;No findings yet. They appear as testing finds
-            them.&quot;). <Mono>/template</Mono> only suggests the template ids: without one it opens the Template screen.
+            An argument that matches none of the choices opens the same menu (it is never an error). If there is nothing
+            to choose from yet, it says so (&quot;No findings yet. They appear as testing finds them.&quot;). <Mono>/template</Mono> only suggests the template ids: without one it opens the Template screen.
             Unavailable choices are shown dimmed and cannot be picked.
           </p>
         </DocSection>

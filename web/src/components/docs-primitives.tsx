@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Info, PencilLine, TriangleAlert } from "lucide-react";
+import { Info, TriangleAlert } from "lucide-react";
 import { CopyButton } from "@/components/ui/copy-button";
 import { cn } from "@/lib/utils";
 
@@ -59,10 +59,9 @@ export function Kbd({ children }: { children: React.ReactNode }) {
 const CALLOUTS = {
   note: { icon: Info, box: "border-primary/30 bg-primary/5", tone: "text-primary" },
   warning: { icon: TriangleAlert, box: "border-accent/40 bg-accent/5", tone: "text-accent" },
-  draft: { icon: PencilLine, box: "border-dashed border-muted-foreground/40 bg-muted/40", tone: "text-muted-foreground" },
 } as const;
 
-/** Note (teal), warning (amber, approval gates and risks) or draft (grey, content pending). */
+/** Note (teal) or warning (amber, approval gates and risks). */
 export function Callout({
   variant = "note",
   title,
@@ -108,7 +107,7 @@ export type TableRow = { key: React.ReactNode; value: React.ReactNode };
 export function DocTable({ head, rows, caption }: { head: [string, string]; rows: TableRow[]; caption: string }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full text-left text-sm">
+      <table className="docs-table w-full text-left text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead className="bg-card font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
           <tr>
@@ -123,7 +122,7 @@ export function DocTable({ head, rows, caption }: { head: [string, string]; rows
         <tbody>
           {rows.map((r, i) => (
             <tr key={i} className="border-t border-border align-top">
-              <th scope="row" className="whitespace-nowrap p-3 font-mono text-xs font-medium text-foreground">
+              <th scope="row" className="max-w-[22rem] whitespace-normal break-words p-3 font-mono text-xs font-medium text-foreground">
                 {r.key}
               </th>
               <td className="p-3">{r.value}</td>

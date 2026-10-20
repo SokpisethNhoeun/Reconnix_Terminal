@@ -44,8 +44,9 @@ export const assessmentGuide: GroupContent = {
           <ul>
             <li>Start testing. Nothing runs until the scope is approved and the plan is run.</li>
             <li>
-              Start twice: &quot;An assessment is already running. Type /new to start over.&quot; A line typed during a run
-              goes to the assistant instead.
+              Start twice: while a run is going, a line typed at the prompt goes to the assistant, not to a new run;{" "}
+              <Mono>/new</Mono> starts over. (The store&apos;s own refusal, &quot;An assessment is already running. Type /new
+              to start over.&quot;, is never reached from the prompt.)
             </li>
             <li>
               Be empty or too long: &quot;Type a request first.&quot;, &quot;Keep the request under 500 characters.&quot;
@@ -79,7 +80,7 @@ export const assessmentGuide: GroupContent = {
               { key: "Allowed methods", value: "The HTTP methods a request may use (web and API scopes)." },
               { key: "Excluded paths", value: "Paths (or, for a network, hosts and ports; for source, repository paths) the run never touches." },
               { key: "Allowed ports", value: "Network scopes only." },
-              { key: "Time limit", value: "Minutes; once reached, every further request is blocked by policy." },
+              { key: "Time limit", value: "Minutes; once reached, the run stops at its next step (\u201cTime limit reached. Testing stopped.\u201d) and, like any stopped run, cannot be exported; a request checked after that is blocked too." },
               { key: "Tools", value: "The tools the run may use. They decide the target login the plan asks for." },
             ]}
           />
@@ -227,7 +228,8 @@ export const assessmentGuide: GroupContent = {
             head={["Reason", "When"]}
             rows={[
               { key: "Scope not approved", value: "A request before the manifest was approved." },
-              { key: "Time limit reached", value: "The scope's time limit has passed." },
+              { key: "Time limit reached", value: "The scope's time limit has passed (the run itself stops at its next step)." },
+              { key: "Encoded path separators are not allowed", value: "Web and API: the path contains %2F or %5C." },
               { key: "Method <X> not allowed", value: "Web and API: the method is not in the allowed methods." },
               { key: "Host outside approved scope", value: "Another host, scheme or port than the target's; or a network host outside the range." },
               { key: "Malformed request target / Malformed target", value: "The target cannot be read safely (ambiguous encoding, control characters, an unreadable host:port)." },
@@ -375,7 +377,8 @@ export const assessmentGuide: GroupContent = {
         <DocSection title="Stopping">
           <p>
             <Kbd>Ctrl+C</Kbd> on Execution asks &quot;Keep running&quot; or &quot;Stop now&quot; (nothing else runs; the
-            findings so far are kept). Rejecting the scope or a gated action also stops the run. A stopped assessment
+            findings so far are kept). Rejecting the scope or a gated action also stops the run, and so does the scope&apos;s
+            time limit (&quot;Time limit reached. Testing stopped.&quot;). A stopped assessment
             cannot be resumed: <Mono>/new</Mono> starts another, and the stopped one keeps its partial findings under{" "}
             <Mono>/assessments</Mono>. With no run going, stopping says &quot;No assessment is running.&quot;
           </p>
@@ -428,7 +431,8 @@ export const assessmentGuide: GroupContent = {
         <DocSection title="What you need">
           <Steps>
             <li>
-              The backend harness: <Mono>pip install -e backend</Mono> (it adds litellm, mcp and pyyaml). Without it:
+              The backend harness: <Mono>pip install -e backend</Mono> (it adds litellm, mcp and pyyaml, and needs{" "}
+              <strong>Python 3.10 or later</strong>, unlike the terminal&apos;s 3.9). Without it:
               &quot;The harness backend isn&apos;t installed (pip install -e backend).&quot;
             </li>
             <li>
@@ -453,7 +457,7 @@ export const assessmentGuide: GroupContent = {
               <Mono>/assess &lt;target&gt;</Mono> (alias <Mono>/agent</Mono>), or simply a target typed at the prompt while a
               model is active, builds the run and its scope like the scripted flow and opens the Template screen. Text
               that is not a target is refused: &quot;That doesn&apos;t look like a scan target (URL, host or repo).&quot;
-              A running assessment is left where it is and a fresh one starts.
+              A running assessment is stopped (it stays listed under <Mono>/assessments</Mono>) and a fresh one starts.
             </li>
             <li>
               The scope manifest lists the agent&apos;s whole tool set (the harness&apos;s scanners: gobuster, httpprobe,
@@ -468,8 +472,9 @@ export const assessmentGuide: GroupContent = {
             </li>
             <li>
               When the agent needs a decision it pops a dialog (&quot;AGENT NEEDS YOUR DECISION&quot;, Yes/No or its own
-              options); when it needs a login it pops the secure-input form, and the password, token or cookie is used
-              host-side and never reaches the model.
+              options); when it needs a login it pops the secure-input form. A username and password are exchanged
+              host-side for a session, so the raw password never reaches the model; a <strong>token or cookie</strong>{" "}
+              you type is handed back to the agent as the tool&apos;s result, so it does reach the model and its provider.
             </li>
             <li>
               A line typed during the run continues the same agent (its history is kept). While a turn runs, chat waits:

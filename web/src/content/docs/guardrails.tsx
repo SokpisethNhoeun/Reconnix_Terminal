@@ -156,14 +156,17 @@ export const guardrails: GroupContent = {
           </p>
           <p>
             With the backend harness, the AI agent behind <Mono>/assess</Mono> sees the target, the tool output it
-            gathers and your answers to its questions; logins it asks for are used host-side and never reach the model.
+            gathers and your answers to its questions. A username and password it asks for are exchanged host-side for a
+            session (the raw password never reaches the model); a token or cookie you give it is returned to the agent as
+            the tool&apos;s result, so it reaches the model and its provider.
           </p>
         </DocSection>
         <DocSection title="Where it goes">
           <Callout variant="warning">
             The context is sent to the provider you configured: a local Ollama or endpoint stays on your machine; OpenAI,
-            Anthropic, DeepSeek or a remote endpoint receive it. Check that this is acceptable for the data in your
-            assessment before activating a remote model.
+            Anthropic, DeepSeek or a remote endpoint receive it, and with the AI agent so does a token or cookie you type
+            into its login form. Check that this is acceptable for the data in your assessment before activating a remote
+            model.
           </Callout>
           <p>
             Chat lines and replies are kept in <Mono>~/.reconix/llm.db</Mono> (redacted). The dashboard&apos;s AI Assistant

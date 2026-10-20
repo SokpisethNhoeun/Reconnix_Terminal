@@ -63,7 +63,7 @@ describe("the generated command reference", () => {
     expect(COMMAND_GROUPS).toBe(commandsJson.groups);
     expect(COMMANDS.length).toBe(commandsJson.count);
     expect(new Set(COMMANDS.map((c) => c.name)).size).toBe(COMMANDS.length);
-    expect(COMMANDS.length).toBe(19);
+    expect(COMMANDS.length).toBe(commandsJson.count);
   });
 
   it("has a hand-written page for every command, and no page for a command that is gone", () => {

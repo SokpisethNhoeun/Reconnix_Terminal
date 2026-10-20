@@ -182,7 +182,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
     ),
     errors: [
       { message: "No findings yet. They appear as testing finds them.", meaning: "Nothing has been revealed: run the plan first." },
-      { message: "(nothing happens)", meaning: "An id that matches no finding opens nothing; use the menu to see the ids." },
+      { message: "(the \u201cWhich finding?\u201d menu opens)", meaning: "An id that matches no finding is not an error: the menu opens so you can pick one." },
     ],
   },
   report: {
@@ -215,7 +215,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
     ),
     errors: [
       { message: "The report is available once the assessment is complete.", meaning: "The run is still going or was stopped." },
-      { message: "Unknown report format <x>.", meaning: "Not one of the seven format ids." },
+      { message: "(the \u201cExport the report as…\u201d menu opens)", meaning: "An argument that is not one of the seven format ids is not an error: the menu opens instead." },
       { message: "<Format> reports aren't in this demo.", meaning: "PDF without WeasyPrint or Chrome, or DOCX without python-docx." },
       { message: "PDF export needs WeasyPrint or a Chrome/Chromium browser. / Couldn't render the PDF with the browser. / The browser did not produce a PDF.", meaning: "The PDF engine is missing or failed; export HTML and print it." },
       { message: "Couldn't open it. The report is saved at <path>.", meaning: "The file is written but no browser or app could be launched here." },
@@ -291,7 +291,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
   assess: {
     purpose: "Runs a real assessment of a target with the AI agent, through the same scope gate.",
     when: "When a model is active and the backend harness is installed, to let the agent plan and run tools against an authorized target.",
-    syntax: "/assess <target>",
+    syntax: "/assess <target>",   // needs the harness (Python 3.10+) and a /model
     example: "/assess http://target.example.com",
     behaviour: (
       <>
@@ -299,7 +299,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
         agent&apos;s whole tool set. Approving the scope hands the assessment to the agent, which runs on the Execution
         screen: its plan as task rows, its tool calls in the live output, its findings as <Mono>AI-NNN</Mono> findings.
         It asks for decisions and logins through dialogs; a chat line continues it; <Mono>/model</Mono> switches its model
-        mid-run. A running assessment is left where it is. See{" "}
+        mid-run. A running assessment is stopped and stays listed under <Mono>/assessments</Mono>. See{" "}
         <DocLink href="/docs/assessment-guide/ai-agent">The AI agent</DocLink>.
       </>
     ),
@@ -310,7 +310,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
       { message: "That doesn't look like a scan target (URL, host or repo).", meaning: "The argument names no target." },
       { message: "No LLM model is active. Use /model to pick one.", meaning: "The model was removed while the agent was running." },
       { message: "The assessment is running — you can chat once it finishes.", meaning: "A chat line while a turn runs; wait." },
-      { message: "Agent error: <detail>", meaning: "The harness failed; the run is marked finished and the terminal keeps working." },
+      { message: "Agent error: <the Python error>", meaning: "The harness failed; the run is marked finished and the terminal keeps working." },
     ],
   },
   provider: {
@@ -333,7 +333,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
       { message: "The base URL must start with http:// or https://. / Put the API key in the key field, not in the base URL.", meaning: "The base URL is not a plain http(s) URL." },
       { message: "<Provider> holds a single model. / Reconix's base URL comes from .env and can't be changed.", meaning: "That provider's rules; see the catalog." },
       { message: "<Provider> is not configured (yet).", meaning: "Test, use or unset before set." },
-      { message: "Unreachable — <detail>", meaning: <>The test failed; see <DocLink href="/docs/ai-models/errors">Common errors</DocLink>.</> },
+      { message: "<Provider>: UNREACHABLE — <detail>", meaning: <>The test failed; see <DocLink href="/docs/ai-models/errors">Common errors</DocLink>.</> },
     ],
   },
   model: {
@@ -345,7 +345,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
       <>
         Without an argument, a menu lists every model of every configured provider (disabled until its provider is
         Reachable). With <Mono>provider/model</Mono>, that model becomes active at once: the top bar shows{" "}
-        <Mono>llm: &lt;provider&gt; · &lt;model&gt; ●</Mono>, the chat notes the switch, and a running agent is repointed
+        <Mono>llm: &lt;provider label&gt; · &lt;model&gt; ●</Mono>, the chat notes the switch, and a running agent is repointed
         with its history kept. The run, findings and approvals are untouched. See{" "}
         <DocLink href="/docs/ai-models/models">Models</DocLink>.
       </>

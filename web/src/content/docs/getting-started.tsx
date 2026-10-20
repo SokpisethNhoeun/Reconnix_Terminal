@@ -105,7 +105,7 @@ export const gettingStarted: GroupContent = {
               { key: "DOCX export", value: <>The <Mono>python-docx</Mono> package (<Mono>pip install python-docx</Mono>; it is in <Mono>requirements-dev.txt</Mono>).</> },
               { key: "/web dashboard", value: <>Node.js 20 or later with npm. The first <Mono>/web</Mono> runs <Mono>npm install</Mono> in <Mono>web/</Mono>, which takes a few minutes.</> },
               { key: "A model", value: <>An API key for OpenAI, Anthropic or DeepSeek, a local Ollama, or any OpenAI-compatible endpoint. See <DocLink href="/docs/ai-models">AI models</DocLink>.</> },
-              { key: "/assess (the AI agent)", value: <>A model, the backend harness (<Mono>pip install -e backend</Mono>) and a reachable Kali MCP server configured in <Mono>.env</Mono>. See <DocLink href="/docs/assessment-guide/ai-agent">The AI agent</DocLink>.</> },
+              { key: "/assess (the AI agent)", value: <>A model, the backend harness (<Mono>pip install -e backend</Mono>, which needs <strong>Python 3.10 or later</strong>) and a reachable Kali MCP server configured in <Mono>.env</Mono>. See <DocLink href="/docs/assessment-guide/ai-agent">The AI agent</DocLink>.</> },
             ]}
           />
         </DocSection>
@@ -187,7 +187,7 @@ python run.py         # the launcher in the repository root`}</Code>
             caption="Environment variables the terminal reads"
             head={["Variable", "Meaning"]}
             rows={[
-              { key: "RECONIX_DATA_DIR", value: <>Where saved copies go (default <Mono>~/.reconix/assessments</Mono>). The folder is created 0700 and each file is 0600; a folder that belongs to another user or is group/world-writable is refused.</> },
+              { key: "RECONIX_DATA_DIR", value: <>Where saved copies go (default <Mono>~/.reconix/assessments</Mono>). The folder is created 0700 and each file is 0600; a folder of yours with looser permissions is tightened to 0700, and one that belongs to another user is refused.</> },
               { key: "RECONIX_SAVE", value: <><Mono>0</Mono>, <Mono>false</Mono>, <Mono>no</Mono> or <Mono>off</Mono> turns saving off.</> },
               { key: "RECONIX_WEB_URL_FILE", value: <>Where the dashboard leaves its sign-in link for <Mono>/web</Mono> (default <Mono>~/.reconix/web.url</Mono>). Only a loopback http link is accepted.</> },
               { key: "RECONIX_WEB_LOG", value: <>The dashboard&apos;s log when <Mono>/web</Mono> starts it (default <Mono>~/.reconix/web.log</Mono>).</> },

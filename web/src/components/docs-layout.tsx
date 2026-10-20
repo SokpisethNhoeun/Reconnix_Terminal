@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, ChevronRight } from "lucide-react";
-import { Callout } from "@/components/docs-primitives";
 import { DocsSidebar } from "@/components/docs-sidebar";
 import { DocsToc } from "@/components/docs-toc";
 import { docNeighbours, findDoc } from "@/lib/docs-nav";
@@ -18,7 +17,6 @@ export function DocsLayout({
   href,
   title,
   lede,
-  draft,
   children,
 }: {
   /** this page's route, as listed in DOCS_NAV */
@@ -26,8 +24,6 @@ export function DocsLayout({
   /** defaults to the DOCS_NAV title */
   title?: string;
   lede: string;
-  /** content not written yet: shows the Draft callout above the content */
-  draft?: boolean;
   children: React.ReactNode;
 }) {
   const entry = findDoc(href);
@@ -65,12 +61,6 @@ export function DocsLayout({
         <p className="mt-4 text-lg leading-relaxed text-foreground/85 sm:text-xl">{lede}</p>
 
         <div data-docs-content className="mt-10 space-y-12">
-          {draft && (
-            <Callout variant="draft" title="Draft: content pending">
-              This page is a placeholder. What is shown below is what the Reconix docs already state; the rest is still
-              to be written.
-            </Callout>
-          )}
           {children}
         </div>
 

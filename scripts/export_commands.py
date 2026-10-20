@@ -48,7 +48,7 @@ def _entry(command) -> Dict[str, object]:
 
 
 def build() -> Dict[str, object]:
-    """The reference as plain data: the areas, each with its commands in COMMANDS order."""
+    """The reference as plain data: the areas, each with its commands, in GROUPS order."""
     by_name = {command.name: command for command in COMMANDS}
     placed: List[str] = [name for _, _, names in GROUPS for name in names]
     missing = sorted(set(by_name) - set(placed))

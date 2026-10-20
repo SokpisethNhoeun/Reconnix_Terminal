@@ -18,6 +18,15 @@
 /* long lines stay inside the block on a phone: the block scrolls, the page never does */
 .docs-code pre { max-width: 100%; }
 
+/* ---- Two-column tables (DocTable): below sm the key sits above its meaning, each row a block,
+   so a long message or key never squeezes the other column ---- */
+@media (max-width: 639px) {
+  .docs-table thead { display: none; }
+  .docs-table tbody, .docs-table tr, .docs-table th, .docs-table td { display: block; width: 100%; box-sizing: border-box; }
+  .docs-table th[scope="row"] { max-width: none; padding-bottom: 0.25rem; }
+  .docs-table td { padding-top: 0.25rem; }
+}
+
 /* ---- The sidebar: the tree scrolls inside the sticky column on desktop (the search stays put) ---- */
 .docs-sidebar nav { scrollbar-width: thin; }
 

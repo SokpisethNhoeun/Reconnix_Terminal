@@ -45,7 +45,8 @@ export const aiModels: GroupContent = {
         <DocSection title="Test the connection">
           <p>
             <strong>Test connection</strong> in the submenu, or <Mono>/provider test &lt;id&gt;</Mono>. The test runs in the
-            background (a notification says &quot;Testing …&quot;) and takes at most ten seconds:
+            background (a notification says &quot;Testing …&quot;) and takes up to about twenty seconds (each request
+            waits at most ten):
           </p>
           <ul>
             <li>
@@ -61,11 +62,11 @@ export const aiModels: GroupContent = {
             </li>
           </ul>
           <p>
-            The result is saved on the provider: <strong>Reachable</strong> (&quot;model available&quot; or
-            &quot;reachable&quot;) or <strong>Unreachable</strong> with a short, redacted reason: &quot;model not
-            found&quot;, &quot;bad API key (unauthorized)&quot;, &quot;timed out&quot;, &quot;connection refused&quot;,
-            &quot;no base URL&quot; or &quot;could not reach the model&quot;. Only a Reachable provider&apos;s models can
-            be activated.
+            The result is saved on the provider and shown as a notification, &quot;&lt;Provider&gt;: REACHABLE —
+            model available&quot; (or &quot;reachable&quot;), or <strong>UNREACHABLE</strong> with a short, redacted
+            reason: &quot;model not found&quot;, &quot;bad API key (unauthorized)&quot;, &quot;timed out&quot;,
+            &quot;connection refused&quot; or &quot;could not reach the model&quot;. Only a Reachable provider&apos;s
+            models can be activated.
           </p>
         </DocSection>
         <DocSection title="Use a model, or remove the provider">
@@ -101,7 +102,8 @@ export const aiModels: GroupContent = {
 /model openai/gpt-4o-mini
 /model ollama/llama3.1`}</Code>
           <p>
-            The top bar then shows <Mono>llm: &lt;provider&gt; · &lt;model&gt; ●</Mono>, the chat notes &quot;Switched to
+            The top bar then shows <Mono>llm: &lt;provider label&gt; · &lt;model&gt; ●</Mono> (for example{" "}
+            <Mono>llm: Reconix (default) · your-model-id ●</Mono>), the chat notes &quot;Switched to
             OpenAI · gpt-4o-mini&quot;, and the switch is recorded in the activity log, the audit trail and the{" "}
             <Mono>model_switches</Mono> table of <Mono>llm.db</Mono>. With no configured, reachable provider the command
             says &quot;No models yet. Use /provider to set one up and test it.&quot;
@@ -228,12 +230,11 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
             head={["Message", "Meaning"]}
             rows={[
               { key: "<Provider> is not configured. / … not configured yet.", value: "Set it up first (/provider set <id>)." },
-              { key: "Unreachable — model not found", value: "The model is not in the endpoint's list, or the completion came back 404. Check the model name (for Ollama, pull it first)." },
-              { key: "Unreachable — bad API key (unauthorized)", value: "The endpoint answered 401 or 403, or complained about the key." },
-              { key: "Unreachable — timed out", value: "No answer within ten seconds." },
-              { key: "Unreachable — connection refused", value: "Nothing listens at the base URL, or the host could not be reached." },
-              { key: "Unreachable — no base URL", value: "The Reconix provider has no LLM_BASE_URL in .env." },
-              { key: "Unreachable — could not reach the model", value: "Any other provider or transport error; the detail is deliberately short." },
+              { key: "UNREACHABLE — model not found", value: "The model is not in the endpoint's list, or the completion came back 404. Check the model name (for Ollama, pull it first)." },
+              { key: "UNREACHABLE — bad API key (unauthorized)", value: "The endpoint answered 401 or 403, or complained about the key." },
+              { key: "UNREACHABLE — timed out", value: "No answer within a request's ten-second limit." },
+              { key: "UNREACHABLE — connection refused", value: "Nothing listens at the base URL, or the host could not be reached." },
+              { key: "UNREACHABLE — could not reach the model", value: "Any other provider or transport error; the detail is deliberately short." },
               { key: "Test the connection first — the provider is not reachable.", value: "Only a Reachable provider's model can be activated." },
               { key: "<model> is not configured for <Provider>.", value: "The model after the slash is not in that provider's list." },
               { key: "Use provider/model, e.g. openai/gpt-4o-mini.", value: "/model takes the id and the model separated by a slash." },

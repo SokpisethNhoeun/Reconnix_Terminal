@@ -172,7 +172,7 @@ export const reports: GroupContent = {
             head={["Message", "Meaning"]}
             rows={[
               { key: "The report is available once the assessment is complete.", value: "The run has not completed (it is still going, or it was stopped)." },
-              { key: "Unknown report format <x>.", value: "The format is not one of html, pdf, docx, sarif, csv, json, markdown." },
+              { key: "(the \u201cExport the report as…\u201d menu opens)", value: "An argument that is not a format id is not refused: /export opens its menu instead." },
               { key: "<Format> reports aren't in this demo.", value: "PDF without WeasyPrint or Chrome, or DOCX without python-docx." },
               { key: "PDF export needs WeasyPrint or a Chrome/Chromium browser.", value: "Neither PDF engine was found at export time." },
               { key: "Couldn't render the PDF with the browser. / The browser did not produce a PDF.", value: "Chrome was found but printing failed; the HTML export still works." },
@@ -208,7 +208,7 @@ export const reports: GroupContent = {
             caption="The dashboard's export formats for one run"
             head={["Format", "What it is"]}
             rows={[
-              { key: "PDF", value: "The styled report printed to PDF on this computer by a headless Chrome; page 1 is the one-page executive summary. Without Chrome the route answers with the HTML instead." },
+              { key: "PDF", value: "The styled report printed to PDF on this computer by a headless Chrome; page 1 is the one-page executive summary. Without Chrome the route answers 501 with a JSON hint and a link to the HTML export." },
               { key: "HTML", value: "The same report as one self-contained page." },
               { key: "JSON", value: "The complete saved assessment, exactly as the terminal wrote it (evidence already masked)." },
               { key: "CSV", value: "One row per finding: id, severity, CVSS, status, category, location, CWE/OWASP, remediation." },

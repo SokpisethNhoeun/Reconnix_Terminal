@@ -15,10 +15,9 @@ export const troubleshooting: GroupContent = {
             head={["Detail", "Check"]}
             rows={[
               { key: "connection refused", value: <>Nothing listens at the base URL. Is the server running? For Ollama, is it on <Mono>http://localhost:11434</Mono> (or your <Mono>OLLAMA_BASE_URL</Mono>)? For the Reconix provider, is <Mono>LLM_BASE_URL</Mono> in <Mono>.env</Mono> right (most servers end in <Mono>/v1</Mono>)?</> },
-              { key: "timed out", value: "No answer within ten seconds: a firewall, a sleeping server or a slow network." },
+              { key: "timed out", value: "No answer within a request's ten-second limit: a firewall, a sleeping server or a slow network." },
               { key: "bad API key (unauthorized)", value: <>The endpoint refused the key. Update it with <Mono>/provider set &lt;id&gt;</Mono>; the hint (<Mono>sk-…3f9a</Mono>) tells you which key is saved.</> },
               { key: "model not found", value: <>The model name is not known at the endpoint. For Ollama, <Mono>ollama pull &lt;model&gt;</Mono> first; for the Reconix provider, check <Mono>LLM_MODEL</Mono>; for a frontier provider, check the spelling of the model.</> },
-              { key: "no base URL", value: <>The Reconix provider has no <Mono>LLM_BASE_URL</Mono>: create <Mono>.env</Mono> from <Mono>.env.example</Mono> and restart.</> },
               { key: "could not reach the model", value: "Another provider or transport error. Try the endpoint from the command line with the same key and model." },
             ]}
           />
@@ -41,8 +40,11 @@ export const troubleshooting: GroupContent = {
         </DocSection>
         <DocSection title="Changing .env">
           <p>
-            <Mono>.env</Mono> is read once at start: after editing <Mono>LLM_BASE_URL</Mono>, <Mono>LLM_MODEL</Mono> or{" "}
-            <Mono>LLM_TIMEOUT</Mono>, quit and start the terminal again. The Reconix provider&apos;s saved key is kept.
+            <Mono>.env</Mono> is read once at start, and the Reconix provider&apos;s base URL and model are copied into{" "}
+            <Mono>llm.db</Mono> when you save the provider; tests and chat read that stored row. So after editing{" "}
+            <Mono>LLM_BASE_URL</Mono> or <Mono>LLM_MODEL</Mono>: quit, start the terminal again, then{" "}
+            <Mono>/provider set reconix</Mono> to re-save it (leave the key blank to keep the saved one; the status goes
+            back to Untested) and test it again. Only <Mono>LLM_TIMEOUT</Mono> applies after a restart alone.
           </p>
         </DocSection>
       </>
@@ -102,7 +104,8 @@ export const troubleshooting: GroupContent = {
           <p>
             A red line in the live output and a banner mean the policy engine refused a request the run proposed. This
             is the system working: the request was outside the approved scope (another host, an excluded path, a method
-            or port not allowed, the time limit reached), and it was never sent. The reasons are listed in{" "}
+            or port not allowed), and it was never sent; once the scope&apos;s time limit is reached the run stops
+            altogether. The reasons are listed in{" "}
             <DocLink href="/docs/assessment-guide/policy-checks">Policy checks</DocLink>; the verdicts are in{" "}
             <Mono>/audit</Mono>, the report and the dashboard&apos;s Scope view. If the block was wrong, the scope was: start
             a new assessment and edit the manifest before approving it.
@@ -164,8 +167,6 @@ export const troubleshooting: GroupContent = {
               { key: "Nothing to choose from yet.", value: "A command's list is empty." },
               { key: "The report is available once the assessment is complete.", value: "/export before the run completed." },
               { key: "No assessment is running.", value: "Stopping with nothing to stop." },
-              { key: "Start an assessment first.", value: "A chat line before any run." },
-              { key: "An assessment is already running. Type /new to start over.", value: "A second target while one runs." },
               { key: "A template can only be chosen when Reconix asks for one. / This assessment already has a template.", value: "/template <id> outside the template gate; /template without an id starts over when the current one is past it." },
               { key: "Started a new assessment. The previous one is under /assessments.", value: "Not an error: /template started a fresh assessment because the current one was already approved or stopped." },
             ]}
@@ -193,7 +194,8 @@ export const troubleshooting: GroupContent = {
               and in the saved copy). Let the plan finish, or start a new assessment.
             </li>
             <li>
-              <strong>&quot;Unknown report format &lt;x&gt;.&quot;</strong> Use html, pdf, docx, sarif, csv, json or markdown.
+              <strong>A format that does not exist</strong> is never refused: <Mono>/export</Mono> with an unknown argument
+              opens the &quot;Export the report as…&quot; menu instead.
             </li>
             <li>
               <strong>&quot;&lt;Format&gt; reports aren&apos;t in this demo.&quot;</strong> The format&apos;s engine is missing:
