@@ -23,14 +23,10 @@ const RUN = newest().uid; // Reports and Scope need one run
 const VIEWS = ["overview", "findings", `reports&uid=${RUN}`, `scope&uid=${RUN}`];
 const viewName = (v: string) => v.split("&")[0];
 
-/* Known faults owned by other areas: the check for that size and view is expected to FAIL, and
-   fails with "remove this entry" once the fault is gone, so a stale entry can't hide a new one.
-   - the Overview's bottom row is a fixed clamp(190px, 27vh, 230px) (dashboard.css); at 1280×720
-     its cards are taller and hang past the frame's bottom edge, which clips them;
-   - the Report's Target value (reports-view.tsx, Meta) never wraps, so on a phone a long target
-     runs past the content area's edge and is cut off. */
-const KNOWN_OVERHANG = new Set(["1280×720 overview"]);
-const KNOWN_SIDEWAYS = new Set(["390×844 reports"]);
+/* Known faults by size and view (none today): the check for that pair is expected to FAIL, and
+   fails with "remove this entry" once the fault is gone, so a stale entry can't hide a new one. */
+const KNOWN_OVERHANG = new Set<string>([]);
+const KNOWN_SIDEWAYS = new Set<string>([]);
 
 type Scroll = { kind: "content" | "window"; top: number; range: number };
 

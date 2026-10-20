@@ -13,15 +13,9 @@ import { newest, signIn } from "./support";
 const RUN = newest().uid;
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
-/* Violations owned by other areas, by page and axe rule. Each is expected to be found, and the
-   test fails with "remove it from KNOWN" once it is gone, so a stale entry can't hide a new one.
-   - findings-view.tsx: the list is role="listbox" with a <button> inside every role="option"
-     (nested-interactive); the "findings format" link is told from its text by colour only
-     (link-in-text-block). */
-const KNOWN: Record<string, string[]> = {
-  findings: ["nested-interactive"],
-  "one finding": ["nested-interactive", "link-in-text-block"],
-};
+/* Known violations by page and axe rule (none today). Each entry is expected to be found, and the
+   test fails with "remove it from KNOWN" once it is gone, so a stale entry can't hide a new one. */
+const KNOWN: Record<string, string[]> = {};
 
 async function axe(page: Page, name: string) {
   const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
@@ -176,13 +170,11 @@ test.describe("focus and the assistant", () => {
     await expect(ai).toBeFocused({ timeout: 5000 });
   });
 
-  /* The top bar's pieces carry an inline `visibility: visible` under reduced motion (intro.tsx sets
-     it, and dashboard.css's reduced-motion rule says the same), which beats the `hidden` the open
-     assistant puts on the top bar, so Tab walks into controls it covers. Drop `.fixme` once the
-     intro sets `autoAlpha: 1` (visibility: inherit) or the viewer makes what it covers inert. */
+  /* Under reduced motion the intro must not leave an inline `visibility: visible` on the top bar's
+     pieces (it would beat the `hidden` the open assistant puts on the top bar). */
   test.describe("with reduced motion", () => {
     test.use({ reducedMotion: "reduce" });
-    test.fixme("Tab never lands under the assistant", async ({ page }) => {
+    test("Tab never lands under the assistant", async ({ page }) => {
       await signIn(page);
       await show(page, "/?view=assistant");
       const stops = await tabStops(page, 25);
