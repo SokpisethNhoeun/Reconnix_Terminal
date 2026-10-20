@@ -216,7 +216,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
 
       <p className="dash-findings-foot mt-4 text-xs text-muted-foreground">
         See{" "}
-        <Link href="/docs/reference/findings" className={LINK}>
+        <Link href="/docs/reports/understanding-findings" className={LINK}>
           the findings format
         </Link>{" "}
         for how severity, validation and evidence are recorded.
