@@ -10,11 +10,23 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { Line2 } from "three/examples/jsm/lines/Line2.js";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
 
-export type GlobeControls = { pause(): void; resume(): void; destroy(): void };
+export type GlobeControls = {
+  /** Stop drawing for `reason`; several reasons can hold it at once ("offscreen", "hidden", the
+      assistant's "faded"…). It draws again once every reason is lifted with `resume(reason)`. */
+  pause(reason?: string): void;
+  resume(reason?: string): void;
+  /** Ambient mode, behind the AI Assistant at low opacity: no bloom pass and about 30 frames a
+      second, so it stays light on the GPU. */
+  setAmbient(on: boolean): void;
+  /** Draw one frame now (the still globe under reduced motion, after its canvas moved). */
+  redraw(): void;
+  destroy(): void;
+};
 
 type Opts = { reducedMotion: boolean; lowPower: boolean; onReady?: () => void };
 
@@ -423,10 +435,21 @@ export function mountGlobe(canvas: HTMLCanvasElement, opts: Opts): GlobeControls
     const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.9, 0.6, 0.15);
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
-    disposables.push(bloom as unknown as { dispose(): void });
+    // The bloom's blur writes alpha 1 everywhere, which made the canvas an opaque black box. The
+    // globe is light on black, so take the alpha from the light: black is transparent, and the
+    // canvas sits on whatever is behind it (the hero, or the AI Assistant's card).
+    const alpha = new ShaderPass({
+      uniforms: { tDiffuse: { value: null } },
+      vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+      fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+        void main(){ vec4 c=texture2D(tDiffuse,vUv); float a=clamp(max(c.r,max(c.g,c.b)),0.0,1.0); gl_FragColor=vec4(min(c.rgb,vec3(a)),a); }`,
+    });
+    composer.addPass(alpha);
+    disposables.push(bloom as unknown as { dispose(): void }, alpha as unknown as { dispose(): void });
   }
 
-  const render = () => (composer ? composer.render() : renderer.render(scene, camera));
+  let ambient = false; // behind the assistant: no bloom, ~30 fps (setAmbient)
+  const render = () => (composer && !ambient ? composer.render() : renderer.render(scene, camera));
   let booted = false; // true once the first frame has been drawn
 
   // ---- land.bin load ----
@@ -458,9 +481,10 @@ export function mountGlobe(canvas: HTMLCanvasElement, opts: Opts): GlobeControls
   let w = 1;
   let h = 1;
   const resize = () => {
-    const rect = canvas.getBoundingClientRect();
-    w = Math.max(1, rect.width);
-    h = Math.max(1, rect.height);
+    // the layout size (clientWidth/Height), not getBoundingClientRect(): the assistant carries the
+    // canvas with a CSS transform, and the drawing buffer must keep its own resolution meanwhile
+    w = Math.max(1, canvas.clientWidth);
+    h = Math.max(1, canvas.clientHeight);
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
@@ -521,9 +545,15 @@ export function mountGlobe(canvas: HTMLCanvasElement, opts: Opts): GlobeControls
   let raf = 0;
   let running = false;
   const AUTO = 0.035;
+  const holds = new Set<string>(); // why it is paused (it draws when this is empty)
+  let lastDraw = 0;
+  const AMBIENT_FRAME_MS = 1000 / 30;
+  const state = (s: "running" | "paused" | "still") => (canvas.dataset.globe = s);
 
-  const frame = () => {
+  const frame = (now: number) => {
     raf = requestAnimationFrame(frame);
+    if (ambient && now - lastDraw < AMBIENT_FRAME_MS - 4) return; // ~30 fps behind the assistant
+    lastDraw = now;
     const dt = Math.min(0.05, clock.getDelta());
     const t = clock.elapsedTime;
     uTime.value = t;
@@ -616,12 +646,20 @@ export function mountGlobe(canvas: HTMLCanvasElement, opts: Opts): GlobeControls
   const start = () => {
     if (running) return;
     running = true;
+    state("running");
     clock.getDelta();
     raf = requestAnimationFrame(frame);
   };
   const stop = () => {
+    if (running) state("paused");
     running = false;
     cancelAnimationFrame(raf);
+  };
+  // after the first frame, run exactly when nothing holds it (before that, kick() decides)
+  const sync = () => {
+    if (!animated || !booted) return;
+    if (holds.size) stop();
+    else start();
   };
 
   // first paint: wait for land, then onReady + start (or a single frame under reduced motion)
@@ -636,8 +674,11 @@ export function mountGlobe(canvas: HTMLCanvasElement, opts: Opts): GlobeControls
       opts.onReady?.();
     }
     booted = true;
-    if (animated) start();
-    else {
+    if (animated) {
+      if (holds.size) state("paused");
+      else start();
+    } else {
+      state("still");
       // Still frame: Americas forward, cage fully drawn, no motion.
       spin.rotation.y = BASE_YAW;
       cageSpin.rotation.y = BASE_YAW * 0.85;
@@ -648,8 +689,22 @@ export function mountGlobe(canvas: HTMLCanvasElement, opts: Opts): GlobeControls
   raf = requestAnimationFrame(kick);
 
   return {
-    pause: () => animated && stop(),
-    resume: () => animated && start(),
+    pause: (reason = "external") => {
+      holds.add(reason);
+      sync();
+    },
+    resume: (reason = "external") => {
+      holds.delete(reason);
+      sync();
+    },
+    setAmbient: (on) => {
+      if (ambient === on) return;
+      ambient = on;
+      if (!animated && booted) render();
+    },
+    redraw: () => {
+      if (booted && !animated) render();
+    },
     destroy: () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
