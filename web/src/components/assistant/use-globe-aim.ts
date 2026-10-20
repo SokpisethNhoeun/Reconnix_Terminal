@@ -23,8 +23,10 @@ export interface GlobeAimRefs {
 }
 
 export function useGlobeAim({ stage, front, halo, breath }: GlobeAimRefs, phase: RefObject<Phase>, on: boolean) {
-  const { messages } = useAssistant();
-  const welcome = messages.length === 0;
+  const { messages, opening } = useAssistant();
+  // the welcome (and its globe): no messages, and no saved conversation being read either, so a
+  // reload or a History pick never flashes the globe before its messages arrive
+  const welcome = messages.length === 0 && !opening;
   const welcomeNow = useRef(welcome);
   const globe = useSharedGlobe();
 
