@@ -29,7 +29,7 @@ export function Globe() {
     canvas.className = "dash-globe-canvas";
     carrier.append(canvas);
     home.append(carrier);
-    const shared: SharedGlobe = { carrier, home, canvas, controls: null };
+    const shared: SharedGlobe = { carrier, home, controls: null };
     publishGlobe(shared);
 
     let controls: GlobeControls | null = null;

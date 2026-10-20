@@ -6,20 +6,22 @@
    There is never a second globe or a second WebGL context.
 
    The stage's wishes (paused because it faded out, ambient quality) are kept here too, so they
-   apply even when three.js finishes loading after the stage asked. */
+   apply even when three.js finishes loading after the stage asked. They belong to that globe:
+   when it goes away (another page, a remount) they are dropped, so the next one starts drawing
+   at full quality. */
 import { useSyncExternalStore } from "react";
+import { Holds } from "@/lib/globe-holds";
 import type { GlobeControls } from "@/lib/globe";
 
 export interface SharedGlobe {
   carrier: HTMLElement; // what moves between the hero and the assistant stage
   home: HTMLElement; // its place in the hero (.dash-globe-wrap)
-  canvas: HTMLCanvasElement;
   controls: GlobeControls | null; // null until three.js has loaded (or without WebGL)
 }
 
 let current: SharedGlobe | null = null;
 const listeners = new Set<() => void>();
-const holds = new Set<string>();
+const holds = new Holds();
 let ambient = false;
 
 const subscribe = (listener: () => void) => {
@@ -28,11 +30,14 @@ const subscribe = (listener: () => void) => {
 };
 
 /** Called by <Globe />: when it mounts, when its controls are ready (a new object), and with
-    null when it unmounts. */
+    null when it unmounts (which drops the stage's wishes with it). */
 export function publishGlobe(globe: SharedGlobe | null): void {
   current = globe;
-  if (globe?.controls) {
-    for (const reason of holds) globe.controls.pause(reason);
+  if (!globe) {
+    holds.clear();
+    ambient = false;
+  } else if (globe.controls) {
+    for (const reason of holds.list()) globe.controls.pause(reason);
     globe.controls.setAmbient(ambient);
   }
   for (const listener of listeners) listener();
@@ -47,8 +52,7 @@ export function useSharedGlobe(): SharedGlobe | null {
 
 /** Pause (on) or release (off) the globe's drawing for `reason`. */
 export function holdGlobe(reason: string, on: boolean): void {
-  if (on) holds.add(reason);
-  else holds.delete(reason);
+  if (!holds.set(reason, on)) return; // no change
   const controls = current?.controls;
   if (controls) {
     if (on) controls.pause(reason);
@@ -56,8 +60,12 @@ export function holdGlobe(reason: string, on: boolean): void {
   }
 }
 
-/** Ambient quality while it sits behind the assistant (no bloom, ~30 fps). */
+/** Ambient quality while it sits behind the assistant (no bloom, ~30 fps; a still frame on a
+    low-power device). */
 export function setGlobeAmbient(on: boolean): void {
   ambient = on;
   current?.controls?.setAmbient(on);
 }
+
+/** What the stage has asked for (tests and debugging). */
+export const globeWishes = () => ({ holds: holds.list(), ambient });
