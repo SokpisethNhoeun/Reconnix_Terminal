@@ -55,7 +55,9 @@ export function Intro() {
     const counts = q("[data-countup]");
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      gsap.set(reveal, { visibility: "visible", opacity: 1 });
+      // autoAlpha sets visibility to inherit, not visible: a hidden parent (the top bar under
+      // the open assistant) keeps its controls out of reach
+      gsap.set(reveal, { autoAlpha: 1 });
       return;
     }
 

@@ -447,5 +447,7 @@
 @media (prefers-reduced-motion: reduce) {
   .dash-livedot, .dash-bell-dot, .dash-mark[data-pending], .dash-seg[data-live], .dash-gate-mark,
   .dash-pop, .dash-details { animation: none; }
-  .dash-overview .dash-card, .dash-navbtn, .dash-reveal { visibility: visible; }
+  /* inherit, not visible: under a hidden parent (the top bar beneath the open assistant) the
+     controls must stay hidden and out of the tab order */
+  .dash-overview .dash-card, .dash-navbtn, .dash-reveal { visibility: inherit; }
 }
