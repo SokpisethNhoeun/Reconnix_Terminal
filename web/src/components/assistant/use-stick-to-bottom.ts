@@ -1,47 +1,28 @@
 "use client";
 
-/* Keeps a scrolling box (the conversation) on its newest content while the reader is near the
-   bottom. Once they scroll up it stays where they are and reports `atBottom: false`, so the page
-   can offer a "↓ New messages" control (scroll-to-bottom.tsx). New and growing content
-   (streamed text) is noticed with a MutationObserver, so callers pass no dependencies. */
-import { useCallback, useEffect, useRef, useState } from "react";
+/* Keeps a scrolling box (the conversation) on its newest content while the reader is at the
+   bottom, and leaves them alone once they scroll up: then `atBottom` is false and the page offers
+   "↓ New messages" (scroll-to-bottom.tsx), whose click calls `scrollToBottom()`.
 
-const NEAR_PX = 48; // this close to the bottom counts as "at the bottom"
+     const { ref, atBottom, scrollToBottom } = useStickToBottom<HTMLDivElement>();
+     <div ref={ref} role="log" className="min-h-0 flex-1 overflow-y-auto">…</div>
+     <ScrollToBottom show={!atBottom} onClick={scrollToBottom} />
+     scrollToBottom({ instant: true }); // jump, e.g. when a long saved conversation opens
 
-export function useStickToBottom<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
-  const pinned = useRef(true);
+   The rules are in lib/scroll/stick-rules.ts and the DOM work in lib/scroll/stick-controller.ts
+   (both unit-tested); this file only ties them to React state. */
+import { useState } from "react";
+import { createStickToBottom, type ScrollToBottom, type StickRef } from "@/lib/scroll/stick-controller";
+
+export type { ScrollToBottomOptions, StickRef } from "@/lib/scroll/stick-controller";
+
+export function useStickToBottom<T extends HTMLElement = HTMLDivElement>(): {
+  ref: StickRef<T>;
+  atBottom: boolean;
+  scrollToBottom: ScrollToBottom;
+} {
   const [atBottom, setAtBottom] = useState(true);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const onScroll = () => {
-      const near = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_PX;
-      pinned.current = near;
-      setAtBottom(near);
-    };
-    const follow = () => {
-      if (pinned.current) el.scrollTop = el.scrollHeight;
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    const watch = new MutationObserver(follow);
-    watch.observe(el, { childList: true, subtree: true, characterData: true });
-    follow();
-    return () => {
-      el.removeEventListener("scroll", onScroll);
-      watch.disconnect();
-    };
-  }, []);
-
-  const scrollToBottom = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    pinned.current = true;
-    setAtBottom(true);
-    const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
-  }, []);
-
-  return { ref, atBottom, scrollToBottom };
+  // created once; setAtBottom is stable
+  const [stick] = useState(() => createStickToBottom<T>({ onPinned: setAtBottom }));
+  return { ref: stick.ref, atBottom, scrollToBottom: stick.scrollToBottom };
 }
