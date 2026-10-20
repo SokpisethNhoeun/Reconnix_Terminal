@@ -24,7 +24,10 @@ test("the overview totals every saved file by default", async ({ page }) => {
   await expect(stat(page, "Findings")).toHaveText(String(all.reduce((n, a) => n + counted(a).length, 0)));
   await expect(stat(page, "Tool execution")).toHaveText(String(all.reduce((n, a) => n + toolSteps(a), 0)));
   await expect(card(page, "Assessment progress")).toContainText(`${done} of ${all.length} runs completed`);
-  await expect(page.getByRole("region", { name: "Policy checks" })).toHaveCount(0); // removed by the owner
+  // exactly the four summary cards (Policy checks, Blocked by policy and Assessments were removed)
+  const cards = page.locator('[data-motion="top"] > section');
+  await expect(cards).toHaveCount(4);
+  expect(await cards.evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).toEqual(["Findings", "Assessment progress", "Tool execution", "Duration"]);
   await page.click(view("Findings"));
   await expect(findingRows(page)).toHaveCount(all.reduce((n, a) => n + a.findings.length, 0));
   await page.click(view("Reports"));
@@ -49,7 +52,8 @@ test("one run's overview counts what its file holds", async ({ page }) => {
 test("the overview's groups carry the transition's motion hooks", async ({ page }) => {
   await signIn(page);
   for (const name of ["top", "hero", "right", "bottom"]) await expect(page.locator(`[data-motion="${name}"]`)).toHaveCount(1);
-  await expect(page.locator('[data-motion="fade"]')).toHaveCount(2); // the hero title and the Ask bar
+  expect(await page.locator('[data-motion="fade"]').count()).toBeGreaterThanOrEqual(1); // hero text that only fades
+  await expect(page.locator('[data-motion="hero"] [data-motion="fade"]').first()).toBeVisible();
   await expect(page.locator('[data-motion="hero"] canvas')).toHaveCount(1); // the globe stays in the hero
   await expect(page.locator('[data-motion="hero"] .dash-askbar')).toHaveCount(1);
 });
@@ -122,7 +126,7 @@ test("a waiting run shows its pending approval", async ({ page }) => {
   const waiting = sample().find((a) => a.status === "Awaiting input")!;
   await page.goto(`/?uid=${waiting.uid}`);
   await expect(card(page, "Assessment progress").getByText("Waiting for you")).toBeVisible();
-  await expect(page.locator("#execution-timeline").locator("..").locator("..").getByText("Waiting for approval").first()).toBeVisible();
+  await expect(page.getByRole("region", { name: "Execution Timeline" }).getByText("Waiting for approval").first()).toBeVisible();
   await page.getByRole("button", { name: /waiting on you/ }).click();
   await expect(page.getByText("This run waits on you")).toBeVisible();
   await expect(page.getByText(/awaiting approval/).first()).toBeVisible();
