@@ -1,19 +1,20 @@
 import Link from "next/link";
 import { Check, SquareArrowOutUpRight, X } from "lucide-react";
 import type { Dashboard } from "@/components/dashboard/derive";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { APPROVAL_STATE, type Meaning, type Tone } from "@/lib/status";
 
-const RISK_TONE: Record<string, string> = { LOW: "success", MEDIUM: "accent", HIGH: "danger" };
-const STATE_TONE: Record<string, string> = { APPROVED: "success", REJECTED: "danger", PENDING: "accent", "NOT REACHED": "muted-foreground" };
-
-function Chip({ text, tone }: { text: string; tone: string }) {
-  return (
-    <span
-      className="dash-chip h-[18px] shrink-0 rounded-md px-1.5 text-[9px] uppercase"
-      style={{ background: `color-mix(in oklab, var(--${tone}) 14%, transparent)`, color: `var(--${tone})` }}
-    >
-      {text}
-    </span>
-  );
+/** An approval's risk, coloured as the TUI does (LOW green, MEDIUM amber, HIGH red). Risk is not
+    a status, so its meaning is defined here. */
+const RISK_TONE: Record<string, Tone> = { LOW: "success", MEDIUM: "warning", HIGH: "danger" };
+function riskMeaning(risk: string): Meaning {
+  const name = risk ? `${risk[0]}${risk.slice(1).toLowerCase()}` : "Unknown";
+  return {
+    label: `${name} risk`,
+    tone: RISK_TONE[risk] ?? "info",
+    icon: "severity",
+    hint: risk === "HIGH" ? "High risk: approved only after a double check in the TUI." : `${name} risk: needs the operator's approval in the TUI.`,
+  };
 }
 
 export function ScopeView({ dash }: { dash: Dashboard }) {
@@ -95,13 +96,13 @@ export function ScopeView({ dash }: { dash: Dashboard }) {
               <h2 className="mb-3 text-[13px] font-medium text-foreground">Approval requests</h2>
               <ul className="space-y-2">
                 {approvals.map((a) => (
-                  <li key={a.id} className="flex items-center gap-3 text-sm">
-                    <span className="min-w-0 flex-1">
+                  <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
+                    <span className="min-w-0 flex-1 basis-[200px]">
                       <span className="block truncate text-foreground">{a.action}</span>
                       <span className="block truncate font-mono text-[11px] text-muted-foreground">{a.target}</span>
                     </span>
-                    <Chip text={a.risk} tone={RISK_TONE[a.risk] ?? "muted-foreground"} />
-                    <Chip text={a.state} tone={STATE_TONE[a.state]} />
+                    <StatusBadge meaning={riskMeaning(a.risk)} />
+                    <StatusBadge meaning={APPROVAL_STATE[a.state]} />
                   </li>
                 ))}
               </ul>

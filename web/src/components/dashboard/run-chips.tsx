@@ -1,16 +1,27 @@
 "use client";
 
 /* The top bar's chips for one open run: its Target (scope in and out), Template and Status
-   (progress, phases, budget). */
+   (progress, phases, budget). A client component, so it gets only what it shows (RunChipsData,
+   picked on the server in top-bar.tsx), never the whole Dashboard. */
 import Link from "next/link";
 import { Check, X } from "lucide-react";
 import { CHIP, ChipTrigger, Row } from "@/components/dashboard/assessment-switcher";
 import { TEMPLATES, type Dashboard } from "@/components/dashboard/derive";
 import { Popover } from "@/components/dashboard/popover";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { RUN_STATUS, STEP_STATUS } from "@/lib/status";
 
 const LINK = "rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-export function RunChips({ dash }: { dash: Dashboard }) {
+export interface RunChipsData {
+  assessment: Pick<Dashboard["assessment"], "target" | "template" | "status" | "progress">;
+  scope: { include: string[]; exclude: string[] } | null;
+  phases: Dashboard["phases"];
+  requests: number;
+  minutes: Dashboard["minutes"];
+}
+
+export function RunChips({ dash }: { dash: RunChipsData }) {
   const a = dash.assessment;
   return (
     <>
@@ -47,7 +58,8 @@ export function RunChips({ dash }: { dash: Dashboard }) {
         )}
       </Popover>
 
-      <Popover triggerClassName={CHIP} triggerAriaLabel="Template" align="start" panelClassName="w-[220px] space-y-2 p-3 text-xs" triggerContent={<ChipTrigger label="Template" value={a.template} />}>
+      <div className="hidden min-[1440px]:block">
+        <Popover triggerClassName={CHIP} triggerAriaLabel="Template" align="start" panelClassName="w-[220px] space-y-2 p-3 text-xs" triggerContent={<ChipTrigger label="Template" value={a.template} />}>
         <ul className="space-y-1">
           {TEMPLATES.map((t) => {
             const on = t === a.template;
@@ -63,8 +75,11 @@ export function RunChips({ dash }: { dash: Dashboard }) {
           About templates
         </Link>
       </Popover>
+      </div>
 
-      <Popover triggerClassName={CHIP} triggerAriaLabel="Status" align="end" panelClassName="w-[260px] space-y-3 p-3 text-xs" triggerContent={<ChipTrigger label="Status" value={a.status} />}>
+      <Popover triggerClassName={CHIP} triggerAriaLabel="Status" align="end" panelClassName="w-[300px] space-y-3 p-3 text-xs" triggerContent={<ChipTrigger label="Status" value={RUN_STATUS[a.status].label} />}>
+        <StatusBadge meaning={RUN_STATUS[a.status]} />
+        <p className="text-muted-foreground">{RUN_STATUS[a.status].hint}</p>
         <div>
           <div className="mb-1 flex items-center justify-between">
             <span className="text-muted-foreground">Progress</span>
@@ -77,9 +92,10 @@ export function RunChips({ dash }: { dash: Dashboard }) {
         {dash.phases.length > 0 && (
           <ul className="space-y-1">
             {dash.phases.map((p) => (
-              <li key={p.key} className="flex items-center justify-between gap-3">
-                <span className={p.status === "pending" ? "truncate text-muted-foreground" : "truncate text-foreground"}>{p.label}</span>
-                <span className="tabnums shrink-0 text-muted-foreground">{p.pct}%</span>
+              <li key={p.key} className="flex items-center gap-2">
+                <span className={p.status === "pending" ? "min-w-0 flex-1 truncate text-muted-foreground" : "min-w-0 flex-1 truncate text-foreground"}>{p.label}</span>
+                <StatusBadge meaning={STEP_STATUS[p.status]} />
+                <span className="tabnums w-9 shrink-0 text-right text-muted-foreground">{p.pct}%</span>
               </li>
             ))}
           </ul>

@@ -7,6 +7,9 @@ import { CHIP, ChipTrigger } from "@/components/dashboard/assessment-switcher";
 import { TEMPLATES } from "@/components/dashboard/derive";
 import type { CountRow, Overall } from "@/components/dashboard/derive-overall";
 import { Popover } from "@/components/dashboard/popover";
+import { StatusBadge } from "@/components/ui/status-badge";
+import type { Status } from "@/lib/data/view-types";
+import { RUN_STATUS } from "@/lib/status";
 
 const LINK = "rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -20,6 +23,7 @@ function CountsChip({
   rows,
   align = "start",
   children,
+  statuses = false,
 }: {
   label: string;
   value: string;
@@ -27,14 +31,19 @@ function CountsChip({
   rows: CountRow[];
   align?: "start" | "end";
   children?: React.ReactNode;
+  statuses?: boolean; // the rows are run statuses: show each as its badge
 }) {
   return (
     <Popover triggerClassName={CHIP} triggerAriaLabel={label} align={align} panelClassName="w-[260px] space-y-2.5 p-3 text-xs" triggerContent={<ChipTrigger label={label} value={value} />}>
       <p className="text-muted-foreground">{heading}</p>
-      <ul className="max-h-[220px] space-y-1 overflow-y-auto" data-lenis-prevent>
+      <ul className="max-h-[220px] space-y-1 overflow-y-auto">
         {rows.map((r) => (
           <li key={r.name} className="flex items-center justify-between gap-3">
-            <span className={r.count ? "truncate font-mono text-[11px] text-foreground" : "truncate font-mono text-[11px] text-muted-foreground"}>{r.name}</span>
+            {statuses && r.name in RUN_STATUS ? (
+              <StatusBadge meaning={RUN_STATUS[r.name as Status]} />
+            ) : (
+              <span className={r.count ? "truncate font-mono text-[11px] text-foreground" : "truncate font-mono text-[11px] text-muted-foreground"}>{r.name}</span>
+            )}
             <span className="tabnums shrink-0 text-muted-foreground">{r.count}</span>
           </li>
         ))}
@@ -44,7 +53,10 @@ function CountsChip({
   );
 }
 
-export function OverallChips({ overall }: { overall: Overall }) {
+/** The slice of the every-run Overview the chips show (top-bar.tsx picks it on the server). */
+export type OverallChipsData = Pick<Overall, "runs" | "completed" | "waiting" | "targets" | "templates" | "statuses">;
+
+export function OverallChips({ overall }: { overall: OverallChipsData }) {
   const { runs, completed, waiting } = overall;
   const known = new Set<string>(TEMPLATES);
   const templates = [
@@ -55,17 +67,20 @@ export function OverallChips({ overall }: { overall: Overall }) {
   return (
     <>
       <CountsChip label="Target" value={many(overall.targets, "targets")} heading="Runs per target" rows={overall.targets} />
-      <CountsChip label="Template" value={many(overall.templates, "templates")} heading="Runs per template" rows={templates}>
+      <div className="hidden min-[1440px]:block">
+        <CountsChip label="Template" value={many(overall.templates, "templates")} heading="Runs per template" rows={templates}>
         <Link href="/docs/assessments/templates" className={`inline-block ${LINK}`}>
           About templates
         </Link>
       </CountsChip>
+      </div>
       <CountsChip
         label="Status"
         value={waiting ? `${waiting} waiting` : `${completed}/${runs} done`}
         heading="Runs per status"
         rows={overall.statuses}
         align="end"
+        statuses
       >
         <div className="border-t border-border pt-2">
           <div className="mb-1 flex items-center justify-between">

@@ -3,46 +3,22 @@
 import { useRef } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import type { FindingRow, Tone } from "@/components/dashboard/derive";
+import type { FindingRow } from "@/components/dashboard/derive";
 import { FilterChips, FilterSummary, SearchField } from "@/components/dashboard/filter-bar";
 import { FINDING_ICON } from "@/components/dashboard/finding-icon";
-import { SEVERITY_ORDER, VALIDATION, countBy, findingMatches, list, sortFindings, validationOf } from "@/components/dashboard/filters";
+import { SEVERITY_ORDER, VALIDATION, countBy, findingMatches, list, reviewLabel, sortFindings, validationOf } from "@/components/dashboard/filters";
 import { useQueryParams } from "@/components/dashboard/view-url";
+import { SeverityBadge, StatusBadge } from "@/components/ui/status-badge";
+import { FINDING_REVIEW, SEVERITY_META, toneColor } from "@/lib/status";
+import type { Severity } from "@/lib/data/view-types";
 
-const SEV_TONE: Record<string, string> = { CRITICAL: "danger", HIGH: "danger", MEDIUM: "accent", LOW: "success", INFO: "muted-foreground" };
-const VAL_LABEL: Record<string, string> = { confirmed: "Confirmed", review: "Needs review", closed: "Closed" };
 const KEYS = ["sev", "val", "q", "finding"] as const;
 const WRAP = "[overflow-wrap:anywhere]"; // saved text may hold long unbroken tokens (URLs, payloads)
-
-function SevBadge({ level, tone }: { level: string; tone: Tone }) {
-  const color = tone === "dim" ? "muted-foreground" : tone;
-  return (
-    <span
-      className="dash-chip h-[18px] rounded-md px-1.5 text-[9px] uppercase"
-      style={{ background: `color-mix(in oklab, var(--${color}) 14%, transparent)`, color: `var(--${color})` }}
-    >
-      {level}
-    </span>
-  );
-}
-
-/** CONFIRMED (green), NEEDS_REVIEW (amber: open and not confirmed), else the triage status. */
-function ValidationChip({ f }: { f: FindingRow }) {
-  const [label, tone] = f.confirmed ? ["CONFIRMED", "success"] : f.needsReview ? ["NEEDS_REVIEW", "accent"] : [f.status.toUpperCase(), "muted-foreground"];
-  return (
-    <span
-      className="dash-chip h-[20px] rounded-md px-2 text-[10px]"
-      style={{ background: `color-mix(in oklab, var(--${tone}) 14%, transparent)`, color: `var(--${tone})` }}
-    >
-      {label}
-    </span>
-  );
-}
 
 const EV_STYLE: Record<string, string> = {
   request: "text-muted-foreground",
   response: "text-foreground",
-  masked: "text-accent",
+  masked: "text-info",
 };
 
 /**
@@ -69,8 +45,11 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
   const runHref = (f: FindingRow) => (f.run ? `/?uid=${encodeURIComponent(f.run.uid)}&view=findings&finding=${encodeURIComponent(f.id)}` : "");
   const sevChips = countBy(findings, (f) => f.severity, SEVERITY_ORDER)
     .filter((c) => c.count > 0 || filter.sev.includes(c.value))
-    .map((c) => ({ ...c, label: c.value.toLowerCase(), tone: SEV_TONE[c.value] }));
-  const valChips = countBy(findings, validationOf, VALIDATION).map((c) => ({ ...c, label: VAL_LABEL[c.value] }));
+    .map((c) => ({ ...c, label: c.value.toLowerCase(), color: SEVERITY_META[c.value as Severity]?.color }));
+  const valChips = countBy(findings, validationOf, VALIDATION).map((c) => {
+    const meaning = FINDING_REVIEW[c.value as keyof typeof FINDING_REVIEW];
+    return { ...c, label: meaning?.label ?? c.value, color: meaning ? toneColor(meaning.tone) : undefined, hint: meaning?.hint };
+  });
 
   return (
     <div className="dash-view">
@@ -110,14 +89,14 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
       {current && (
         <div className="dash-findings">
           {/* list */}
-          <ul className="flex flex-col gap-2" role="listbox" aria-label="Findings">
+          <ul className="flex flex-col gap-2" aria-label="Findings">
             {sorted.map((f) => {
               const Icon = FINDING_ICON[f.icon];
               return (
-                <li key={f.key} role="option" aria-selected={f.key === current.key}>
+                <li key={f.key}>
                   <button
                     type="button"
-                    aria-current={f.key === current.key}
+                    aria-current={f.key === current.key ? "true" : undefined}
                     onClick={() => open(f.key)}
                     className="dash-finding-row flex items-start gap-3 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
@@ -127,7 +106,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
                         <span className="font-mono text-[11px] text-muted-foreground">{f.id}</span>
-                        <SevBadge level={f.severity} tone={f.tone} />
+                        <SeverityBadge level={f.severity} />
                         {f.score != null && <span className="ml-auto font-mono text-[11px] tabnums text-foreground">{f.score.toFixed(1)}</span>}
                       </span>
                       <span className="mt-1 block truncate text-sm text-foreground">{f.title}</span>
@@ -144,7 +123,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
           <article ref={detail} className="dash-card flex scroll-mt-4 flex-col gap-4 p-4" aria-live="polite">
             <header className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-xs text-muted-foreground">{current.id}</span>
-              <SevBadge level={current.severity} tone={current.tone} />
+              <SeverityBadge level={current.severity} />
               <span className="font-mono text-xs text-muted-foreground">{current.rating}</span>
               {current.score != null && <span className="ml-auto text-[26px] leading-none tabnums text-foreground">{current.score.toFixed(1)}</span>}
             </header>
@@ -152,7 +131,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
             {current.run && (
               <p className="-mt-2 text-xs text-muted-foreground">
                 From{" "}
-                <Link href={runHref(current)} className="rounded-sm font-mono text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Link href={runHref(current)} className="rounded-sm font-mono text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   {current.run.label}
                 </Link>
               </p>
@@ -188,7 +167,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
             {current.evidence.length > 0 && (
               <section>
                 <h3 className="mb-1.5 text-[13px] font-medium text-foreground">Evidence</h3>
-                <div className="dash-tile overflow-x-auto rounded-lg p-3 font-mono text-[11px] leading-relaxed" data-lenis-prevent>
+                <div className="dash-tile overflow-x-auto rounded-lg p-3 font-mono text-[11px] leading-relaxed">
                   {current.evidence.map((e, i) => (
                     <div key={i} className={cn("whitespace-pre", EV_STYLE[e.tone])}>
                       {e.text}
@@ -213,7 +192,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
               <span className="text-muted-foreground">
                 Validation <span className="text-foreground">{current.validation}</span>
               </span>
-              <ValidationChip f={current} />
+              <StatusBadge meaning={FINDING_REVIEW[validationOf(current)]} label={reviewLabel(current)} />
               {current.references.length > 0 && (
                 <span className={cn("min-w-0 basis-full font-mono text-[11px] text-muted-foreground sm:ml-auto sm:basis-auto sm:text-right", WRAP)}>
                   {current.references.join(" · ")}
@@ -226,7 +205,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
 
       <p className="mt-4 text-xs text-muted-foreground">
         See{" "}
-        <Link href="/docs/reference/findings" className="rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <Link href="/docs/reference/findings" className="rounded-sm text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           the findings format
         </Link>{" "}
         for how severity, validation and evidence are recorded.
