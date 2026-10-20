@@ -147,15 +147,44 @@ describe("parseBlocks", () => {
   it("finds paragraphs, lists, headings and code", () => {
     const text = "## Summary\nTwo runs\nfound issues.\n\n- **F-001** high\n- F-002\n  wrapped\n1. first\n2. second\n```\nGET /a\n```";
     expect(parseBlocks(text)).toEqual([
-      { kind: "h", text: "Summary" },
+      { kind: "h", level: 3, text: "Summary" },
       { kind: "p", text: "Two runs found issues." },
       { kind: "ul", items: ["**F-001** high", "F-002 wrapped"] },
       { kind: "ol", items: ["first", "second"] },
-      { kind: "code", text: "GET /a" },
+      { kind: "code", lang: "", text: "GET /a" },
     ]);
+  });
+  it("reads a code block's language, and keeps its text as it is", () => {
+    expect(parseBlocks("```Bash\ncurl -s https://example.test/a | jq .\n  indented\n```")).toEqual([
+      { kind: "code", lang: "bash", text: "curl -s https://example.test/a | jq .\n  indented" },
+    ]);
+    // a block still streaming has no closing fence yet
+    expect(parseBlocks("```ts\nconst a = 1;")).toEqual([{ kind: "code", lang: "ts", text: "const a = 1;" }]);
+  });
+  it("finds tables, their alignment, and keeps rows to the head's columns", () => {
+    const text = "| Finding | Severity | CVSS |\n|:--|:-:|--:|\n| F-001 | **High** | 7.5 |\n| F-002 \\| a | Low |\n\nAfter.";
+    expect(parseBlocks(text)).toEqual([
+      {
+        kind: "table",
+        head: ["Finding", "Severity", "CVSS"],
+        align: ["left", "center", "right"],
+        rows: [
+          ["F-001", "**High**", "7.5"],
+          ["F-002 | a", "Low", ""],
+        ],
+      },
+      { kind: "p", text: "After." },
+    ]);
+  });
+  it("needs a separator line for a table, and reads quotes and rules", () => {
+    expect(parseBlocks("a | b\nc | d")).toEqual([{ kind: "p", text: "a | b c | d" }]);
+    expect(parseBlocks("> careful\n> here\n\n---")).toEqual([{ kind: "quote", text: "careful here" }, { kind: "hr" }]);
   });
   it("keeps markup as text", () => {
     expect(parseBlocks("<img src=x onerror=alert(1)>")).toEqual([{ kind: "p", text: "<img src=x onerror=alert(1)>" }]);
+    expect(parseBlocks("| <b>x</b> |\n| --- |\n| [link](javascript:alert(1)) |")).toEqual([
+      { kind: "table", head: ["<b>x</b>"], align: [null], rows: [["[link](javascript:alert(1))"]] },
+    ]);
   });
 });
 
