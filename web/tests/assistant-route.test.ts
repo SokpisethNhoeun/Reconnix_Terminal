@@ -128,7 +128,9 @@ describe("POST /api/assistant", () => {
     const res = await ask(question);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/x-ndjson");
+    const header = res.headers.get("x-conversation-id");
     const frames = await framesOf(res);
+    expect(frames[0]).toMatchObject({ conversationId: header });
     expect(frames[0]).toMatchObject({ t: "meta", title: "What waits on my approval?", scope: { uid: null, label: "All assessments" } });
     const cards = frames.filter((f) => f.t === "card");
     expect(cards.map((f) => f.t === "card" && f.card.kind)).toEqual(["approvals"]);
@@ -187,6 +189,48 @@ describe("POST /api/assistant", () => {
     expect(reply?.state).toBe("stopped");
     expect(reply?.content).toContain("word");
     expect(reply?.content).not.toContain("word199");
+  });
+});
+
+describe("retrying and deleting while an answer is written", () => {
+  const slowAnswer = async (body: Record<string, unknown>) => {
+    slow = true;
+    const res = await ask(body);
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let text = "";
+    while (!text.includes("word2")) text += decoder.decode((await reader.read()).value, { stream: true });
+    return { id: res.headers.get("x-conversation-id")!, reader, decoder, text };
+  };
+  it("refuses to retry a question that is still being answered", async () => {
+    const { id, reader } = await slowAnswer({ uid: null, question: "Tell me everything" });
+    const retry = await ask({ conversationId: id, uid: null, question: "Tell me everything", retry: true });
+    expect(retry.status).toBe(409);
+    expect((await retry.json()).detail).toContain("still being answered");
+    await reader.cancel();
+  });
+  it("says so when the conversation was deleted before the answer could be saved", async () => {
+    const { id, reader, decoder } = await slowAnswer({ uid: null, question: "Tell me everything" });
+    const res = await one.DELETE(request(`/api/assistant/conversations/${id}`, { method: "DELETE" }), ctx(id));
+    expect(res.status).toBe(200);
+    let rest = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      rest += decoder.decode(value, { stream: true });
+    }
+    const frames = rest.split("\n").map(parseFrame).filter((f): f is Frame => f !== null);
+    expect(frames.some((f) => f.t === "error" && f.detail.includes("deleted"))).toBe(true);
+    expect(frames.at(-1)).toEqual({ t: "done" });
+    expect((await getOne(id)).status).toBe(404); // not brought back
+  });
+  it("keeps a near-limit question within the limit after masking", async () => {
+    const question = `${"x".repeat(3_988)} password=a`;
+    const frames = await framesOf(await ask({ uid: null, question }));
+    expect(frames.at(-1)).toEqual({ t: "done" });
+    const sent = seen[0].at(-1)!.content;
+    expect(sent.length).toBe(4_000);
+    expect(sent).not.toContain("password=a");
   });
 });
 

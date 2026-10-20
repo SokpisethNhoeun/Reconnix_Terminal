@@ -2,13 +2,14 @@
    the model's text as it arrives, an `error` if the model fails, then `done`. When it ends the
    reply is saved after its question with the cards that were shown (history-store.ts): "done",
    "error" with what went wrong, or "stopped" with the part that arrived when the operator
-   pressed Stop (the request is aborted, which cancels this stream and the model's). The rate
-   slot is handed back at the very end. Nothing here logs the question or the answer. */
+   pressed Stop (the request is aborted, which cancels this stream and the model's). While it
+   runs the question is marked as being answered (a Retry of it is refused). The rate slot is
+   handed back at the very end. Nothing here logs the question or the answer. */
 import "server-only";
 
 import type { ModelConfig } from "./config";
 import type { Conversation, ReplyState, UserMessage } from "./history-schema";
-import { saveReply } from "./history-store";
+import { markStreaming, saveReply } from "./history-store";
 import { ModelError, streamReply, type Turn } from "./llm";
 import { type Card, encodeFrame, type Frame } from "./protocol";
 
@@ -29,6 +30,7 @@ export function replyStream({ config, turns, conversation, asked, cards, signal,
   signal.addEventListener("abort", onAbort, { once: true });
   if (signal.aborted) abort.abort();
   let open = true;
+  const done = markStreaming(asked.id);
 
   const run = async (controller: ReadableStreamDefaultController<Uint8Array>) => {
     const send = (frame: Frame) => {
@@ -72,10 +74,12 @@ export function replyStream({ config, turns, conversation, asked, cards, signal,
     }
     if (detail) send({ t: "error", detail });
     try {
-      await saveReply(conversation.id, { replyTo: asked.id, content: reply, cards, state, ...(detail ? { detail } : {}) });
+      const kept = await saveReply(conversation.id, { replyTo: asked.id, content: reply, cards, state, ...(detail ? { detail } : {}) });
+      if (!kept) send({ t: "error", detail: "The reply was not saved: the conversation was deleted meanwhile." });
     } catch {
       send({ t: "error", detail: "The reply could not be saved." });
     }
+    done();
     send({ t: "done" });
     signal.removeEventListener("abort", onAbort);
     release();

@@ -14,12 +14,15 @@ import {
   deleteConversation,
   HistoryError,
   historyDir,
+  keptQuestion,
   listConversations,
+  markStreaming,
   readConversation,
   renameConversation,
   retentionDays,
   saveReply,
 } from "@/lib/assistant/history-store";
+import { MAX_QUESTION } from "@/lib/assistant/request";
 import { MASK } from "@/lib/assistant/redact";
 import { earlierTurns } from "@/lib/assistant/turns";
 
@@ -41,11 +44,12 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-const ask = async (question: string, id?: string, now?: number) => {
-  const result = await addQuestion({ id, scope: ALL, question }, now);
-  if (!result) throw new Error("not saved");
+/** A question that must have been saved. */
+const added = <T,>(result: T | "busy" | null): T => {
+  if (!result || result === "busy") throw new Error(`not saved: ${result}`);
   return result;
 };
+const ask = async (question: string, id?: string, now?: number) => added(await addQuestion({ id, scope: ALL, question }, now));
 const fileOf = (id: string) => path.join(dir, `${id}.json`);
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 function craft(id: string, updatedAt: number, messages: Conversation["messages"] = [{ id: uuid(999_999), role: "user", content: "hi", at: updatedAt }]): Conversation {
@@ -128,6 +132,40 @@ describe("the folder and the files", () => {
   });
 });
 
+describe("refusals", () => {
+  it.runIf(posix)("refuses a parent folder others can write to, unless it is sticky", async () => {
+    chmodSync(root, 0o777);
+    await expect(listConversations()).rejects.toThrow("can be changed by other users");
+    chmodSync(root, 0o1777);
+    await expect(listConversations()).resolves.toEqual([]);
+    chmodSync(root, 0o700);
+  });
+  it("only 'no such file' means already deleted; anything else is reported", async () => {
+    mkdirSync(path.join(dir, `${uuid(7)}.json`), { recursive: true }); // a folder can't be unlinked
+    expect(await deleteConversation(uuid(8))).toBe(false);
+    await expect(deleteConversation(uuid(7))).rejects.toThrow("The conversation could not be deleted.");
+    await ask("one");
+    await expect(deleteAllConversations()).rejects.toThrow("Some conversations could not be deleted.");
+  });
+  it.runIf(posix)("never names a path in an error", async () => {
+    mkdirSync(path.join(dir, `${uuid(7)}.json`), { recursive: true });
+    const errors: string[] = [];
+    for (const attempt of [() => deleteConversation(uuid(7)), () => deleteAllConversations()]) await attempt().catch((e: Error) => errors.push(e.message));
+    rmSync(dir, { recursive: true });
+    symlinkSync(root, dir);
+    await listConversations().catch((e: Error) => errors.push(e.message));
+    expect(errors).toHaveLength(3);
+    for (const message of errors) {
+      expect(message).not.toContain(root);
+      expect(message).not.toContain(tmpdir());
+    }
+  });
+  it("keeps one change queue for every module copy (on globalThis)", async () => {
+    await ask("one");
+    expect((globalThis as Record<symbol, unknown>)[Symbol.for("reconix.assistant.history.queue")]).toBeInstanceOf(Promise);
+  });
+});
+
 describe("ids", () => {
   it.each(["../x", "nope", "", "0B0E2D55-1C5A-4B1E-9B8C-2F1D3C4B5A69", `${uuid(1)}/../x`])("refuses %j", async (id) => {
     expect(await readConversation(id)).toBeNull();
@@ -156,9 +194,9 @@ describe("what is saved", () => {
   });
   it("keeps the scope a conversation was started with", async () => {
     const scope = { uid: "20261005-140300-9f76_RCX-DEMO-002", label: "RCX-DEMO-002 · 5 Oct 14:03" };
-    const first = await addQuestion({ scope, question: "a" });
-    const next = await addQuestion({ id: first!.conversation.id, scope: ALL, question: "b" });
-    expect(next!.conversation.scope).toEqual(scope);
+    const first = added(await addQuestion({ scope, question: "a" }));
+    const next = added(await addQuestion({ id: first.conversation.id, scope: ALL, question: "b" }));
+    expect(next.conversation.scope).toEqual(scope);
   });
   it("puts a reply right after its question, even when another question came first", async () => {
     const { conversation, asked: q1 } = await ask("one");
@@ -173,10 +211,34 @@ describe("what is saved", () => {
   it("replaces a failed question and its error on retry", async () => {
     const { conversation, asked } = await ask("one");
     await saveReply(conversation.id, { replyTo: asked.id, content: "", cards: [], state: "error", detail: "The model is down." });
-    const again = await addQuestion({ id: conversation.id, scope: ALL, question: "one", retry: true });
-    expect(again!.conversation.messages.map((m) => m.role)).toEqual(["user"]);
-    const noReply = await addQuestion({ id: conversation.id, scope: ALL, question: "one", retry: true });
-    expect(noReply!.conversation.messages).toHaveLength(1); // a question with no reply is replaced too
+    const again = added(await addQuestion({ id: conversation.id, scope: ALL, question: "one", retry: true }));
+    expect(again.conversation.messages.map((m) => m.role)).toEqual(["user"]);
+    const noReply = added(await addQuestion({ id: conversation.id, scope: ALL, question: "one", retry: true }));
+    expect(noReply.conversation.messages).toHaveLength(1); // a question with no reply is replaced too
+  });
+  it("replaces only the same question on retry, never an earlier failed turn", async () => {
+    const { conversation, asked } = await ask("one");
+    await saveReply(conversation.id, { replyTo: asked.id, content: "", cards: [], state: "error", detail: "down" });
+    const other = added(await addQuestion({ id: conversation.id, scope: ALL, question: "two", retry: true }));
+    expect(other.conversation.messages.map((m) => m.content)).toEqual(["one", "", "two"]);
+    await saveReply(conversation.id, { replyTo: other.asked.id, content: "fine", cards: [], state: "done" });
+    const late = added(await addQuestion({ id: conversation.id, scope: ALL, question: "one", retry: true }));
+    expect(late.conversation.messages.map((m) => m.content)).toEqual(["one", "", "two", "fine", "one"]);
+  });
+  it("refuses to retry a question that is still being answered", async () => {
+    const { conversation, asked } = await ask("one");
+    const done = markStreaming(asked.id);
+    expect(await addQuestion({ id: conversation.id, scope: ALL, question: "one", retry: true })).toBe("busy");
+    done();
+    expect(added(await addQuestion({ id: conversation.id, scope: ALL, question: "one", retry: true })).conversation.messages).toHaveLength(1);
+  });
+  it("masks first, then cuts, so a question near the limit still fits", async () => {
+    const question = `${"x".repeat(MAX_QUESTION - 12)} password=a`;
+    expect(question.length).toBeLessThanOrEqual(MAX_QUESTION);
+    expect(keptQuestion(question).length).toBe(MAX_QUESTION);
+    const { asked } = await ask(question);
+    expect(asked.content.length).toBe(MAX_QUESTION);
+    expect(asked.content).not.toContain("password=a");
   });
   it("renames (masked, one line), and refuses an empty name", async () => {
     const { conversation } = await ask("one");
@@ -253,6 +315,29 @@ describe("retention and limits", () => {
     const { conversation } = await ask("x".repeat(3_000), big.id, now);
     expect(statSync(fileOf(big.id)).size).toBeLessThanOrEqual(MAX_FILE_BYTES);
     expect(conversation.messages.at(-1)?.role).toBe("user");
+  });
+  it.runIf(posix)("removes an unreadable file named like a conversation once its last change is past retention", async () => {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const old = new Date(Date.now() - 40 * DAY);
+    const stale = fileOf(uuid(1));
+    const fresh = fileOf(uuid(2));
+    const link = fileOf(uuid(3));
+    const notOurs = path.join(dir, "notes.json");
+    writeFileSync(stale, "{broken");
+    writeFileSync(fresh, "{broken");
+    writeFileSync(notOurs, "{broken");
+    symlinkSync(stale, link);
+    utimesSync(stale, old, old);
+    utimesSync(notOurs, old, old);
+    await listConversations();
+    expect(existsSync(stale)).toBe(false);
+    expect(existsSync(fresh)).toBe(true);
+    expect(lstatSync(link).isSymbolicLink()).toBe(true); // a link is left alone
+    expect(existsSync(notOurs)).toBe(true);
+    process.env.RECONIX_ASSISTANT_RETENTION_DAYS = "0";
+    utimesSync(fresh, old, old);
+    await listConversations();
+    expect(existsSync(fresh)).toBe(true); // 0 keeps everything
   });
   it.runIf(posix)("removes an unfinished write after ten minutes", async () => {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
