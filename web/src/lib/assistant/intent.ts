@@ -19,13 +19,22 @@ export interface Asked {
   findingIds: string[]; // finding ids named in the question, as findingKey() spells them
 }
 
-const PLAN = /\b(plan|design|prepare|set ?up|create|start|begin|launch|kick ?off|schedule|new)\b[^.?!\n]{0,40}\b(assessments?|pentests?|penetration tests?|security tests?|engagements?|scans?)\b/;
-const RUN = /\b(run|execute|launch|start|perform|trigger|fire|do|re-?run)\b[^.?!\n]{0,30}\b(scans?|nmap|sqlmap|nikto|nuclei|ffuf|exploits?|attacks?|payloads?|brute.?force|tools?)\b|\bscan\s+(https?:\/\/|[a-z0-9-]+\.[a-z]{2,})/;
+// planning: a planning verb right before its object ("plan a security assessment", "start a
+// scan"), or new/another right before the noun ("a new assessment"). Never "new" alone, so
+// "which findings are new in this assessment?" is about findings.
+const KINDS = "(?:security |web |api |network |source code )?";
+const NOUN = "(?:assessments?|pentests?|penetration tests?|security tests?|engagements?|scans?|tests?|runs?)";
+const PLAN = new RegExp(
+  `\\b(?:plan|design|prepare|set ?up|create|start|begin|launch|kick ?off|schedule)\\s+(?:an? |the |my )?(?:(?:new|another|fresh|next) )?${KINDS}${NOUN}\\b|\\b(?:new|another) ${KINDS}${NOUN}\\b`,
+);
+// running something: a run verb with a named tool or attack, or "scan <target>". Not "do", not
+// "tools" alone, so "how do I see which tools were used?" is about tools.
+const RUN = /\b(run|execute|launch|start|perform|trigger|fire|re-?run)\b[^.?!\n]{0,30}\b(scans?|nmap|sqlmap|nikto|nuclei|ffuf|exploits?|attacks?|payloads?|brute.?force)\b|\bscan\s+(https?:\/\/|[a-z0-9-]+\.[a-z]{2,})/;
 const ACT = /\b(approve|reject|deny|authori[sz]e|sign off on|grant)\b/;
 const TOP = /\b(top|worst|most (severe|critical|serious|important|dangerous|urgent)|highest|biggest|riskiest|first to fix|fix first|prioriti[sz]e)\b/;
 const FINDINGS = /\bfindings?\b|\bvuln|\bweakness|\bissues?\b|\brisks?\b|\bseverit|\bcritical\b|\bcvss\b|\bcwe\b|\bowasp\b|\bcve\b|\bexploitable\b|\banaly[sz]|\bwhat did (it|you|reconix) find\b|\bfound\b|\bsummar|\boverview\b/;
 const APPROVALS = /\bapprov|\bwait(s|ing)? (on|for)\b|\bpending\b|\bdecid|\bdecision|\bgates?\b|\bon hold\b|\bneeds? (me|my|you)\b/;
-const PROGRESS = /\bprogress\b|\bstatus\b|\bphases?\b|\bsteps?\b|\bhow far\b|\bremaining\b|\bleft to do\b|\bcomplet|\bfinished\b|\bexecution\b|\bplan\b|\bstages?\b|\bsummar|\boverview\b|\bwhat happened\b/;
+const PROGRESS = /\bprogress\b|\bstatus\b|\bphases?\b|\bsteps?\b|\bhow far\b|\bremaining\b|\bleft to do\b|\bcomplet|\bfinish(ed)?\b|\bexecution\b|\bplan\b|\bstages?\b|\bsummar|\boverview\b|\bwhat happened\b/;
 const TOOLS = /\btools?\b|\bnmap\b|\bsqlmap\b|\bnikto\b|\bnuclei\b|\bffuf\b|\bscanners?\b|\bwhat ran\b|\bexecuted\b|\bcommands?\b|\brequests? sent\b|\bactivity\b/;
 const POLICY = /\bpolic|\bblock(ed|s)?\b(?! on)|\bout of scope\b|\boutside (the )?scope\b|\brefus|\bdenied\b|\bforbidden\b|\bguardrails?\b|\bscope (checks?|violations?)\b/;
 const REPORT = /\breports?\b|\bexport|\bdownload|\bpdf\b|\bsarif\b|\bcsv\b|\bhtml\b|\bjson\b|\bdeliverable/;

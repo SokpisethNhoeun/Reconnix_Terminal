@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import { approvalsCard, cardNotes, NOTICES, pickCards } from "@/lib/assistant/cards";
-import { rankFindings, scopedViews, topFinding } from "@/lib/assistant/insights";
+import { rankFindings, scopedViews } from "@/lib/assistant/insights";
 import { readIntent } from "@/lib/assistant/intent";
 import { welcomePrompts } from "@/lib/assistant/prompts";
 import { type Card, CardSchema } from "@/lib/assistant/protocol";
@@ -36,6 +36,22 @@ describe("readIntent", () => {
     ["Run nmap against 192.0.2.10", ["run"]],
     ["scan example.com now", ["run"]],
     ["hello there", []],
+    // ordinary questions that only look like planning or running
+    ["Which findings are new in this assessment?", ["findings"]],
+    ["Show me the new findings in the latest assessment", ["findings"]],
+    ["How do I see which tools were used?", ["tools"]],
+    ["What tools do you have?", ["tools"]],
+    ["Create a report for the latest assessment", ["report"]],
+    ["What is the status of the scan?", ["progress"]],
+    ["Did the run finish?", ["progress"]],
+    ["Was anything blocked by the policy?", ["policy"]],
+    ["Thanks, that helps", []],
+    // and real ones
+    ["Start a new assessment on example.com", ["plan"]],
+    ["I need another pentest next week", ["plan"]],
+    ["Set up a web assessment for staging", ["plan"]],
+    ["Can you run a scan on the staging site?", ["run"]],
+    ["Please execute sqlmap on /login", ["run"]],
   ])("%s → %j", (question, intents) => {
     expect(readIntent(question).intents).toEqual(intents);
   });
@@ -63,8 +79,9 @@ describe("pickCards", () => {
       const suggestion = welcomePrompts(scoped).find((p) => p.kind === "top")!;
       const card = of(pickCards(samples, uid, suggestion.question), "finding");
       expect(suggestion.detail.startsWith(card.item.id)).toBe(true);
-      expect(card.item.id).toBe(topFinding(scoped)!.finding.id);
-      expect(card.item.run.uid).toBe(topFinding(scoped)!.view.uid);
+      const top = rankFindings(scoped)[0];
+      expect(card.item.id).toBe(top.finding.id);
+      expect(card.item.run.uid).toBe(top.view.uid);
     }
   });
   it("shows a finding named by id", () => {
@@ -105,6 +122,10 @@ describe("pickCards", () => {
     expect(of(pickCards(samples, completed.uid, "Generate a report"), "report").runs).toHaveLength(1);
     const all = of(pickCards(samples, null, "Generate a report"), "report");
     expect(all.runs.map((r) => r.run.uid)).toEqual(scopedViews(views, null).map((v) => v.uid));
+  });
+  it("never answers an ordinary question about new findings or tools with a notice", () => {
+    for (const q of ["Which findings are new in this assessment?", "Show me the new findings in the latest assessment"]) expect(kinds(pickCards(samples, null, q))).toEqual(["findings"]);
+    expect(kinds(pickCards(samples, completed.uid, "How do I see which tools were used?"))).toEqual(["tools"]);
   });
   it("answers planning with guidance only, never a plan", () => {
     const cards = pickCards(samples, null, "Plan a security assessment");

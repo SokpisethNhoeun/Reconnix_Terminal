@@ -55,9 +55,6 @@ export function rankFindings(views: AssessmentView[]): Located[] {
     );
 }
 
-/** The finding to fix first in these runs, or null. */
-export const topFinding = (views: AssessmentView[]): Located | null => rankFindings(views)[0] ?? null;
-
 export function severityCounts(views: AssessmentView[]): Record<Severity, number> {
   const counts: Record<Severity, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
   for (const v of views) for (const f of realFindings(v)) counts[f.severity] += 1;
