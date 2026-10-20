@@ -10,12 +10,10 @@ test.beforeEach(async ({ page }) => {
 test("the dashboard counts what the files hold", async ({ page }) => {
   const data = sample();
   const vulns = data.flatMap((a) => a.findings).filter((f) => f.status !== "false-positive");
-  const blocked = data.flatMap((a) => a.verdicts).filter((v) => !v.allowed).length;
   const tile = (label: string) => page.locator(".kpi").filter({ hasText: label }).locator(".kpi-value");
 
   await expect(tile("Assessments")).toHaveText(String(data.length));
   await expect(tile("Findings")).toHaveText(String(vulns.length));
-  await expect(tile("Blocked by policy")).toHaveText(String(blocked));
   await expect(page.locator(".kpi").filter({ hasText: "Critical & High" })).toBeVisible();
   for (const title of ["Needs attention", "Findings by severity", "Findings per day", "Recent assessments"]) {
     await expect(page.getByRole("heading", { name: title })).toBeVisible();
@@ -95,26 +93,6 @@ test("findings page through 10 at a time, and a row opens the finding", async ({
   await page.locator("tbody tr a").first().click();
   await expect(page).toHaveURL(/\/findings\/.+/);
   await expect(page.getByRole("link", { name: "← All findings" })).toBeVisible();
-});
-
-test("policy shows blocked requests and decisions", async ({ page }) => {
-  await page.goto("/policy");
-  await expect(page.getByRole("heading", { name: "Blocked requests" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Approval decisions" })).toBeVisible();
-  await expect(page.getByText("REJECTED").first()).toBeVisible();
-});
-
-test("approval decisions page on their own", async ({ page }) => {
-  const total = sample().reduce((n, a) => n + a.approvals.length, 0);
-  expect(total).toBeGreaterThan(10);
-  await page.goto("/policy");
-  const decisions = page.getByRole("region", { name: "Approval decisions" });
-  await expect(decisions.locator("tbody tr")).toHaveCount(10);
-  await decisions.getByRole("link", { name: "Next page" }).click();
-  await expect(page).toHaveURL(/[?&]decisions=2/);
-  await expect(decisions.locator("tbody tr")).toHaveCount(Math.min(total - 10, 10));
-  // the blocked requests stay where they were (one page in the sample data)
-  await expect(page.getByRole("navigation", { name: "Blocked request pages" })).toHaveCount(0);
 });
 
 test("the theme toggle switches to dark and back", async ({ page }) => {

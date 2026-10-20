@@ -1,10 +1,9 @@
-/* The AI Assistant: a preview of the Reconix chat in this browser tab (operators only). It
-   reads the assessment that is waiting for a decision and mirrors what the terminal app
-   shows — the scope manifest, the approval gate and the running rail. Assessments are driven
-   from the terminal app; this page does not act. */
+/* The AI Assistant: a chat preview of Reconix in this browser tab (operators only). A
+   read-only mock — the transcript fills the page and the composer stays pinned at the
+   bottom. Assessments are driven from the terminal app; this page does not act. */
 import type { Metadata } from "next";
 
-import { AssistantView } from "@/components/assistant/assistant-view";
+import { Composer } from "@/components/assistant/composer";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/neu/card";
 import { requireTerminalAccess } from "@/lib/auth/guard";
@@ -33,9 +32,9 @@ export default async function AssistantPage() {
   }
 
   return (
-    <>
+    <div className="flex min-h-[calc(100vh-48px)] flex-col gap-6">
       <PageHeader title="AI Assistant" sub={`${a.label} · ${a.target} · ${a.template.name ? templateLabel(a.template.name) : "no template"}`} />
-      <AssistantView assessment={a} />
-    </>
+      <Composer />
+    </div>
   );
 }

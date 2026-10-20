@@ -71,7 +71,7 @@ export default async function DashboardPage() {
     <>
       <PageHeader
         title="Dashboard"
-        sub={`What Reconix found across ${plural(stats.assessments, "assessment")} · ${formatDay(oldest)} – ${formatDay(newest)}`}
+        sub={`What Reconix found across ${plural(stats.assessments, "assessment")} from ${formatDay(oldest)} to ${formatDay(newest)}`}
         actions={newAssessment}
       />
       <SkippedFiles problems={problems} />
@@ -140,16 +140,6 @@ export default async function DashboardPage() {
               {s.Stopped} stopped
             </span>
           )}
-        </StatCard>
-
-        <StatCard label="Blocked by policy" value={stats.blocked} href="/policy">
-          <span>
-            {stats.blocked} of {plural(stats.checks, "AI action")} blocked
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Dot tone="ok" />
-            All requests stayed in scope
-          </span>
         </StatCard>
       </StatGrid>
 

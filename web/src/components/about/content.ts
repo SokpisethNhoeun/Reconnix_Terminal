@@ -155,7 +155,7 @@ export const GUARDS: Guard[] = [
   },
   {
     title: "Policy check on every request",
-    body: "The policy engine compares each request with the approved scope and blocks the rest. Blocked requests show on the Policy page.",
+    body: "The policy engine compares each request with the approved scope and blocks the rest. Blocked requests show in each assessment's policy checks.",
   },
   {
     title: "Decisions bound to the request",

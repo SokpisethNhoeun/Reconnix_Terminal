@@ -1,4 +1,4 @@
-/* The dashboard's four headline tiles. Each is a whole-card link (with a chevron) into the
+/* The dashboard's headline tiles. Each is a whole-card link (with a chevron) into the
    page that explains it; the first turns "urgent" when critical or high findings still need
    a look. Built on the shared `.kpi` surface so it matches the rest of the dashboard. */
 import { ChevronRight } from "lucide-react";
@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export function StatGrid({ children }: { children: ReactNode }) {
-  return <section className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 xl:grid-cols-4 xl:gap-[22px]">{children}</section>;
+  return <section className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 xl:grid-cols-3 xl:gap-[22px]">{children}</section>;
 }
 
 interface StatCardProps {
