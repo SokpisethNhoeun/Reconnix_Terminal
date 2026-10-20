@@ -13,8 +13,8 @@ import { newest, signIn } from "./support";
 const RUN = newest().uid;
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
-/* Violations owned by other areas, by page and axe rule, so this suite stays green until they
-   are fixed (remove each entry with its fix):
+/* Violations owned by other areas, by page and axe rule. Each is expected to be found, and the
+   test fails with "remove it from KNOWN" once it is gone, so a stale entry can't hide a new one.
    - findings-view.tsx: the list is role="listbox" with a <button> inside every role="option"
      (nested-interactive); the "findings format" link is told from its text by colour only
      (link-in-text-block). */
@@ -25,10 +25,13 @@ const KNOWN: Record<string, string[]> = {
 
 async function axe(page: Page, name: string) {
   const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  const known = KNOWN[name] ?? [];
   const found = violations
-    .filter((v) => !(KNOWN[name] ?? []).includes(v.id))
+    .filter((v) => !known.includes(v.id))
     .map((v) => `${v.id} (${v.impact}): ${v.help} — ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(" | ")}`);
   expect(found, `${name}: axe violations`).toEqual([]);
+  const ids = violations.map((v) => v.id);
+  for (const rule of known) expect(ids, `${name}: ${rule} is fixed: remove it from KNOWN`).toContain(rule);
 }
 
 async function show(page: Page, url: string) {

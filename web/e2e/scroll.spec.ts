@@ -14,6 +14,7 @@ const SIZES = [
   { width: 1366, height: 768 },
   { width: 1280, height: 720 },
   { width: 1024, height: 768 },
+  { width: 844, height: 390 }, // a phone held sideways: wide enough for the rail, too short for it to stick
   { width: 390, height: 844 },
 ];
 const label = (s: { width: number; height: number }) => `${s.width}×${s.height}`;
@@ -22,14 +23,14 @@ const RUN = newest().uid; // Reports and Scope need one run
 const VIEWS = ["overview", "findings", `reports&uid=${RUN}`, `scope&uid=${RUN}`];
 const viewName = (v: string) => v.split("&")[0];
 
-/* Known faults owned by other areas, in px, so this suite stays green until they are fixed
-   (remove each entry with its fix):
+/* Known faults owned by other areas: the check for that size and view is expected to FAIL, and
+   fails with "remove this entry" once the fault is gone, so a stale entry can't hide a new one.
    - the Overview's bottom row is a fixed clamp(190px, 27vh, 230px) (dashboard.css); at 1280×720
-     its 213 px cards hang 3 px past the frame's bottom edge, which clips them;
+     its cards are taller and hang past the frame's bottom edge, which clips them;
    - the Report's Target value (reports-view.tsx, Meta) never wraps, so on a phone a long target
-     runs 126 px past the content area's edge and is cut off. */
-const KNOWN_OVERHANG: Record<string, number> = { "1280×720 overview": 3 };
-const KNOWN_SIDEWAYS: Record<string, number> = { "390×844 reports": 126 };
+     runs past the content area's edge and is cut off. */
+const KNOWN_OVERHANG = new Set(["1280×720 overview"]);
+const KNOWN_SIDEWAYS = new Set(["390×844 reports"]);
 
 type Scroll = { kind: "content" | "window"; top: number; range: number };
 
@@ -63,24 +64,27 @@ async function open(page: Page, view: string) {
   await settled(page);
 }
 
-/** Real wheel input over the open view until it stops moving; returns where it ended. */
-async function wheelToEnd(page: Page, x: number, y: number) {
+/** Real wheel input over the open view, sent until its end is reached (or the time runs out:
+    then the poll fails with how far from the end it got); returns where it ended. */
+async function wheelToEnd(page: Page, x: number, y: number, timeout = 15_000) {
   await page.mouse.move(x, y);
-  let before = -1;
-  for (let i = 0; i < 30; i++) {
-    await page.mouse.wheel(0, 800);
-    await page.waitForTimeout(120);
-    const s = await scrollState(page);
-    if (s.top >= s.range - 1 || s.top === before) break;
-    before = s.top;
-  }
-  await page.waitForTimeout(400); // let a wheel animation finish
+  await expect
+    .poll(
+      async () => {
+        const s = await scrollState(page);
+        if (s.range - s.top > 1) await page.mouse.wheel(0, 800);
+        return s.range - s.top;
+      },
+      { timeout, intervals: [150], message: "the wheel did not reach the end of the view" },
+    )
+    .toBeLessThanOrEqual(1);
   return scrollState(page);
 }
 
-/** How far the lowest visible text or control of the open view hangs below what can be seen,
-    with the view scrolled to its end (≤ 0: everything is reachable). Things inside an inner box
-    that scrolls or clips are that box's business and are skipped. */
+/** How far the lowest visible piece of the open view (text, a control, or a box with a border or
+    a fill, such as a card) hangs below what can be seen, with the view scrolled to its end
+    (≤ 0: everything is reachable). Things inside an inner box that scrolls or clips are that
+    box's business and are skipped, and so are decorations (aria-hidden, the globe's canvas). */
 async function overhang(page: Page) {
   await page.evaluate(() => {
     const main = document.querySelector("main")!;
@@ -102,14 +106,39 @@ async function overhang(page: Page) {
       return false;
     };
     for (const el of view ? Array.from(view.querySelectorAll<HTMLElement>("*")) : []) {
+      if (el.closest('[aria-hidden="true"]') || el.tagName === "CANVAS") continue;
+      const s = getComputedStyle(el);
       const text = Array.from(el.childNodes).some((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim());
-      if (!text && !el.matches("a, button, input, textarea, select, [tabindex]")) continue;
+      const surface = parseFloat(s.borderBottomWidth) > 0 || s.backgroundColor !== "rgba(0, 0, 0, 0)" || s.backgroundImage !== "none";
+      if (!text && !surface && !el.matches("a, button, input, textarea, select, [tabindex]")) continue;
       if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
       const r = el.getBoundingClientRect();
       if (!r.height || inInnerBox(el)) continue;
-      if (r.bottom - floor > worst.by) worst = { by: Math.round(r.bottom - floor), what: `${el.tagName} "${el.textContent!.trim().slice(0, 40)}"` };
+      if (r.bottom - floor > worst.by) worst = { by: Math.round(r.bottom - floor), what: `${el.tagName}.${el.classList[0] ?? ""} "${el.textContent!.trim().slice(0, 40)}"` };
     }
     return worst;
+  });
+}
+
+/** Sidebar links that can't be brought fully on screen (scrolled into view as far as the page
+    and the rail allow), or that the frame or the rail cuts off. */
+function unreachableRail(page: Page) {
+  return page.evaluate(() => {
+    const rail = document.querySelector("aside")!;
+    const missed: string[] = [];
+    for (const el of Array.from(rail.querySelectorAll<HTMLElement>("a[href], button"))) {
+      el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+      const r = el.getBoundingClientRect();
+      const box = rail.getBoundingClientRect();
+      const frame = rail.closest(".dash-frame")!.getBoundingClientRect();
+      const inside = (outer: DOMRect) => r.top >= outer.top - 0.5 && r.bottom <= outer.bottom + 0.5 && r.left >= outer.left - 0.5 && r.right <= outer.right + 0.5;
+      const onScreen = r.top >= -0.5 && r.bottom <= innerHeight + 0.5 && r.left >= -0.5 && r.right <= innerWidth + 0.5;
+      // the rail itself only clips sideways (the phone strip scrolls); the frame clips everything
+      const railClips = getComputedStyle(rail).overflowX !== "visible";
+      if (!onScreen || !inside(frame) || (railClips && !inside(box))) missed.push(el.getAttribute("aria-label") ?? el.textContent!.trim());
+    }
+    window.scrollTo({ top: 0, behavior: "instant" });
+    return missed;
   });
 }
 
@@ -143,9 +172,8 @@ for (const size of [SIZES[0], SIZES[2]]) {
         await open(page, view);
         const start = await scrollState(page);
         expect(start.kind).toBe("content"); // the fixed frame: the content area scrolls, not the page
-        const end = await wheelToEnd(page, size.width * 0.6, size.height * 0.6);
         if (view === "findings") expect(start.range).toBeGreaterThan(200); // the sample's findings don't fit
-        expect(end.top).toBeGreaterThanOrEqual(end.range - 1);
+        await wheelToEnd(page, size.width * 0.6, size.height * 0.6);
         expect(await page.evaluate(() => scrollY)).toBe(0);
         expect(await page.evaluate(() => document.documentElement.classList.contains("lenis"))).toBe(false);
       });
@@ -165,14 +193,17 @@ for (const size of SIZES) {
         await open(page, view);
         const s = await scrollState(page);
         expect(s.kind, `${viewName(view)} scrolls the ${fixedFrame(size) ? "content area" : "window"}`).toBe(fixedFrame(size) ? "content" : "window");
+        const key = `${label(size)} ${viewName(view)}`;
         const low = await overhang(page);
-        const allowed = KNOWN_OVERHANG[`${label(size)} ${viewName(view)}`] ?? 1;
-        expect(low.by, `${viewName(view)}: ${low.what} hangs out of reach`).toBeLessThanOrEqual(allowed);
+        if (KNOWN_OVERHANG.has(key)) expect(low.by, `${key} reaches its bottom now: remove this entry from KNOWN_OVERHANG`).toBeGreaterThanOrEqual(1);
+        else expect(low.by, `${viewName(view)}: ${low.what} hangs out of reach`).toBeLessThanOrEqual(1);
         const wide = await sideways(page);
         expect(wide.page, `${viewName(view)}: the page scrolls sideways`).toBe(0);
         // the content area clips sideways, so anything wider than it would be cut off unseen
-        expect(wide.content, `${viewName(view)}: content is cut off at the side`).toBeLessThanOrEqual(KNOWN_SIDEWAYS[`${label(size)} ${viewName(view)}`] ?? 0);
+        if (KNOWN_SIDEWAYS.has(key)) expect(wide.content, `${key} fits sideways now: remove this entry from KNOWN_SIDEWAYS`).toBeGreaterThan(0);
+        else expect(wide.content, `${viewName(view)}: content is cut off at the side`).toBe(0);
       }
+      expect(await unreachableRail(page), "sidebar links out of reach").toEqual([]);
       // the page itself never hides its overflow to "fix" scrolling
       const hidden = await page.evaluate(() => [document.documentElement, document.body].map((el) => getComputedStyle(el).overflowY));
       expect(hidden).not.toContain("hidden");
@@ -197,7 +228,6 @@ for (const size of SIZES) {
       const end = await wheelToEnd(page, size.width * 0.6, size.height * 0.7);
       expect(end.kind).toBe(fixedFrame(size) ? "content" : "window");
       expect(end.range).toBeGreaterThan(0);
-      expect(end.top).toBeGreaterThanOrEqual(end.range - 1);
     });
   });
 }
@@ -275,9 +305,9 @@ test.describe("the docs", () => {
     const hash = (await target.getAttribute("href"))!;
     await target.click();
     await expect(page).toHaveURL(new RegExp(`${hash}$`));
-    // the heading glides to just under the sticky nav (its scroll-margin-top)
+    // the heading glides to just under the sticky nav (64px and its border), at its scroll-margin-top
     await expect.poll(() => page.locator(hash).evaluate((el) => Math.round(el.getBoundingClientRect().top)), { timeout: 5000 }).toBeLessThan(140);
-    expect(await page.locator(hash).evaluate((el) => el.getBoundingClientRect().top)).toBeGreaterThanOrEqual(0);
+    expect(await page.locator(hash).evaluate((el) => el.getBoundingClientRect().top), "the heading is under the nav").toBeGreaterThanOrEqual(65);
 
     await page.getByRole("banner").getByRole("link").first().click(); // the nav's logo: back to the dashboard
     await page.waitForURL((url) => url.pathname === "/");
@@ -285,7 +315,7 @@ test.describe("the docs", () => {
     await page.locator('nav[aria-label="Views"] button[aria-label="Findings"]').click();
     await settled(page);
     const end = await wheelToEnd(page, 900, 600);
-    expect(end.top).toBeGreaterThan(0);
+    expect(end.range).toBeGreaterThan(0);
   });
 });
 
