@@ -29,6 +29,7 @@ function focusTarget(target: Element): HTMLElement | null {
 
 export function useReturnFocus(stage: RefObject<HTMLElement | null>) {
   const opener = useRef<HTMLElement | null>(null);
+  const focusedAtOpen = useRef<Element | null>(null); // where focus was as the open started
   const pointer = useRef<{ target: Element; at: number } | null>(null);
 
   useEffect(() => {
@@ -39,25 +40,26 @@ export function useReturnFocus(stage: RefObject<HTMLElement | null>) {
     return () => document.removeEventListener("pointerdown", note, true);
   }, []);
 
-  /** As the assistant starts to open: who opened it. */
+  /** As the assistant starts to open: who opened it. A recent click names it more precisely than
+      the focus does when the focus is on something around it (the body, or the content area,
+      which a click on a card's background focuses). */
   const remember = useCallback(() => {
     const s = stage.current;
-    const active = document.activeElement;
-    if (active instanceof HTMLElement && active !== document.body && !s?.contains(active)) {
-      opener.current = active;
-      return;
-    }
+    const raw = document.activeElement;
+    focusedAtOpen.current = raw;
+    const active = raw instanceof HTMLElement && raw !== document.body && !s?.contains(raw) ? raw : null;
     const p = pointer.current;
-    const recent = p && performance.now() - p.at < RECENT_MS && !s?.contains(p.target);
-    opener.current = recent ? focusTarget(p.target) : null;
+    const recent = p && performance.now() - p.at < RECENT_MS && !s?.contains(p.target) ? focusTarget(p.target) : null;
+    opener.current = recent && (!active || active.contains(recent)) ? recent : active;
   }, [stage]);
 
-  /** As the open lands: the composer, if focus is still where the open left it. */
+  /** As the open lands: the composer, if focus is still where the open found it (or in the stage). */
   const focusComposer = useCallback(
     (composer: HTMLTextAreaElement | null) => {
       const s = stage.current;
       const active = document.activeElement;
-      const free = !active || active === document.body || active === opener.current || !!s?.contains(active);
+      const stayed = active === opener.current || active === focusedAtOpen.current;
+      const free = !active || active === document.body || stayed || !!s?.contains(active);
       if (free && composer && !composer.disabled) composer.focus({ preventScroll: true });
     },
     [stage],

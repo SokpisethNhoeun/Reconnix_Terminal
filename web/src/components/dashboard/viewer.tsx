@@ -71,7 +71,8 @@ export function Viewer({
         <div className="dash-frame" data-assistant-open={shown === "assistant" ? "" : undefined}>
           <Sidebar active={view} onSelect={select} terminalState={terminalState} />
           {topBar}
-          <main className="dash-content">
+          {/* tabIndex -1: focusable by script and click, so the keys scroll it (no tab stop) */}
+          <main className="dash-content" tabIndex={-1}>
             <div
               data-view-pane="overview"
               hidden={shown !== "overview" && !backdrop}
