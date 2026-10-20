@@ -18,6 +18,12 @@ const detail = (page: Page) => page.getByRole("article", { name: /^Finding / });
 const rowId = (page: Page, i: number) => rows(page).nth(i).locator("button span span span").first().innerText();
 const rowSeverity = async (page: Page, i: number) => (await rows(page).nth(i).locator("button span span span").nth(1).innerText()).toUpperCase();
 const param = (page: Page, key: string) => new URL(page.url()).searchParams.get(key);
+/** Open an address and wait for the page to settle: a click before hydration is replayed, but the
+    address change it makes can then slip past the router (the view would not follow it). */
+async function go(page: Page, url: string) {
+  await page.goto(url);
+  await page.waitForLoadState("networkidle");
+}
 
 const TOTAL = sample().reduce((n, a) => n + a.findings.length, 0);
 const PAGES = Math.ceil(TOTAL / PER_PAGE);
@@ -25,7 +31,7 @@ test.beforeAll(() => expect(PAGES, "the sample data needs more than one page of 
 
 test("ten findings a page, with Previous and Next under the list", async ({ page }) => {
   await signIn(page);
-  await page.goto("/?view=findings");
+  await go(page, "/?view=findings");
   await expect(rows(page)).toHaveCount(PER_PAGE);
   await expect(pager(page)).toContainText(`Page 1 of ${PAGES} · ${TOTAL} results`);
   await expect(pager(page).getByRole("button", { name: "Previous page" })).toBeDisabled();
@@ -47,7 +53,7 @@ test("ten findings a page, with Previous and Next under the list", async ({ page
 
 test("a deep link opens the page that holds its finding, and the selection stays while it is on the page", async ({ page }) => {
   await signIn(page);
-  await page.goto("/?view=findings&page=2");
+  await go(page, "/?view=findings&page=2");
   await rows(page).nth(1).locator("button").click(); // the second row of page 2
   const key = param(page, "finding")!;
   expect(key).toContain("~"); // every run's list: keyed by run
@@ -55,7 +61,7 @@ test("a deep link opens the page that holds its finding, and the selection stays
 
   // the link alone, and with the wrong page: both land on page 2 with the row selected
   for (const url of [`/?view=findings&finding=${encodeURIComponent(key)}`, `/?view=findings&page=1&finding=${encodeURIComponent(key)}`]) {
-    await page.goto(url);
+    await go(page, url);
     await expect(pager(page)).toContainText(`Page 2 of ${PAGES}`);
     await expect(selected(page)).toHaveCount(1);
     await expect(detail(page)).toContainText(key.split("~")[1]);
@@ -69,7 +75,7 @@ test("a deep link opens the page that holds its finding, and the selection stays
 
 test("a filter goes back to the first page; Previous and Next finding cross the page end", async ({ page }) => {
   await signIn(page);
-  await page.goto("/?view=findings&page=2");
+  await go(page, "/?view=findings&page=2");
   await expect(pager(page)).toContainText("Page 2 of");
   const sev = await rowSeverity(page, 0);
   await page.getByRole("group", { name: "Severity" }).getByRole("button", { name: new RegExp(`^${sev.toLowerCase()}`) }).click();
@@ -91,14 +97,14 @@ test("a filter goes back to the first page; Previous and Next finding cross the 
   expect(param(page, "finding")).toBe(last);
   await expect(detail(page)).toContainText(`${PER_PAGE} of ${TOTAL}`);
   // the ends are disabled, not dead
-  await page.goto("/?view=findings");
+  await go(page, "/?view=findings");
   await expect(detail(page).getByRole("button", { name: "Previous finding" })).toBeDisabled();
 });
 
 test("a finding the address names but the list lacks falls back to the first row, with a way out", async ({ page }) => {
   await signIn(page);
   // unknown: nothing by that name in any run
-  await page.goto("/?view=findings&finding=no-such-finding");
+  await go(page, "/?view=findings&finding=no-such-finding");
   await expect(page.getByRole("status").filter({ hasText: "No finding" })).toContainText("no-such-finding");
   await expect(selected(page)).toHaveCount(1);
   await expect(detail(page)).toBeVisible();
@@ -107,11 +113,11 @@ test("a finding the address names but the list lacks falls back to the first row
 
   // hidden by a filter: Show it clears the filters and keeps it selected
   const a = sample().find((x) => new Set(x.findings.map((f) => f.severity)).size > 1)!;
-  await page.goto(`/?uid=${a.uid}&view=findings`);
+  await go(page, `/?uid=${a.uid}&view=findings`);
   const fid = await rowId(page, 0);
   const sev = await rowSeverity(page, 0);
   const other = a.findings.find((x) => x.severity !== sev)!.severity;
-  await page.goto(`/?uid=${a.uid}&view=findings&sev=${other}&finding=${fid}`);
+  await go(page, `/?uid=${a.uid}&view=findings&sev=${other}&finding=${fid}`);
   await expect(page.getByRole("status").filter({ hasText: "hidden by the filters" })).toContainText(fid);
   await page.getByRole("button", { name: "Show it" }).click();
   await expect(page).not.toHaveURL(/sev=/);
@@ -125,7 +131,7 @@ test.describe("on the fixed frame (1366×768)", () => {
 
   test("the list pane scrolls on its own, the page does not, and the detail keeps its header", async ({ page }) => {
     await signIn(page);
-    await page.goto("/?view=findings");
+    await go(page, "/?view=findings");
     await expect(rows(page)).toHaveCount(PER_PAGE);
     const main = page.locator("main.dash-content");
     const state = () =>
@@ -177,7 +183,7 @@ test.describe("on a phone (390×844)", () => {
 
   test("the list first; a row opens the detail with Back, and the browser's Back returns to the list", async ({ page }) => {
     await signIn(page);
-    await page.goto("/?view=findings");
+    await go(page, "/?view=findings");
     await expect(list(page)).toBeVisible();
     await expect(detail(page)).toBeHidden();
     const back = page.getByRole("button", { name: "Back to the findings" });
@@ -205,7 +211,7 @@ test.describe("on a phone (390×844)", () => {
     expect(key).toBeNull();
     await rows(page).first().locator("button").tap();
     const direct = page.url();
-    await page.goto(direct);
+    await go(page, direct);
     await expect(detail(page)).toBeVisible();
     await back.tap();
     await expect(list(page)).toBeVisible();
