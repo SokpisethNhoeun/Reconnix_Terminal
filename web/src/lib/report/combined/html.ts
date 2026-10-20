@@ -18,6 +18,8 @@ const EXTRA_CSS = `
 .toc a{color:var(--ink)}
 .run{font-family:"IBM Plex Mono"; font-size:10.5px; color:var(--accent); background:#eaf1fb; border-radius:6px; padding:1px 7px; white-space:nowrap}
 .runs{display:flex; flex-wrap:wrap; gap:4px}
+td .run{white-space:normal}
+.nw{white-space:nowrap}
 .sub-h{font-size:13px; font-weight:600; color:var(--ink); margin-top:6px}
 .occ{border:1px solid var(--line); border-radius:9px; padding:10px 12px; display:grid; gap:8px}
 .occ+.occ{margin-top:8px}
@@ -135,7 +137,7 @@ function overview(r: CombinedReport): string {
       const plan = x.plan.total ? `${x.plan.done}/${x.plan.total}` : "—";
       return (
         `<tr><td class="id"><a href="#run-${esc(x.uid)}">${esc(x.id)}</a></td><td>${esc(x.template)}</td><td class="mono">${esc(x.target)}</td>` +
-        `<td>${esc(x.status)}</td><td class="mono">${esc(window)}</td><td class="mono">${x.findings.length}</td><td class="mono">${plan}</td>` +
+        `<td>${esc(x.status)}</td><td class="mono nw">${esc(window)}</td><td class="mono">${x.findings.length}</td><td class="mono">${plan}</td>` +
         `<td class="mono">${x.requests}</td><td class="mono">${x.approvals.approved}/${x.approvals.total}</td></tr>`
       );
     })
@@ -153,7 +155,7 @@ function findingsTable(r: CombinedReport): string {
     r.findings
       .map(
         (u) =>
-          `<tr><td>${esc(u.title)}</td><td>${pill(u.severity)}</td><td class="mono">${score(u.cvss)}</td><td class="mono">${esc(u.cwe ?? "—")}</td>` +
+          `<tr><td>${esc(u.title)}</td><td>${pill(u.severity)}</td><td class="mono">${score(u.cvss)}</td><td class="mono nw">${esc(u.cwe ?? "—")}</td>` +
           `<td class="mono">${esc(u.target || "—")}</td><td>${validation(u.confirmed ? "CONFIRMED" : "UNCONFIRMED")}</td>` +
           `<td>${runTags(u.runs)}</td></tr>`,
       )

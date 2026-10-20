@@ -1,12 +1,13 @@
 /* The Report view, for one run or every saved run (ReportCards, derive-report.ts), in the
    Overview's style. One run: the summary strip, its details and plan, Findings by Severity and
    the findings table, with every export format to download. Every run: the strip, Findings by
-   Severity, the targets and the runs, each with its reports. Server component. */
+   Severity, the targets, and the runs with their reports — plus the Selection panel and preview
+   that combine up to five of them into one report (ReportCombine). Server component. */
 import { FindingsCard } from "@/components/dashboard/findings-card";
 import { ReportDetails } from "@/components/dashboard/report-details";
 import { ReportDownloads } from "@/components/dashboard/report-downloads";
 import { ReportFindings } from "@/components/dashboard/report-findings";
-import { ReportRuns } from "@/components/dashboard/report-runs";
+import { ReportCombine } from "@/components/dashboard/report-selection";
 import { ReportTargets } from "@/components/dashboard/report-targets";
 import type { ReportCards } from "@/components/dashboard/report-types";
 import { StatStrip } from "@/components/dashboard/stat-strip";
@@ -30,7 +31,7 @@ export function ReportsView({ data }: { data: ReportCards }) {
         <div className="dash-panels">
           <FindingsCard id="report-severity" data={data.findings} />
           <ReportTargets targets={data.targets} />
-          <ReportRuns runs={data.runs} />
+          <ReportCombine runs={data.runs} />
         </div>
       )}
     </div>
