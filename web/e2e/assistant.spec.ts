@@ -238,8 +238,40 @@ test.describe("with reduced motion", () => {
     await expect(page).toHaveURL(/finding=/);
     await expect(page.getByRole("heading", { name: "Findings", level: 1 })).toBeVisible();
     await tab(page).click();
+    // a card link to another run opens it, and the conversation stays (it says it is about
+    // every run while the dashboard shows that one)
+    await ask(page, "Generate a report");
+    const report = log(page).getByRole("region", { name: "Report" });
+    await report.getByRole("button", { name: /RCX-DEMO-002/ }).first().click();
+    await report.getByRole("link", { name: /^Open the Reports view of RCX-DEMO-002/ }).click();
+    await expect(page).toHaveURL(/uid=\d{8}-\d{6}-[0-9a-f]{4}_RCX-DEMO-002/);
+    await expect(page).toHaveURL(/view=reports/);
+    await tab(page).click();
+    await expect(log(page)).toContainText("You asked: Generate a report");
+    await expect(log(page)).toContainText("You asked: Plan a security assessment");
+    await expect(page.getByText(/This conversation is about All assessments/)).toBeVisible();
     await plan.getByRole("button", { name: "Open Terminal" }).click();
     await expect(page).toHaveURL(/view=terminal/);
+  });
+});
+
+test.describe("when the model fails", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  test("the reply says why, keeps its cards, and Retry replaces the failed turn", async ({ page }) => {
+    await signIn(page);
+    await page.goto("/?view=assistant");
+    await ask(page, "Summarize the findings [stub:fail]");
+    const failed = log(page).getByRole("region", { name: "The assistant couldn't answer" });
+    await expect(failed).toContainText("HTTP 500");
+    await expect(log(page).getByRole("region", { name: "Findings" })).toBeVisible(); // the cards still came
+    await failed.getByRole("button", { name: "Retry" }).click();
+    await expect(log(page)).toContainText("Earlier turns: 0. You asked: Summarize the findings [stub:fail]");
+    await expect(failed).toHaveCount(0);
+    await page.reload();
+    await expect(log(page)).toContainText("You asked: Summarize the findings [stub:fail]");
+    await expect(log(page).locator(".ai-bubble")).toHaveCount(1); // replaced, not kept twice
+    await expect(log(page).getByRole("region", { name: "The assistant couldn't answer" })).toHaveCount(0);
   });
 });
 
