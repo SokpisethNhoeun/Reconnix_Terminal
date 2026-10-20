@@ -1,11 +1,13 @@
 "use client";
 
 /* One run's activity log as labelled lanes (Scope, Policy, Tool, Finding, Approval gate,
-   Operator, Info, Mask) on a time axis. Events too close to draw apart are one mark with a count
-   (derive.ts clusters them). Hover or focus a mark for its tooltip; click it (or Enter) to
-   expand its events: time, label, status and the masked text. */
+   Operator, Info, Mask) on a time axis. Events too close to draw apart are one count pill that
+   starts at the first of them (derive.ts clusters them; axis.ts holds the geometry, passed to
+   the CSS here). Hover or focus a mark for its tooltip; click it (or Enter) to expand its
+   events: time, label, status and the masked text. */
 import { useId, useRef, useState } from "react";
 
+import { DOT_PX, PILL_PX, PLOT_MIN_PX } from "@/components/dashboard/axis";
 import { Axis } from "@/components/dashboard/axis-labels";
 import { ChartTooltip, useTip } from "@/components/dashboard/chart-tooltip";
 import { EventBadge, badgeText } from "@/components/dashboard/event-badge";
@@ -17,7 +19,7 @@ import { useMarkNav } from "@/components/dashboard/use-mark-nav";
 
 type Events = Extract<ActivityCard, { mode: "events" }>;
 
-const mid = (m: ActivityMark) => (m.start + m.end) / 2;
+const GEOMETRY = { "--plot-min": `${PLOT_MIN_PX}px`, "--dot": `${DOT_PX}px`, "--pill": `${PILL_PX}px` };
 
 function preview(m: ActivityMark): string[] {
   const first = m.events.slice(0, 2).map((e) => `${badgeText(e.badge)} · ${e.text}`);
@@ -56,8 +58,16 @@ export function EventLanes({ data }: { data: Events }) {
 
   return (
     <>
-      <div className="dash-chart-scroll" data-lenis-prevent>
-        <div ref={group} role="group" aria-label={data.summary} aria-describedby={hint} className="dash-lanes" onKeyDown={nav.onKeyDown}>
+      <div className="dash-chart-scroll">
+        <div
+          ref={group}
+          role="group"
+          aria-label={data.summary}
+          aria-describedby={hint}
+          className="dash-lanes"
+          style={{ ...GEOMETRY, "--lanes": data.lanes.length } as React.CSSProperties}
+          onKeyDown={nav.onKeyDown}
+        >
           {data.lanes.map((l, row) => {
             const Icon = KIND_ICON[l.kind];
             return (
@@ -75,14 +85,14 @@ export function EventLanes({ data }: { data: Events }) {
                       data-mark
                       data-key={m.key}
                       data-row={row}
-                      data-pos={mid(m)}
+                      data-pos={m.start}
                       data-count={m.count > 1 ? "" : undefined}
                       data-pending={m.pending ? "" : undefined}
                       tabIndex={m.key === nav.active ? 0 : -1}
                       aria-label={`${l.label}: ${m.title}`}
                       aria-haspopup="dialog"
                       className="dash-mark"
-                      style={{ left: `${mid(m) * 100}%`, width: m.count > 1 ? `max(18px, ${(m.end - m.start) * 100}%)` : undefined }}
+                      style={{ left: `${m.start * 100}%` }}
                       onMouseEnter={(e) => show(e.currentTarget, m.title, preview(m))}
                       onMouseLeave={hide}
                       onFocus={(e) => {
@@ -95,7 +105,7 @@ export function EventLanes({ data }: { data: Events }) {
                         setOpen(m.key);
                       }}
                     >
-                      {m.count > 1 ? m.count : null}
+                      {m.count > 99 ? "99+" : m.count > 1 ? m.count : null}
                     </button>
                   ))}
                 </div>

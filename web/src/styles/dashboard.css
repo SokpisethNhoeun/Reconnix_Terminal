@@ -28,7 +28,7 @@
     grid-template-rows: auto minmax(min-content, 1fr) minmax(min-content, 36vh);
     grid-template-areas: "top top" "hero right" "bottom right";
   }
-  .dash-bottom { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+  .dash-bottom { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
 }
 @media (max-width: 767.98px) {
   .dash-overview { padding: 12px 16px 16px; }
@@ -145,13 +145,18 @@
 }
 .dash-details-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 
-/* ---- Activity Timeline: labelled lanes on a time axis ---- */
+/* ---- Activity Timeline: labelled lanes on a time axis ----
+   --plot-min, --dot, --pill and --lanes come from axis.ts / the data (event-lanes.tsx), so the
+   clustering and the drawing agree: marks start ≥ 25 px apart at the narrowest plot. */
 .dash-lanes {
+  --lane-label: 104px;
+  --track-inset: 9px;
   flex: 1;
-  min-width: 380px;
+  /* the right inset is a pill wide: a pill starting at the very end stays inside */
+  min-width: calc(var(--lane-label) + 8px + var(--track-inset) + var(--pill, 18px) + var(--plot-min, 296px));
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
-  grid-template-rows: repeat(8, minmax(18px, 1fr)) auto;
+  grid-template-columns: var(--lane-label) minmax(0, 1fr);
+  grid-template-rows: repeat(var(--lanes, 8), minmax(18px, 1fr)) auto;
   column-gap: 8px;
 }
 .dash-lane { display: contents; }
@@ -159,15 +164,16 @@
 .dash-lane-label > svg { color: var(--c); }
 .dash-lane-track {
   position: relative;
-  margin: 0 9px;
+  margin: 0 var(--pill, 18px) 0 var(--track-inset, 9px);
   background: linear-gradient(color-mix(in oklab, var(--foreground) 7%, transparent), color-mix(in oklab, var(--foreground) 7%, transparent)) center / 100% 1px no-repeat;
 }
-.dash-lane-axis { grid-column: 2; margin: 3px 9px 0; }
+.dash-lane-axis { grid-column: 2; margin: 3px var(--pill, 18px) 0 var(--track-inset, 9px); }
+/* a single event: a dot centred on its time */
 .dash-mark {
   position: absolute;
   top: 50%;
-  width: 10px;
-  height: 10px;
+  width: var(--dot, 10px);
+  height: var(--dot, 10px);
   padding: 0;
   border: 0;
   border-radius: 999px;
@@ -176,12 +182,15 @@
   cursor: pointer;
   transition: filter 0.15s ease, box-shadow 0.15s ease;
 }
+/* events close together: a count pill that starts at the first of them */
 .dash-mark[data-count] {
+  width: var(--pill, 18px);
   height: 16px;
-  padding: 0 4px;
-  font: 600 10px/16px var(--font-mono);
+  font: 600 9px/16px var(--font-mono);
+  text-align: center;
   color: var(--background);
   font-variant-numeric: tabular-nums;
+  transform: translate(0, -50%);
 }
 .dash-mark:hover { filter: brightness(1.18); box-shadow: 0 0 0 3px color-mix(in oklab, var(--c) 28%, transparent); }
 .dash-mark:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
@@ -229,7 +238,7 @@
   font-size: 12px;
 }
 .dash-phase { display: contents; }
-.dash-track { min-width: 360px; display: grid; grid-template-columns: 112px minmax(0, 1fr); grid-template-rows: 24px auto; column-gap: 8px; }
+.dash-track { min-width: 280px; display: grid; grid-template-columns: 64px minmax(0, 1fr); grid-template-rows: 24px auto; column-gap: 8px; }
 .dash-seg {
   position: absolute;
   top: 3px;

@@ -56,7 +56,7 @@ export function RunsPerDay({ data }: { data: Days }) {
 
   return (
     <>
-      <div className="dash-chart-scroll" data-lenis-prevent>
+      <div className="dash-chart-scroll">
         <div ref={group} role="group" aria-label={data.summary} aria-describedby={hint} className="dash-days" onKeyDown={nav.onKeyDown}>
           <div aria-hidden className="dash-yaxis">
             {data.yTicks.map((v) => (

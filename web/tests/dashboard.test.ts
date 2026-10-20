@@ -4,7 +4,19 @@
    overlap, and log text is masked. */
 import { describe, expect, it } from "vitest";
 
-import { CLUSTER_GAP, cluster, countTicks, MAX_SEGMENTS, mergeNarrow, type Segment, ticksAt } from "@/components/dashboard/axis";
+import {
+  CLUSTER_GAP,
+  cluster,
+  countTicks,
+  DOT_PX,
+  MARK_MARGIN_PX,
+  MAX_SEGMENTS,
+  mergeNarrow,
+  PILL_PX,
+  PLOT_MIN_PX,
+  type Segment,
+  ticksAt,
+} from "@/components/dashboard/axis";
 import { deriveDashboard } from "@/components/dashboard/derive";
 import { deriveOverall, LATEST_RUNS } from "@/components/dashboard/derive-overall";
 import { EVENT_KIND, eventBadge, LANE_ORDER, toolsNamed } from "@/components/dashboard/event-kinds";
@@ -86,12 +98,20 @@ describe("assessmentView", () => {
 // --- axis helpers -------------------------------------------------------------------------
 
 describe("axis helpers", () => {
-  it("clusters close items so no two groups are within the gap", () => {
+  it("clusters items into windows that start more than the gap apart", () => {
     const items = [0, 0.01, 0.02, 0.3, 0.33, 0.9, 1].map((pos, i) => ({ pos, item: i }));
     const groups = cluster(items);
     expect(groups.map((g) => g.items.length)).toEqual([3, 2, 1, 1]);
-    for (let i = 1; i < groups.length; i++) expect(groups[i].start - groups[i - 1].end).toBeGreaterThan(CLUSTER_GAP);
+    for (const g of groups) expect(g.end - g.start).toBeLessThanOrEqual(CLUSTER_GAP);
+    for (let i = 1; i < groups.length; i++) expect(groups[i].start - groups[i - 1].start).toBeGreaterThan(CLUSTER_GAP);
     expect(groups.flatMap((g) => g.items)).toEqual(items.map((x) => x.item));
+  });
+  it("never chains a dense run of items into one group", () => {
+    const dense = Array.from({ length: 400 }, (_, i) => ({ pos: i / 399, item: i }));
+    expect(cluster(dense).length).toBeGreaterThanOrEqual(Math.floor(1 / CLUSTER_GAP));
+  });
+  it("keeps marks apart at the narrowest plot: a pill, half a dot and a margin fit the gap", () => {
+    expect(CLUSTER_GAP * PLOT_MIN_PX).toBeGreaterThanOrEqual(PILL_PX + DOT_PX / 2 + MARK_MARGIN_PX);
   });
   it("merges the narrowest tool segments until they fit, keeping order and coverage", () => {
     const segs: Segment[] = Array.from({ length: 60 }, (_, i) => ({ key: String(i), tools: [`t${i % 4}`], start: i / 60, end: (i + 1) / 60, steps: 1, times: [String(i)] }));
@@ -174,8 +194,8 @@ describe("deriveDashboard", () => {
       const act = activityOf(a);
       const exe = executionOf(a);
       for (const l of act.lanes) {
-        for (const m of l.marks) expect(inAxis(m.start) && inAxis(m.end) && m.start <= m.end).toBe(true);
-        for (let i = 1; i < l.marks.length; i++) expect(l.marks[i].start - l.marks[i - 1].end).toBeGreaterThan(CLUSTER_GAP);
+        for (const m of l.marks) expect(inAxis(m.start) && inAxis(m.end) && m.start <= m.end && m.end - m.start <= CLUSTER_GAP).toBe(true);
+        for (let i = 1; i < l.marks.length; i++) expect(l.marks[i].start - l.marks[i - 1].start).toBeGreaterThan(CLUSTER_GAP);
       }
       for (const s of exe.tools) expect(inAxis(s.start) && inAxis(s.end) && s.start <= s.end).toBe(true);
       for (let i = 1; i < exe.tools.length; i++) expect(exe.tools[i].start).toBeGreaterThanOrEqual(exe.tools[i - 1].end - 1e-9);
@@ -209,14 +229,21 @@ describe("deriveDashboard", () => {
     expect(deriveDashboard(assessmentView(completed)).cards.ask.questions).not.toContain("What is this run waiting for?");
   });
 
-  it("keeps a long run readable: clustered lanes, at most 24 tool segments, its pending gate", () => {
-    const busy = (i: number) => (i % 2 ? line(waiting, i * 3, "TOOL", `Executing permitted scan · tool${i % 7}`) : line(waiting, i * 3, "POLICY", "Blocked: out of scope", "block"));
-    const long = { ...waiting, timeline: [...Array.from({ length: 300 }, (_, i) => busy(i)), ...waiting.timeline.slice(-3)] };
+  it("keeps a long run readable: 400 lines 3 s apart stay many marks, ≤ 24 tool segments, its gate", () => {
+    const busy = (i: number) =>
+      i % 2 ? line(waiting, i * 3, "TOOL", `Executing permitted scan · tool${i % 7}`) : line(waiting, i * 3, "POLICY", "Blocked: out of scope", "block");
+    const tail = waiting.timeline.slice(-3).map((e, i) => ({ ...e, at: new Date(Date.parse(waiting.created_at) + (1200 + i) * 1000).toISOString() }));
+    const long = { ...waiting, timeline: [...Array.from({ length: 400 }, (_, i) => busy(i)), ...tail] };
     const act = activityOf(long);
     const exe = executionOf(long);
+    const lane = (kind: string) => act.lanes.find((l) => l.kind === kind)!;
+    expect(lane("tool").count).toBe(200 + tail.filter((e) => e.who === "TOOL").length);
+    expect(lane("tool").marks.length).toBeGreaterThanOrEqual(10); // not one pill for the lot
+    expect(lane("policy").marks.length).toBeGreaterThanOrEqual(10);
+    expect(lane("tool").marks.reduce((n, m) => n + m.count, 0)).toBe(lane("tool").count);
     expect(exe.tools.length).toBeLessThanOrEqual(MAX_SEGMENTS);
     expect(exe.tools.reduce((n, s) => n + s.steps, 0)).toBe(long.timeline.filter((e) => e.type === "activity" && e.who === "TOOL").length);
-    for (const l of act.lanes) for (let i = 1; i < l.marks.length; i++) expect(l.marks[i].start - l.marks[i - 1].end).toBeGreaterThan(CLUSTER_GAP);
+    for (const l of act.lanes) for (let i = 1; i < l.marks.length; i++) expect(l.marks[i].start - l.marks[i - 1].start).toBeGreaterThan(CLUSTER_GAP);
     expect(act.lanes.flatMap((l) => l.marks).some((m) => m.pending)).toBe(true);
   });
 

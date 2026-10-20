@@ -46,7 +46,7 @@ export function MarkDetails({
           <X className="size-4" aria-hidden />
         </button>
       </header>
-      <div className="dash-details-body" data-lenis-prevent>
+      <div className="dash-details-body">
         {children}
       </div>
     </div>
