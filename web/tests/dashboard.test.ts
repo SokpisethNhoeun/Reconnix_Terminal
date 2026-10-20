@@ -306,6 +306,49 @@ describe("deriveDashboard", () => {
     const scores = d.cards.findings.top.map((t) => t.score);
     expect(scores).toEqual([...scores].sort((a, b) => b - a));
   });
+
+  // Findings by Severity lists HIGH, MEDIUM and LOW always; CRITICAL and INFO only when present.
+  // Every level stays in `severity` (the bar, the total and the accessible name count them all).
+  describe("severity rows", () => {
+    const rows = (a: Assessment) => deriveDashboard(assessmentView(a)).cards.findings;
+    const levels = (f: ReturnType<typeof rows>) => f.severity.map((s) => s.level);
+    /** The run with its first counted finding (not a false positive) moved to `level`. */
+    const withOne = (level: Finding["severity"]) => {
+      const at = completed.findings.findIndex((x) => x.status !== "false-positive");
+      return { ...completed, findings: completed.findings.map((x, i) => (i === at ? { ...x, severity: level, effective_severity: level } : x)) };
+    };
+
+    it("hides the CRITICAL and INFO rows of a run without such findings", () => {
+      const f = rows(completed);
+      expect(completed.findings.some((x) => x.severity === "CRITICAL" || x.severity === "INFO")).toBe(false);
+      expect(levels(f)).toEqual(["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]);
+      expect(f.severity.filter((s) => s.hidden).map((s) => s.level)).toEqual(["CRITICAL", "INFO"]);
+      expect(f.severity.filter((s) => !s.hidden).map((s) => s.level)).toEqual(["HIGH", "MEDIUM", "LOW"]);
+      expect(f.words).toBe(`0 critical, ${f.severity[1].count} high, ${f.severity[2].count} medium, ${f.severity[3].count} low, 0 info`);
+    });
+
+    it("shows the CRITICAL row once a finding is critical, and INFO once one is informational", () => {
+      const f = rows(withOne("CRITICAL"));
+      expect(f.severity.find((s) => s.level === "CRITICAL")).toMatchObject({ count: 1, hidden: false });
+      expect(f.severity.find((s) => s.level === "INFO")).toMatchObject({ count: 0, hidden: true });
+      expect(f.severity.filter((s) => !s.hidden).map((s) => s.level)).toEqual(["CRITICAL", "HIGH", "MEDIUM", "LOW"]);
+      expect(f.severity.reduce((n, s) => n + s.count, 0)).toBe(f.total); // the bar still counts every level
+      expect(f.words.startsWith("1 critical, ")).toBe(true);
+
+      expect(rows(withOne("INFO")).severity.filter((s) => !s.hidden).map((s) => s.level)).toEqual(["HIGH", "MEDIUM", "LOW", "INFO"]);
+    });
+
+    it("keeps the HIGH, MEDIUM and LOW rows even at zero (a run without findings too)", () => {
+      const none = { ...completed, findings: [] };
+      const f = rows(none);
+      expect(f.total).toBe(0);
+      expect(f.severity.filter((s) => !s.hidden).map((s) => s.level)).toEqual(["HIGH", "MEDIUM", "LOW"]);
+      expect(f.severity.filter((s) => !s.hidden).every((s) => s.count === 0)).toBe(true);
+      // a false positive does not bring its level's row back
+      const fp = { ...completed, findings: [{ ...completed.findings[0], severity: "CRITICAL" as const, status: "false-positive" }] };
+      expect(rows(fp).severity.find((s) => s.level === "CRITICAL")).toMatchObject({ count: 0, hidden: true });
+    });
+  });
 });
 
 // --- every run ----------------------------------------------------------------------------
@@ -323,6 +366,9 @@ describe("deriveOverall", () => {
     expect(all.runs).toBe(samples.length);
     expect(summary.findings.total).toBe(real.length);
     expect(all.cards.findings.severity.reduce((n, s) => n + s.count, 0)).toBe(real.length);
+    // every level is listed; a row is hidden only when it is an optional level with no finding
+    expect(all.cards.findings.severity.map((s) => s.level)).toEqual(["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]);
+    for (const s of all.cards.findings.severity) expect(s.hidden).toBe(s.count === 0 && (s.level === "CRITICAL" || s.level === "INFO"));
     expect(summary.tools.steps).toBe(samples.reduce((n, a) => n + tools(a).length, 0));
     expect(summary.tools.requests).toBe(samples.reduce((n, a) => n + a.run.requests, 0));
     expect(all.waiting).toBe(samples.filter((a) => a.status === "Awaiting input").length);
