@@ -55,17 +55,16 @@ export function Intro() {
     const counts = q("[data-countup]");
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      gsap.set(reveal, { visibility: "visible", opacity: 1 });
+      // autoAlpha sets visibility to inherit, not visible: a hidden parent (the top bar under
+      // the open assistant) keeps its controls out of reach
+      gsap.set(reveal, { autoAlpha: 1 });
       return;
     }
 
     const frame = document.querySelector(".dash-frame");
-    const right = q(".dash-right .dash-card");
-    const bottom = q(".dash-bottom .dash-card");
-    const stats = bottom.filter((c) => !c.querySelector("h2"));
-    const exec = bottom.filter((c) => c.querySelector("h2"));
-    const heroCards = q(".dash-hero .dash-card");
-    const cards = [...right, ...stats, ...exec, ...heroCards];
+    // the Overview's groups, found as the assistant's transition finds them (data-motion)
+    const group = (name: string) => q(`[data-motion="${name}"] .dash-card`);
+    const cards = [...group("top"), ...group("right"), ...group("bottom"), ...group("hero")];
 
     gsap.set(reveal, { autoAlpha: 0 });
 
@@ -74,7 +73,7 @@ export function Intro() {
     tl.fromTo(q(".dash-navbtn"), { autoAlpha: 0, x: -12 }, { autoAlpha: 1, x: 0, duration: 0.6, ease: "expo.out", stagger: 0.04, clearProps: "transform" }, 0.1);
     tl.fromTo(q("header .dash-reveal"), { autoAlpha: 0, y: -10 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: "expo.out", stagger: 0.05, clearProps: "transform" }, 0.15);
     tl.fromTo(
-      q(".dash-hero-title .dash-reveal, .dash-preview-label.dash-reveal"),
+      q('[data-motion="hero"] .dash-reveal'),
       { autoAlpha: 0, y: 20 },
       { autoAlpha: 1, y: 0, duration: 0.9, ease: "expo.out", stagger: 0.08, clearProps: "transform" },
       0.25,
@@ -87,7 +86,7 @@ export function Intro() {
     );
     // chart reveals
     tl.from(q("[data-bar]"), { scaleY: 0, transformOrigin: "center bottom", duration: 0.7, ease: "expo.out", stagger: 0.006, clearProps: "transform" }, 0.9);
-    tl.from(q("[data-bar-x]"), { scaleX: 0, transformOrigin: "left center", duration: 1.0, ease: "expo.out", stagger: 0.05, clearProps: "transform" }, 0.95);
+    tl.from(q("[data-bar-x]"), { scaleX: 0, transformOrigin: "left center", duration: 1.0, ease: "expo.out", stagger: 0.03, clearProps: "transform" }, 0.95);
 
     // count-ups start as the cards come in
     counts.forEach((el, i) => countUp(el, 0.6 + i * 0.03));

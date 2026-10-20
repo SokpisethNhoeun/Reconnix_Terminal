@@ -20,7 +20,8 @@ interface SampleAssessment {
   verdicts: { allowed: boolean }[];
   approvals: unknown[];
   created_at: string;
-  timeline: { type: string; who: string }[];
+  timeline: { type: string; who: string; text: string }[];
+  run: { requests: number };
 }
 
 export function sample(): SampleAssessment[] {
@@ -37,3 +38,6 @@ export function newest(): SampleAssessment {
 
 /** Findings the dashboard counts (false positives are left out). */
 export const counted = (a: SampleAssessment) => a.findings.filter((f) => f.status !== "false-positive");
+
+/** The run's tool steps (TOOL lines of its activity log). */
+export const toolSteps = (a: SampleAssessment) => a.timeline.filter((e) => e.type === "activity" && e.who === "TOOL").length;

@@ -2,8 +2,8 @@
 import { describe, expect, it } from "vitest";
 
 import { deriveDashboard } from "@/components/dashboard/derive";
-import { countBy, findingMatches, list, sortFindings, validationOf } from "@/components/dashboard/filters";
-import { assessmentView } from "@/lib/data/adapt";
+import { countBy, findingMatches, list, reviewLabel, runMatches, sortFindings, validationOf } from "@/components/dashboard/filters";
+import { assessmentView, libraryItem } from "@/lib/data/adapt";
 
 import { sampleAssessments } from "./fixtures";
 
@@ -31,6 +31,14 @@ describe("findingMatches", () => {
       expect(findings.filter((x) => findingMatches(x, { ...none, q })).map((x) => x.id)).toContain(f.id);
     }
     expect(findings.filter((x) => findingMatches(x, { ...none, q: "no-such-thing-zzz" }))).toHaveLength(0);
+  });
+  it("says why a closed finding is closed", () => {
+    const open = findings.find((f) => f.needsReview)!;
+    expect(reviewLabel(open)).toBe("Needs review");
+    expect(reviewLabel({ ...open, needsReview: false, confirmed: false, status: "fixed" })).toBe("Fixed");
+    expect(reviewLabel({ ...open, needsReview: false, confirmed: false, status: "accepted" })).toBe("Accepted");
+    expect(reviewLabel({ ...open, needsReview: false, confirmed: false, falsePositive: true, status: "false-positive" })).toBe("False positive");
+    expect(reviewLabel({ ...open, needsReview: false, confirmed: true })).toBe("Confirmed");
   });
   it("buckets every finding once", () => {
     expect(findings.every((f) => ["confirmed", "review", "closed"].includes(validationOf(f)))).toBe(true);
@@ -61,5 +69,17 @@ describe("helpers", () => {
       { value: "c", count: 0 },
       { value: "z", count: 1 },
     ]);
+  });
+});
+
+describe("runMatches", () => {
+  const items = sampleAssessments().map(libraryItem);
+  const waiting = items.find((i) => i.status === "Awaiting input")!;
+  it("finds a run by the status label its badge shows, as well as the saved status", () => {
+    expect(runMatches(waiting, "waiting for you")).toBe(true);
+    expect(runMatches(waiting, "awaiting")).toBe(true);
+    expect(items.filter((i) => runMatches(i, "waiting for you")).every((i) => i.status === "Awaiting input")).toBe(true);
+    expect(runMatches(waiting, "")).toBe(true);
+    expect(runMatches(waiting, "no-such-run-zzz")).toBe(false);
   });
 });

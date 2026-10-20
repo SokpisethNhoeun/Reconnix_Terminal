@@ -5,7 +5,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SearchField } from "@/components/dashboard/filter-bar";
-import { RunRow, runMatches } from "@/components/dashboard/run-row";
+import { runMatches } from "@/components/dashboard/filters";
+import { RunRow } from "@/components/dashboard/run-row";
 import { useRunHref } from "@/components/dashboard/view-url";
 import type { LibraryItem } from "@/lib/data/view-types";
 

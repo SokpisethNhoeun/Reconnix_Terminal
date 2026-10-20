@@ -14,6 +14,13 @@ const srcUrl = pathToFileURL(rpath(process.cwd(), "src")).href;
 
 const { deriveOverall } = await import(`${srcUrl}/components/dashboard/derive-overall.ts`);
 const line = (k, v) => console.log(`  ${k.padEnd(22)} ${v}`);
+const summary = (s) => {
+  console.log("== Summary strip ==");
+  line("Findings", `${s.findings.total} · worst ${s.findings.worst ? `${s.findings.worst.level} ×${s.findings.worst.count}` : "none"} · ${s.findings.needsReview} need review`);
+  line("Assessment progress", `${s.progress.pct}% · ${s.progress.caption}${s.progress.status ? ` · ${s.progress.status}` : ""}${s.progress.other ? ` · ${s.progress.other.count} ${s.progress.other.status}` : ""}`);
+  line("Tool execution", `${s.tools.steps} steps · tools ${s.tools.tools.join(", ") || "none"} · ${s.tools.caption}${s.tools.running ? " · running" : ""}`);
+  line("Duration", `${s.duration.value} · ${s.duration.caption}${s.duration.over ? ` · ${s.duration.over} over the limit` : ""}`);
+};
 
 if (process.argv[2] === "--all") {
   const dir = process.argv[3] ?? "sample-data";
@@ -32,14 +39,19 @@ if (process.argv[2] === "--all") {
     process.exit(1);
   }
   const o = deriveOverall(views);
+  const c = o.cards;
   console.log(`\n${dir} · every run\n`);
   line("runs", `${o.runs} (${o.completed} completed, ${o.waiting} waiting)`);
-  o.cards.statCards.forEach((c) => line(c.label, `${c.value} · chip "${c.chip}"`));
-  line("gauge", `${o.cards.gauge.value}% · ${o.cards.gauge.caption}`);
-  line("tool steps", `${o.cards.tools.used} · ${o.cards.tools.caption}`);
-  line("severity", o.cards.findings.words);
-  o.cards.findings.top.forEach((f) => line(f.id, `${f.score} · ${f.title} · ${f.run}`));
-  line("axis", o.cards.execution.chip);
+  summary(c.summary);
+  line("severity", c.findings.words);
+  line("review", `${c.findings.review.confirmed} confirmed · ${c.findings.review.needsReview} need review · ${c.findings.review.closed} closed`);
+  c.findings.top.forEach((f) => line(f.id, `${f.score} · ${f.severity} · ${f.title} · ${f.run}`));
+  console.log("\n== Activity: runs per " + c.activity.unit + " ==");
+  line("window", `${c.activity.window} · count axis ${c.activity.yTicks.join(" ")}`);
+  c.activity.days.filter((d) => d.total).forEach((d) => line(d.label, `${d.total} · ${d.segments.map((s) => `${s.status} ${s.count}`).join(", ")}`));
+  console.log("\n== Execution: " + c.execution.caption + " ==");
+  c.execution.runs.forEach((r) => line(`${r.id} ${r.when}`, `${r.status} · ${r.progress}% · ${r.steps.done}/${r.steps.total} steps · ${r.findings} findings`));
+  console.log("\n== Statuses ==");
   o.statuses.forEach((s) => line(`  ${s.name}`, s.count));
   console.log();
   process.exit(0);
@@ -69,36 +81,33 @@ console.log(`\n${file}`);
 console.log("\n== Assessment ==");
 for (const [k, v] of Object.entries(d.assessment)) line(k, v);
 
+const c = d.cards;
+console.log();
+summary(c.summary);
+
 console.log("\n== Findings / severity ==");
 line("findingTotal", d.findingTotal);
-d.severity.forEach((s) => line(s.level, `count ${s.count} · share ${s.share}% · ${s.tone}`));
-line("review", `${d.cards.findings.review.confirmed} confirmed · ${d.cards.findings.review.needsReview} need review`);
-d.cards.findings.top.forEach((f) => line(f.id, `${f.score} · ${f.severity} · ${f.title}`));
+c.findings.severity.forEach((x) => line(x.level, `count ${x.count} · share ${x.share}%`));
+line("review", `${c.findings.review.confirmed} confirmed · ${c.findings.review.needsReview} need review · ${c.findings.review.closed} closed`);
+c.findings.top.forEach((f) => line(f.id, `${f.score} · ${f.severity} · ${f.title}`));
 
 console.log("\n== Policy / run ==");
 line("checks", `${d.checks.allowed} allowed / ${d.checks.total} (${d.checks.blocked} blocked)`);
 line("maskedSecrets", d.maskedSecrets);
 line("requests", d.requests);
-line("minutes", `${d.minutes.used} / ${d.minutes.max ?? "no limit"}`);
+line("minutes", `${d.minutes.used} / ${d.minutes.max ?? "no limit"}${d.minutes.over ? " (over)" : ""}`);
 line("planSteps", `${d.planSteps.done} / ${d.planSteps.total}`);
 d.phases.forEach((p) => line(`  ${p.key}`, `${p.pct}% · ${p.status}`));
 line("gate", d.gate ? `[${d.gate.time}] ${d.gate.text}` : "none");
 
-console.log("\n== Timeline ==");
-line("window", `${d.window.start} → ${d.window.end}`);
-line("log lines", d.log.length);
-line("kinds", Object.entries(Object.groupBy(d.log, (l) => l.kind)).map(([k, v]) => `${k}:${v.length}`).join(" "));
-line("event bars", d.cards.activity.bars.filter((b) => b.hasEvent).length);
-line("peaks", d.cards.activity.peaks.length);
-line("brackets", d.cards.activity.brackets.map((b) => b.label).join(" "));
-line("gauge", `${d.cards.gauge.lit} / ${d.cards.gauge.ticks}`);
-line("tool steps", `${d.cards.tools.used} (bars end at ${d.cards.tools.bars.at(-1).value})`);
-
-console.log("\n== Execution lanes ==");
-d.cards.execution.lanes.forEach((l) =>
-  line(l.label, l.kind === "dot" ? `dot @${l.start.toFixed(2)}` : `${l.start.toFixed(2)} → ${l.end.toFixed(2)}${l.pulse ? " (pulse)" : ""}`),
+console.log("\n== Activity lanes ==");
+line("window", `${c.activity.window} · ticks ${c.activity.ticks.map((t) => t.label).join(" ")}`);
+c.activity.lanes.forEach((l) =>
+  line(l.label, `${l.count} events · ${l.marks.map((m) => `${m.start.toFixed(2)}${m.count > 1 ? `×${m.count}` : ""}${m.pending ? "(waits)" : ""}`).join(" ") || "—"}`),
 );
 
-console.log("\n== Stat cards ==");
-d.cards.statCards.forEach((c) => line(c.label, `${c.value} · chip "${c.chip}" · ${c.tone}`));
+console.log("\n== Execution ==");
+line("caption", c.execution.caption);
+c.execution.tools.forEach((t) => line(t.label, `${t.start.toFixed(2)} → ${t.end.toFixed(2)} · ${t.steps} steps${t.live ? " (live)" : ""}`));
+line("gate", c.execution.gate ? `${c.execution.gate.meaning.label} @${c.execution.gate.pos?.toFixed(2) ?? "—"} · ${c.execution.gate.text}` : "none");
 console.log();

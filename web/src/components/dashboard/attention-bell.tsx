@@ -35,7 +35,7 @@ export function AttentionBell({
       triggerContent={
         <>
           <Bell className="size-[18px]" strokeWidth={1.6} aria-hidden />
-          {count > 0 && <span className="dash-bell-dot absolute right-2 top-2 size-1.5 rounded-full bg-accent" aria-hidden />}
+          {count > 0 && <span className="dash-bell-dot absolute right-2 top-2 size-1.5 rounded-full bg-warning" aria-hidden />}
         </>
       }
     >
@@ -59,7 +59,7 @@ export function AttentionBell({
                 {others.length} {currentUid ? "other " : ""}
                 {others.length === 1 ? "run waits" : "runs wait"} on a decision
               </p>
-              <ul className="max-h-[200px] space-y-1 overflow-y-auto" data-lenis-prevent>
+              <ul className="max-h-[200px] space-y-1 overflow-y-auto">
                 {others.map((i) => (
                   <li key={i.uid}>
                     <Link
@@ -70,7 +70,7 @@ export function AttentionBell({
                       <span className="block truncate text-foreground">
                         {i.id} · {i.template}
                       </span>
-                      <span className="block truncate font-mono text-[10px] text-accent">{i.waiting}</span>
+                      <span className="block truncate font-mono text-[10px] text-warning">{i.waiting}</span>
                     </Link>
                   </li>
                 ))}

@@ -1,7 +1,9 @@
-/* What the Findings filters keep. Pure functions over the derived data (no I/O,
+/* What the Findings filters and the saved-run searches keep. Pure functions over the derived data (no I/O,
    no React), so the views and the unit tests share them. Filter values come from the address
    (`?sev=HIGH,LOW&val=review&q=sql`), so anything unknown is ignored rather than trusted. */
 import type { FindingRow } from "@/components/dashboard/derive";
+import type { LibraryItem } from "@/lib/data/view-types";
+import { FINDING_REVIEW, RUN_STATUS } from "@/lib/status";
 
 export const SEVERITY_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
 
@@ -16,6 +18,15 @@ const has = (text: string, q: string) => text.toLowerCase().includes(q);
 export function validationOf(f: FindingRow): Validation {
   if (f.confirmed) return "confirmed";
   return f.needsReview ? "review" : "closed";
+}
+
+/** Why a closed finding is closed (from its triage status). */
+const CLOSED_AS: Record<string, string> = { fixed: "Fixed", accepted: "Accepted", "false-positive": "False positive" };
+
+/** A finding's review badge label: Confirmed, Needs review, or why it is closed. */
+export function reviewLabel(f: FindingRow): string {
+  const v = validationOf(f);
+  return v === "closed" ? (CLOSED_AS[f.status] ?? FINDING_REVIEW.closed.label) : FINDING_REVIEW[v].label;
 }
 
 export interface FindingFilter {
@@ -46,3 +57,8 @@ export function countBy<T>(items: T[], key: (item: T) => string, order: readonly
   const extra = [...counts.keys()].filter((k) => !order.includes(k)).sort();
   return [...order, ...extra].map((value) => ({ value, count: counts.get(value) ?? 0 }));
 }
+
+/** Whether a run matches a search: its ID, template, target, time, saved status or the status
+    label shown on its badge ("waiting for you", "not started"). */
+export const runMatches = (item: LibraryItem, q: string) =>
+  !q || [item.id, item.template, item.target, item.status, RUN_STATUS[item.status].label, item.when].some((t) => t.toLowerCase().includes(q));

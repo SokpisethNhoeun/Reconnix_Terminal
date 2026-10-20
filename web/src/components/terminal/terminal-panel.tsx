@@ -75,7 +75,7 @@ export function TerminalPanel() {
           onDone={focus}
         />
       </header>
-      <div className="term" data-lenis-prevent>
+      <div className="term">
         <div ref={host} className="h-full w-full" aria-label="Reconix terminal" />
         <ScrollToLatest shown={!view.atBottom} onClick={view.scrollToLatest} />
       </div>

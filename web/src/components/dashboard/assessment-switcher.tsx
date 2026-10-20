@@ -11,9 +11,12 @@ import type { Dashboard } from "@/components/dashboard/derive";
 import type { Overall } from "@/components/dashboard/derive-overall";
 import { SearchField } from "@/components/dashboard/filter-bar";
 import { Popover } from "@/components/dashboard/popover";
-import { RunRow, runMatches } from "@/components/dashboard/run-row";
+import { runMatches } from "@/components/dashboard/filters";
+import { RunRow } from "@/components/dashboard/run-row";
 import { useRunHref } from "@/components/dashboard/view-url";
+import { StatusBadge } from "@/components/ui/status-badge";
 import type { LibraryItem, SkippedFile } from "@/lib/data/view-types";
+import { RUN_STATUS } from "@/lib/status";
 
 export const CHIP =
   "flex h-[34px] items-center gap-1.5 rounded-[10px] border border-border bg-card px-3 text-xs transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-expanded:border-primary/50";
@@ -24,17 +27,17 @@ export function ChipTrigger({ label, value }: { label: string; value: string }) 
   return (
     <>
       <span className="hidden text-muted-foreground sm:inline">{label}:</span>
-      <span className="max-w-[140px] truncate text-foreground">{value}</span>
+      <span className="max-w-[120px] truncate text-foreground min-[1440px]:max-w-[140px]">{value}</span>
       <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
     </>
   );
 }
 
-export function Row({ k, v }: { k: string; v: string }) {
+export function Row({ k, v }: { k: string; v: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <span className="shrink-0 text-muted-foreground">{k}</span>
-      <span className="tabnums truncate text-foreground">{v}</span>
+      <span className="tabnums flex min-w-0 items-center gap-1.5 truncate text-foreground">{v}</span>
     </div>
   );
 }
@@ -72,7 +75,15 @@ export function AssessmentSwitcher({
             <>
               <p className="px-1.5 pb-1.5 pt-1 text-[13px] font-medium text-foreground [overflow-wrap:anywhere]">{current.name}</p>
               <div className="space-y-1 px-1.5 pb-2">
-                <Row k="Status" v={`${current.status} · ${current.progress}%`} />
+                <Row
+                  k="Status"
+                  v={
+                    <>
+                      <StatusBadge meaning={RUN_STATUS[current.status]} />
+                      {current.progress}%
+                    </>
+                  }
+                />
                 <Row k="Started" v={current.startedAt} />
                 <Row k="Duration" v={current.duration} />
                 <Row k="Operator" v={current.operator} />
@@ -97,7 +108,7 @@ export function AssessmentSwitcher({
             </p>
             {items.length > 6 && <SearchField label="Search saved assessments" placeholder="ID, template, target, status…" value={query} onChange={setQuery} />}
           </div>
-          <ul className="max-h-[260px] overflow-y-auto" data-lenis-prevent>
+          <ul className="max-h-[260px] overflow-y-auto">
             {!q && (
               <li>
                 <Link href={href(null)} onClick={close} aria-current={current ? undefined : "true"} className={ROW}>
@@ -127,7 +138,7 @@ export function AssessmentSwitcher({
           </p>
           {skipped.length > 0 && (
             <details className="mx-1.5 mt-2 rounded-md border border-border p-2">
-              <summary className="flex cursor-pointer items-center gap-1.5 text-accent">
+              <summary className="flex cursor-pointer items-center gap-1.5 text-warning">
                 <TriangleAlert className="size-3.5" aria-hidden />
                 {skipped.length} {skipped.length === 1 ? "file was" : "files were"} skipped
               </summary>
