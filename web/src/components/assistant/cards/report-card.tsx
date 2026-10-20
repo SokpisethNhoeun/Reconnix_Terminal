@@ -39,7 +39,7 @@ export function ReportCard({ card }: { card: CardOf<"report"> }) {
         footer={
           <>
             <span>Made from the saved, masked data.</span>
-            <ViewLinkOut uid={run.uid} view="reports" label={`Open the Reports view of ${run.label}`}>
+            <ViewLinkOut uid={run.uid} view="reports" params={{}} label={`Open the Reports view of ${runName(run)}`}>
               Open in Reports
             </ViewLinkOut>
           </>
@@ -68,8 +68,11 @@ export function ReportCard({ card }: { card: CardOf<"report"> }) {
                 <StatusBadge meaning={RUN_STATUS[status]} />
               </button>
               {open && (
-                <div className="px-2.5 pb-3 pt-1">
+                <div className="flex flex-col gap-2 px-2.5 pb-3 pt-1">
                   <Downloads run={run} />
+                  <ViewLinkOut uid={run.uid} view="reports" params={{}} label={`Open the Reports view of ${runName(run)}`} className="self-start">
+                    Open in Reports
+                  </ViewLinkOut>
                 </div>
               )}
             </li>

@@ -55,7 +55,10 @@
 .ai-dot[data-tone="success"] { background: var(--success); box-shadow: 0 0 6px color-mix(in oklab, var(--success) 60%, transparent); }
 .ai-dot[data-tone="warning"] { background: var(--warning); }
 
-/* buttons */
+/* Text buttons. Square icon buttons are components/ui/icon-button.tsx; these stay their own
+   because ui/button.tsx starts at h-9 / px-4 / text-sm (too big for the assistant's 28-32 px
+   controls) and its disabled:pointer-events-none would hide the tooltip that says why a
+   control is off. */
 .ai-btn {
   display: inline-flex;
   align-items: center;
@@ -73,17 +76,13 @@
 .ai-btn:hover:not(:disabled) { color: var(--foreground); background: color-mix(in oklab, var(--foreground) 6%, transparent); }
 .ai-btn[aria-expanded="true"] { color: var(--foreground); background: color-mix(in oklab, var(--foreground) 8%, transparent); }
 .ai-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.ai-btn-square { width: 32px; padding: 0; }
 .ai-btn-outline { border-color: var(--border); }
 .ai-btn-small { height: 28px; padding: 0 8px; border-radius: 8px; font-size: 12px; }
-.ai-btn-primary { color: var(--primary-foreground); background: var(--primary-strong); }
-.ai-btn-primary:hover:not(:disabled) { color: var(--primary-foreground); background: var(--primary); }
 .ai-btn-danger { color: var(--danger); }
 .ai-btn-danger:hover:not(:disabled) { color: var(--danger); background: color-mix(in oklab, var(--danger) 10%, transparent); }
 .ai-btn-danger-solid { color: var(--foreground); background: color-mix(in oklab, var(--danger) 70%, var(--card)); }
 .ai-btn-danger-solid:hover:not(:disabled) { color: var(--foreground); background: var(--danger); }
-.ai-btn:focus-visible,
-.ai-focus:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.ai-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 @media (max-width: 640px) {
   .ai-btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .ai-btn-chevron { display: none; }
@@ -239,8 +238,20 @@
 .ai-card[data-tone="danger"] .ai-card-icon { color: var(--danger); }
 .ai-card[data-tone="info"] .ai-card-icon { color: var(--info); }
 
-.ai-link { display: inline-flex; align-items: center; gap: 4px; border-radius: 4px; font-size: 12px; color: var(--primary); white-space: nowrap; }
-.ai-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+/* links stay underlined (a link inside text must not rely on colour alone) */
+.ai-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--primary);
+  white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--primary) 45%, transparent);
+  text-underline-offset: 3px;
+}
+.ai-link:hover { text-decoration-color: var(--primary); }
 .ai-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .ai-mono { font-family: var(--font-mono); }
 .ai-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }

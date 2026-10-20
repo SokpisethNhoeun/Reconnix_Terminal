@@ -3,9 +3,12 @@
 /* The History menu: the saved conversations (kept by the dashboard's server on this computer),
    newest first and grouped by day. Each can be opened, renamed or deleted; "Delete all" asks
    first. Escape or a click outside closes it and focus goes back to its button. Operators
-   only: a viewer sees the button disabled with the reason. */
+   only: a viewer sees the button disabled with the reason.
+   Its own panel rather than the dashboard's Popover: Escape inside the rename field must end
+   the rename and leave the panel open, and the panel sits inside the assistant's header. */
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown, History, Loader, Pencil, Trash2, X } from "lucide-react";
+import { IconButton } from "@/components/ui/icon-button";
 import type { ConversationSummary } from "@/lib/assistant/history-schema";
 import { MAX_TITLE } from "@/lib/assistant/history-schema";
 import { ago, type Group, groupOf } from "@/lib/assistant/when";
@@ -59,12 +62,12 @@ function Row({ c, now, active, onOpen }: { c: ConversationSummary; now: number; 
             aria-label="Conversation name"
             className="ai-input"
           />
-          <button type="submit" disabled={saving} aria-label="Save the name" className="ai-btn ai-btn-square ai-btn-small">
-            <Check className="size-4" aria-hidden />
-          </button>
-          <button type="button" onClick={() => setMode("idle")} aria-label="Cancel renaming" className="ai-btn ai-btn-square ai-btn-small">
-            <X className="size-4" aria-hidden />
-          </button>
+          <IconButton type="submit" label="Save the name" disabled={saving} className="size-7 shrink-0">
+            <Check aria-hidden />
+          </IconButton>
+          <IconButton label="Cancel renaming" onClick={() => setMode("idle")} className="size-7 shrink-0">
+            <X aria-hidden />
+          </IconButton>
         </form>
         {error && <p className="ai-error-text mt-1 px-1">{error}</p>}
       </li>
@@ -97,31 +100,27 @@ function Row({ c, now, active, onOpen }: { c: ConversationSummary; now: number; 
         </span>
       </button>
       <span className="ai-menu-actions">
-        <button
-          type="button"
+        <IconButton
+          label={`Rename “${c.title}”`}
           onClick={() => {
             setTitle(c.title);
             setError(null);
             setMode("rename");
           }}
-          aria-label={`Rename “${c.title}”`}
-          title="Rename"
-          className="ai-btn ai-btn-square ai-btn-small"
+          className="size-7 [&_svg]:size-3.5"
         >
-          <Pencil className="size-3.5" aria-hidden />
-        </button>
-        <button
-          type="button"
+          <Pencil aria-hidden />
+        </IconButton>
+        <IconButton
+          label={`Delete “${c.title}”`}
           onClick={() => {
             setError(null);
             setMode("delete");
           }}
-          aria-label={`Delete “${c.title}”`}
-          title="Delete"
-          className="ai-btn ai-btn-square ai-btn-small ai-btn-danger"
+          className="size-7 hover:text-danger [&_svg]:size-3.5"
         >
-          <Trash2 className="size-3.5" aria-hidden />
-        </button>
+          <Trash2 aria-hidden />
+        </IconButton>
       </span>
     </li>
   );
@@ -208,11 +207,11 @@ export function ConversationMenu() {
         >
           <div className="ai-menu-head">
             <p className="ai-menu-heading">Conversations</p>
-            <button type="button" onClick={() => close()} aria-label="Close the history" className="ai-btn ai-btn-square ai-btn-small">
-              <X className="size-4" aria-hidden />
-            </button>
+            <IconButton label="Close the history" onClick={() => close()} className="size-7">
+              <X aria-hidden />
+            </IconButton>
           </div>
-          <div className="ai-menu-list" data-lenis-prevent>
+          <div className="ai-menu-list">
             {history.status === "loading" && !history.items.length ? (
               <p className="ai-menu-state" role="status">
                 <Loader className="mr-1.5 inline size-3.5 animate-spin" aria-hidden /> Loading conversations…

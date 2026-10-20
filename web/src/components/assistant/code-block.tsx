@@ -10,7 +10,7 @@ export function CodeBlock({ lang, code }: { lang: string; code: string }) {
         <span>{lang || "text"}</span>
         <CopyButton text={code} label={`Copy the ${lang || "text"} code`} />
       </figcaption>
-      <pre tabIndex={0} aria-label={`${lang || "Text"} code`} data-lenis-prevent>
+      <pre tabIndex={0} aria-label={`${lang || "Text"} code`}>
         <code>{code}</code>
       </pre>
     </figure>

@@ -33,7 +33,7 @@ export function MessageText({ text }: { text: string }) {
             return <CodeBlock key={i} lang={b.lang} code={b.text} />;
           case "table":
             return (
-              <div key={i} className="ai-table-wrap" tabIndex={0} role="region" aria-label="Table" data-lenis-prevent>
+              <div key={i} className="ai-table-wrap" tabIndex={0} role="region" aria-label="Table">
                 <table className="ai-table">
                   <thead>
                     <tr>

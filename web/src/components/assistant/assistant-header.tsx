@@ -4,6 +4,7 @@
    with that scope's status, the model that answers (local or remote), History, New chat and
    minimize (back to the dashboard). */
 import { Crosshair, Minimize2, SquarePen } from "lucide-react";
+import { IconButton } from "@/components/ui/icon-button";
 import { AssistantOrb } from "./assistant-orb";
 import { useAssistant } from "./assistant-provider";
 import { ConversationMenu } from "./conversation-menu";
@@ -44,9 +45,9 @@ export function AssistantHeader({ onMinimize }: { onMinimize: () => void }) {
           <SquarePen className="size-4" aria-hidden />
           <span className="ai-btn-label">New chat</span>
         </button>
-        <button type="button" onClick={onMinimize} aria-label="Back to the dashboard" title="Back to the dashboard" className="ai-btn ai-btn-square">
-          <Minimize2 className="size-4" aria-hidden />
-        </button>
+        <IconButton label="Back to the dashboard" onClick={onMinimize}>
+          <Minimize2 aria-hidden />
+        </IconButton>
       </div>
     </header>
   );

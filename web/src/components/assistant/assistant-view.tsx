@@ -5,7 +5,7 @@
    the composer. The three pieces carry data-assistant-piece so the open animation can bring
    them in as the surface settles. The conversation follows new text while the reader is at the
    bottom; scrolled up, "New messages" brings them back (useStickToBottom). */
-import { forwardRef, useEffect } from "react";
+import { forwardRef, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Info, Loader, ShieldAlert } from "lucide-react";
 import { useAssistant } from "./assistant-provider";
@@ -29,9 +29,16 @@ function Reason({ tone = "warning", id, children }: { tone?: "warning" | "info";
 export const AssistantView = forwardRef<HTMLTextAreaElement, { onMinimize: () => void }>(function AssistantView({ onMinimize }, composerRef) {
   const { info, canAsk, messages, busy, retry, conversation, opening, notice, newChat } = useAssistant();
   const { ref: scroller, atBottom, scrollToBottom } = useStickToBottom<HTMLDivElement>();
+  const view = useRef<HTMLElement>(null);
   const { model } = info;
+  // "New messages" goes away once used: carry on where the next question is typed
+  const toLatest = () => {
+    scrollToBottom();
+    view.current?.querySelector<HTMLTextAreaElement>(".ai-composer textarea")?.focus({ preventScroll: true });
+  };
 
-  // a question just asked, or another conversation opened: show its end
+  // a question just asked (the operator's own message stays in view), or another conversation
+  // opened: show its end
   const lastUser = [...messages].reverse().find((m) => m.role === "user")?.id;
   useEffect(() => {
     if (lastUser) scrollToBottom();
@@ -51,11 +58,11 @@ export const AssistantView = forwardRef<HTMLTextAreaElement, { onMinimize: () =>
   const last = messages[messages.length - 1];
 
   return (
-    <section aria-label="AI Assistant" className="ai-view">
+    <section ref={view} aria-label="AI Assistant" className="ai-view">
       <AssistantHeader onMinimize={onMinimize} />
 
       <div data-assistant-piece className="ai-conversation">
-        <div ref={scroller} role="log" aria-label="Conversation" aria-busy={busy || opening} tabIndex={0} data-lenis-prevent className="ai-scroll">
+        <div ref={scroller} role="log" aria-label="Conversation" aria-busy={busy || opening} tabIndex={0} className="ai-scroll">
           <div className={welcome ? "ai-column is-fill" : "ai-column"}>
             {opening ? (
               <p className="flex items-center justify-center gap-2 py-24 text-sm text-muted-foreground" role="status">
@@ -81,7 +88,8 @@ export const AssistantView = forwardRef<HTMLTextAreaElement, { onMinimize: () =>
             )}
           </div>
         </div>
-        <ScrollToBottom show={!atBottom && messages.length > 0} onClick={scrollToBottom} className="ai-scroll-down" />
+        {/* over the log, not inside the scrolling element */}
+        <ScrollToBottom show={!atBottom && messages.length > 0} onClick={toLatest} className="ai-scroll-down" />
       </div>
 
       <div data-assistant-piece className="ai-composer-area">

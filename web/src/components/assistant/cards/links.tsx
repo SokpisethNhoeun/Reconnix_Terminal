@@ -39,7 +39,9 @@ export function ViewLinkOut({
 }) {
   const { info } = useAssistant();
   if (!RUN_UID.test(uid)) return null;
-  const here = info.scope.uid === uid ? params : info.scope.uid === null && allParams ? allParams : null;
+  // in place: the dashboard shows this run (its own params, or none), or every run and the view
+  // can show this one there (allParams)
+  const here = info.scope.uid === uid ? (params ?? {}) : info.scope.uid === null && allParams ? allParams : null;
   return (
     <Link
       href={runHref(uid, view, params)}
