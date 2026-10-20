@@ -24,7 +24,7 @@ import {
   runEntry,
   toolCaption,
 } from "./derive";
-import type { ActivityCard, DayBar, ExecutionCard, OverviewCards, SummaryStrip } from "./overview-types";
+import type { ActivityCard, DayBar, ExecutionCard, OverviewCards, Pattern, SummaryStrip } from "./overview-types";
 
 const DAY = 86_400_000;
 const MAX_DAYS = 45; // a wider span is counted per week
@@ -32,6 +32,18 @@ const MAX_TICKS = 8; // labels along the day axis
 export const LATEST_RUNS = 8; // rows of the Execution Timeline
 
 export type CountRow = { name: string; count: number };
+
+/** Run statuses that share a colour (lib/status.ts) get different fills in the stacked day
+    bars: Waiting for you solid and Interrupted striped (both amber), Stopped solid and Not
+    started striped (both slate). */
+export const RUN_PATTERN: Record<Status, Pattern> = {
+  New: "stripes",
+  Running: "solid",
+  "Awaiting input": "solid",
+  Completed: "solid",
+  Stopped: "solid",
+  Interrupted: "stripes",
+};
 
 export interface Overall {
   runs: number;
@@ -80,6 +92,7 @@ function activityDays(views: AssessmentView[]): ActivityCard {
       status,
       count: here.filter((v) => v.status === status).length,
       color: toneColor(RUN_STATUS[status].tone),
+      pattern: RUN_PATTERN[status],
     })).filter((s) => s.count > 0);
     const states = segments.map((s) => `${s.count} ${RUN_STATUS[s.status].label.toLowerCase()}`).join(", ");
     return {
@@ -108,7 +121,15 @@ function activityDays(views: AssessmentView[]): ActivityCard {
     total: views.length,
     window,
     summary: `Assessments started per ${unit}, ${window}: ${plural(views.length, "run")}, busiest ${unit} ${busiest}.`,
-    legend: present.map((s) => ({ label: RUN_STATUS[s].label, color: toneColor(RUN_STATUS[s].tone), hint: RUN_STATUS[s].hint, shape: "bar" as const })),
+    legend: present.map((s) => ({
+      label: RUN_STATUS[s].label,
+      color: toneColor(RUN_STATUS[s].tone),
+      hint: RUN_STATUS[s].hint,
+      shape: "bar" as const,
+      pattern: RUN_PATTERN[s],
+      meaning: RUN_STATUS[s],
+      count: views.filter((v) => v.status === s).length,
+    })),
   };
 }
 
@@ -167,7 +188,10 @@ export function deriveOverall(views: AssessmentView[]): Overall {
       value: longDuration(totalSec),
       countup: totalSec < 3600,
       caption: `in total · longest ${duration(longest.durationSec)}${longest.scope ? ` of ${minutesLimit(longest.scope.windowMinutes)}` : ""}`,
-      frac: longest.scope && longest.scope.windowMinutes > 0 ? Math.min(1, longest.durationSec / (longest.scope.windowMinutes * 60)) : null,
+      meter:
+        longest.scope && longest.scope.windowMinutes > 0
+          ? { frac: Math.min(1, longest.durationSec / (longest.scope.windowMinutes * 60)), over: longest.durationSec > longest.scope.windowMinutes * 60 }
+          : null,
       over: overLimit,
     },
   };

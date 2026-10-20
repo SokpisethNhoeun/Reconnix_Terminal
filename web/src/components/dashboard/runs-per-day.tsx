@@ -96,7 +96,7 @@ export function RunsPerDay({ data }: { data: Days }) {
               >
                 <span className="dash-daybar-stack" data-bar style={{ height: `${(d.total / data.max) * 100}%` }}>
                   {d.segments.map((s) => (
-                    <span key={s.status} style={{ flexGrow: s.count, background: s.color }} />
+                    <span key={s.status} data-pattern={s.pattern === "stripes" ? "stripes" : undefined} style={{ flexGrow: s.count, backgroundColor: s.color }} />
                   ))}
                 </span>
               </button>

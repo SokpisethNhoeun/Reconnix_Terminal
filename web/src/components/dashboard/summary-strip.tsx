@@ -1,9 +1,12 @@
 /* The Overview's summary strip: Findings, Assessment progress, Tool execution and Duration, for
    one run or every run (derive*.ts). Each card: a label, one big number and its context as badges
-   and words, never colour alone. Big numbers carry data-countup for the intro's count-up. */
+   and words, never colour alone; every badge and note with an explanation is a toggletip
+   (hint.tsx), reachable by keyboard and touch too. Big numbers carry data-countup for the intro's
+   count-up. */
 import { Bug, Clock, Gauge, Wrench, type LucideIcon } from "lucide-react";
 
 import type { SummaryStrip as Summary } from "@/components/dashboard/overview-types";
+import { Hint } from "@/components/dashboard/hint";
 import { ViewLink } from "@/components/dashboard/view-link";
 import { SeverityBadge, StatusBadge } from "@/components/ui/status-badge";
 import { FINDING_REVIEW, type Meaning, RUN_STATUS, SEVERITY_META, STEP_STATUS } from "@/lib/status";
@@ -52,7 +55,11 @@ export function SummaryStrip({ data }: { data: Summary }) {
       <Card label="Findings" icon={Bug}>
         <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-1">
           <Big value={String(findings.total)} />
-          {findings.worst && <SeverityBadge level={findings.worst.level} />}
+          {findings.worst && (
+            <Hint title={`Worst severity: ${SEVERITY_META[findings.worst.level].label}`} text={SEVERITY_META[findings.worst.level].hint}>
+              <SeverityBadge level={findings.worst.level} />
+            </Hint>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <p className="dash-stat-note">
@@ -60,7 +67,11 @@ export function SummaryStrip({ data }: { data: Summary }) {
               ? `${findings.worst.count} ${SEVERITY_META[findings.worst.level].label.toLowerCase()} · worst severity`
               : "No findings yet"}
           </p>
-          {findings.needsReview > 0 && <StatusBadge meaning={FINDING_REVIEW.review} label={`${findings.needsReview} need review`} />}
+          {findings.needsReview > 0 && (
+            <Hint title={`${findings.needsReview} need review`} text={FINDING_REVIEW.review.hint}>
+              <StatusBadge meaning={FINDING_REVIEW.review} label={`${findings.needsReview} need review`} />
+            </Hint>
+          )}
         </div>
         <ViewLink view={findings.link.view} filters={findings.link.filters} label={findings.link.label} className="absolute inset-0 z-[1] rounded-[14px]">
           <span className="sr-only">{findings.link.label}</span>
@@ -70,9 +81,15 @@ export function SummaryStrip({ data }: { data: Summary }) {
       <Card label="Assessment progress" icon={Gauge}>
         <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-1">
           <Big value={`${progress.pct}%`} format="pct" />
-          {progress.status && <StatusBadge meaning={RUN_STATUS[progress.status]} />}
+          {progress.status && (
+            <Hint title={RUN_STATUS[progress.status].label} text={RUN_STATUS[progress.status].hint}>
+              <StatusBadge meaning={RUN_STATUS[progress.status]} />
+            </Hint>
+          )}
           {progress.other && (
-            <StatusBadge meaning={RUN_STATUS[progress.other.status]} label={`${progress.other.count} ${RUN_STATUS[progress.other.status].label.toLowerCase()}`} />
+            <Hint title={`${progress.other.count} ${RUN_STATUS[progress.other.status].label.toLowerCase()}`} text={RUN_STATUS[progress.other.status].hint}>
+              <StatusBadge meaning={RUN_STATUS[progress.other.status]} label={`${progress.other.count} ${RUN_STATUS[progress.other.status].label.toLowerCase()}`} />
+            </Hint>
           )}
         </div>
         <Meter frac={progress.pct / 100} color="var(--primary)" label="Assessment progress" />
@@ -85,25 +102,35 @@ export function SummaryStrip({ data }: { data: Summary }) {
             <Big value={String(tools.steps)} />
             <span className="text-xs text-muted-foreground">{tools.steps === 1 ? "tool step" : "tool steps"}</span>
           </span>
-          {tools.running && <StatusBadge meaning={STEP_STATUS.active} />}
+          {tools.running && (
+            <Hint title={STEP_STATUS.active.label} text="A run is executing its tool steps now.">
+              <StatusBadge meaning={STEP_STATUS.active} />
+            </Hint>
+          )}
         </div>
-        <p className="dash-stat-note truncate" title={tools.tools.join(", ")}>
-          {tools.tools.length
-            ? `${tools.tools.length === 1 ? "1 tool" : `${tools.tools.length} tools`} · ${tools.tools.join(", ")}`
-            : "No approved tool named yet"}
-        </p>
-        <p className="dash-stat-note" title="Requests the approved tools sent inside the scope (the run's request count).">
+        {tools.tools.length ? (
+          <Hint title="Tools used" text={tools.tools.join(", ")} className="dash-stat-note min-w-0 self-stretch truncate">
+            {`${tools.tools.length === 1 ? "1 tool" : `${tools.tools.length} tools`} · ${tools.tools.join(", ")}`}
+          </Hint>
+        ) : (
+          <p className="dash-stat-note">No approved tool named yet</p>
+        )}
+        <Hint title="Requests sent" text="Requests the approved tools sent inside the scope (the run's request count)." className="dash-stat-note self-start">
           {tools.caption}
-        </p>
+        </Hint>
       </Card>
 
       <Card label="Duration" icon={Clock}>
         <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-1">
           <Big value={duration.value} format={duration.countup ? "duration" : "none"} />
-          {duration.over > 0 && <StatusBadge meaning={OVER_LIMIT} label={duration.over === 1 ? OVER_LIMIT.label : `${duration.over} over the limit`} />}
+          {duration.over > 0 && (
+            <Hint title={OVER_LIMIT.label} text={OVER_LIMIT.hint}>
+              <StatusBadge meaning={OVER_LIMIT} label={duration.over === 1 ? OVER_LIMIT.label : `${duration.over} over the limit`} />
+            </Hint>
+          )}
         </div>
-        {duration.frac !== null && (
-          <Meter frac={duration.frac} color={duration.frac >= 1 ? "var(--danger)" : "var(--primary)"} label="Time used of the limit" />
+        {duration.meter && (
+          <Meter frac={duration.meter.frac} color={duration.meter.over ? "var(--danger)" : "var(--primary)"} label="Time used of the limit" />
         )}
         <p className="dash-stat-note">{duration.caption}</p>
       </Card>

@@ -11,11 +11,17 @@ import type { EventBadge } from "./event-kinds";
 export type { EventBadge, Marker };
 
 /** One legend entry: a swatch (CSS colour from the tokens), its name and what it means. */
+/** A fill on top of a colour, so two meanings that share a colour still look different. */
+export type Pattern = "solid" | "stripes";
+
 export interface LegendItem {
   label: string;
   color: string;
   hint: string;
   shape: "dot" | "count" | "ring" | "bar" | "diamond";
+  pattern?: Pattern;
+  meaning?: Meaning; // shown as its badge (icon and label) instead of plain text
+  count?: number; // how many the chart holds
 }
 
 /** A drill-down: which view a number opens, with which filters (see view-url.ts). */
@@ -47,7 +53,7 @@ export interface SummaryStrip {
     value: string; // "6m 24s", or "1h 32m" in total
     countup: boolean; // the intro may count it up ("Xm YYs" only)
     caption: string; // "of 30 min limit", "longest 14m 05s of 30 min"
-    frac: number | null; // elapsed / limit (0–1, capped), when there is a limit
+    meter: { frac: number; over: boolean } | null; // elapsed / limit (capped at 1), and past it
     over: number; // runs past their time limit
   };
 }
@@ -106,7 +112,7 @@ export interface DayBar {
   pos: number; // centre
   width: number; // fraction of the axis one slot takes
   total: number;
-  segments: { status: Status; count: number; color: string }[];
+  segments: { status: Status; count: number; color: string; pattern: Pattern }[];
   title: string;
   runs: RunEntry[];
 }

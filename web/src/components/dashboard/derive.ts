@@ -343,7 +343,7 @@ export function deriveDashboard(v: AssessmentView): Dashboard {
       value: durationText,
       countup: true,
       caption: windowLimit ? `of the ${windowLimit} limit` : "no time limit",
-      frac: maxMinutes ? Math.min(1, v.durationSec / (maxMinutes * 60)) : null,
+      meter: maxMinutes ? { frac: Math.min(1, v.durationSec / (maxMinutes * 60)), over } : null,
       over: over ? 1 : 0,
     },
   };

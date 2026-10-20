@@ -3,7 +3,7 @@
 /* The charts' tooltip: shown while a mark is hovered or focused, above it (below when there is
    no room), kept on screen. It repeats the mark's accessible name for sighted users, so it is
    hidden from screen readers. Fixed to the viewport, so no card or scroller clips it; it hides
-   when anything scrolls or the window resizes. */
+   on Esc, and when anything scrolls or the window resizes. */
 import { useCallback, useEffect, useState } from "react";
 
 export interface Tip {
@@ -28,11 +28,16 @@ export function useTip() {
   const hide = useCallback(() => setTip(null), []);
   useEffect(() => {
     if (!tip) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") hide();
+    };
     window.addEventListener("scroll", hide, true);
     window.addEventListener("resize", hide);
+    window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("scroll", hide, true);
       window.removeEventListener("resize", hide);
+      window.removeEventListener("keydown", onKey);
     };
   }, [tip, hide]);
   return { tip, show, hide };

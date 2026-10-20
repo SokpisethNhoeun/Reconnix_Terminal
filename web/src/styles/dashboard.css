@@ -112,6 +112,16 @@
 .dash-swatch[data-shape="count"] { width: 16px; height: 10px; }
 .dash-swatch[data-shape="ring"] { background: transparent; border: 2px solid var(--c); width: 10px; height: 10px; }
 .dash-swatch[data-shape="diamond"] { border-radius: 1px; transform: rotate(45deg); }
+.dash-swatch[data-pattern="stripes"] { width: 14px; height: 10px; }
+/* Stripes over a colour: tells apart statuses that share one (Interrupted from Waiting for you,
+   Not started from Stopped) in the day bars and their legend. */
+[data-pattern="stripes"] {
+  background-image: repeating-linear-gradient(135deg, color-mix(in oklab, var(--background) 62%, transparent) 0 2px, transparent 2px 5px);
+}
+
+/* A toggletip trigger (hint.tsx): looks like the text or badge it wraps, focusable. */
+.dash-hint { position: relative; z-index: 2; border-radius: 6px; text-align: left; cursor: help; }
+.dash-hint:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
 /* Tooltip (chart-tooltip.tsx): fixed to the viewport, above the mark (below near the top). */
 .dash-tooltip {

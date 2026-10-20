@@ -265,8 +265,9 @@ describe("deriveDashboard", () => {
     const d = deriveDashboard(assessmentView(late));
     expect(d.minutes.over).toBe(true);
     expect(d.cards.summary.duration.over).toBe(1);
-    expect(d.cards.summary.duration.frac).toBe(1);
+    expect(d.cards.summary.duration.meter).toEqual({ frac: 1, over: true });
     expect(deriveDashboard(assessmentView(completed)).cards.summary.duration.over).toBe(0);
+    expect(deriveDashboard(assessmentView(completed)).cards.summary.duration.meter?.over).toBe(false);
   });
 
   it("draws no time axis for a run with no log yet, and says so", () => {
