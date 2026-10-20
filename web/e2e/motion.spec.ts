@@ -269,35 +269,33 @@ test("on a low-power device the globe behind the assistant is a still frame", as
   await settled(page);
   await expect(canvas(page)).toHaveAttribute("data-globe-mode", "ambient");
   await expect(canvas(page)).toHaveAttribute("data-globe", "paused"); // not drawing behind it
-  // …but it still shows: with everything else held still, the region looks different without it
+  // …but it still shows: with the rest of the stage hidden, its part of the stage isn't flat (the
+  // canvas itself is never touched: a paused canvas couldn't draw itself again)
   const globeShows = async () => {
     await expect.poll(() => carrierOpacity(page)).toBeCloseTo(0.18, 2); // its fade has ended
-    const still = await page.addStyleTag({ content: "*, *::before, *::after { animation-play-state: paused !important; }" });
-    const box = (await page.locator(".dash-globe-carrier").boundingBox())!;
-    const clip = { x: box.x + box.width * 0.25, y: box.y + box.height * 0.25, width: box.width * 0.5, height: box.height * 0.5 };
-    const shown = (await page.screenshot({ clip })).toString("base64");
-    const tag = await page.addStyleTag({ content: ".dash-globe-canvas { visibility: hidden !important; }" });
-    const hidden = (await page.screenshot({ clip })).toString("base64");
-    await tag.evaluate((el) => (el as Element).remove());
-    await still.evaluate((el) => (el as Element).remove());
-    return page.evaluate(async ([a, b]) => {
-      const pixels = async (png: string) => {
-        const img = new Image();
-        img.src = `data:image/png;base64,${png}`;
-        await img.decode();
-        const c = document.createElement("canvas");
-        [c.width, c.height] = [img.width, img.height];
-        const ctx = c.getContext("2d")!;
-        ctx.drawImage(img, 0, 0);
-        return ctx.getImageData(0, 0, c.width, c.height).data;
-      };
-      const [pa, pb] = [await pixels(a), await pixels(b)];
-      let sum = 0;
-      for (let i = 0; i < pa.length; i += 4) sum += Math.abs(pa[i + 1] - pb[i + 1]);
-      return sum / (pa.length / 4); // the canvas's mean share of the green channel
-    }, [shown, hidden]);
+    const content = ".dash-assistant-front, .dash-assistant-surface, .dash-assistant-halo { visibility: hidden !important; }";
+    const rest = await page.addStyleTag({ content });
+    const c = (await page.locator(PARTS.carrier).boundingBox())!;
+    const s = (await page.locator(PARTS.stage).boundingBox())!;
+    const [x, y] = [Math.max(c.x, s.x), Math.max(c.y, s.y)];
+    const clip = { x, y, width: Math.min(c.x + c.width, s.x + s.width) - x, height: Math.min(c.y + c.height, s.y + s.height) - y };
+    const shot = (await page.screenshot({ clip })).toString("base64");
+    await rest.evaluate((el) => (el as Element).remove());
+    return page.evaluate(async (png) => {
+      const img = new Image();
+      img.src = `data:image/png;base64,${png}`;
+      await img.decode();
+      const cv = document.createElement("canvas");
+      [cv.width, cv.height] = [img.width, img.height];
+      const ctx = cv.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, cv.width, cv.height).data;
+      let [sum, sq, n] = [0, 0, 0];
+      for (let i = 1; i < d.length; i += 4, n++) [sum, sq] = [sum + d[i], sq + d[i] * d[i]];
+      return Math.sqrt(sq / n - (sum / n) ** 2); // the green channel's spread
+    }, shot);
   };
-  expect(await globeShows()).toBeGreaterThan(1); // ≈4 when drawn, ≈0.2 when cleared
+  expect(await globeShows()).toBeGreaterThan(3); // a flat (blank) stage: ≈0
   await minimize(page);
   await closed(page);
   await expect(canvas(page)).toHaveAttribute("data-globe", "running");
@@ -309,7 +307,7 @@ test("on a low-power device the globe behind the assistant is a still frame", as
   await tab(page).click();
   await settled(page);
   await expect(canvas(page)).toHaveAttribute("data-globe", "paused");
-  await expect.poll(globeShows).toBeGreaterThan(1);
+  expect(await globeShows()).toBeGreaterThan(3);
 });
 
 test("no reload, one history entry per open, and rapid clicks leave nothing stuck", async ({ page }) => {
