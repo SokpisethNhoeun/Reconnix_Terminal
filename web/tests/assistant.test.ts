@@ -8,7 +8,7 @@ import { modelSetup } from "@/lib/assistant/config";
 import { buildContext, clean, CONTEXT_LIMIT } from "@/lib/assistant/context";
 import { fenceTag, systemPrompt } from "@/lib/assistant/prompt";
 import { redact } from "@/lib/assistant/redact";
-import { createLimiter } from "@/lib/assistant/rate";
+import { createLimiter, limitsFromEnv, PER_MINUTE, RUNNING } from "@/lib/assistant/rate";
 import { ChatRequestSchema, MAX_QUESTION } from "@/lib/assistant/request";
 import { createEventParser, createThinkFilter } from "@/lib/assistant/stream";
 
@@ -203,5 +203,15 @@ describe("createLimiter", () => {
     c();
     expect(limiter.take(4)).toBeNull(); // three this minute
     expect(limiter.take(60_001)).not.toBeNull();
+  });
+});
+
+describe("limitsFromEnv", () => {
+  it("reads positive whole numbers, and keeps the defaults otherwise", () => {
+    expect(limitsFromEnv({})).toEqual([PER_MINUTE, RUNNING]);
+    expect(limitsFromEnv({ RECONIX_ASSISTANT_RATE_PER_MINUTE: "120", RECONIX_ASSISTANT_RATE_RUNNING: " 3 " })).toEqual([120, 3]);
+    for (const bad of ["0", "-5", "1.5", "lots", "", "1e3", "9999999"]) {
+      expect(limitsFromEnv({ RECONIX_ASSISTANT_RATE_PER_MINUTE: bad, RECONIX_ASSISTANT_RATE_RUNNING: bad })).toEqual([PER_MINUTE, RUNNING]);
+    }
   });
 });

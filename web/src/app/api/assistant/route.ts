@@ -16,7 +16,7 @@ import { scopeOf } from "@/lib/assistant/insights";
 import { readIntent } from "@/lib/assistant/intent";
 import { fenceTag, systemPrompt } from "@/lib/assistant/prompt";
 import { NDJSON } from "@/lib/assistant/protocol";
-import { createLimiter } from "@/lib/assistant/rate";
+import { createLimiter, limitsFromEnv } from "@/lib/assistant/rate";
 import { redact } from "@/lib/assistant/redact";
 import { replyStream } from "@/lib/assistant/reply";
 import { ChatRequestSchema, MAX_BODY } from "@/lib/assistant/request";
@@ -24,7 +24,7 @@ import { earlierTurns } from "@/lib/assistant/turns";
 import { assessmentView } from "@/lib/data/adapt";
 import { loadLibrary } from "@/lib/data/store";
 
-const limiter = createLimiter();
+const limiter = createLimiter(...limitsFromEnv());
 const GONE = "That conversation is not saved any more. Start a new chat.";
 
 export async function POST(request: Request) {

@@ -2,11 +2,17 @@
 // By default it streams a short answer that names how many saved runs the system prompt
 // described, how many earlier turns it was sent (the server reads them from its own file) and
 // the last question, so the tests see that the route built the context and streamed the reply.
-// A question with "markdown" gets a table and a code block; one with "long" gets a long answer
-// that streams slowly (for Stop and "New messages").
+// Only explicit tokens change that (ordinary words never do, so other specs' questions echo):
+//   [stub:markdown]  a table and a code block
+//   [stub:long]      a long answer, then the stream stays open until the client goes away (or
+//                    60 s pass), so Stop never races the end of the answer
+//   [stub:fail]      HTTP 500 the first time each such question is asked, a normal answer after
+//                    (so Retry can succeed)
 import { createServer } from "node:http";
 
 const port = Number(process.env.LLM_STUB_PORT || 3195);
+const HOLD_MS = 60_000;
+const failed = new Set();
 
 const MARKDOWN = [
   "## Findings by severity\n\n",
@@ -22,12 +28,10 @@ const MARKDOWN = [
   "- Decide on approvals in the TUI.\n",
 ];
 
-const long = () => {
-  const parts = ["## A long answer\n\n"];
-  for (let i = 1; i <= 40; i++) parts.push(`Paragraph ${i}: the saved data says this part of the run is described in detail, line after line, so the conversation grows taller than the screen.\n\n`);
-  parts.push("The end of the long answer.");
-  return parts;
-};
+const LONG = ["## A long answer\n\n"];
+for (let i = 1; i <= 40; i++) LONG.push(`Paragraph ${i}: the saved data says this part of the run is described in detail, line after line, so the conversation grows taller than the screen.\n\n`);
+
+const chunk = (text) => `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`;
 
 createServer((req, res) => {
   if (req.method === "GET") return res.writeHead(200).end("stub ready");
@@ -40,20 +44,27 @@ createServer((req, res) => {
     const runs = system.match(/ALL SAVED ASSESSMENTS: (\d+)/)?.[1] ?? (system.includes("ASSESSMENT ") ? "1" : "0");
     const question = messages.at(-1)?.content ?? "";
     const earlier = messages.filter((m) => m.role !== "system").length - 1;
-    const lower = question.toLowerCase();
-    const words = lower.includes("markdown")
+    if (question.includes("[stub:fail]") && !failed.has(question)) {
+      failed.add(question);
+      return res.writeHead(500, { "Content-Type": "application/json" }).end('{"error":"stub failure"}');
+    }
+    const long = question.includes("[stub:long]");
+    const words = question.includes("[stub:markdown]")
       ? MARKDOWN
-      : lower.includes("long")
-        ? long()
+      : long
+        ? LONG
         : ["Stub answer:", ` I saw ${runs} runs.`, ` Earlier turns: ${earlier}.`, " You asked:", ` ${question}`];
-    const delay = lower.includes("long") ? 90 : 40;
     res.writeHead(200, { "Content-Type": "text/event-stream" });
     let i = 0;
     const next = () => {
       if (res.destroyed) return;
       if (i < words.length) {
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: words[i++] } }] })}\n\n`);
-        setTimeout(next, delay);
+        res.write(chunk(words[i++]));
+        setTimeout(next, long ? 30 : 40);
+      } else if (long) {
+        // hold the answer open until the client stops it (or a long time passes)
+        const timer = setTimeout(() => res.destroyed || res.end(`${chunk("The end of the long answer.")}data: [DONE]\n\n`), HOLD_MS);
+        res.on("close", () => clearTimeout(timer));
       } else res.end("data: [DONE]\n\n");
     };
     next();

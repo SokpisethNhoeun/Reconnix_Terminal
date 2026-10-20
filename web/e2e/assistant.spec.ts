@@ -2,11 +2,10 @@
    the shared draft; answers streamed by the stand-in model (e2e/llm-stub.mjs) with the cards the
    server built from the sample data; conversations the dashboard's server keeps (they survive
    a reload and a new browser; open, rename, delete); Markdown with Copy; Stop and "New
-   messages"; what a viewer can't do; and the routes' locks. The chat panel breathes (it never
-   holds still), so clicks inside it are forced outside the reduced-motion tests.
-
-   The route allows 12 questions a minute (refused requests count too), so the whole file asks
-   at most 11. Conversations go to a test folder (playwright.config.ts: RECONIX_ASSISTANT_DIR). */
+   messages"; Retry; what a viewer can't do; and the routes' locks. The chat panel breathes (it
+   never holds still), so clicks inside it are forced outside the reduced-motion tests. The
+   stand-in model changes its answer only for explicit [stub:…] tokens. Conversations go to a
+   test folder, and the e2e server allows more questions a minute (playwright.config.ts). */
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
 import { sessionValue } from "../src/lib/auth/session";
@@ -97,7 +96,7 @@ test.describe("with reduced motion", () => {
     await signIn(page);
     await forgetAll(page);
     await page.goto("/?view=assistant");
-    // 1: a suggestion asks, the findings card comes from the sample data, then the model's text
+    // a suggestion asks, the findings card comes from the sample data, then the model's text
     await page.getByRole("button", { name: /Analyze current findings/ }).click();
     const findings = log(page).getByRole("region", { name: "Findings" });
     await expect(findings).toBeVisible();
@@ -105,7 +104,7 @@ test.describe("with reduced motion", () => {
     await expect(findings).toContainText(`${total} across ${sample().length} runs`);
     await expect(findings).toContainText("Saved data");
     await expect(log(page)).toContainText(`Stub answer: I saw ${sample().length} runs. Earlier turns: 0. You asked: Analyze the current findings`);
-    // 2: a follow-up gets the first turn back from the server's file, not from the page
+    // a follow-up gets the first turn back from the server's file, not from the page
     await ask(page, "What waits on my approval?");
     await expect(log(page)).toContainText("Earlier turns: 2. You asked: What waits on my approval?");
     const approvals = log(page).getByRole("region", { name: "Approvals" });
@@ -168,7 +167,7 @@ test.describe("with reduced motion", () => {
     await page.goto(`/?uid=${run.uid}&view=assistant`);
     await expect(header(page)).toContainText(run.label);
     await expect(header(page)).toContainText("Waiting for you"); // its status as a badge
-    await page.getByRole("button", { name: /Review assessment progress/ }).click(); // 3
+    await page.getByRole("button", { name: /Review assessment progress/ }).click();
     await expect(log(page)).toContainText("I saw 1 runs");
     const progress = log(page).getByRole("region", { name: "Assessment progress" });
     await expect(progress.getByRole("listitem")).toHaveCount(5);
@@ -184,7 +183,7 @@ test.describe("with reduced motion", () => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: ORIGIN });
     await signIn(page);
     await page.goto("/?view=assistant");
-    await ask(page, "Show the findings as markdown please"); // 4
+    await ask(page, "Show the findings as a table [stub:markdown]");
     const table = log(page).getByRole("region", { name: "Table" });
     await expect(table.getByRole("columnheader", { name: "Severity" })).toBeVisible();
     await expect(table.getByRole("row")).toHaveCount(3);
@@ -194,7 +193,7 @@ test.describe("with reduced motion", () => {
     await expect(code.getByRole("button", { name: "Copied" })).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("curl -s 'https://staging.example.com/api/v1/orders");
 
-    await ask(page, "Give me a long answer"); // 5
+    await ask(page, "Give me the whole story [stub:long]");
     await expect(log(page)).toContainText("Paragraph 6");
     const down = page.getByRole("button", { name: /new messages/i });
     await expect(down).toBeHidden(); // following the text at the bottom
@@ -227,11 +226,11 @@ test.describe("with reduced motion", () => {
   test("approvals and planning stay in the TUI: guidance and Open Terminal, never a plan", async ({ page }) => {
     await signIn(page);
     await page.goto("/?view=assistant");
-    await page.getByRole("button", { name: /Plan a security assessment/ }).click(); // 6
+    await page.getByRole("button", { name: /Plan a security assessment/ }).click();
     const plan = log(page).getByRole("region", { name: "Plan a new assessment in the TUI" });
     await expect(plan).toContainText("no plan has been made");
     await expect(log(page)).toContainText("You asked: Plan a security assessment");
-    await ask(page, "Explain the top finding"); // 7
+    await ask(page, "Explain the top finding");
     const top = log(page).getByRole("region", { name: /^Finding / });
     await expect(top).toContainText("CVSS");
     await top.getByRole("link", { name: /in Findings$/ }).click();
@@ -265,9 +264,9 @@ test("the routes want a signed-in operator, the page's origin and a valid reques
   await signIn(page);
   const post = (data: unknown, origin = ORIGIN) => page.request.post("/api/assistant", { headers: { Origin: origin }, data });
   expect((await post(body, "http://evil.example")).status()).toBe(403);
-  expect((await post({ uid: null, messages: [{ role: "user", content: "hi" }] })).status()).toBe(400); // 8: no history from the browser
-  expect((await post({ uid: "20200101-000000-dead_NOPE-1", question: "hi" })).status()).toBe(404); // 9
-  const ok = await post(body); // 10
+  expect((await post({ uid: null, messages: [{ role: "user", content: "hi" }] })).status()).toBe(400); // no history from the browser
+  expect((await post({ uid: "20200101-000000-dead_NOPE-1", question: "hi" })).status()).toBe(404);
+  const ok = await post(body);
   expect(ok.status()).toBe(200);
   expect(ok.headers()["content-type"]).toContain("application/x-ndjson");
   const lines = (await ok.text()).trim().split("\n").map((l) => JSON.parse(l) as { t: string; delta?: string; conversationId?: string });
