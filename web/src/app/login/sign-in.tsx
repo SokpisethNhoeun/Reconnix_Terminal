@@ -1,7 +1,7 @@
 "use client";
 
 /* Reads the token from the link's fragment (#token=…), trades it for the session cookie,
-   removes it from the address bar, and opens the overview. */
+   removes it from the address bar, and opens the Overview. */
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -28,19 +28,15 @@ export function SignIn() {
   }, [router]);
 
   if (state === "working") {
-    return (
-      <>
-        <div className="ring" aria-hidden />
-        <b className="text-[15px]">Signing you in…</b>
-      </>
-    );
+    return <b className="text-[15px] font-medium text-foreground">Signing you in…</b>;
   }
   return (
     <>
-      <b className="text-[15px]">{state === "missing" ? "Open your sign-in link" : "That sign-in link has expired"}</b>
-      <p className="max-w-[44ch] text-[13.5px] text-muted">
-        This dashboard runs on your computer only. The sign-in link is new each time it starts: open the link that{" "}
-        <code className="font-mono text-accent">npm start</code> printed in your terminal.
+      <b className="text-[15px] font-medium text-foreground">{state === "missing" ? "Open your sign-in link" : "That sign-in link has expired"}</b>
+      <p className="max-w-[44ch] text-[13.5px] text-muted-foreground">
+        This dashboard runs on your computer only, and its sign-in link is new each time it starts. Run{" "}
+        <code className="font-mono text-primary">/web</code> in the TUI, or open the link that{" "}
+        <code className="font-mono text-primary">npm run dev</code> printed.
       </p>
     </>
   );

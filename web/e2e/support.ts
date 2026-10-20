@@ -19,6 +19,8 @@ interface SampleAssessment {
   findings: { severity: string; validation: string; title: string; status: string; cvss_score: number }[];
   verdicts: { allowed: boolean }[];
   approvals: unknown[];
+  created_at: string;
+  timeline: { type: string; who: string }[];
 }
 
 export function sample(): SampleAssessment[] {
@@ -27,3 +29,11 @@ export function sample(): SampleAssessment[] {
     .filter((n) => n.endsWith(".json"))
     .map((n) => JSON.parse(readFileSync(path.join(dir, n), "utf8")) as SampleAssessment);
 }
+
+/** The assessment the dashboard opens first: the newest by creation time (as store.ts sorts). */
+export function newest(): SampleAssessment {
+  return [...sample()].sort((a, b) => b.created_at.localeCompare(a.created_at) || b.uid.localeCompare(a.uid))[0];
+}
+
+/** Findings the dashboard counts (false positives are left out). */
+export const counted = (a: SampleAssessment) => a.findings.filter((f) => f.status !== "false-positive");

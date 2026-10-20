@@ -1,110 +1,72 @@
 "use client";
 
-/* The AI Assistant's chat. This preview has no AI backend, so a sent message is echoed into
-   the transcript with a canned reply that points to the terminal app; nothing runs. The
-   transcript fills the page and the composer stays pinned at the bottom, like a chat app. */
-import { ArrowUp, Diamond, Paperclip } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+/* The assistant's message box: the shared draft (the Overview's Ask bar edits the same one),
+   Enter to send and Shift+Enter for a new line, Stop while a reply streams. The microphone is
+   shown as on the Ask bar but voice input isn't available, so it only says so. */
+import { forwardRef, useState } from "react";
+import { Mic, Send, Square } from "lucide-react";
+import { MAX_QUESTION } from "@/lib/assistant/request";
+import { useAssistant } from "./assistant-provider";
 
-import { Input } from "../ui/input";
-
-interface Message {
-  role: "you" | "reconix";
-  text: string;
-}
-
-const REPLY =
-  "This is a read-only preview of the AI Assistant. Run assessments in the terminal app (or with `reconix` on this computer) and they show up here, with the same scope and approval gates.";
-
-export function Composer() {
-  const [value, setValue] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
-  const endRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const send = () => {
-    const text = value.trim();
-    if (!text) return;
-    setMessages((m) => [...m, { role: "you", text }]);
-    setValue("");
-    window.setTimeout(() => setMessages((m) => [...m, { role: "reconix", text: REPLY }]), 450);
+export const Composer = forwardRef<HTMLTextAreaElement, { label: string }>(function Composer({ label }, ref) {
+  const { draft, setDraft, ask, busy, stop, canAsk } = useAssistant();
+  const [micNote, setMicNote] = useState(false);
+  const send = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!busy) ask();
   };
-
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* Transcript — grows and scrolls above the composer */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        {messages.length === 0 ? (
-          <div className="m-auto flex max-w-md flex-col items-center gap-3 text-center">
-            <Diamond size={30} className="text-accent" aria-hidden />
-            <p className="text-[17px] font-semibold">Ask Reconix, or type a target to begin</p>
-            <p className="text-[13px] text-muted">A read-only preview · run assessments in the terminal app.</p>
-          </div>
-        ) : (
-          <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 pb-6">
-            {messages.map((m, i) =>
-              m.role === "you" ? (
-                <p key={i} className="chat-you">
-                  {m.text}
-                </p>
-              ) : (
-                <div key={i} className="flex gap-3">
-                  <span className="eyebrow mt-1 flex flex-none items-center gap-1.5">
-                    <Diamond size={13} aria-hidden />
-                    reconix
-                  </span>
-                  <p className="text-[14.5px] leading-relaxed [overflow-wrap:anywhere]">{m.text}</p>
-                </div>
-              ),
-            )}
-            <div ref={endRef} />
-          </div>
+    <form onSubmit={send} className="dash-composer flex items-end gap-2 p-2">
+      <textarea
+        ref={ref}
+        rows={1}
+        value={draft}
+        maxLength={MAX_QUESTION}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) send(e);
+        }}
+        aria-label={label}
+        placeholder={canAsk ? "Ask about the findings, the scope, what waits on you…" : "Write your question (asking needs the setup below)"}
+        className="max-h-[132px] min-h-[40px] flex-1 resize-none bg-transparent px-2 py-2.5 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none [field-sizing:content]"
+      />
+      <div className="relative">
+        <button
+          type="button"
+          aria-disabled="true"
+          aria-label="Voice input (not available)"
+          onClick={() => setMicNote((v) => !v)}
+          onBlur={() => setMicNote(false)}
+          className="grid size-[38px] place-items-center rounded-lg text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Mic className="size-[18px]" strokeWidth={1.6} aria-hidden />
+        </button>
+        {micNote && (
+          <span role="status" className="dash-pop absolute bottom-[calc(100%+6px)] right-0 w-max max-w-[220px] px-2.5 py-1.5 text-[11px] text-muted-foreground">
+            Voice input isn&apos;t available yet. Type your question.
+          </span>
         )}
       </div>
-
-      {/* Composer — pinned to the bottom */}
-      <div className="mx-auto w-full max-w-4xl pt-4">
-        <div className="card gap-3.5 !p-4">
-          <div className="flex items-center gap-3">
-            <button type="button" className="btn flex-none !px-3" aria-label="Add file">
-              <Paperclip size={17} aria-hidden />
-            </button>
-            <Input
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  send();
-                }
-              }}
-              placeholder="Write a message…"
-              aria-label="Message the AI Assistant"
-              className="h-12 flex-1 text-[15px]"
-            />
-            <button
-              type="button"
-              onClick={send}
-              className="btn flex-none !bg-accent !px-4 font-semibold !text-accent-ink [&_svg]:!text-accent-ink"
-            >
-              Send
-              <ArrowUp size={17} aria-hidden />
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2.5 text-[13px] text-muted">
-            <span className="btn">
-              <Diamond size={14} aria-hidden />
-              Reconix model ▾
-            </span>
-          </div>
-        </div>
-        <p className="mt-2.5 text-center text-[12px] text-faint">
-          A preview of the AI Assistant · run assessments in the terminal app.
-        </p>
-      </div>
-    </div>
+      {busy ? (
+        <button
+          type="button"
+          onClick={stop}
+          aria-label="Stop the answer"
+          className="grid size-[38px] shrink-0 place-items-center rounded-lg border border-border text-foreground transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Square className="size-3.5 fill-current" aria-hidden />
+        </button>
+      ) : (
+        <button
+          type="submit"
+          aria-label="Send"
+          disabled={!canAsk || !draft.trim()}
+          className="grid size-[38px] shrink-0 place-items-center rounded-lg transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+          style={{ background: "var(--primary-strong)", color: "var(--primary-foreground)" }}
+        >
+          <Send className="size-[16px]" strokeWidth={1.8} aria-hidden />
+        </button>
+      )}
+    </form>
   );
-}
+});

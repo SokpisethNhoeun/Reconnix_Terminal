@@ -20,6 +20,7 @@ from urllib.parse import urlsplit
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 LOG_FILE = Path(os.environ.get("RECONIX_WEB_LOG") or "~/.reconix/web.log").expanduser()
+PORTS_BUSY = 2   # web/scripts/serve.mjs exits with this when its ports are already taken
 
 
 def problem() -> str:

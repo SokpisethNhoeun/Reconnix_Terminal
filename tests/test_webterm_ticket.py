@@ -146,8 +146,10 @@ def test_bad_ports_are_refused(port):
 
 def test_the_program_never_gets_the_launch_token():
     env = child_env({"RECONIX_WEB_TOKEN": TOKEN, "RECONIX_TERM_COMMAND": "x", "COLUMNS": "80",
-                     "LINES": "24", "RECONIX_DATA_DIR": "/data", "PYTHONPATH": "/extra"})
+                     "LINES": "24", "RECONIX_DATA_DIR": "/data", "PYTHONPATH": "/extra",
+                     "LLM_API_KEY": "sk-test", "LLM_BASE_URL": "https://llm.example.com/v1"})
     assert "RECONIX_WEB_TOKEN" not in env and "RECONIX_TERM_COMMAND" not in env
+    assert not [key for key in env if key.startswith("LLM_")]      # the dashboard's model key
     assert "COLUMNS" not in env and "LINES" not in env              # the pty has the size
     assert env["RECONIX_DATA_DIR"] == "/data"                       # saves where the web reads
     assert env["TERM"] == "xterm-256color" and env["COLORTERM"] == "truecolor"

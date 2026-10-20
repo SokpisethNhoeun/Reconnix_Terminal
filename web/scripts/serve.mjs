@@ -14,8 +14,9 @@
         RECONIX_WEB_TOKEN (only for tests; normally a new random token each start). */
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import net from "node:net";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +31,27 @@ const token = process.env.RECONIX_WEB_TOKEN || randomBytes(24).toString("base64u
 const link = `http://127.0.0.1:${port}/login#token=${token}`;
 const dataDir = process.env.RECONIX_DATA_DIR || "~/.reconix/assessments";
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
+
+/* Never start next to another dashboard on the same ports: Next.js and the helper would both
+   fail, and nothing of the running one (its link file in particular) may be touched. */
+const busy = [];
+for (const p of terminal ? [port, termPort] : [port]) if (await portInUse(p)) busy.push(p);
+if (busy.length) {
+  console.error(
+    `[web] 127.0.0.1:${busy.join(" and ")} ${busy.length > 1 ? "are" : "is"} already in use, probably by another ` +
+      "Reconix dashboard. Stop it (or set RECONIX_WEB_PORT / RECONIX_TERM_PORT), then start again.",
+  );
+  process.exit(2);
+}
+
+function portInUse(p) {
+  return new Promise((resolve) => {
+    const probe = net.createServer();
+    probe.once("error", (error) => resolve(error.code === "EADDRINUSE"));
+    probe.once("listening", () => probe.close(() => resolve(false)));
+    probe.listen(Number(p), "127.0.0.1");
+  });
+}
 
 const helper = terminal ? startTerminal() : null;
 
@@ -52,11 +74,13 @@ function startTerminal() {
   const windows = process.platform === "win32";
   const venv = path.join(repoRoot, ".venv", windows ? "Scripts/python.exe" : "bin/python");
   const python = process.env.RECONIX_PYTHON || (existsSync(venv) ? venv : windows ? "python" : "python3");
+  // the AI Assistant's model settings (LLM_API_KEY above all) stay with the dashboard
+  const ownEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("LLM_")));
   const proc = spawn(python, ["-m", "reconix.webterm"], {
     cwd: repoRoot,
     stdio: ["pipe", "inherit", "inherit"],
     env: {
-      ...process.env,
+      ...ownEnv,
       RECONIX_WEB_TOKEN: token,
       RECONIX_WEB_PORT: port,
       RECONIX_TERM_PORT: termPort,
@@ -119,11 +143,12 @@ function writeLink() {
   }
 }
 
+/* Only our own link: the file is shared, and another dashboard may have written it since. */
 function removeLink() {
   try {
-    rmSync(linkFile, { force: true });
+    if (readFileSync(linkFile, "utf8").trim() === link) rmSync(linkFile, { force: true });
   } catch {
-    /* ignore */
+    /* gone already, or unreadable: leave it */
   }
 }
 

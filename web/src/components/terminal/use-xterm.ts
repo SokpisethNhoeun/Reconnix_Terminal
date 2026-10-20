@@ -22,7 +22,7 @@ export function useXterm(host: RefObject<HTMLDivElement | null>): Terminal | nul
       const css = getComputedStyle(document.documentElement);
       const token = (name: string) => css.getPropertyValue(name).trim();
       const term = new Terminal({
-        fontFamily: `${token("--font-code") || "monospace"}, ui-monospace, monospace`,
+        fontFamily: `${token("--font-mono") || "monospace"}, ui-monospace, monospace`,
         fontSize: 13,
         cursorBlink: true,
         theme: { background: token("--term-bg"), foreground: token("--term-text"), cursor: token("--term-cursor"), cursorAccent: token("--term-bg") },

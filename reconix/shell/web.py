@@ -75,8 +75,13 @@ class WebDashboardMixin:
         self._web_process = process = web_server.start(persist.DATA_DIR, persist.WEB_URL_FILE)
         waited = 0.0
         while waited < READY_TIMEOUT and not self._web_quit.is_set():
-            if process.poll() is not None:
+            code = process.poll()
+            if code is not None:
                 self._web_process = None
+                if code == web_server.PORTS_BUSY:
+                    return ("Another web dashboard already uses its port on 127.0.0.1 (an older "
+                            "one left running?). Stop it, then run /web again. Details: "
+                            f"{log}", "error")
                 return f"The web dashboard stopped while starting. Details: {log}", "error"
             if web_server.is_listening(store.web_dashboard_url()):
                 return ("The web dashboard is ready and opened in your browser. /web opens it "

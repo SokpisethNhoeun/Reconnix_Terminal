@@ -1,11 +1,13 @@
 "use client";
 
-/* The session's controls, kept small: copy, clear, restart, expand. Icon buttons on one
-   well, each with a tooltip and a name for screen readers. Copy says how it went. */
+/* The session's controls, kept small: copy, clear, restart, expand. Icon buttons in one
+   group, each with a tooltip and a name for screen readers. Copy says how it went.
+   (Adapted from reconix-tui/web/src/components/terminal/terminal-toolbar.tsx.) */
 import { Check, Copy, Eraser, Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { Button } from "../ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+
 import { RestartButton } from "./restart-button";
 import type { SessionState } from "./use-terminal-session";
 
@@ -29,21 +31,19 @@ export function TerminalToolbar({ state, expanded, onExpand, onCopy, onClear, on
     return () => window.clearTimeout(timer);
   }, [copied]);
 
-  const copyLabel = copied === "ok" ? "Copied" : "Copy output";
-  const expandLabel = expanded ? "Restore" : "Expand";
   return (
-    <div role="toolbar" aria-label="Terminal controls" className="flex items-center gap-0.5 rounded-[10px] bg-well p-0.5 shadow-[var(--press-sm)]">
-      <Button variant="quiet" size="icon-sm" aria-label={copyLabel} title={copyLabel} onClick={async () => setCopied((await onCopy()) ? "ok" : "failed")}>
-        {copied === "ok" ? <Check aria-hidden className="text-ok" /> : <Copy aria-hidden />}
-      </Button>
-      <Button variant="quiet" size="icon-sm" aria-label="Clear terminal" title="Clear terminal" onClick={onClear}>
+    <div role="toolbar" aria-label="Terminal controls" className="flex items-center gap-0.5 rounded-[10px] border border-border bg-card-2 p-0.5">
+      <IconButton label={copied === "ok" ? "Copied" : "Copy output"} onClick={async () => setCopied((await onCopy()) ? "ok" : "failed")}>
+        {copied === "ok" ? <Check aria-hidden className="text-success" /> : <Copy aria-hidden />}
+      </IconButton>
+      <IconButton label="Clear terminal" onClick={onClear}>
         <Eraser aria-hidden />
-      </Button>
-      <RestartButton live={state === "connected"} disabled={state === "connecting"} onRestart={onRestart} onClose={onDone} />
-      <Button variant="quiet" size="icon-sm" aria-label={expandLabel} title={expandLabel} onClick={onExpand}>
+      </IconButton>
+      <RestartButton live={state === "connected"} disabled={state === "connecting"} onRestart={onRestart} onDone={onDone} />
+      <IconButton label={expanded ? "Restore" : "Expand"} onClick={onExpand}>
         {expanded ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
-      </Button>
-      <span className="sr-only-x" role="status">
+      </IconButton>
+      <span className="sr-only" role="status">
         {copied === "ok" ? "Copied to the clipboard" : copied === "failed" ? "Couldn't copy" : ""}
       </span>
     </div>

@@ -220,6 +220,9 @@ export function averageTestingMs(list: Assessment[]): number | null {
 /** A run the TUI is playing now: it moves, or it waits for the operator. */
 export const isLive = (a: Assessment) => a.status === "Running" || a.status === "Awaiting input";
 
+/** A run that has not ended (New, Running or Awaiting input). */
+export const isUnfinished = (a: Assessment) => UNFINISHED.has(a.status);
+
 /** How long an unfinished run may go without a save before it reads as interrupted. */
 export const STALE_AFTER_HOURS = 12;
 

@@ -2,6 +2,8 @@
    server). The proxy requires the operator role for both. */
 
 export const TERMINAL_PAGE = "/terminal";
+/** The Terminal view on the dashboard page; /terminal redirects here. */
+export const TERMINAL_VIEW = "/?view=terminal";
 export const TICKET_ROUTE = "/api/terminal/ticket";
 
 /** Paths only operators may open: the page and everything under /api/terminal. */

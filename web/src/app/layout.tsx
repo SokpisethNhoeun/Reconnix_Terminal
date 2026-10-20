@@ -1,29 +1,33 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, JetBrains_Mono, Space_Grotesk } from "next/font/google";
-import { headers } from "next/headers";
-import type { ReactNode } from "react";
-
-import { ThemeProvider } from "@/components/layout/theme-provider";
-
+import { Inter, JetBrains_Mono } from "next/font/google";
+import { SmoothScroll } from "@/components/smooth-scroll";
+import { SITE_NAME } from "@/lib/site";
 import "./globals.css";
 
-const ui = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-ui" });
-const code = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-code" });
-/* headings: the landing site's display font */
-const head = Space_Grotesk({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-head" });
+// Inter drives both display and body (the SOC dashboard uses one clean geometric sans);
+// JetBrains Mono stays for chips, ticks, timestamps and the terminal. Variable names are
+// unchanged so the docs and the ui/ primitives keep resolving --font-display / --font-body /
+// --font-mono.
+const display = Inter({ subsets: ["latin"], variable: "--font-display" });
+const body = Inter({ subsets: ["latin"], variable: "--font-body" });
+const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
-  title: { default: "Reconix analysis", template: "%s · Reconix analysis" },
-  description: "Read-only analysis of the assessments the Reconix terminal app saved on this computer.",
+  title: { default: `${SITE_NAME} analysis`, template: `%s · ${SITE_NAME} analysis` },
+  description: "The assessments the Reconix terminal app saved on this computer, and the TUI itself.",
   robots: { index: false, follow: false },
 };
 
-export default async function RootLayout({ children }: { children: ReactNode }) {
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${ui.variable} ${code.variable} ${head.variable}`}>
-      <body>
-        <ThemeProvider nonce={nonce}>{children}</ThemeProvider>
+    <html lang="en" suppressHydrationWarning className={`${display.variable} ${body.variable} ${mono.variable}`}>
+      <body className="min-h-screen antialiased">
+        {/* The dashboard page (src/app/page.tsx) adds the `js` class itself, with the request's
+            CSP nonce (the docs don't use it). */}
+        {/* SmoothScroll (Lenis) is global; the site nav / footer / scroll progress now live in
+            the docs layout only — the dashboard at / supplies its own chrome. */}
+        <SmoothScroll />
+        {children}
       </body>
     </html>
   );

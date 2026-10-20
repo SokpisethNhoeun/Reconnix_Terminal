@@ -1,124 +1,181 @@
-/* Every page renders the sample data with the right numbers, in both themes. */
-import { expect, test } from "@playwright/test";
+/* The globe dashboard on the sample data: every view, the assessment switcher, the report
+   downloads, the docs, and the Terminal view (with the stand-in program from
+   playwright.config.ts instead of the TUI). */
+import { expect, type Page, test } from "@playwright/test";
 
-import { sample, signIn } from "./support";
+import { counted, newest, sample, signIn } from "./support";
 
-test.beforeEach(async ({ page }) => {
+const view = (name: string) => `nav[aria-label="Views"] button[aria-label^="${name}"]`;
+
+const stat = (page: Page, label: string) => page.locator(".dash-bottom .dash-card", { hasText: label }).locator("[data-countup]");
+
+test("the overview totals every saved file by default", async ({ page }) => {
   await signIn(page);
+  const all = sample();
+  await expect(page.getByRole("heading", { name: "Assessment Operations Center" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Choose an assessment" })).toContainText(`All (${all.length})`);
+  await expect(stat(page, "Assessments")).toHaveText(String(all.length));
+  await expect(stat(page, "Findings")).toHaveText(String(all.reduce((n, a) => n + counted(a).length, 0)));
+  await expect(stat(page, "Policy checks")).toHaveText(String(all.reduce((n, a) => n + a.verdicts.length, 0)));
+  await page.click(view("Findings"));
+  await expect(page.locator('[role="option"]')).toHaveCount(all.reduce((n, a) => n + a.findings.length, 0));
+  await page.click(view("Audit log"));
+  await expect(page.getByRole("list", { name: "Saved assessments" }).getByRole("link")).toHaveCount(all.length);
 });
 
-test("the dashboard counts what the files hold", async ({ page }) => {
-  const data = sample();
-  const vulns = data.flatMap((a) => a.findings).filter((f) => f.status !== "false-positive");
-  const tile = (label: string) => page.locator(".kpi").filter({ hasText: label }).locator(".kpi-value");
+test("one run's overview counts what its file holds", async ({ page }) => {
+  await signIn(page);
+  const a = newest();
+  await page.goto(`/?uid=${a.uid}`);
+  await expect(page.getByRole("heading", { name: "Assessment Operations Center" })).toBeVisible();
+  await expect(stat(page, "Findings")).toHaveText(String(counted(a).length));
+  await expect(stat(page, "Policy checks")).toHaveText(String(a.verdicts.length));
+  await expect(stat(page, "Blocked by policy")).toHaveText(String(a.verdicts.filter((v) => !v.allowed).length));
+  await expect(page.getByRole("button", { name: "Choose an assessment" })).toContainText(a.label);
+});
 
-  await expect(tile("Assessments")).toHaveText(String(data.length));
-  await expect(tile("Findings")).toHaveText(String(vulns.length));
-  await expect(page.locator(".kpi").filter({ hasText: "Critical & High" })).toBeVisible();
-  for (const title of ["Needs attention", "Findings by severity", "Findings per day", "Recent assessments"]) {
-    await expect(page.getByRole("heading", { name: title })).toBeVisible();
+test("the views switch in the page and keep their place in the address", async ({ page }) => {
+  await signIn(page);
+  for (const [name, param] of [["Findings", "findings"], ["Audit log", "audit"], ["Reports", "reports"], ["Scope", "scope"]]) {
+    await page.click(view(name));
+    await expect(page).toHaveURL(new RegExp(`view=${param}`));
+    await expect(page.locator(view(name))).toHaveAttribute("data-active", "true");
   }
-});
-
-test("needs attention lists decisions and findings to review", async ({ page }) => {
-  const waiting = sample().find((a) => a.status === "Awaiting input");
-  const card = page.getByRole("region", { name: "Needs attention" });
-  if (waiting) await expect(card.getByText(`${waiting.label} needs your decision`)).toBeVisible();
-  // every row carries a button into the place that acts on it
-  await expect(card.getByRole("link", { name: /Continue in AI|View/ }).first()).toBeVisible();
-});
-
-test("the chart has a table view", async ({ page }) => {
-  await page.getByRole("button", { name: "Table" }).click();
-  await expect(page.locator("table").filter({ hasText: "Assessments" }).first()).toBeVisible();
-});
-
-test("assessments open into their sections", async ({ page }) => {
-  const data = sample();
-  // scope to the sidebar: the dashboard also has an "Assessments" stat-card link
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Assessments" }).click();
-  await expect(page.locator("tbody tr")).toHaveCount(data.length);
-
-  const done = data.find((a) => a.status === "Completed" && a.findings.length)!;
-  await page.goto(`/assessments/${done.uid}`);
-  await expect(page.getByRole("heading", { name: "Plan" })).toBeVisible();
-
-  await page.getByRole("link", { name: "Timeline" }).click();
-  await expect(page.getByText("Scope approved.", { exact: false }).first()).toBeVisible();
-  await page.getByRole("link", { name: "Policy", exact: true }).click();
-  await expect(page.locator("ol.m-0 li").first()).toContainText("POLICY");
-
-  await page.getByRole("link", { name: /^Findings \(/ }).click();
-  // the findings tab lists the run's findings; each row links to the finding's own page
-  await expect(page.getByRole("link", { name: done.findings[0].title }).first()).toBeVisible();
-
-  await page.getByRole("link", { name: "Scope & policy" }).click();
-  await expect(page.getByText("BLOCKED").first()).toBeVisible();
-
-  await page.getByRole("link", { name: "Approvals", exact: true }).click();
-  await expect(page.getByText("APPROVED").first()).toBeVisible();
-});
-
-test("a waiting assessment asks for a decision in the AI Assistant", async ({ page }) => {
-  const waiting = sample().find((a) => a.status === "Awaiting input")!;
-  await page.goto(`/assessments/${waiting.uid}`);
-  await expect(page.getByText("Needs your decision:")).toBeVisible();
-});
-
-test("findings filter by severity and search", async ({ page }) => {
-  const findings = sample().flatMap((a) => a.findings);
-  const onePage = (n: number) => Math.min(n, 10);
-  await page.goto("/findings");
-  await expect(page.locator("tbody tr")).toHaveCount(onePage(findings.length));
-  const severity = page.getByRole("region", { name: "Filter by severity" });
-  await severity.getByRole("link", { name: "High" }).click(); // the tile reads "High <count>"
-  await expect(page).toHaveURL(/[?&]sev=HIGH/);
-  await expect(page.locator("tbody tr")).toHaveCount(onePage(findings.filter((f) => f.severity === "HIGH").length));
-  await page.goto("/findings?q=cookie");
-  await expect(page.locator("tbody tr")).toHaveCount(onePage(findings.filter((f) => f.title.toLowerCase().includes("cookie")).length) || 1);
-});
-
-test("findings page through 10 at a time, and a row opens the finding", async ({ page }) => {
-  const total = sample().flatMap((a) => a.findings).length;
-  expect(total).toBeGreaterThan(10); // the sample data has a second page
-  await page.goto("/findings");
-  const pager = page.getByRole("navigation", { name: "Finding pages" });
-  await expect(pager).toContainText(`1–10 of ${total}`);
-  await expect(pager.getByRole("link", { name: "Previous page" })).toHaveAttribute("aria-disabled", "true");
-  await pager.getByRole("link", { name: "Next page" }).click();
-  await expect(page).toHaveURL(/[?&]page=2/);
-  await expect(page.locator("tbody tr")).toHaveCount(Math.min(total - 10, 10));
-  await expect(pager).toContainText(`11–${Math.min(total, 20)} of ${total}`);
-  // a row opens the finding on its own page
-  await page.locator("tbody tr a").first().click();
-  await expect(page).toHaveURL(/\/findings\/.+/);
-  await expect(page.getByRole("link", { name: "← All findings" })).toBeVisible();
-});
-
-test("the theme toggle switches to dark and back", async ({ page }) => {
-  await page.emulateMedia({ colorScheme: "light" });
   await page.reload();
-  await page.getByRole("button", { name: "Switch to the dark theme" }).click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await page.getByRole("button", { name: "Switch to the light theme" }).click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.getByRole("heading", { name: "Scope", level: 1 })).toBeVisible();
 });
 
-test("the documentation page explains the project", async ({ page }) => {
-  await page.getByRole("link", { name: "Documentation" }).click();
-  await expect(page).toHaveURL(/\/about$/);
-  await expect(page.getByRole("heading", { name: "Documentation", level: 1 })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Overview", level: 2 })).toBeVisible();
-  // the sub-nav moves between the four sections
-  const nav = page.getByRole("navigation", { name: "Documentation sections" });
-  await nav.getByRole("link", { name: "Architecture" }).click();
-  await expect(page).toHaveURL(/\/about\?s=architecture/);
-  await expect(page.getByRole("heading", { name: "Architecture", level: 2 })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Findings explained", level: 2 })).toHaveCount(0);
+test("the switcher opens another assessment and keeps the view", async ({ page }) => {
+  await signIn(page);
+  await page.click(view("Findings"));
+  const other = sample().find((a) => a.uid !== newest().uid && counted(a).length > 1)!;
+  await page.getByRole("button", { name: "Choose an assessment" }).click();
+  await page.locator(`[role="dialog"] a[href*="uid=${other.uid}"]`).click();
+  await expect(page).toHaveURL(new RegExp(`uid=${other.uid}`));
+  await expect(page).toHaveURL(/view=findings/);
+  await expect(page.locator('[role="option"]')).toHaveCount(other.findings.length);
 });
 
-test("an unknown assessment is a 404 page", async ({ page }) => {
-  const res = await page.goto("/assessments/20260101-000000-ffff_RCX-NOPE-001");
-  expect(res?.status()).toBe(404);
-  await expect(page.getByText("Not found")).toBeVisible();
+test("a waiting run shows its pending approval", async ({ page }) => {
+  await signIn(page);
+  const waiting = sample().find((a) => a.status === "Awaiting input")!;
+  await page.goto(`/?uid=${waiting.uid}`);
+  await page.getByRole("button", { name: /waiting on you/ }).click();
+  await expect(page.getByText("This run waits on you")).toBeVisible();
+  await expect(page.getByText(/awaiting approval/).first()).toBeVisible();
+  await page.click(view("Scope"));
+  await expect(page.getByText("PENDING", { exact: true })).toBeVisible();
+});
+
+test("the audit log lists every activity line", async ({ page }) => {
+  await signIn(page);
+  await page.goto(`/?uid=${newest().uid}`);
+  await page.click(view("Audit log"));
+  const lines = newest().timeline.filter((e) => e.type === "activity").length;
+  await expect(page.locator(".dash-log-row")).toHaveCount(lines);
+});
+
+test("the report links every export format and a download works", async ({ page }) => {
+  await signIn(page);
+  await page.goto(`/?uid=${newest().uid}`);
+  await page.click(view("Reports"));
+  const links = page.getByRole("navigation", { name: "Download the report" }).getByRole("link");
+  await expect(links).toHaveText(["PDF", "HTML", "JSON", "CSV", "SARIF"]);
+  const res = await page.request.get((await links.nth(2).getAttribute("href"))!);
+  expect(res.status()).toBe(200);
+  expect((await res.json()).uid ?? (await res.text())).toBeTruthy();
+});
+
+test("a card opens its documentation", async ({ page }) => {
+  await signIn(page);
+  await page.getByRole("link", { name: "Open Findings by Severity documentation" }).click();
+  await expect(page).toHaveURL(/\/docs\/reference\/findings/);
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+});
+
+test("the terminal view runs a session and keeps it while you browse", async ({ page }) => {
+  await signIn(page);
+  await page.click(view("Terminal"));
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".xterm-rows")).toContainText("READY");
+  await page.locator(".xterm").click();
+  await page.keyboard.type("hello-reconix");
+  await expect(page.locator(".xterm-rows")).toContainText("hello-reconix");
+  await page.click(view("Overview"));
+  await page.click(view("Terminal"));
+  await expect(page.getByText("Connected", { exact: true })).toBeVisible();
+  await expect(page.locator(".xterm-rows")).toContainText("hello-reconix"); // the same session
+});
+
+test("an unknown assessment opens every run, and an unknown page is a 404", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/?uid=20200101-000000-dead_NOPE-1");
+  await expect(page.getByRole("button", { name: "Choose an assessment" })).toContainText(`All (${sample().length})`);
+  const res = await page.goto("/no-such-page");
+  expect(res!.status()).toBe(404);
+  await expect(page.getByRole("link", { name: "Open the dashboard" })).toBeVisible();
+});
+
+test("findings filter by severity, validation and search, and clear in one click", async ({ page }) => {
+  await signIn(page);
+  const a = sample().find((x) => x.findings.length >= 3)!;
+  await page.goto(`/?uid=${a.uid}&view=findings`);
+  const rows = page.locator('[role="option"]');
+  await expect(rows).toHaveCount(a.findings.length);
+  const sev = a.findings[0].severity;
+  await page.getByRole("group", { name: "Severity" }).getByRole("button", { name: new RegExp(`^${sev.toLowerCase()}`) }).click();
+  await expect(page).toHaveURL(new RegExp(`sev=${sev}`));
+  await expect(rows).toHaveCount(a.findings.filter((f) => f.severity === sev).length);
+  await page.getByRole("searchbox", { name: "Search findings" }).fill("no-such-finding-zzz");
+  await expect(page.getByText("No finding matches these filters.")).toBeVisible();
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(rows).toHaveCount(a.findings.length);
+  await page.getByRole("group", { name: "Validation" }).getByRole("button", { name: /^Confirmed/ }).click();
+  await expect(rows).toHaveCount(a.findings.filter((f) => f.validation === "CONFIRMED" && f.status !== "false-positive").length);
+});
+
+test("the overview drills into filtered views", async ({ page }) => {
+  await signIn(page);
+  const a = sample().find((x) => x.findings.some((f) => f.severity === "MEDIUM") && x.verdicts.some((v) => !v.allowed))!;
+  await page.goto(`/?uid=${a.uid}`);
+  const medium = a.findings.filter((f) => f.severity === "MEDIUM").length;
+  await page.getByRole("button", { name: `Show the ${medium} medium ${medium === 1 ? "finding" : "findings"}` }).click();
+  await expect(page).toHaveURL(/view=findings/);
+  await expect(page).toHaveURL(/sev=MEDIUM/);
+  await expect(page.locator('[role="option"]')).toHaveCount(medium);
+
+  await page.click(view("Overview"));
+  await page.getByRole("button", { name: "Show the blocked requests in the audit log" }).click();
+  await expect(page).toHaveURL(/view=audit/);
+  await expect(page).toHaveURL(/kind=policy/);
+  await expect(page.locator(".dash-log-row").first()).toContainText("Blocked");
+});
+
+test("the audit log filters by author and search", async ({ page }) => {
+  await signIn(page);
+  await page.goto(`/?uid=${newest().uid}`);
+  await page.click(view("Audit log"));
+  await page.getByRole("group", { name: "By" }).getByRole("button", { name: /^TOOL/ }).click();
+  await expect(page).toHaveURL(/who=TOOL/);
+  const rows = page.locator(".dash-log-row");
+  const n = await rows.count();
+  expect(n).toBe(newest().timeline.filter((e) => e.type === "activity" && e.who === "TOOL").length);
+  for (let i = 0; i < n; i++) await expect(rows.nth(i)).toContainText("TOOL");
+  await page.getByRole("searchbox", { name: "Search the audit log" }).fill("zzz-nothing");
+  await expect(page.getByText("No event matches these filters.")).toBeVisible();
+});
+
+test("the switcher searches every saved run, and the bell lists other waiting runs", async ({ page }) => {
+  await signIn(page);
+  const waiting = sample().find((x) => x.status === "Awaiting input")!;
+  const other = sample().find((x) => x.uid !== waiting.uid)!;
+  await page.goto(`/?uid=${other.uid}`);
+  await page.getByRole("button", { name: /waiting on you/ }).click();
+  await expect(page.getByText(/other run waits on a decision|other runs wait on a decision/)).toBeVisible();
+  await page.locator(`a[href*="uid=${waiting.uid}"]`).first().click();
+  await expect(page).toHaveURL(new RegExp(`uid=${waiting.uid}`));
+
+  await page.getByRole("button", { name: "Choose an assessment" }).click();
+  const list = page.locator('[role="dialog"] li a');
+  await expect(list).toHaveCount(sample().length + 1); // "All assessments", then every run
 });

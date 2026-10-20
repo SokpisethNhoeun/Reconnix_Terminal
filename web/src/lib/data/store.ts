@@ -33,6 +33,7 @@ export interface Problem {
 
 export interface Library {
   dir: string;
+  readAt: number; // when the folder was read (epoch ms), for the "updated" label
   assessments: Assessment[];
   problems: Problem[];
 }
@@ -108,7 +109,7 @@ export const loadLibrary = cache(async (): Promise<Library> => {
   try {
     names = await readdir(/*turbopackIgnore: true*/ dir); // outside the project, on purpose
   } catch {
-    return { dir, assessments: [], problems: [] };
+    return { dir, readAt: Date.now(), assessments: [], problems: [] };
   }
   const assessments: Assessment[] = [];
   const problems: Problem[] = [];
@@ -125,7 +126,7 @@ export const loadLibrary = cache(async (): Promise<Library> => {
     problems.push({ file: `${candidates.length - MAX_FILES} older files`, reason: `not shown (only the newest ${MAX_FILES} are read)` });
   }
   assessments.sort((a, b) => b.created_at.localeCompare(a.created_at) || b.uid.localeCompare(a.uid));
-  return { dir, assessments, problems };
+  return { dir, readAt: now, assessments, problems };
 });
 
 /** The folder as shown to the operator ("~/.reconix/assessments"). */

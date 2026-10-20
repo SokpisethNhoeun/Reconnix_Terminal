@@ -1,973 +1,653 @@
 @import "tailwindcss";
+@import "lenis/dist/lenis.css";
+
+/* Colour tokens: GENERATED into src/styles/tokens.css from reconix/theme.py (WEB_TOKENS) by
+   scripts/export_tokens.py; add or change a colour there, never here. Dark Security-Operations-
+   Center console: teal --primary for active states, chart fills and rings; amber --accent for
+   approval gates / MEDIUM; green --success for pass / LOW; red --danger for CRITICAL / HIGH;
+   --term-* is the browser terminal (the TUI's own colours). */
 @import "../styles/tokens.css";
 
-/* The landing site's operator-console look: a navy page with a soft teal glow, card
-   surfaces with a thin border and a faint teal light along their top edge, recessed wells
-   for inputs and tracks, teal for the active state and amber for approval gates. Raised =
-   an object (card, button); pressed = a well (inputs, tracks, chips). Colors come from
-   tokens.css (generated from theme.py); everything else is a color-mix of those tokens. */
+:root {
+  /* Easing curves — the GSAP equivalents are noted so CSS and JS stay in step. */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1); /* GSAP expo.out */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1); /* GSAP power3.out */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1); /* GSAP power2.inOut */
+}
 
 @theme inline {
-  --color-bg: var(--bg);
+  --color-page: var(--page);
+  --color-page-glow: var(--page-glow);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
   --color-card: var(--card);
-  --color-well: var(--well);
-  --color-text: var(--text);
+  --color-card-2: var(--card-2);
+  --color-card-foreground: var(--card-foreground);
+  --color-surface: var(--surface);
   --color-muted: var(--muted);
-  --color-faint: var(--faint);
-  --color-line: var(--line);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-dim: var(--primary-dim);
+  --color-primary-foreground: var(--primary-foreground);
   --color-accent: var(--accent);
-  --color-accent-ink: var(--accent-ink);
-  --color-accent-wash: var(--accent-wash);
-  --color-ok: var(--ok);
-  --color-warn: var(--warn);
-  --color-bad: var(--bad);
-  --font-sans: var(--font-ui), system-ui, sans-serif;
-  --font-mono: var(--font-code), ui-monospace, monospace;
-  --font-display: var(--font-head), var(--font-ui), system-ui, sans-serif;
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-ring: var(--ring);
+  --color-globe-dot: var(--globe-dot);
+  --color-globe-glow: var(--globe-glow);
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-:root {
-  --raise: 0 0 0 1px var(--line), 0 24px 48px -32px color-mix(in oklab, var(--sd) 70%, transparent);
-  --raise-sm: 0 0 0 1px var(--line), 0 8px 18px -12px color-mix(in oklab, var(--sd) 55%, transparent);
-  --press: inset 0 0 0 1px var(--line), inset 0 2px 6px color-mix(in oklab, var(--sd) 22%, transparent);
-  --press-sm: inset 0 0 0 1px var(--line);
-  /* the lit top edge of raised surfaces */
-  --edge: linear-gradient(90deg, transparent, color-mix(in oklab, var(--accent) 60%, transparent), transparent);
+html {
+  color-scheme: dark;
 }
 
-html,
+/* Native smooth anchors only when Lenis is not driving the page (no JS).
+   Lenis adds the `lenis` class to <html>; reduced-motion users get neither. */
+@media (prefers-reduced-motion: no-preference) {
+  html:not(.lenis) { scroll-behavior: smooth; }
+}
+
 body {
-  min-height: 100%;
+  background: var(--page);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  /* clip, not hidden: hidden would make body a scroll container (breaks sticky + Lenis) */
+  overflow-x: clip;
 }
-body {
-  background:
-    radial-gradient(60% 45% at 12% 0%, color-mix(in oklab, var(--accent) 8%, transparent), transparent 70%),
-    radial-gradient(50% 40% at 100% 100%, color-mix(in oklab, var(--accent) 4%, transparent), transparent 70%),
-    var(--bg);
-  background-attachment: fixed;
-  color: var(--text);
-  font: 14px/1.5 var(--font-ui), system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  scrollbar-color: var(--line) transparent;
-}
-/* a faint grid behind the content, fading out from the top left (the landing's backdrop) */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    linear-gradient(to right, color-mix(in oklab, var(--text) 4%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in oklab, var(--text) 4%, transparent) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(ellipse 70% 60% at 25% 0%, #000 15%, transparent 100%);
-}
-h1,
-h2,
-h3 {
-  font-family: var(--font-head), var(--font-ui), system-ui, sans-serif;
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
   letter-spacing: -0.015em;
-}
-::selection {
-  background: color-mix(in oklab, var(--accent) 30%, transparent);
-}
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
-.sr-only-x {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
+  text-wrap: balance;
 }
 
-@layer components {
-  /* --- shell --------------------------------------------------------------------------- */
-  .shell {
-    display: grid;
-    grid-template-columns: 236px minmax(0, 1fr);
-    gap: 26px;
-    padding: 24px;
-    align-items: start;
-    min-height: 100vh;
-  }
-  .side {
-    position: sticky;
-    top: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 22px;
-    padding: 22px 14px;
-    border-radius: 16px;
-    background: color-mix(in oklab, var(--card) 92%, transparent);
-    box-shadow: var(--raise);
-    min-height: calc(100vh - 48px);
-  }
-  .nav-link {
-    display: grid;
-    grid-template-columns: 20px minmax(0, 1fr) auto;
-    gap: 12px;
-    align-items: center;
-    padding: 9px 12px;
-    border-radius: 10px;
-    color: var(--muted);
-    font-weight: 500;
-    transition: background-color 0.2s ease, color 0.2s ease;
-  }
-  .nav-link:hover {
-    color: var(--text);
-    background: color-mix(in oklab, var(--text) 4%, transparent);
-  }
-  .nav-link[aria-current="page"] {
-    color: var(--text);
-    background: var(--accent-wash);
-    box-shadow: inset 2px 0 0 var(--accent);
-  }
-  .nav-link[aria-current="page"] svg {
-    color: var(--accent);
-  }
-  .well {
-    border-radius: 12px;
-    background: var(--well);
-    box-shadow: var(--press-sm);
-  }
+/* ======================================================================================
+   SOC DASHBOARD (the / route). Frame + grid in §4, cards in §3. Numbers come from
+   components/dashboard/derive.ts; colours are tokens only.
+   ====================================================================================== */
 
-  /* --- surfaces ------------------------------------------------------------------------ */
-  .card,
-  .kpi,
-  .side {
-    isolation: isolate;
-  }
-  .card,
-  .kpi {
-    position: relative;
-    background: var(--card);
-    box-shadow: var(--raise);
-  }
-  .card::before,
-  .kpi::before,
-  .side::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto;
-    height: 1px;
-    background: var(--edge);
-    opacity: 0.45;
-    pointer-events: none;
-  }
-  .card {
-    border-radius: 14px;
-    padding: 20px 22px;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-  .kpi {
-    border-radius: 12px;
-    padding: 16px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-  }
-  .pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 13px;
-    border-radius: 999px;
-    background: var(--well);
-    box-shadow: var(--press-sm);
-    font: 12px var(--font-code), monospace;
-    color: var(--muted);
-    white-space: nowrap;
-  }
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 1px 10px;
-    border-radius: 999px;
-    background: var(--well);
-    box-shadow: var(--press-sm);
-    font: 500 11.5px/1.7 var(--font-code), monospace;
-    letter-spacing: 0.03em;
-    white-space: nowrap;
-    color: var(--text);
-  }
-  .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    flex: none;
-    background: var(--faint);
-  }
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 7px 15px;
-    border-radius: 10px;
-    background: var(--card);
-    box-shadow: var(--raise-sm);
-    font-weight: 500;
-    font-size: 13px;
-    color: var(--text);
-    white-space: nowrap;
-    cursor: pointer;
-    transition: color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
-  }
-  .btn:hover {
-    color: var(--accent);
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 45%, var(--line));
-  }
-  .btn:active {
-    background: var(--well);
-  }
-  .btn svg {
-    color: var(--accent);
-  }
-  .link {
-    color: var(--accent);
-    font-weight: 500;
-    font-size: 13px;
-    display: inline-flex;
-    gap: 6px;
-    align-items: center;
-  }
-  .link:hover {
-    text-decoration: underline;
-    text-underline-offset: 4px;
-  }
-  .seg {
-    display: inline-flex;
-    gap: 4px;
-    padding: 4px;
-    border-radius: 12px;
-    background: var(--well);
-    box-shadow: var(--press-sm);
-    flex-wrap: wrap;
-  }
-  .seg > a,
-  .seg > button {
-    padding: 5px 13px;
-    border-radius: 8px;
-    font-size: 12.5px;
-    font-weight: 500;
-    color: var(--muted);
-    cursor: pointer;
-    transition: color 0.2s ease, background-color 0.2s ease;
-  }
-  .seg > a:hover,
-  .seg > button:hover {
-    color: var(--text);
-  }
-  .seg > [aria-current="true"],
-  .seg > [aria-pressed="true"] {
-    background: var(--accent-wash);
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 35%, transparent);
-    color: var(--accent);
-  }
-  .field {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 14px;
-    border-radius: 10px;
-    background: var(--well);
-    box-shadow: var(--press-sm);
-    color: var(--muted);
-  }
-  .field input,
-  .field select {
-    border: 0;
-    background: transparent;
-    outline: none;
-    padding: 8px 0;
-    font-size: 13px;
-    color: var(--text);
-    min-width: 0;
-  }
-  .field select option {
-    background: var(--card);
-    color: var(--text);
-  }
-  .field:focus-within {
-    box-shadow: var(--press-sm), 0 0 0 2px var(--accent);
-  }
-  .notice {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    padding: 13px 16px;
-    border-radius: 12px;
-    background: var(--well);
-    box-shadow: var(--press-sm);
-    font-size: 13.5px;
-  }
-
-  /* --- dashboard: stat cards, badges, attention feed, severity donut ------------------- */
-  .kpi-link {
-    position: relative;
-    text-decoration: none;
-    transition: box-shadow 0.2s ease;
-  }
-  .kpi-link:hover {
-    box-shadow: var(--raise), 0 0 0 1px color-mix(in oklab, var(--accent) 45%, var(--line));
-  }
-  .kpi-urgent {
-    background:
-      radial-gradient(75% 85% at 100% 0%, color-mix(in oklab, var(--high) 14%, transparent), transparent 70%),
-      var(--card);
-    box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--high) 45%, transparent),
-      0 0 32px -10px color-mix(in oklab, var(--high) 45%, transparent);
-  }
-  .kpi-urgent::before {
-    background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--high) 60%, transparent), transparent);
-    opacity: 0.6;
-  }
-  .kpi-urgent:hover {
-    box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--high) 60%, transparent),
-      0 0 36px -8px color-mix(in oklab, var(--high) 55%, transparent);
-  }
-  .kpi-urgent .kpi-value {
-    color: var(--high);
-  }
-  .kpi-go {
-    position: absolute;
-    right: 16px;
-    bottom: 15px;
-    color: var(--faint);
-    transition: color 0.2s ease, transform 0.2s ease;
-  }
-  .kpi-link:hover .kpi-go {
-    color: var(--accent);
-    transform: translateX(2px);
-  }
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 2px 9px;
-    border-radius: 999px;
-    font: 600 10px var(--font-code), monospace;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    background: color-mix(in oklab, var(--tone, var(--accent)) 20%, transparent);
-    color: var(--tone, var(--accent));
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tone, var(--accent)) 35%, transparent);
-  }
-  .badge.badge-solid {
-    background: var(--tone, var(--accent));
-    color: var(--bg);
-    box-shadow: none;
-  }
-  .feed-row {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 11px 14px;
-  }
-  .feed-badge {
-    flex: none;
-    display: inline-flex;
-    min-width: 76px;
-  }
-  /* --- AI Assistant (mock chat) -------------------------------------------------------- */
-  .ring-accent {
-    box-shadow: var(--raise), 0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent);
-  }
-  .chat-you {
-    align-self: flex-end;
-    max-width: 80%;
-    padding: 11px 16px;
-    border-radius: 14px 14px 4px 14px;
-    background: var(--accent-wash);
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent);
-    font-size: 13.5px;
-  }
-  .flow-step {
-    display: inline-flex;
-    align-items: center;
-    gap: 9px;
-    white-space: nowrap;
-  }
-  .flow-step > i {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    flex: none;
-    font: 600 11px var(--font-code), monospace;
-    color: var(--faint);
-    box-shadow: inset 0 0 0 1.5px var(--line);
-  }
-  .flow-step.done > i {
-    color: var(--accent-ink);
-    background: var(--accent);
-    box-shadow: none;
-  }
-  .flow-step.active > i {
-    color: var(--warn);
-    box-shadow: inset 0 0 0 1.5px var(--warn), 0 0 0 4px color-mix(in oklab, var(--warn) 18%, transparent);
-    background: color-mix(in oklab, var(--warn) 20%, transparent);
-  }
-  .flow-line {
-    flex: 1 1 14px;
-    min-width: 14px;
-    height: 1px;
-    background: var(--line);
-  }
-  .banner-warn {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 13px 18px;
-    border-radius: 12px;
-    background:
-      radial-gradient(60% 120% at 0% 0%, color-mix(in oklab, var(--warn) 12%, transparent), transparent 70%),
-      color-mix(in oklab, var(--warn) 6%, var(--card));
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--warn) 40%, transparent);
-    color: var(--text);
-    font-size: 13.5px;
-  }
-  .banner-warn > svg {
-    flex: none;
-    color: var(--warn);
-  }
-  .sev-card {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 14px 16px;
-    border-radius: 12px;
-    background: var(--card);
-    box-shadow: var(--raise);
-    text-decoration: none;
-    isolation: isolate;
-    transition: box-shadow 0.2s ease, background-color 0.2s ease;
-  }
-  .sev-card::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto;
-    height: 1px;
-    background: var(--edge);
-    opacity: 0.45;
-    pointer-events: none;
-  }
-  .sev-card:hover {
-    box-shadow: var(--raise), 0 0 0 1px color-mix(in oklab, var(--accent) 45%, var(--line));
-  }
-  .sev-card[aria-current="true"] {
-    background: color-mix(in oklab, var(--tone, var(--accent)) 8%, var(--card));
-    box-shadow: var(--raise), 0 0 0 1px color-mix(in oklab, var(--tone, var(--accent)) 55%, transparent);
-  }
-  .donut {
-    position: relative;
-    width: 150px;
-    height: 150px;
-    flex: none;
-  }
-  .donut-center {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-content: center;
-    text-align: center;
-    pointer-events: none;
-  }
-  .legend-row {
-    display: grid;
-    grid-template-columns: 14px minmax(0, 1fr) auto auto;
-    gap: 10px;
-    align-items: center;
-    padding: 5px 8px;
-    border-radius: 8px;
-  }
-  .legend-row:hover {
-    background: color-mix(in oklab, var(--text) 4%, transparent);
-  }
-  .legend-swatch {
-    width: 11px;
-    height: 11px;
-    border-radius: 3px;
-    background: var(--tone, var(--faint));
-  }
-
-  /* --- terminal (the TUI is dark in both themes), framed like the landing's app window --- */
-  .term {
-    position: relative;
-    height: max(420px, calc(100vh - 260px));
-    padding: 10px 12px;
-    border-radius: 12px;
-    background: var(--term-bg);
-    box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--accent) 22%, var(--line)),
-      0 30px 80px -32px color-mix(in oklab, var(--accent) 38%, transparent);
-    overflow: hidden;
-  }
-  /* Expand: the session card fills the browser window; the page behind it stays put */
-  .card.term-full {
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    border-radius: 0;
-    padding: 14px 16px 16px;
-    gap: 12px;
-  }
-  .term-full .term {
-    flex: 1;
-    height: auto;
-    min-height: 0;
-  }
-  :root:has(.term-full) {
-    overflow: hidden;
-  }
-  /* "↓ Latest": over the terminal's bottom right, only while scrolled up */
-  .term-latest {
-    position: absolute;
-    right: 16px;
-    bottom: 12px;
-    z-index: 5;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 12px 5px 10px;
-    border-radius: 999px;
-    background: color-mix(in oklab, var(--term-text) 14%, var(--term-bg));
-    color: var(--term-text);
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--term-text) 22%, transparent), 0 8px 20px -8px var(--sd);
-    font: 12px var(--font-code), monospace;
-    cursor: pointer;
-  }
-  .term-latest:hover {
-    background: color-mix(in oklab, var(--term-text) 22%, var(--term-bg));
-  }
-  .term-latest:focus-visible {
-    outline: 2px solid var(--term-cursor);
-    outline-offset: 2px;
-  }
-  .term-latest svg {
-    color: var(--term-cursor);
-  }
-
-  /* --- tables -------------------------------------------------------------------------- */
-  .table-wrap {
-    overflow-x: auto;
-    margin: 0 -6px;
-  }
-  .data {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    font-size: 13px;
-  }
-  .data th {
-    font: 600 10.5px var(--font-code), monospace;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-    text-align: left;
-    padding: 8px 12px;
-    white-space: nowrap;
-  }
-  .data td {
-    padding: 11px 12px;
-    border-top: 1px solid var(--line);
-    vertical-align: top;
-  }
-  /* a small table of numbers (e.g. under a chart) */
-  .data.dense th { padding-block: 6px; }
-  .data.dense td { padding-block: 7px; vertical-align: middle; }
-  .data tr.row-link {
-    position: relative;
-  }
-  .data tr.row-link:hover td {
-    background: color-mix(in oklab, var(--accent-wash) 60%, transparent);
-  }
-  .data tr[aria-current="true"] td {
-    background: var(--accent-wash);
-  }
-  .data tr[aria-current="true"] td:first-child {
-    border-radius: 8px 0 0 8px;
-    box-shadow: inset 2px 0 0 var(--accent);
-  }
-  .data tr[aria-current="true"] td:last-child {
-    border-radius: 0 8px 8px 0;
-  }
-  .stretch::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-  }
-  .cell-sub {
-    display: block;
-    font: 11.5px var(--font-code), monospace;
-    color: var(--muted);
-    margin-top: 2px;
-  }
-
-  /* --- charts -------------------------------------------------------------------------- */
-  .hbar {
-    display: grid;
-    grid-template-columns: minmax(0, 118px) minmax(0, 1fr) 34px;
-    gap: 12px;
-    align-items: center;
-  }
-  .hbar.wide {
-    grid-template-columns: minmax(0, 200px) minmax(0, 1fr) 34px;
-  }
-  .track {
-    height: 12px;
-    border-radius: 999px;
-    background: var(--well);
-    box-shadow: var(--press-sm);
-    padding: 2px;
-  }
-  .track > span {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-  }
-  .meter {
-    display: flex;
-    height: 12px;
-    border-radius: 999px;
-    background: var(--well);
-    box-shadow: var(--press-sm);
-    padding: 2px;
-    gap: 2px;
-  }
-  .meter > span {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-  }
-
-  /* --- timeline ------------------------------------------------------------------------ */
-  .tl {
-    display: grid;
-    grid-template-columns: 70px 22px minmax(0, 1fr);
-    gap: 12px;
-    align-items: start;
-  }
-  .tl-rail {
-    position: relative;
-    align-self: stretch;
-    display: flex;
-    justify-content: center;
-  }
-  .tl-rail::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: var(--line);
-  }
-  .tl-rail > i {
-    position: relative;
-    margin-top: 12px;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--card);
-    box-shadow: 0 0 0 1px var(--line);
-  }
-  .tl-rail > i.fill-tone {
-    background: var(--tone);
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--tone) 18%, transparent);
-  }
-  .boxed {
-    border-radius: 10px;
-    background: var(--well);
-    box-shadow: var(--press-sm);
-    padding: 9px 13px;
-    font: 12.5px var(--font-code), monospace;
-  }
-  .evidence {
-    margin: 0;
-    padding: 11px 13px;
-    border-radius: 10px;
-    background: var(--well);
-    box-shadow: var(--press-sm);
-    font: 12px/1.65 var(--font-code), monospace;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-  .ring {
-    width: 54px;
-    height: 54px;
-    border-radius: 50%;
-    background: var(--well);
-    box-shadow: var(--press);
-    display: grid;
-    place-items: center;
-  }
-  .ring::after {
-    content: "";
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: 3px solid var(--accent-wash);
-    border-top-color: var(--accent);
-    animation: spin 1s linear infinite;
-  }
-
-  /* --- long pages (About): eyebrows, themed cards, steps, paths ------------------------- */
-  .eyebrow {
-    font: 500 11px var(--font-code), monospace;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--accent);
-  }
-  /* the landing's hero: a teal glow from the top left over a faint pixel grid */
-  .hero {
-    background:
-      radial-gradient(60% 90% at 0% 0%, color-mix(in oklab, var(--accent) 12%, transparent), transparent 70%),
-      var(--card);
-  }
-  .hero::after,
-  .hazard::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    pointer-events: none;
-  }
-  .hero::after {
-    background-image:
-      linear-gradient(to right, color-mix(in oklab, var(--text) 5%, transparent) 1px, transparent 1px),
-      linear-gradient(to bottom, color-mix(in oklab, var(--text) 5%, transparent) 1px, transparent 1px);
-    background-size: 32px 32px;
-    mask-image: radial-gradient(ellipse 60% 85% at 100% 0%, #000 10%, transparent 80%);
-  }
-  /* approval gates: amber hazard stripes and an amber glow from the top right */
-  .hazard {
-    background:
-      radial-gradient(45% 70% at 100% 0%, color-mix(in oklab, var(--warn) 10%, transparent), transparent 70%),
-      var(--card);
-  }
-  .hazard::before {
-    background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--warn) 60%, transparent), transparent);
-  }
-  .hazard::after {
-    background: repeating-linear-gradient(135deg, color-mix(in oklab, var(--warn) 7%, transparent) 0 2px, transparent 2px 28px);
-    mask-image: radial-gradient(ellipse 70% 80% at 100% 0%, #000 10%, transparent 75%);
-  }
-  .icon-tile {
-    display: grid;
-    place-items: center;
-    flex: none;
-    width: 34px;
-    height: 34px;
-    border-radius: 9px;
-    color: var(--accent);
-    background: var(--accent-wash);
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 25%, transparent);
-  }
-  .page-row {
-    display: grid;
-    grid-template-columns: 18px minmax(0, 1fr);
-    gap: 12px;
-    align-items: start;
-    padding: 9px 10px;
-    border-radius: 10px;
-    transition: background-color 0.2s ease;
-  }
-  .page-row svg {
-    margin-top: 2px;
-    color: var(--accent);
-  }
-  .page-row:hover {
-    background: color-mix(in oklab, var(--accent-wash) 70%, transparent);
-  }
-  /* a teal rule down the left of a short titled item (the landing's guardrail rails) */
-  .rail {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding-left: 14px;
-    border-left: 2px solid color-mix(in oklab, var(--accent) 50%, transparent);
-  }
-  /* flow steps (the landing's workflow stepper): the approval gate is amber */
-  .step {
-    --step-c: var(--accent);
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 16px;
-    border-radius: 12px;
-    background: var(--card);
-    box-shadow: var(--raise-sm);
-    transition: box-shadow 0.25s ease;
-  }
-  .step:hover {
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--step-c) 45%, var(--line));
-  }
-  .step[data-gate] {
-    --step-c: var(--warn);
-    background: color-mix(in oklab, var(--warn) 6%, var(--card));
-    box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--warn) 45%, transparent),
-      0 0 28px -8px color-mix(in oklab, var(--warn) 40%, transparent);
-  }
-  .step-num {
-    display: grid;
-    place-items: center;
-    min-width: 30px;
-    height: 22px;
-    padding: 0 6px;
-    border-radius: 6px;
-    font: 600 11px var(--font-code), monospace;
-    color: var(--step-c);
-    background: color-mix(in oklab, var(--step-c) 14%, transparent);
-  }
-  .step-icon {
-    color: var(--step-c);
-  }
-  /* data paths: nodes joined by connectors with a travelling pulse; top to bottom, or left
-     to right from 1280px */
-  .path {
-    display: flex;
-    flex-direction: column;
-  }
-  .path-node {
-    display: grid;
-    grid-template-columns: 34px minmax(0, 1fr);
-    gap: 12px;
-    align-items: center;
-    padding: 12px 14px;
-    border-radius: 12px;
-    background: var(--well);
-    box-shadow: var(--press-sm);
-  }
-  .path-link {
-    position: relative;
-    height: 26px;
-  }
-  .path-link::before {
-    content: "";
-    position: absolute;
-    left: 31px;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: linear-gradient(
-      to bottom,
-      color-mix(in oklab, var(--accent) 55%, transparent),
-      color-mix(in oklab, var(--accent) 20%, transparent)
-    );
-  }
-  .path-link::after {
-    content: "";
-    position: absolute;
-    left: 29px;
-    top: 0;
-    width: 5px;
-    height: 5px;
-    border-radius: 999px;
-    background: var(--accent);
-    box-shadow: 0 0 10px 1px color-mix(in oklab, var(--accent) 70%, transparent);
-    animation: path-flow-y 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-  }
-  /* commands: terminal colors, dark in both themes */
-  .cmd {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 14px 16px;
-    border-radius: 10px;
-    background: var(--term-bg);
-    color: var(--term-text);
-    font: 12.5px/1.6 var(--font-code), monospace;
-    white-space: nowrap;
-    overflow-x: auto;
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 22%, var(--line));
-  }
-  .cmd-prompt {
-    color: var(--term-cursor);
-  }
-  .cmd-note {
-    color: color-mix(in oklab, var(--term-text) 55%, var(--term-bg));
-  }
+/* Outer page: --page with two soft --page-glow washes (top-right, bottom-left), like the ref. */
+.dash-page {
+  position: relative;
+  min-height: 100dvh;
+  padding: 16px;
+  background:
+    radial-gradient(45% 45% at 100% 0%, color-mix(in oklab, var(--page-glow) 55%, transparent), transparent 70%),
+    radial-gradient(45% 45% at 0% 100%, color-mix(in oklab, var(--page-glow) 45%, transparent), transparent 70%),
+    var(--page);
 }
+@media (max-width: 767.98px) { .dash-page { padding: 12px; } }
+
+/* App frame */
+.dash-frame {
+  position: relative;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-rows: 64px minmax(0, 1fr);
+  border-radius: 22px;
+  border: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
+  background: var(--background);
+  box-shadow: 0 40px 120px -40px color-mix(in oklab, var(--globe-glow) 25%, transparent);
+  overflow: clip;
+}
+/* On a roomy desktop the frame is exactly the viewport minus the 16px gutters: no page scroll. */
+@media (min-width: 1280px) and (min-height: 760px) {
+  .dash-frame { height: calc(100dvh - 32px); }
+}
+
+/* Frame children placement (≥768). Sidebar rail left, top bar + content on the right. */
+.dash-sidebar { grid-column: 1; grid-row: 1 / span 2; flex-direction: column; border-right: 1px solid var(--border); }
+.dash-topbar { grid-column: 2; grid-row: 1; }
+/* Content area = the scroll container for whichever view is active. */
+.dash-content { grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+
+/* Overview view: the dashboard grid (hero + bottom on the left, right column on the right). */
+.dash-overview {
+  padding: 0 16px 16px 4px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto;
+}
+.dash-hero { position: relative; overflow: visible; min-height: 420px; }
+.dash-bottom { min-width: 0; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.dash-right { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
 @media (min-width: 1280px) {
-  .path { flex-direction: row; }
-  .path-node { flex: 1 1 0; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 10px; }
-  .path-link { flex: 0 0 28px; height: auto; }
-  .path-link::before {
-    inset: 50% 0 auto;
-    width: auto;
-    height: 1px;
-    background: linear-gradient(
-      to right,
-      color-mix(in oklab, var(--accent) 55%, transparent),
-      color-mix(in oklab, var(--accent) 20%, transparent)
-    );
+  .dash-overview {
+    height: 100%;
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 22vw, 330px);
+    grid-template-rows: minmax(0, 1fr) clamp(190px, 27vh, 230px);
   }
-  .path-link::after { top: calc(50% - 2px); left: 0; animation-name: path-flow-x; }
-}
-@keyframes path-flow-y {
-  0% { top: 0; opacity: 0; }
-  15%, 85% { opacity: 1; }
-  100% { top: calc(100% - 5px); opacity: 0; }
-}
-@keyframes path-flow-x {
-  0% { left: 0; opacity: 0; }
-  15%, 85% { opacity: 1; }
-  100% { left: calc(100% - 5px); opacity: 0; }
+  .dash-hero { grid-column: 1; grid-row: 1; }
+  .dash-bottom { grid-column: 1; grid-row: 2; }
+  .dash-right { grid-column: 2; grid-row: 1 / span 2; }
 }
 
-/* tone and severity colors for dots, marks and text */
-.tone-ok { --tone: var(--ok); }
-.tone-warn { --tone: var(--warn); }
-.tone-bad { --tone: var(--bad); }
-.tone-accent { --tone: var(--accent); }
-.tone-faint { --tone: var(--faint); }
-.sev-CRITICAL { --tone: var(--critical); }
-.sev-HIGH { --tone: var(--high); }
-.sev-MEDIUM { --tone: var(--medium); }
-.sev-LOW { --tone: var(--low); }
-.sev-INFO { --tone: var(--info); }
-.dot[class*="tone-"],
-.dot[class*="sev-"] { background: var(--tone); }
-.fill-tone { background: var(--tone); }
-.text-tone { color: var(--tone); }
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
+/* Tablet (768–1279): single column; the right column becomes a row of three. */
+@media (min-width: 768px) and (max-width: 1279.98px) {
+  .dash-hero { min-height: 560px; }
+  .dash-right { flex-direction: row; }
+  .dash-right > * { flex: 1; min-width: 0; }
 }
+/* Bottom row (stats | execution timeline) splits side-by-side at ≥1024, stacks below. */
+@media (min-width: 1024px) {
+  .dash-bottom { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.5fr); }
+}
+
+/* Phone (<768): sidebar becomes a horizontal strip under the top bar; everything stacks. */
+@media (max-width: 767.98px) {
+  .dash-frame { grid-template-columns: 1fr; grid-template-rows: 64px auto minmax(0, 1fr); height: auto; }
+  .dash-topbar { grid-column: 1; grid-row: 1; }
+  .dash-sidebar {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: row;
+    width: 100%;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 2px;
+    padding-inline: 8px;
+  }
+  .dash-sidebar::-webkit-scrollbar { display: none; }
+  .dash-sidebar > a { height: auto; width: auto; padding: 0 6px; }
+  .dash-sidebar nav { flex: 1; flex-direction: row; padding: 6px 0; }
+  .dash-sidebar > div { flex-direction: row; padding: 0; }
+  .dash-content { grid-column: 1; grid-row: 3; }
+  .dash-overview { padding: 12px 16px 16px; }
+  .dash-hero { min-height: 440px; }
+}
+
+/* ---- Shared card ---- */
+.dash-card {
+  position: relative;
+  isolation: isolate;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--card), var(--card-2));
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--foreground) 4%, transparent);
+  padding: 14px;
+  overflow: clip;
+  transition: border-color 0.3s var(--ease-out-quart);
+}
+@media (min-width: 1536px) { .dash-card { padding: 16px; } }
+/* cursor-following soft light (--mx/--my set by pointermove in dash-card.tsx) */
+.dash-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0;
+  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklab, var(--primary) 7%, transparent), transparent 70%);
+  transition: opacity 0.3s var(--ease-out-quart);
+}
+.dash-card:hover { border-color: color-mix(in oklab, var(--primary) 22%, var(--border)); }
+.dash-card:hover::before { opacity: 1; }
+
+/* Glass variant: cards that sit over the globe (Activity Timeline, Ask bar). */
+.dash-glass {
+  background: color-mix(in oklab, var(--card) 72%, transparent);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+}
+
+/* Card header: title left, "open in docs" icon right. */
+.dash-card-open { color: var(--muted-foreground); transition: color 0.2s ease; }
+.dash-card-open:hover { color: var(--primary); }
+
+/* Inner surface tile (findings 2×2, icon wells). */
+.dash-tile { background: var(--surface); border-radius: 10px; }
+
+/* ---- Sidebar ---- */
+.dash-navbtn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  color: var(--muted-foreground);
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+.dash-navbtn:hover { color: var(--foreground); background: color-mix(in oklab, var(--foreground) 5%, transparent); }
+.dash-navbtn[data-active="true"] {
+  background: var(--surface);
+  border-color: color-mix(in oklab, var(--primary) 25%, transparent);
+  color: var(--primary);
+  box-shadow: 0 0 18px -4px color-mix(in oklab, var(--primary) 45%, transparent);
+}
+/* tooltip (right side) */
+.dash-tip {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  translate: 0 -50%;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 11px;
+  opacity: 0;
+  transform: translateX(-4px);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  z-index: 40;
+}
+.dash-navbtn:hover .dash-tip,
+.dash-navbtn:focus-visible .dash-tip { opacity: 1; transform: translateX(0); }
+
+/* ---- Chips / small bits reused across cards ---- */
+.dash-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 7px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.tabnums { font-variant-numeric: tabular-nums; }
+
+/* The "Running" status dot (ambient pulse added in Phase 6). */
+.dash-livedot { background: var(--primary); box-shadow: 0 0 8px color-mix(in oklab, var(--primary) 70%, transparent); }
+
+/* Popovers / search dropdowns */
+.dash-pop {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.6), inset 0 1px 0 color-mix(in oklab, var(--foreground) 4%, transparent);
+  transform-origin: top;
+  animation: dash-pop-in 0.18s var(--ease-out-expo);
+}
+@keyframes dash-pop-in { from { opacity: 0; transform: translateY(-4px) scale(0.96); } }
+
+/* Ask-bar inline note (appears on submit) */
+.dash-note { animation: dash-note-in 0.2s var(--ease-out-expo); }
+@keyframes dash-note-in { from { opacity: 0; transform: translateY(4px); } }
+
+/* ---- Intro reveal: hide the animated pieces before GSAP runs, but only when scripting is on
+   (no inline script needed, so nothing bypasses the CSP). No-JS users see the full page; a
+   browser without the `scripting` media feature shows it too, and GSAP still animates it in.
+   GSAP sets the pieces visible itself. ---- */
+@media (scripting: enabled) {
+  .dash-overview .dash-card,
+  .dash-navbtn,
+  .dash-reveal { visibility: hidden; }
+}
+
+/* ---- Ambient loops (§7.2) ---- */
+@keyframes dash-ping {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 55%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 6px transparent; }
+}
+.dash-livedot { animation: dash-ping 1.6s ease-out infinite; }
+.dash-bell-dot { animation: dash-ping 1.6s ease-out 0.7s infinite; box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 55%, transparent); }
+.dash-bell-dot { animation-name: dash-ping-amber; }
+@keyframes dash-ping-amber {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 55%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 6px transparent; }
+}
+@keyframes dash-gate { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.dash-gate-pulse { animation: dash-gate 1.4s ease-in-out infinite; }
+@keyframes dash-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.dash-breathe { animation: dash-breathe 2s ease-in-out infinite; }
+@keyframes dash-marker { 0%, 100% { filter: drop-shadow(0 0 1px color-mix(in oklab, var(--primary) 50%, transparent)); } 50% { filter: drop-shadow(0 0 4px color-mix(in oklab, var(--primary-strong) 80%, transparent)); } }
+.dash-marker-breathe { animation: dash-marker 2.4s ease-in-out infinite; }
+
+/* ---- Hero (globe + overlaid glass cards) ---- */
+.dash-globe-wrap { position: absolute; inset: 0; z-index: 0; }
+.dash-globe-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 46%, color-mix(in oklab, var(--globe-glow) 22%, transparent), transparent 55%);
+  transition: opacity 0.6s ease;
+}
+.dash-globe-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; transition: opacity 0.8s ease; }
+.dash-hero-title { position: relative; z-index: 2; padding: 24px 0 0 24px; }
+/* Phones: the globe sits right behind the title, so the title gets a shadow of the background
+   to stay readable over its glow. */
+@media (max-width: 767.98px) {
+  .dash-hero-title { padding: 16px 0 0 16px; }
+  .dash-hero-title > * { text-shadow: 0 0 2px var(--background), 0 2px 18px var(--background); }
+}
+.dash-preview-label {
+  position: absolute;
+  top: 24px;
+  right: 0;
+  z-index: 2;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+/* Below desktop the title wraps, so the preview label flows under it instead of overlapping. */
+@media (max-width: 1279.98px) {
+  .dash-preview-label { position: static; display: block; margin: 8px 0 0 24px; }
+}
+
+.dash-timeline-card { position: relative; z-index: 2; margin-top: 16px; display: flex; }
+.dash-timeline-card > * { flex: 1; min-width: 0; min-height: 0; }
+.dash-askbar { position: relative; z-index: 2; margin-top: 12px; }
+
+@media (min-width: 768px) {
+  .dash-globe-wrap { inset: -24px -12px -40px -12px; }
+  .dash-timeline-card {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: clamp(220px, 22%, 270px);
+    height: 62%;
+    margin: 0;
+  }
+  .dash-askbar {
+    position: absolute;
+    left: calc(clamp(220px, 22%, 270px) + 12px);
+    right: 0;
+    bottom: 0;
+    margin: 0;
+  }
+}
+
+/* ---- Footer (site-footer.tsx): a faint teal light along its top edge, like the cards' lit edge ---- */
+/* ---- Viewer views (Findings / Audit / Reports / Scope) ---- */
+.dash-view { padding: 20px 16px 28px 8px; }
+
+/* ---- Terminal view (the Reconix TUI over xterm.js; from reconix-tui/web's globals.css) ---- */
+.term {
+  position: relative;
+  height: max(420px, calc(100dvh - 250px));
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--term-bg);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--primary) 22%, var(--border)),
+    0 30px 80px -32px color-mix(in oklab, var(--primary) 30%, transparent);
+  overflow: hidden;
+}
+/* Expand: the session card fills the browser window; the page behind it stays put */
+.dash-card.term-full {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  border-radius: 0;
+  padding: 14px 16px 16px;
+}
+.term-full .term { flex: 1; height: auto; min-height: 0; }
+:root:has(.term-full) { overflow: hidden; }
+/* "↓ Latest": over the terminal's bottom right, only while scrolled up */
+.term-latest {
+  position: absolute;
+  right: 16px;
+  bottom: 12px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: color-mix(in oklab, var(--term-text) 14%, var(--term-bg));
+  color: var(--term-text);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--term-text) 22%, transparent), 0 8px 20px -8px rgba(0, 0, 0, 0.6);
+}
+.term-latest:hover { background: color-mix(in oklab, var(--term-text) 22%, var(--term-bg)); }
+.term-latest:focus-visible { outline: 2px solid var(--term-cursor); outline-offset: 2px; }
+.term-latest svg { color: var(--term-cursor); }
+.dash-findings { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1024px) { .dash-findings { grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); } }
+.dash-finding-row {
+  width: 100%;
+  text-align: left;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--card), var(--card-2));
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.dash-finding-row:hover { border-color: color-mix(in oklab, var(--primary) 30%, var(--border)); }
+.dash-finding-row[aria-current="true"] {
+  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+  background: color-mix(in oklab, var(--primary) 6%, var(--card));
+}
+.dash-log-row { transition: background-color 0.2s ease; }
+.dash-log-row:hover { background: color-mix(in oklab, var(--foreground) 3%, transparent); }
+
+/* ---- Footer (site-footer.tsx): a faint teal light along its top edge, like the cards' lit edge ---- */
+.footer-edge {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--primary) 60%, transparent), transparent);
+}
+
+/* ---- Nav dropdowns / mobile menu (nav-menu.tsx): panels pop in when un-hidden
+   (an animation restarts whenever an element goes from display:none to shown) ---- */
+.nav-panel:not([hidden]) { animation: nav-pop 160ms ease-out; }
+@keyframes nav-pop { from { opacity: 0; transform: translateY(-4px); } }
+
+/* ---- Nav CTA (NavCta): on the landing page it stays out of the way while the hero,
+   which has its own "Get started", is on screen ---- */
+.nav-cta { transition: opacity 0.25s ease, transform 0.25s ease; }
+.nav-cta[data-hidden="true"] { opacity: 0; transform: translateY(-4px); pointer-events: none; }
+
+.integration-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: var(--border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--card), var(--primary) 3%),
+    color-mix(in oklab, var(--card) 70%, transparent)
+  );
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.integration-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--primary) 70%, transparent), transparent);
+  opacity: 0.35;
+  transition: opacity 0.3s ease;
+}
+.integration-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(60% 50% at 0% 0%, color-mix(in oklab, var(--primary) 10%, transparent), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.integration-card:hover {
+  border-color: color-mix(in oklab, var(--primary) 30%, var(--border));
+  box-shadow: 0 18px 40px -24px color-mix(in oklab, var(--primary) 40%, transparent);
+}
+.integration-card:hover::before,
+.integration-card:hover::after { opacity: 1; }
+
+.integration-card[data-accent] {
+  border-color: color-mix(in oklab, var(--primary) 35%, var(--border));
+  background:
+    radial-gradient(70% 120% at 50% 0%, color-mix(in oklab, var(--primary) 9%, transparent), transparent 70%),
+    linear-gradient(180deg, color-mix(in oklab, var(--card), var(--primary) 5%), color-mix(in oklab, var(--card) 80%, transparent));
+  box-shadow: 0 0 40px -18px color-mix(in oklab, var(--primary) 45%, transparent);
+}
+.integration-card[data-accent]::before { opacity: 0.8; }
+
+/* ---- Reduced motion: every CSS animation off ---- */
 @media (prefers-reduced-motion: reduce) {
-  .ring::after { animation: none; }
-  .nav-link, .btn, .seg > a, .seg > button, .page-row, .step { transition: none; }
-  .path-link::after { animation: none; opacity: 0; }
+  .nav-cta,
+  .integration-card, .integration-card::before, .integration-card::after { transition: none; }
+  .nav-panel:not([hidden]) { animation: none; }
+  /* dashboard: all ambient loops + enter animations off, nothing hidden */
+  .dash-livedot, .dash-bell-dot, .dash-gate-pulse, .dash-breathe, .dash-marker-breathe,
+  .dash-pop, .dash-note { animation: none; }
+  .dash-overview .dash-card, .dash-navbtn, .dash-reveal { visibility: visible; }
 }
 
-@media (max-width: 820px) {
-  .shell { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 18px; }
-  .side { position: relative; top: 0; min-height: 0; padding: 14px; gap: 14px; }
-  /* phone navigation: icon over a short label, in one row (or two rows of three) */
-  .nav-link { grid-template-columns: 1fr; justify-items: center; gap: 4px; padding: 8px 4px; font-size: 12px; }
-  .nav-link[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--accent); }
-  .hbar, .hbar.wide { grid-template-columns: 96px minmax(0, 1fr) 30px; }
-  .tl { grid-template-columns: 52px 18px minmax(0, 1fr); gap: 8px; }
-  .data { min-width: 560px; } /* scroll inside .table-wrap instead of wrapping letter by letter */
-  .data.dense { min-width: 0; }
-  .card.term-full { padding: 10px; }
+/* ---- AI Assistant (components/assistant/*) --------------------------------------------
+   stage   — over the top bar and the content, beside the sidebar (never covers it)
+   surface — what the open/close animation moves and resizes (motion.ts)
+   fill    — the surface's background and glow (fades in as it grows)
+   panel   — the chat itself; it breathes once the assistant has settled
+   One 4 s breathing cycle is shared by the panel, the orb and the sidebar's AI icon. */
+.dash-assistant-stage {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  position: relative;
+  z-index: 35;
+  min-width: 0;
+  min-height: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+.dash-assistant-stage[data-on] { visibility: visible; }
+.dash-assistant-surface { position: absolute; inset: 0; overflow: hidden; pointer-events: auto; }
+.dash-assistant-fill {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(55% 45% at 50% 0%, color-mix(in oklab, var(--globe-glow) 13%, transparent), transparent 70%),
+    radial-gradient(45% 45% at 100% 100%, color-mix(in oklab, var(--page-glow) 45%, transparent), transparent 70%),
+    var(--background);
+}
+.dash-assistant-panel {
+  position: absolute;
+  inset: 14px; /* room for the breathing scale and glow: nothing clips, nothing scrolls */
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  border: 1px solid color-mix(in oklab, var(--primary) 18%, var(--border));
+  background: linear-gradient(180deg, color-mix(in oklab, var(--card) 90%, transparent), color-mix(in oklab, var(--card-2) 94%, transparent));
+  box-shadow: 0 0 36px -22px color-mix(in oklab, var(--primary) 45%, transparent);
+  overflow: hidden;
+  transform-origin: 50% 50%;
+}
+.dash-assistant-panel.is-breathing { animation: dash-chat-breathe 4s ease-in-out infinite; }
+@keyframes dash-chat-breathe {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 36px -22px color-mix(in oklab, var(--primary) 45%, transparent); }
+  50% { transform: scale(1.003); box-shadow: 0 0 72px -14px color-mix(in oklab, var(--primary) 60%, transparent); }
+}
+/* The top bar sits under the open assistant (the sidebar stays). */
+@media (min-width: 768px) { .dash-frame[data-assistant-open] .dash-topbar { visibility: hidden; } }
+/* Off the fixed-height desktop frame the frame grows with its content: give the assistant a
+   screen's height, so the composer is always in reach. */
+@media (max-width: 1279.98px), (max-height: 759.98px) {
+  .dash-assistant-stage[data-on] { min-height: calc(100dvh - 34px); }
+}
+/* Phones: the sidebar strip and the top bar stay above the assistant. */
+@media (max-width: 767.98px) {
+  .dash-assistant-stage { grid-column: 1; grid-row: 3; }
+  .dash-assistant-stage[data-on] { min-height: max(420px, calc(100dvh - 150px)); }
+  .dash-assistant-panel { inset: 8px; }
+}
+
+.dash-composer {
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  transition: border-color 0.2s ease;
+}
+.dash-composer:focus-within { border-color: color-mix(in oklab, var(--primary) 45%, var(--border)); }
+
+/* The AI orb: the globe's colours as a small sphere with a dot texture and a halo. */
+.dash-orb {
+  position: relative;
+  display: inline-block;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%,
+    color-mix(in oklab, var(--primary-strong) 85%, var(--foreground)) 0%,
+    var(--primary) 24%,
+    color-mix(in oklab, var(--globe-glow) 70%, transparent) 50%,
+    color-mix(in oklab, var(--primary-dim) 55%, transparent) 69%,
+    transparent 71%);
+  animation: dash-orb-breathe 4s ease-in-out infinite;
+}
+.dash-orb-dots {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-image: radial-gradient(circle, color-mix(in oklab, var(--globe-dot) 80%, transparent) 0.6px, transparent 1.1px);
+  background-size: 4px 4px;
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, var(--foreground) 58%, transparent 70%);
+  mask-image: radial-gradient(circle at 50% 50%, var(--foreground) 58%, transparent 70%);
+  opacity: 0.6;
+}
+@keyframes dash-orb-breathe {
+  0%, 100% { transform: scale(0.96); filter: drop-shadow(0 0 3px color-mix(in oklab, var(--globe-glow) 45%, transparent)); }
+  50% { transform: scale(1.04); filter: drop-shadow(0 0 12px color-mix(in oklab, var(--globe-glow) 70%, transparent)); }
+}
+
+/* The sidebar's AI icon: it breathes (size and a soft halo), stronger while selected. Only the
+   icon scales; the button and its clickable area stay put. */
+.dash-ai-icon {
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  animation: dash-ai-breathe 4s ease-in-out infinite;
+}
+.dash-navbtn[data-active="true"] .dash-ai-icon { animation-name: dash-ai-breathe-on; }
+@keyframes dash-ai-breathe {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 0%, transparent); }
+  50% { transform: scale(1.12); box-shadow: 0 0 10px 2px color-mix(in oklab, var(--primary) 28%, transparent); }
+}
+@keyframes dash-ai-breathe-on {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 6px 1px color-mix(in oklab, var(--primary) 30%, transparent); }
+  50% { transform: scale(1.12); box-shadow: 0 0 16px 4px color-mix(in oklab, var(--primary) 50%, transparent); }
+}
+
+/* The active view's marker: a bar on the sidebar's edge that grows in (under the strip on phones). */
+.dash-navbtn::after {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  width: 3px;
+  height: 18px;
+  margin-top: -9px;
+  border-radius: 0 3px 3px 0;
+  background: var(--primary);
+  box-shadow: 0 0 10px color-mix(in oklab, var(--primary) 70%, transparent);
+  opacity: 0;
+  transform: scaleY(0);
+  transition: transform 0.35s var(--ease-out-expo), opacity 0.2s ease;
+}
+.dash-navbtn[data-active="true"]::after { opacity: 1; transform: scaleY(1); }
+@media (max-width: 767.98px) {
+  .dash-navbtn::after { left: 50%; top: auto; bottom: -6px; width: 18px; height: 3px; margin: 0 0 0 -9px; border-radius: 3px 3px 0 0; transform: scaleX(0); }
+  .dash-navbtn[data-active="true"]::after { transform: scaleX(1); }
+}
+
+/* "answering…" dots while the first words are on their way */
+.dash-typing {
+  display: inline-block;
+  width: 30px;
+  height: 10px;
+  background: radial-gradient(circle, var(--muted-foreground) 2px, transparent 2.6px) 0 50% / 10px 10px repeat-x;
+  animation: dash-breathe 1.2s ease-in-out infinite;
+}
+
+/* Reduced motion: no breathing scale; a still halo marks the assistant instead. */
+@media (prefers-reduced-motion: reduce) {
+  .dash-assistant-panel.is-breathing, .dash-orb, .dash-ai-icon, .dash-typing,
+  .dash-navbtn[data-active="true"] .dash-ai-icon { animation: none; }
+  .dash-orb { filter: drop-shadow(0 0 8px color-mix(in oklab, var(--globe-glow) 55%, transparent)); }
+  .dash-ai-icon { box-shadow: 0 0 10px 2px color-mix(in oklab, var(--primary) 30%, transparent); }
+  .dash-assistant-panel { box-shadow: 0 0 56px -16px color-mix(in oklab, var(--primary) 55%, transparent); }
+  .dash-navbtn::after { transition: none; }
 }

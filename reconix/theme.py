@@ -60,27 +60,21 @@ CSS_TOKENS: Dict[str, str] = {
 # The web Terminal page shows the TUI itself, which is dark in both web themes.
 TERMINAL_WEB_TOKENS: Dict[str, str] = {"term-bg": BG, "term-text": TEXT, "term-cursor": CYAN}
 
-# Web dashboard (web/) — the landing site's operator-console palette (navy, teal, amber
-# for approval gates) in dark, and a light version of it. scripts/export_tokens.py writes
-# them to web/src/styles/tokens.css; the web code uses only those variables.
-# `card` is a raised surface, `well` a recessed one (inputs, tracks, chips); `sd` is the
-# shadow color. Text colors clear 4.5:1 on bg, card and well in their theme; `faint` is
-# for marks (3:1).
+# Web dashboard (web/) — the dark Security-Operations-Center console from the reconix-web-ui
+# site (globe dashboard). Teal `primary` for active states, chart fills and rings; amber
+# `accent` for approval gates / MEDIUM; green `success` for pass / LOW; red `danger` for
+# CRITICAL / HIGH; `page` is the backdrop behind the near-black app frame (`background`).
+# Dark only. scripts/export_tokens.py writes them to web/src/styles/tokens.css; the web code
+# uses only those variables. The browser terminal uses the TUI's own colors.
 WEB_TOKENS: Dict[str, Dict[str, str]] = {
-    "light": {
-        "bg": "#F3F6F9", "card": "#FFFFFF", "well": "#EAEFF4", "sd": "#8A9AB0",
-        "text": "#0F1622", "muted": "#4B5A6D", "faint": "#77869A", "line": "#D5DDE6",
-        "accent": "#0F766E", "accent-ink": "#FFFFFF", "accent-wash": "#DCF1EE",
-        "critical": "#C8283E", "high": "#A84808", "medium": "#806600", "low": "#0369A1",
-        "info": "#5E6E80", "ok": "#13773A", "warn": "#806600", "bad": "#C8283E",
-        **TERMINAL_WEB_TOKENS,
-    },
     "dark": {
-        "bg": "#0A0F17", "card": "#0F1622", "well": "#152032", "sd": "#000000",
-        "text": "#E8EDF5", "muted": "#8E9BB0", "faint": "#67768C", "line": "#1E2A3C",
-        "accent": TEAL, "accent-ink": "#042F2A", "accent-wash": "#0E272B",
-        "critical": "#F4596B", "high": HIGH, "medium": "#F2B544", "low": LOW,
-        "info": INFO, "ok": "#39D353", "warn": "#F2B544", "bad": "#F87171",
+        "page": "#0B1315", "page-glow": "#1D3A3E", "background": "#030607",
+        "foreground": "#E6EEEE", "card": "#101516", "card-2": "#0B0F10",
+        "card-foreground": "#E6EEEE", "surface": "#171D1E", "muted": "#141A1B",
+        "muted-foreground": "#7D8A8B", "border": "#1B2224",
+        "primary": "#46E0D4", "primary-strong": "#7AF0EC", "primary-dim": "#2C7F7C",
+        "primary-foreground": "#032A27", "accent": "#E7C183", "success": "#5EE6A8",
+        "danger": "#F87171", "ring": "#46E0D4", "globe-dot": "#3CC8D2", "globe-glow": CYAN,
         **TERMINAL_WEB_TOKENS,
     },
 }

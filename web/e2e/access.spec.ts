@@ -6,7 +6,7 @@ import { PORT, TOKEN } from "../playwright.config";
 import { sample, signIn } from "./support";
 
 test("pages and routes need a session", async ({ page, request }) => {
-  await page.goto("/findings");
+  await page.goto("/docs");
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByText("Open your sign-in link")).toBeVisible();
 
@@ -23,10 +23,11 @@ test("the terminal needs a session too", async ({ page, request }) => {
 
 test("a viewer can read the pages but not use the terminal", async ({ page, context }) => {
   await context.addCookies([{ name: "reconix_view", value: sessionValue("viewer", TOKEN), domain: "127.0.0.1", path: "/" }]);
-  await page.goto("/");
-  await expect(page.getByRole("link", { name: "AI Assistant" })).toHaveCount(0);
-  await page.goto("/about"); // the Documentation page is for every role
-  await expect(page.getByRole("heading", { name: "Documentation", level: 1 })).toBeVisible();
+  await page.goto("/?view=terminal");
+  await expect(page.getByText("The terminal needs the operator role")).toBeVisible();
+  await expect(page.locator(".xterm")).toHaveCount(0); // the terminal is never rendered for a viewer
+  await page.goto("/docs"); // the documentation is for every role
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
   const res = await page.request.post("/api/terminal/ticket", { headers: { Origin: `http://127.0.0.1:${PORT}` } });
   expect(res.status()).toBe(403);
   await page.goto("/terminal");

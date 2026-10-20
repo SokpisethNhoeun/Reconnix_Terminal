@@ -41,6 +41,23 @@ async def test_it_says_when_it_is_ready(app, web_launches, monkeypatch):
         assert not app._web_starting
 
 
+async def test_it_says_when_another_dashboard_holds_the_port(app, web_launches, monkeypatch):
+    class Busy:                                            # serve.mjs found its ports taken
+        pid = -1
+
+        def poll(self):
+            return web_server.PORTS_BUSY
+
+    monkeypatch.setattr(web_shell, "POLL_EVERY", 0.01)
+    monkeypatch.setattr(web_server, "start", lambda data_dir, url_file: Busy())
+    async with app.run_test(size=SIZE) as pilot:
+        app.run_command_line("/web")
+        await app.workers.wait_for_complete()
+        await settle(pilot)
+        assert "Another web dashboard already uses its port" in _notes(app)
+        assert app._web_process is None and not app._web_starting
+
+
 async def test_the_first_time_it_installs_the_packages_first(app, web_launches, monkeypatch):
     monkeypatch.setattr(web_server, "needs_install", lambda: True)
     async with app.run_test(size=SIZE) as pilot:

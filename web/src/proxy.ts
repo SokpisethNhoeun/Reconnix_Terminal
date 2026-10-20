@@ -1,10 +1,12 @@
 /* Runs before every page and route: refuses foreign Host headers, requires the viewer
-   role (except for the sign-in page and route) and the operator role for the terminal, and
-   sets the strict Content-Security-Policy from lib/auth/csp.ts with a fresh script nonce. */
+   role (except for the sign-in page and route) and the operator role for the terminal and the
+   AI Assistant's route, and sets the strict Content-Security-Policy from lib/auth/csp.ts with a
+   fresh script nonce. */
 import { type NextRequest, NextResponse } from "next/server";
 
 import { contentSecurityPolicy } from "@/lib/auth/csp";
 import { COOKIE, allowedHosts, hasRole, launchToken, mayUseTerminal, readRole } from "@/lib/auth/session";
+import { isAssistantPath } from "@/lib/assistant/paths";
 import { isTerminalPath } from "@/lib/terminal/paths";
 
 const PUBLIC_PATHS = new Set(["/login", "/api/session"]);
@@ -27,6 +29,9 @@ export function proxy(request: NextRequest) {
   if (isTerminalPath(pathname) && !mayUseTerminal(role)) {
     if (pathname.startsWith("/api/")) return NextResponse.json({ detail: "The terminal needs the operator role." }, { status: 403 });
     return NextResponse.redirect(new URL("/", request.url));
+  }
+  if (isAssistantPath(pathname) && !hasRole(role, "operator")) {
+    return NextResponse.json({ detail: "The AI Assistant needs the operator role." }, { status: 403 });
   }
 
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");

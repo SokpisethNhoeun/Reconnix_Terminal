@@ -16,6 +16,7 @@ MAX_PENDING = 1024 * 1024        # unwritten input kept while the program is bus
 EXIT_CHECK = 0.5                 # seconds: how often a quiet read checks the program ended
 STOP_GRACE = 2.0                 # seconds between asking the program to stop and killing it
 _DROPPED = ("RECONIX_WEB_TOKEN", "COLUMNS", "LINES")
+_DROPPED_PREFIXES = ("RECONIX_TERM_", "LLM_")   # the helper's settings; the dashboard's AI model
 
 
 class Session(Protocol):
@@ -48,13 +49,14 @@ def spawn(command: Sequence[str], env: Mapping[str, str], size: Tuple[int, int],
 
 
 def child_env(base: Mapping[str, str]) -> Dict[str, str]:
-    """The program's environment: no launch token, a capable terminal, reconix importable.
+    """The program's environment: no launch token or AI-model settings (LLM_API_KEY stays with the
+    dashboard), a capable terminal, reconix importable.
 
     RECONIX_IN_WEB tells the TUI it runs on the Terminal page (/web then says so).
     PYTHONSAFEPATH keeps the current folder off the import path (Python 3.11+).
     """
     env = {key: value for key, value in base.items()
-           if key not in _DROPPED and not key.startswith("RECONIX_TERM_")}
+           if key not in _DROPPED and not key.startswith(_DROPPED_PREFIXES)}
     root = str(Path(__file__).resolve().parents[2])      # the folder holding `reconix`
     env["PYTHONPATH"] = os.pathsep.join(p for p in (root, base.get("PYTHONPATH", "")) if p)
     env.update(TERM="xterm-256color", COLORTERM="truecolor", RECONIX_IN_WEB="1",

@@ -7,8 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Keyboard-first terminal UI for **Reconix**, an AI-powered security-testing
 assistant. Built with **Textual 8.x + Rich**, Python ≥ 3.9. The app runs on an
 **in-memory store** (`reconix/store/`) that plays a realistic, simulated assessment
-and is the seam for the Reconix backend. A Next.js dashboard lives in `web/`: read-only
-pages plus a **Terminal** page that runs this TUI in the browser (`reconix/webterm/`).
+and is the seam for the Reconix backend. A Next.js dashboard lives in `web/` (opened with
+`/web`): the globe "Assessment Operations Center" with read-only views of the saved runs, plus
+a **Terminal** view that runs this TUI in the browser (`reconix/webterm/`).
 
 Flow: **Start → Template → Plan → Approval → Execution → Findings → Finding Detail → Report**.
 Branch `classic-ui`: the original full-screen UI (53ac746) running version 1's process —
@@ -158,7 +159,21 @@ Key invariants:
 
 ## Web dashboard (`web/`)
 
-Next.js 16 / React 19, **read-only except the Terminal page**: no route writes or deletes
+Next.js 16 / React 19 with GSAP, Lenis and a three.js globe (the UI came from the
+reconix-web-ui site, see `docs/WEB_GLOBE_UI_PLAN.md`). `/` is one viewer page whose views
+(Overview, Findings, Audit log, Reports, Scope, Terminal) switch in-page via `?view=`; with no
+`?uid=` the Overview totals every saved run (`components/dashboard/derive-overall.ts`), with one
+it shows that run (`derive.ts`); both produce the cards' `OverviewCards` over `lib/data/adapt.ts`,
+and every number comes from them; `/docs` is the documentation. Dark only; colours come from
+`theme.WEB_TOKENS` through `scripts/export_tokens.py`. The **AI Assistant** (`?view=assistant`,
+`components/assistant/`, plan `docs/WEB_AI_ASSISTANT_PLAN.md`) opens from the Ask bar and its
+sidebar tab with a GSAP transition; `POST /api/assistant` (operators) asks the OpenAI-compatible
+model named by `LLM_BASE_URL` / `LLM_MODEL` (`web/.env.local`; off this machine only with
+`LLM_ALLOW_REMOTE=1`), with a context the server builds from the saved files
+(`lib/assistant/context.ts`: no evidence, every value cleaned, framed as untrusted data) and
+questions masked by `lib/assistant/redact.ts` (a port of `store/redact.py`: change both, the
+vectors in `web/tests/redact-vectors.json` check both). `webterm` drops `LLM_*` from the TUI's env.
+**Read-only except the Terminal view**: no route writes or deletes
 anything, and the only thing started is the Terminal page's TUI (the ticket route hands out
 a ticket; `reconix/webterm`, started by `web/scripts/serve.mjs`, runs the TUI), so its gates
 are the store's gates. Minting a ticket needs the operator session cookie **and** the
@@ -168,8 +183,9 @@ it dies with the helper (on Windows the TUI runs in a ConPTY console the helper 
 `docs/WEB_WINDOWS_PLAN.md`; keep both backends behind `webterm/session.py`'s `spawn()`). A stand-in command needs `RECONIX_TERM_TEST=1` (tests only).
 Read `web/CLAUDE.md` and `web/README.md` (Rules) before changing it. This Next.js version
 differs from older ones, so check `web/node_modules/next/dist/docs/` before writing code.
-Every page and route needs the `viewer` role; `/terminal` and `/api/terminal/*` need
-`operator` (`proxy.ts`, and the pages / handlers check again). The ticket format lives in
+Every page and route needs the `viewer` role; `/terminal`, `/api/terminal/*` and
+`/api/assistant` need `operator` (`proxy.ts`, and the pages / handlers check again; the Terminal view is rendered
+only for operators, and guarded pages read the cookies first so none is prerendered). The ticket format lives in
 both `web/src/lib/auth/ticket.ts` and `reconix/webterm/ticket.py` (shared test vector), and
 the frame protocol in `web/src/lib/terminal/protocol.ts` and `reconix/webterm/protocol.py`:
 change each pair together. The helper never logs terminal data (`TEST_PASSWORD` test), and
