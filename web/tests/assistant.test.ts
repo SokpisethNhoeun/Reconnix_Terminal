@@ -3,7 +3,7 @@
    reply, the reply's text blocks and the rate limit. */
 import { describe, expect, it } from "vitest";
 
-import { parseBlocks } from "@/components/assistant/message-text";
+import { parseBlocks } from "@/lib/assistant/markdown";
 import { modelSetup } from "@/lib/assistant/config";
 import { buildContext, clean, CONTEXT_LIMIT } from "@/lib/assistant/context";
 import { fenceTag, systemPrompt } from "@/lib/assistant/prompt";
@@ -180,6 +180,13 @@ describe("parseBlocks", () => {
   it("needs a separator line for a table, and reads quotes and rules", () => {
     expect(parseBlocks("a | b\nc | d")).toEqual([{ kind: "p", text: "a | b c | d" }]);
     expect(parseBlocks("> careful\n> here\n\n---")).toEqual([{ kind: "quote", text: "careful here" }, { kind: "hr" }]);
+  });
+  it("reads a separator line in linear time, even a hostile one", () => {
+    const hostile = `| a |\n|${"-|".repeat(20_000)}x`;
+    const started = performance.now();
+    parseBlocks(hostile);
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(parseBlocks("| a | b |\n  | :- | -: |  \n| 1 | 2 |")[0]).toMatchObject({ kind: "table", align: ["left", "right"] });
   });
   it("keeps markup as text", () => {
     expect(parseBlocks("<img src=x onerror=alert(1)>")).toEqual([{ kind: "p", text: "<img src=x onerror=alert(1)>" }]);
