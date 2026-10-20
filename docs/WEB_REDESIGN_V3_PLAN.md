@@ -176,3 +176,39 @@ partial, blocked or unverified).
   export.
 - Scale: about 7 code agents plus 3 Figma authors and reviewers. That is a lot of tokens and
   hours, and the Figma part is limited by browser time.
+
+## 5. Status (2026-10-20, branch `redesign/v3` at the end of the parallel build)
+
+Every workstream was reviewed (code-reviewer + security-reviewer, fixes applied) and merged:
+Phase 0 → assessments (E4) → dashboard (E1) → assistant (D) → reports (E3) → docs (E5) →
+findings (E2). Nothing is pushed; the `reconix-wt3/*` worktrees and their branches are kept.
+
+**Checks on the merged branch:** `pytest` 755 passed; ruff: the 7 findings all pre-exist on
+`main` (E501 ×5, E402 ×2); `typecheck`, `lint` clean; vitest 526 / 526; `next build` ok;
+Playwright 134 passed, 1 skipped (the motion spec's Findings scroll check now follows the list
+pane, which is its own scroller since the paging).
+
+**Real data (`~/.reconix/assessments`, 27 runs, 30 findings: HIGH 14 / MEDIUM 8 / LOW 8),
+built app, Chromium:** the Overview fits with 0 px of hidden height at 1920×1080, 1440×900 and
+1366×768 (the one-run and every-run views; measured after the intro settles); no horizontal
+overflow on any view at 1920×1080, 1440×900, 1366×768, 1024×768, 768×1024 or 390×844; below
+the fixed frame the window scrolls as designed; Findings shows ten rows a page with Previous /
+Next and the detail beside it (list-then-detail on the phone); the combined report selects five
+runs, disables the sixth with a reason, previews in a sandboxed `srcdoc` frame and downloads one
+PDF (`combined-5-runs-2026-10-20.pdf`, 811 KB); `/docs/commands/model` renders at every size.
+No page errors were logged.
+
+**Figma:** design file `xQ7J9ZesoAfPyldKmgRhm1` — "Web — Design system" (42 variables, 9 text
+styles, 3 effect styles, 40 icons, 35 component sets / 188 variants), "Web — Screens &
+Prototype" (43 frames, 5 flows, 349 reactions, no missing edges) and "Specs & handoff" (motion,
+responsive rules, severity/status meanings, how the file was built). FigJam board
+`kkrYmYIcNTz2Qbg66WIoMm` — section "Reconix Local Application" with the seven workflows in the
+board's own rule and Example format (built by `dist/figjam/W60`, `W61`).
+
+**Partial / unverified:** the Figma prototype cannot carry the WebGL globe, the staggered
+pieces or the streaming text (documented on the specs page); the AI Assistant's cards were
+checked against the stub model only (no real model was called); the dedicated QA sweep (F) is
+covered by the e2e suite rather than a separate report. **Known, not fixed:** `/assess` while an
+agent turn is in flight does not cancel the old worker (`reconix/shell/agent.py`, found by the
+docs review); the scope's methods / paths / ports / time limit are not enforced on the AI agent
+(documented honestly in the Assessment guide).
