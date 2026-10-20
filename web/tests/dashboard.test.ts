@@ -145,12 +145,16 @@ describe("deriveDashboard", () => {
     expect(summary.progress.pct).toBe(d.assessment.progress);
     expect(summary.progress.status).toBe(a.status);
     expect(d.requests).toBe(a.run.requests);
-    expect(d.log).toHaveLength(activity.length);
+    // the raw log stays on the server: only the masked event copies reach the page
+    expect(d).not.toHaveProperty("log");
+    expect(d).not.toHaveProperty("window");
     // every log line is in its own kind's lane exactly once
     const lanes = activityOf(a).lanes;
     expect(lanes.map((l) => l.kind)).toEqual([...LANE_ORDER]);
     expect(lanes.reduce((n, l) => n + l.marks.reduce((m, k) => m + k.count, 0), 0)).toBe(activity.length);
-    for (const l of lanes) expect(l.count).toBe(d.log.filter((x) => x.kind === l.kind).length);
+    const log = assessmentView(a).log;
+    expect(log).toHaveLength(activity.length);
+    for (const l of lanes) expect(l.count).toBe(log.filter((x) => x.kind === l.kind).length);
     expect(executionOf(a).phases).toEqual(d.phases);
   });
 

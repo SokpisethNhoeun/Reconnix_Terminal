@@ -1,17 +1,36 @@
-"use client";
-
 /* The top bar: the live-refresh pill, the Assessment switcher (every width), the Target /
    Template / Status chips (wide screens; for the open run, or counts across every run), docs
-   search, the "needs you" bell and the operator. */
-import { AssessmentSwitcher } from "@/components/dashboard/assessment-switcher";
+   search, the "needs you" bell and the operator. A server component: each client piece gets
+   only the fields it shows (never the whole Dashboard or Overall, which would put every saved
+   value into the page). */
+import { type AllSummary, AssessmentSwitcher } from "@/components/dashboard/assessment-switcher";
 import { AttentionBell } from "@/components/dashboard/attention-bell";
 import type { Dashboard } from "@/components/dashboard/derive";
 import type { Overall } from "@/components/dashboard/derive-overall";
 import { DocsSearch } from "@/components/dashboard/docs-search";
 import { LiveRefresh } from "@/components/dashboard/live-refresh";
-import { OverallChips } from "@/components/dashboard/overall-chips";
-import { RunChips } from "@/components/dashboard/run-chips";
+import { OverallChips, type OverallChipsData } from "@/components/dashboard/overall-chips";
+import { RunChips, type RunChipsData } from "@/components/dashboard/run-chips";
 import type { LibraryItem, SkippedFile } from "@/lib/data/view-types";
+
+const runChips = (d: Dashboard): RunChipsData => ({
+  assessment: { target: d.assessment.target, template: d.assessment.template, status: d.assessment.status, progress: d.assessment.progress },
+  scope: d.scope ? { include: d.scope.include, exclude: d.scope.exclude } : null,
+  phases: d.phases,
+  requests: d.requests,
+  minutes: d.minutes,
+});
+
+const overallChips = (o: Overall): OverallChipsData => ({
+  runs: o.runs,
+  completed: o.completed,
+  waiting: o.waiting,
+  targets: o.targets,
+  templates: o.templates,
+  statuses: o.statuses,
+});
+
+const allSummary = (o: Overall): AllSummary => ({ runs: o.runs, waiting: o.waiting, completed: o.completed, findingTotal: o.findingTotal });
 
 export function TopBar({
   dash,
@@ -41,9 +60,9 @@ export function TopBar({
       <LiveRefresh renderedAt={renderedAt} dir={dir} />
       {(dash || overall) && (
         <div className="dash-reveal flex min-w-0 items-center gap-2 lg:ml-auto">
-          <AssessmentSwitcher current={a} all={overall} items={items} dir={dir} skipped={skipped} />
+          <AssessmentSwitcher current={a} all={overall && allSummary(overall)} items={items} dir={dir} skipped={skipped} />
           <div className="hidden min-w-0 items-center gap-2 lg:flex">
-            {dash ? <RunChips dash={dash} /> : overall && <OverallChips overall={overall} />}
+            {dash ? <RunChips dash={runChips(dash)} /> : overall && <OverallChips overall={overallChips(overall)} />}
           </div>
         </div>
       )}

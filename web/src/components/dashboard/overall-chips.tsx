@@ -53,7 +53,10 @@ function CountsChip({
   );
 }
 
-export function OverallChips({ overall }: { overall: Overall }) {
+/** The slice of the every-run Overview the chips show (top-bar.tsx picks it on the server). */
+export type OverallChipsData = Pick<Overall, "runs" | "completed" | "waiting" | "targets" | "templates" | "statuses">;
+
+export function OverallChips({ overall }: { overall: OverallChipsData }) {
   const { runs, completed, waiting } = overall;
   const known = new Set<string>(TEMPLATES);
   const templates = [

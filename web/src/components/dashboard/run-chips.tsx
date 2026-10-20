@@ -1,7 +1,8 @@
 "use client";
 
 /* The top bar's chips for one open run: its Target (scope in and out), Template and Status
-   (progress, phases, budget). */
+   (progress, phases, budget). A client component, so it gets only what it shows (RunChipsData,
+   picked on the server in top-bar.tsx), never the whole Dashboard. */
 import Link from "next/link";
 import { Check, X } from "lucide-react";
 import { CHIP, ChipTrigger, Row } from "@/components/dashboard/assessment-switcher";
@@ -12,7 +13,15 @@ import { RUN_STATUS, STEP_STATUS } from "@/lib/status";
 
 const LINK = "rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-export function RunChips({ dash }: { dash: Dashboard }) {
+export interface RunChipsData {
+  assessment: Pick<Dashboard["assessment"], "target" | "template" | "status" | "progress">;
+  scope: { include: string[]; exclude: string[] } | null;
+  phases: Dashboard["phases"];
+  requests: number;
+  minutes: Dashboard["minutes"];
+}
+
+export function RunChips({ dash }: { dash: RunChipsData }) {
   const a = dash.assessment;
   return (
     <>

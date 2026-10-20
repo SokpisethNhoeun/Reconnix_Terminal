@@ -77,8 +77,6 @@ export interface Dashboard {
   approvals: ApprovalView[];
   gate: { time: string; text: string } | null;
   findings: FindingRow[];
-  log: LogLine[];
-  window: { start: string; end: string };
   cards: OverviewCards;
 }
 
@@ -349,7 +347,6 @@ export function deriveDashboard(v: AssessmentView): Dashboard {
     },
   };
 
-  const window = { start: clockAt(0), end: clockAt(1) };
   const scopeApproved = v.scope?.approved ?? false;
   const inScope = v.scope?.include.length ?? 0;
 
@@ -383,8 +380,6 @@ export function deriveDashboard(v: AssessmentView): Dashboard {
     approvals: v.approvals,
     gate: v.gate,
     findings,
-    log,
-    window,
     cards: {
       mode: "run",
       summary,
