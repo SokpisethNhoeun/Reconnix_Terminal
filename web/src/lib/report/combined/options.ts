@@ -1,0 +1,35 @@
+/* The combined report's options and links: what the Report view's selection panel, the
+   preview frame and the API route share, so they can never disagree. Pure metadata and URL
+   helpers; safe to import from client components. */
+
+export type CombinedFormat = "html" | "pdf";
+
+export interface CombineOptions {
+  /** Include each occurrence's masked evidence lines. */
+  evidence: boolean;
+  /** Include LOW and INFO findings (otherwise only CRITICAL, HIGH and MEDIUM). */
+  low: boolean;
+  /** Include the appendix (tools, references, the run ids). */
+  appendix: boolean;
+}
+
+export const DEFAULT_COMBINE_OPTIONS: CombineOptions = { evidence: true, low: true, appendix: true };
+
+/** How many runs one report may combine (the route refuses more). */
+export const COMBINE_MAX = 5;
+
+export const COMBINED_ROUTE = "/api/reports/combined";
+
+const OPTION_KEYS: (keyof CombineOptions)[] = ["evidence", "low", "appendix"];
+
+/** The route that builds the report: `?uids=a,b&format=html&evidence=1&low=1&appendix=1`
+    (an option is sent only when it is on). */
+export function combinedHref(uids: readonly string[], format: CombinedFormat, opts: CombineOptions): string {
+  const search = new URLSearchParams({ uids: uids.join(","), format });
+  for (const key of OPTION_KEYS) if (opts[key]) search.set(key, "1");
+  return `${COMBINED_ROUTE}?${search}`;
+}
+
+/** The download's name: ASCII only, so the Content-Disposition header never needs encoding. */
+export const combinedFileName = (runs: number, format: CombinedFormat, now: Date) =>
+  `combined-${runs}-runs-${now.toISOString().slice(0, 10)}.${format}`;

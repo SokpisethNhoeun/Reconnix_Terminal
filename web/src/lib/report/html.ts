@@ -4,11 +4,12 @@
 
    Every value is HTML-escaped (tool output and operator text read as text, never markup),
    the document carries no scripts (the dashboard's CSP would block them anyway), and the
-   evidence it shows was masked before it was saved. */
+   evidence it shows was masked before it was saved. The helpers and the stylesheet are
+   exported for the combined report (combined/html.ts), which must look the same. */
 import type { Assessment, Finding } from "@/lib/data/schema";
 
-const SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
-const SEV_CLASS: Record<string, string> = { CRITICAL: "crit", HIGH: "high", MEDIUM: "med", LOW: "low", INFO: "info" };
+export const SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
+export const SEV_CLASS: Record<string, string> = { CRITICAL: "crit", HIGH: "high", MEDIUM: "med", LOW: "low", INFO: "info" };
 const VALIDATION_CLASS: Record<string, string> = { CONFIRMED: "confirmed", UNCONFIRMED: "unconfirmed", INCONCLUSIVE: "inconclusive" };
 const STATUS_CLASS: Record<string, string> = { open: "open", fixed: "fixed", accepted: "accepted", "false-positive": "falsepos" };
 const STATUS_LABEL: Record<string, string> = { open: "Open", fixed: "Fixed", accepted: "Accepted", "false-positive": "False+" };
@@ -25,34 +26,34 @@ export function esc(value: unknown): string {
 }
 
 /** Escape text but keep its spacing, for evidence shown in a <pre> block. */
-function escPre(value: unknown): string {
+export function escPre(value: unknown): string {
   return String(value ?? "").replace(/[&<>"']/g, (c) => escapeMap[c]);
 }
 
-const shortDate = (iso: string | null | undefined) => (iso ? iso.split("T")[0] : "—");
-const title = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
-const sevRank = (s: string) => {
+export const shortDate = (iso: string | null | undefined) => (iso ? iso.split("T")[0] : "—");
+export const title = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
+export const sevRank = (s: string) => {
   const i = (SEV_ORDER as readonly string[]).indexOf(s.toUpperCase());
   return i < 0 ? SEV_ORDER.length : i;
 };
 
-function counts(findings: Finding[]): Record<string, number> {
+export function counts(findings: Pick<Finding, "severity">[]): Record<string, number> {
   const out: Record<string, number> = Object.fromEntries(SEV_ORDER.map((s) => [s, 0]));
   for (const f of findings) if (f.severity in out) out[f.severity] += 1;
   return out;
 }
 
-const pill = (severity: string) => `<span class="sev ${SEV_CLASS[severity.toUpperCase()] ?? "info"}">${esc(title(severity))}</span>`;
-const validation = (state: string) =>
+export const pill = (severity: string) => `<span class="sev ${SEV_CLASS[severity.toUpperCase()] ?? "info"}">${esc(title(severity))}</span>`;
+export const validation = (state: string) =>
   `<span class="val ${VALIDATION_CLASS[state.toUpperCase()] ?? "inconclusive"}">${esc(title(state))}</span>`;
-const status = (f: Finding) => {
+export const status = (f: Pick<Finding, "status">) => {
   const s = f.status || "open";
   return `<span class="st ${STATUS_CLASS[s] ?? "open"}">${esc(STATUS_LABEL[s] ?? s)}</span>`;
 };
-const cvss = (f: Finding) => (f.cvss_score ? f.cvss_score.toFixed(1) : "—");
+export const cvss = (f: Finding) => (f.cvss_score ? f.cvss_score.toFixed(1) : "—");
 
 /* --- the fixed stylesheet (identical to the TUI's report) ----------------------------------- */
-const CSS = `
+export const CSS = `
 *{box-sizing:border-box}
 :root{
   --paper:#fff; --ink:#141a24; --ink-soft:#434d5c; --muted:#7c8699; --faint:#a4adbd;
@@ -193,7 +194,7 @@ function masthead(a: Assessment, generated: string): string {
   );
 }
 
-function severityBlock(findings: Finding[]): string {
+export function severityBlock(findings: Pick<Finding, "severity">[]): string {
   const c = counts(findings);
   const total = findings.length || 1;
   const present = SEV_ORDER.filter((s) => c[s]);
@@ -244,7 +245,7 @@ function findingsTable(findings: Finding[]): string {
   );
 }
 
-const chips = (items: string[], cls = "") => items.map((x) => `<span class="chip${cls}">${esc(x)}</span>`).join("");
+export const chips = (items: string[], cls = "") => items.map((x) => `<span class="chip${cls}">${esc(x)}</span>`).join("");
 
 function scopeBlock(a: Assessment): string {
   const s = a.scope;
@@ -261,7 +262,7 @@ function scopeBlock(a: Assessment): string {
   );
 }
 
-function findingCard(f: Finding): string {
+export function findingCard(f: Finding): string {
   const cls = SEV_CLASS[f.severity.toUpperCase()] ?? "info";
   const mapping = esc([...f.owasp, ...f.cwe, ...f.cve].join(", ") || "—");
   const badge = f.cvss_score ? `<span class="find-cvss">CVSS ${f.cvss_score.toFixed(1)}</span>` : "";
