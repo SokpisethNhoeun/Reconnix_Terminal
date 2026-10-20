@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import type { FindingRow } from "@/components/dashboard/derive";
 import { FilterChips, FilterSummary, SearchField } from "@/components/dashboard/filter-bar";
 import { FINDING_ICON } from "@/components/dashboard/finding-icon";
-import { SEVERITY_ORDER, VALIDATION, countBy, findingMatches, list, sortFindings, validationOf } from "@/components/dashboard/filters";
+import { SEVERITY_ORDER, VALIDATION, countBy, findingMatches, list, reviewLabel, sortFindings, validationOf } from "@/components/dashboard/filters";
 import { useQueryParams } from "@/components/dashboard/view-url";
 import { SeverityBadge, StatusBadge } from "@/components/ui/status-badge";
 import { FINDING_REVIEW, SEVERITY_META, toneColor } from "@/lib/status";
@@ -89,14 +89,14 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
       {current && (
         <div className="dash-findings">
           {/* list */}
-          <ul className="flex flex-col gap-2" role="listbox" aria-label="Findings">
+          <ul className="flex flex-col gap-2" aria-label="Findings">
             {sorted.map((f) => {
               const Icon = FINDING_ICON[f.icon];
               return (
-                <li key={f.key} role="option" aria-selected={f.key === current.key}>
+                <li key={f.key}>
                   <button
                     type="button"
-                    aria-current={f.key === current.key}
+                    aria-current={f.key === current.key ? "true" : undefined}
                     onClick={() => open(f.key)}
                     className="dash-finding-row flex items-start gap-3 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
@@ -131,7 +131,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
             {current.run && (
               <p className="-mt-2 text-xs text-muted-foreground">
                 From{" "}
-                <Link href={runHref(current)} className="rounded-sm font-mono text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Link href={runHref(current)} className="rounded-sm font-mono text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   {current.run.label}
                 </Link>
               </p>
@@ -167,7 +167,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
             {current.evidence.length > 0 && (
               <section>
                 <h3 className="mb-1.5 text-[13px] font-medium text-foreground">Evidence</h3>
-                <div className="dash-tile overflow-x-auto rounded-lg p-3 font-mono text-[11px] leading-relaxed" data-lenis-prevent>
+                <div className="dash-tile overflow-x-auto rounded-lg p-3 font-mono text-[11px] leading-relaxed">
                   {current.evidence.map((e, i) => (
                     <div key={i} className={cn("whitespace-pre", EV_STYLE[e.tone])}>
                       {e.text}
@@ -192,7 +192,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
               <span className="text-muted-foreground">
                 Validation <span className="text-foreground">{current.validation}</span>
               </span>
-              <StatusBadge meaning={FINDING_REVIEW[validationOf(current)]} />
+              <StatusBadge meaning={FINDING_REVIEW[validationOf(current)]} label={reviewLabel(current)} />
               {current.references.length > 0 && (
                 <span className={cn("min-w-0 basis-full font-mono text-[11px] text-muted-foreground sm:ml-auto sm:basis-auto sm:text-right", WRAP)}>
                   {current.references.join(" · ")}
@@ -205,7 +205,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
 
       <p className="mt-4 text-xs text-muted-foreground">
         See{" "}
-        <Link href="/docs/reference/findings" className="rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <Link href="/docs/reference/findings" className="rounded-sm text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           the findings format
         </Link>{" "}
         for how severity, validation and evidence are recorded.

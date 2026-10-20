@@ -7,6 +7,10 @@ import { counted, newest, sample, signIn, toolSteps } from "./support";
 
 const view = (name: string) => `nav[aria-label="Views"] button[aria-label^="${name}"]`;
 
+/** The Findings view's rows, and the selected one. */
+const findingRows = (page: Page) => page.getByRole("list", { name: "Findings", exact: true }).getByRole("listitem");
+const selectedFinding = (page: Page) => page.getByRole("list", { name: "Findings", exact: true }).locator('button[aria-current="true"]');
+
 /** A summary-strip card (Findings, Assessment progress, Tool execution, Duration). */
 const card = (page: Page, label: string) => page.locator(`[data-motion="top"] section[aria-label="${label}"]`);
 const stat = (page: Page, label: string) => card(page, label).locator("[data-countup]").first();
@@ -22,7 +26,7 @@ test("the overview totals every saved file by default", async ({ page }) => {
   await expect(card(page, "Assessment progress")).toContainText(`${done} of ${all.length} runs completed`);
   await expect(page.getByRole("region", { name: "Policy checks" })).toHaveCount(0); // removed by the owner
   await page.click(view("Findings"));
-  await expect(page.locator('[role="option"]')).toHaveCount(all.reduce((n, a) => n + a.findings.length, 0));
+  await expect(findingRows(page)).toHaveCount(all.reduce((n, a) => n + a.findings.length, 0));
   await page.click(view("Reports"));
   await expect(page.getByRole("list", { name: "Saved assessments" }).getByRole("link")).toHaveCount(all.length);
 });
@@ -110,7 +114,7 @@ test("the switcher opens another assessment and keeps the view", async ({ page }
   await page.locator(`[role="dialog"] a[href*="uid=${other.uid}"]`).click();
   await expect(page).toHaveURL(new RegExp(`uid=${other.uid}`));
   await expect(page).toHaveURL(/view=findings/);
-  await expect(page.locator('[role="option"]')).toHaveCount(other.findings.length);
+  await expect(findingRows(page)).toHaveCount(other.findings.length);
 });
 
 test("a waiting run shows its pending approval", async ({ page }) => {
@@ -179,7 +183,7 @@ test("findings filter by severity, validation and search, and clear in one click
   await signIn(page);
   const a = sample().find((x) => x.findings.length >= 3)!;
   await page.goto(`/?uid=${a.uid}&view=findings`);
-  const rows = page.locator('[role="option"]');
+  const rows = findingRows(page);
   await expect(rows).toHaveCount(a.findings.length);
   const sev = a.findings[0].severity;
   await page.getByRole("group", { name: "Severity" }).getByRole("button", { name: new RegExp(`^${sev.toLowerCase()}`) }).click();
@@ -201,18 +205,18 @@ test("the overview drills into filtered views", async ({ page }) => {
   await page.getByRole("button", { name: `Show the ${medium} medium ${medium === 1 ? "finding" : "findings"}` }).click();
   await expect(page).toHaveURL(/view=findings/);
   await expect(page).toHaveURL(/sev=MEDIUM/);
-  await expect(page.locator('[role="option"]')).toHaveCount(medium);
+  await expect(findingRows(page)).toHaveCount(medium);
 
   // the summary strip's Findings card opens every finding, a top finding opens itself
   await page.click(view("Overview"));
   await page.getByRole("button", { name: "Open all findings" }).click();
   await expect(page).toHaveURL(/view=findings/);
   await expect(page).not.toHaveURL(/sev=/);
-  await expect(page.locator('[role="option"]')).toHaveCount(a.findings.length);
+  await expect(findingRows(page)).toHaveCount(a.findings.length);
   await page.click(view("Overview"));
   await page.getByRole("button", { name: /^Open F-\d+/ }).first().click();
   await expect(page).toHaveURL(/finding=F-\d+/);
-  await expect(page.locator('[role="option"][aria-selected="true"]')).toHaveCount(1);
+  await expect(selectedFinding(page)).toHaveCount(1);
 });
 
 test("the switcher searches every saved run, and the bell lists other waiting runs", async ({ page }) => {

@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { deriveDashboard } from "@/components/dashboard/derive";
-import { countBy, findingMatches, list, sortFindings, validationOf } from "@/components/dashboard/filters";
+import { countBy, findingMatches, list, reviewLabel, sortFindings, validationOf } from "@/components/dashboard/filters";
 import { assessmentView } from "@/lib/data/adapt";
 
 import { sampleAssessments } from "./fixtures";
@@ -31,6 +31,14 @@ describe("findingMatches", () => {
       expect(findings.filter((x) => findingMatches(x, { ...none, q })).map((x) => x.id)).toContain(f.id);
     }
     expect(findings.filter((x) => findingMatches(x, { ...none, q: "no-such-thing-zzz" }))).toHaveLength(0);
+  });
+  it("says why a closed finding is closed", () => {
+    const open = findings.find((f) => f.needsReview)!;
+    expect(reviewLabel(open)).toBe("Needs review");
+    expect(reviewLabel({ ...open, needsReview: false, confirmed: false, status: "fixed" })).toBe("Fixed");
+    expect(reviewLabel({ ...open, needsReview: false, confirmed: false, status: "accepted" })).toBe("Accepted");
+    expect(reviewLabel({ ...open, needsReview: false, confirmed: false, falsePositive: true, status: "false-positive" })).toBe("False positive");
+    expect(reviewLabel({ ...open, needsReview: false, confirmed: true })).toBe("Confirmed");
   });
   it("buckets every finding once", () => {
     expect(findings.every((f) => ["confirmed", "review", "closed"].includes(validationOf(f)))).toBe(true);
