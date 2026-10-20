@@ -4,10 +4,12 @@
    tokens (tokens.css); severity uses the TUI's scale (--sev-*). Owner: the dashboard. */
 
 /* ---- Overview grid -------------------------------------------------------------------
-   ≥1280: the summary strip across the top; the hero with Findings by Severity on its right;
-   the Activity and Execution timelines side by side under the hero. 768–1279: one column.
-   Phones: everything stacked. Rows never shrink below their content: when it doesn't fit,
-   the content area scrolls (nothing is clipped). */
+   ≥1280 wide: the summary strip across the top; the hero with Findings by Severity on its
+   right; the Activity and Execution timelines side by side under the hero. 768–1279: one
+   column. Phones: everything stacked. Rows never shrink below their content.
+   The fixed-height frame (frame.css: ≥1280 wide and ≥760 tall) fills the content area and the
+   hero takes what is left (the content area scrolls when even that doesn't fit). A wide but
+   short window has no fixed frame (the window scrolls), so the hero keeps a roomy height. */
 .dash-overview {
   padding: 0 16px 16px 4px;
   display: grid;
@@ -22,13 +24,18 @@
 
 @media (min-width: 1280px) {
   .dash-overview {
-    min-height: 100%;
     grid-template-columns: minmax(0, 1fr) clamp(300px, 24vw, 390px);
-    /* min-content, not auto: a fixed max (36vh) would clamp an auto minimum below the content */
-    grid-template-rows: auto minmax(min-content, 1fr) minmax(min-content, 36vh);
+    grid-template-rows: auto minmax(min-content, auto) auto;
     grid-template-areas: "top top" "hero right" "bottom right";
   }
   .dash-bottom { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+}
+@media (min-width: 1280px) and (min-height: 760px) {
+  .dash-overview {
+    min-height: 100%;
+    /* min-content, not auto: a fixed max (36vh) would clamp an auto minimum below the content */
+    grid-template-rows: auto minmax(min-content, 1fr) minmax(min-content, 36vh);
+  }
 }
 @media (max-width: 767.98px) {
   .dash-overview { padding: 12px 16px 16px; }
@@ -328,10 +335,11 @@
 .dash-sev-row:hover,
 .dash-top-finding:hover { background: color-mix(in oklab, var(--foreground) 4%, transparent); }
 .dash-top-findings { display: flex; flex-direction: column; gap: 1px; }
-/* As many top findings as the column has room for: 3 on short screens, up to 8 on tall ones
-   (every finding is in the Findings view). Below 1280 the column is not height-bound: 5. */
+/* As many top findings as the column has room for: 3 in a short fixed frame, up to 8 in a tall
+   one (every finding is in the Findings view). Without the fixed frame the column is not
+   height-bound: 5. */
 .dash-top-finding:nth-child(n + 6) { display: none; }
-@media (min-width: 1280px) and (max-height: 859.98px) { .dash-top-finding:nth-child(n + 4) { display: none; } }
+@media (min-width: 1280px) and (min-height: 760px) and (max-height: 859.98px) { .dash-top-finding:nth-child(n + 4) { display: none; } }
 @media (min-width: 1280px) and (min-height: 1000px) { .dash-top-finding:nth-child(n + 6) { display: grid; } }
 
 /* ---- Chips / small bits reused across cards ---- */
@@ -394,8 +402,9 @@
   min-height: 400px;
   border-radius: 16px;
 }
-@media (min-width: 768px) and (max-width: 1279.98px) { .dash-hero { min-height: 460px; } }
-@media (min-width: 1280px) { .dash-hero { min-height: 220px; } }
+@media (min-width: 768px) { .dash-hero { min-height: 460px; } }
+/* in the fixed frame the hero takes the room the other rows leave (at least 220 px) */
+@media (min-width: 1280px) and (min-height: 760px) { .dash-hero { min-height: 220px; } }
 .dash-globe-wrap { position: absolute; inset: -8px 0; z-index: 0; pointer-events: none; }
 .dash-globe-glow {
   position: absolute;
