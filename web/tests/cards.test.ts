@@ -1,0 +1,164 @@
+/* The reply cards (lib/assistant/cards.ts), the intent rules behind them (intent.ts) and the
+   welcome suggestions (prompts.ts), on the sample data: every card passes the shared schema,
+   holds the saved numbers, and the model is only told which cards are shown. */
+import { describe, expect, it } from "vitest";
+
+import { approvalsCard, cardNotes, NOTICES, pickCards } from "@/lib/assistant/cards";
+import { rankFindings, scopedViews, topFinding } from "@/lib/assistant/insights";
+import { readIntent } from "@/lib/assistant/intent";
+import { welcomePrompts } from "@/lib/assistant/prompts";
+import { type Card, CardSchema } from "@/lib/assistant/protocol";
+import { MASK } from "@/lib/assistant/redact";
+import { assessmentView } from "@/lib/data/adapt";
+import type { Assessment } from "@/lib/data/schema";
+
+import { sampleAssessments } from "./fixtures";
+
+const samples = sampleAssessments();
+const views = samples.map(assessmentView);
+const waiting = samples.find((a) => a.status === "Awaiting input")!;
+const completed = samples.find((a) => a.status === "Completed")!;
+const kinds = (cards: Card[]) => cards.map((c) => c.kind);
+const of = <K extends Card["kind"]>(cards: Card[], kind: K) => cards.find((c): c is Extract<Card, { kind: K }> => c.kind === kind)!;
+const real = (a: Assessment) => a.findings.filter((f) => f.status !== "false-positive");
+
+describe("readIntent", () => {
+  it.each([
+    ["Analyze the current findings", ["findings"]],
+    ["Explain the top finding", ["top", "findings"]],
+    ["Review the assessment progress", ["progress"]],
+    ["What waits on my approval?", ["approvals"]],
+    ["Generate a report", ["report"]],
+    ["Plan a security assessment", ["plan"]],
+    ["Which tools ran?", ["tools"]],
+    ["What did the policy block?", ["policy"]],
+    ["Approve the pending action", ["act", "approvals"]],
+    ["Run nmap against 192.0.2.10", ["run"]],
+    ["scan example.com now", ["run"]],
+    ["hello there", []],
+  ])("%s → %j", (question, intents) => {
+    expect(readIntent(question).intents).toEqual(intents);
+  });
+  it("finds finding ids, not the number inside a run label", () => {
+    expect(readIntent("Explain F-002 and imp-1 in RCX-DEMO-001").findingIds).toEqual(["F-2", "IMP-1"]);
+  });
+});
+
+describe("pickCards", () => {
+  it("builds findings from the saved data, worst first, without false positives", () => {
+    const cards = pickCards(samples, null, "Analyze the current findings");
+    expect(kinds(cards)).toEqual(["findings"]);
+    const card = of(cards, "findings");
+    expect(card.total).toBe(samples.reduce((n, a) => n + real(a).length, 0));
+    for (const s of ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const) {
+      expect(card.counts[s]).toBe(samples.reduce((n, a) => n + real(a).filter((f) => (f.effective_severity || f.severity) === s).length, 0));
+    }
+    const top = rankFindings(scopedViews(views, null))[0];
+    expect(card.items[0]).toMatchObject({ id: top.finding.id, severity: top.finding.severity, run: { uid: top.view.uid } });
+    expect(card.items.length).toBeLessThanOrEqual(5);
+  });
+  it("explains the same top finding the welcome suggestion names", () => {
+    for (const uid of [null, completed.uid]) {
+      const scoped = scopedViews(views, uid);
+      const suggestion = welcomePrompts(scoped).find((p) => p.kind === "top")!;
+      const card = of(pickCards(samples, uid, suggestion.question), "finding");
+      expect(suggestion.detail.startsWith(card.item.id)).toBe(true);
+      expect(card.item.id).toBe(topFinding(scoped)!.finding.id);
+      expect(card.item.run.uid).toBe(topFinding(scoped)!.view.uid);
+    }
+  });
+  it("shows a finding named by id", () => {
+    const card = of(pickCards(samples, completed.uid, "Explain F-002 please"), "finding");
+    expect(card.item.id).toBe("F-002");
+    expect(card.item.run.uid).toBe(completed.uid);
+  });
+  it("shows plan progress with the saved phase states", () => {
+    const card = of(pickCards(samples, waiting.uid, "Review the assessment progress"), "progress");
+    expect(card.runs).toHaveLength(1);
+    expect(card.runs[0].phases.map((p) => p.status)).toEqual(waiting.plan.map((p) => p.status));
+    expect(card.runs[0].status).toBe("Awaiting input");
+  });
+  it("lists approvals, the waiting one first, and says nothing can be approved here", () => {
+    const card = of(pickCards(samples, null, "What waits on my approval?"), "approvals");
+    expect(card.pending).toBe(1);
+    expect(card.items[0]).toMatchObject({ state: "PENDING", run: { uid: waiting.uid } });
+    const asked = pickCards(samples, null, "Approve the pending action");
+    expect(kinds(asked)).toEqual(["notice", "approvals"]);
+    expect(of(asked, "notice")).toEqual(NOTICES.act);
+  });
+  it("shows policy blocks, masked again", () => {
+    const leaky = { ...completed, verdicts: [{ method: "GET", path: "/x?password=hunter2", allowed: false, reason: "Path outside approved scope", at: null }] };
+    const card = of(pickCards([leaky], null, "What did the policy block?"), "policy");
+    expect(card.blocked).toBe(1);
+    expect(card.items[0].text).toContain(MASK);
+    expect(card.items[0].text).not.toContain("hunter2");
+    expect(card.items[0].time).toBe("—");
+  });
+  it("shows tool steps from the log", () => {
+    const card = of(pickCards(samples, completed.uid, "Which tools ran?"), "tools");
+    const toolLines = assessmentView(completed).log.filter((l) => l.kind === "tool");
+    expect(card.runs[0].total).toBe(toolLines.length);
+    expect(card.runs[0].steps[0].time).toBe(toolLines[0].t);
+    expect(card.runs[0].requests).toBe(completed.run.requests);
+  });
+  it("offers one run's downloads, or asks which run", () => {
+    expect(of(pickCards(samples, completed.uid, "Generate a report"), "report").runs).toHaveLength(1);
+    const all = of(pickCards(samples, null, "Generate a report"), "report");
+    expect(all.runs.map((r) => r.run.uid)).toEqual(scopedViews(views, null).map((v) => v.uid));
+  });
+  it("answers planning with guidance only, never a plan", () => {
+    const cards = pickCards(samples, null, "Plan a security assessment");
+    expect(cards).toEqual([NOTICES.plan]);
+    expect(NOTICES.plan.body).toContain("no plan has been made");
+    expect(NOTICES.plan.action).toBe("terminal");
+    expect(kinds(pickCards(samples, null, "Run nmap against 192.0.2.10"))).toEqual(["notice"]);
+  });
+  it("narrows every run to the runs a question names", () => {
+    const card = of(pickCards(samples, null, "How is the progress of RCX-DEMO-002?"), "progress");
+    expect(new Set(card.runs.map((r) => r.run.label))).toEqual(new Set(["RCX-DEMO-002"]));
+  });
+  it("shows nothing for small talk, and a notice when nothing is saved", () => {
+    expect(pickCards(samples, null, "hello there")).toEqual([]);
+    expect(pickCards([], null, "Analyze the findings")).toEqual([NOTICES.empty]);
+    expect(pickCards([], null, "thanks")).toEqual([]);
+    expect(pickCards(samples, "20200101-000000-dead_NOPE-1", "Analyze the findings")).toEqual([]);
+  });
+  it("keeps every card within the schema and at most four per reply", () => {
+    const questions = ["Summarize everything: findings, progress, tools, policy blocks, approvals and the report", ...welcomePrompts(views).map((p) => p.question)];
+    for (const uid of [null, ...samples.map((a) => a.uid)]) {
+      for (const q of questions) {
+        const cards = pickCards(samples, uid, q);
+        expect(cards.length).toBeLessThanOrEqual(4);
+        for (const card of cards) expect(CardSchema.safeParse(card).success).toBe(true);
+      }
+    }
+  });
+  it("tells the model which cards are shown, not what they hold", () => {
+    const cards = pickCards(samples, null, "Analyze the current findings and what waits on my approval");
+    const notes = cardNotes(cards).join(" ");
+    expect(notes).toContain("findings card");
+    expect(notes).toContain("approvals card");
+    expect(notes).not.toMatch(/\d|RCX|F-0/);
+  });
+  it("counts what waits for approval the same way the card does", () => {
+    expect(approvalsCard(scopedViews(views, waiting.uid)).pending).toBe(1);
+    expect(approvalsCard(scopedViews(views, completed.uid)).pending).toBe(0);
+  });
+});
+
+describe("welcomePrompts", () => {
+  it("names real numbers, and offers approvals only when something waits", () => {
+    const all = welcomePrompts(scopedViews(views, null));
+    expect(all.map((p) => p.kind)).toEqual(["findings", "top", "progress", "approvals", "report", "plan"]);
+    const total = samples.reduce((n, a) => n + real(a).length, 0);
+    expect(all[0].detail).toContain(`${total} findings`);
+    expect(all.find((p) => p.kind === "progress")!.detail).toBe(`${samples.filter((a) => a.status === "Completed").length} of ${samples.length} runs completed`);
+    expect(welcomePrompts(scopedViews(views, completed.uid)).map((p) => p.kind)).not.toContain("approvals");
+    expect(welcomePrompts(scopedViews(views, waiting.uid)).find((p) => p.kind === "approvals")!.detail).toContain("secret_validation");
+    expect(welcomePrompts([]).map((p) => p.kind)).toEqual(["plan"]);
+  });
+  it("leads each suggestion to its cards", () => {
+    const want: Record<string, string> = { findings: "findings", top: "finding", progress: "progress", approvals: "approvals", report: "report", plan: "notice" };
+    for (const p of welcomePrompts(scopedViews(views, null))) expect(kinds(pickCards(samples, null, p.question))).toContain(want[p.kind]);
+  });
+});
