@@ -155,6 +155,7 @@ export interface GlobeAim {
   mask: number; // MOTION.globeMask.*
   before?: () => void; // as it starts moving (carry it into the stage)
   after?: () => void; // once it has landed (hand it back to the hero)
+  onUpdate?: () => void; // every frame it moves (keep its dots' apparent size)
 }
 
 export const surfaceBox = (b: Box, radius: number) => ({
@@ -174,6 +175,7 @@ const globeTo = (g: GlobeAim, t: { duration: number; ease: string }) => ({
   "--globe-mask": `${g.mask}%`,
   duration: t.duration,
   ease: t.ease,
+  onUpdate: g.onUpdate,
 });
 
 /** Open: the dashboard leaves and the surface grows from `from` (the hero's box) to `to`. */

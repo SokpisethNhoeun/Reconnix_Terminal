@@ -203,6 +203,9 @@ test("the one globe sits behind the welcome at about 0.18, fades out once the co
   await expect.poll(() => carrierOpacity(page)).toBeCloseTo(0.18, 2);
   await expect(canvas(page)).toHaveAttribute("data-globe", "running");
   await expect(canvas(page)).toHaveAttribute("data-globe-mode", "ambient");
+  // drawn at the size it is shown (seated), not a small hero's canvas scaled up
+  const scale = () => page.locator(PARTS.carrier).evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).a);
+  await expect.poll(scale).toBeCloseTo(1, 1);
 
   await composer(page).fill("Which runs wait on me?");
   await composer(page).press("Enter");

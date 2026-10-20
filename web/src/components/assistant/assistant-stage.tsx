@@ -36,7 +36,19 @@ import {
   setPartsOut,
 } from "./motion";
 import { type Phase, reducedMotion, roomy } from "./motion-env";
-import { aimAt, aimFrom, boxSpot, carryGlobe, globeSpot, homeGlobe, isCarried, placeAround, spotBox } from "./motion-globe";
+import {
+  aimAt,
+  aimFrom,
+  boxSpot,
+  carryGlobe,
+  globeSpot,
+  homeGlobe,
+  isCarried,
+  matchPoints,
+  placeAround,
+  spotBox,
+  unseatGlobe,
+} from "./motion-globe";
 import { holdGlobe, setGlobeAmbient, sharedGlobe } from "./use-globe";
 import { useGlobeAim } from "./use-globe-aim";
 import { useReturnFocus } from "./use-return-focus";
@@ -130,10 +142,12 @@ export function AssistantStage({ view, shown, setShown }: { view: View; shown: V
     if (!g) return null;
     const spot = globeSpot(s, l.front);
     placeAround(spot, l.halo, b);
-    if (isCarried(g, b)) return aimAt(g.carrier, spot, globe.opacity());
+    const onUpdate = () => void matchPoints(g);
+    if (isCarried(g, b)) return { ...aimAt(g.carrier, spot, globe.opacity()), onUpdate };
     const home = boxIn(g.home, s);
     if (!home) return null;
-    return { ...aimFrom(g.carrier, home, spot, globe.opacity()), before: () => carryGlobe(g, b, home, 1, MOTION.globeMask.hero) };
+    const before = () => carryGlobe(g, b, home, 1, MOTION.globeMask.hero);
+    return { ...aimFrom(g.carrier, home, spot, globe.opacity()), before, onUpdate };
   };
 
   /** The crossfade's globe: carried in with the assistant when its hero isn't on screen (else it
@@ -243,8 +257,13 @@ export function AssistantStage({ view, shown, setShown }: { view: View; shown: V
     if (g && isCarried(g, b)) {
       gsap.killTweensOf([g.carrier, l.halo]);
       const home = boxIn(g.home, s);
-      // back over its place in the hero, then into it (under the hero's cards) as it lands
-      if (home) aim = { ...aimAt(g.carrier, boxSpot(home), 1, MOTION.globeMask.hero), after: () => homeGlobe(g) };
+      // laid out at the hero's size again, back over its place there, then into it (under the
+      // hero's cards) as it lands
+      if (home) {
+        unseatGlobe(g, b, home);
+        const travel = { after: () => homeGlobe(g), onUpdate: () => void matchPoints(g) };
+        aim = { ...aimAt(g.carrier, boxSpot(home), 1, MOTION.globeMask.hero), ...travel };
+      }
     }
     timeline.current = closeTimeline({ parts, layers: l, to: hero, globe: aim, onComplete: settleClose });
   };

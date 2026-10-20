@@ -10,7 +10,7 @@ import { gsap } from "gsap";
 import { useAssistant } from "./assistant-provider";
 import { MOTION } from "./motion";
 import { type Phase, reducedMotion } from "./motion-env";
-import { aimAt, carryGlobe, globeSpot, isCarried, placeAround, spotBox } from "./motion-globe";
+import { aimAt, carryGlobe, globeSpot, isCarried, matchPoints, placeAround, seatGlobe, spotBox } from "./motion-globe";
 import { holdGlobe, sharedGlobe, useSharedGlobe } from "./use-globe";
 
 type Ref = RefObject<HTMLDivElement | null>;
@@ -56,9 +56,18 @@ export function useGlobeAim({ stage, front, halo, breath }: GlobeAimRefs, phase:
       const to = aimAt(g.carrier, spot, target);
       placeAround(spot, h, b);
       const move = { x: to.x, y: to.y, scale: to.scale };
-      if (how === "fade" && visible && !reducedMotion()) {
-        gsap.to(g.carrier, { ...move, duration: MOTION.globeShift, ease: "power2.out", overwrite: "auto" });
-      } else gsap.set(g.carrier, move);
+      const now = (k: string) => Number(gsap.getProperty(g.carrier, k));
+      const away = Math.abs(now("x") - to.x) + Math.abs(now("y") - to.y) > 1 || Math.abs(now("scale") - to.scale) > 0.005;
+      // once it shows on its spot, it is drawn at the size it is shown (seatGlobe): crisp
+      const seat = () => (how === "fade" && target > 0 ? seatGlobe(g, b, spot) : undefined);
+      if (how === "fade" && visible && away && !reducedMotion()) {
+        const shift = { duration: MOTION.globeShift, ease: "power2.out", overwrite: "auto" as const };
+        gsap.to(g.carrier, { ...move, ...shift, onUpdate: () => void matchPoints(g), onComplete: seat });
+      } else {
+        gsap.set(g.carrier, move);
+        matchPoints(g);
+        seat();
+      }
     }
     if (how === "follow") return;
     const duration = reducedMotion() ? MOTION.fadeReduced.duration : MOTION.globeFade;

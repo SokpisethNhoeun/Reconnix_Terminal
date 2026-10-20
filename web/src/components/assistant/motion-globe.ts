@@ -3,7 +3,9 @@
    [data-globe-slot], or the stage's centre until the welcome has one), and back home.
 
    While it travels, the carrier keeps its hero size and moves with a transform (translate +
-   scale), so the canvas keeps its resolution and three.js never resizes mid-flight. */
+   scale), so three.js never resizes mid-flight; its dots keep their apparent size meanwhile
+   (matchPoints). Once it sits behind the welcome it is laid out at its spot's own size (seated),
+   drawn at the resolution it is shown, so it is crisp however small the hero was. */
 import { gsap } from "gsap";
 import { boxIn, MOTION, type Box, type GlobeAim } from "./motion";
 import type { SharedGlobe } from "./use-globe";
@@ -69,6 +71,7 @@ export function carryGlobe(g: SharedGlobe, layer: HTMLElement, box: Box, opacity
   Object.assign(c.style, { left: px(box.left), top: px(box.top), width: px(box.width), height: px(box.height) });
   c.style.setProperty("--globe-mask", `${mask}%`);
   gsap.set(c, { x: 0, y: 0, scale: 1, opacity, transformOrigin: "50% 50%" });
+  g.controls?.setPointScale(1);
   g.controls?.redraw();
 }
 
@@ -78,7 +81,39 @@ export function homeGlobe(g: SharedGlobe): void {
   gsap.killTweensOf(c);
   if (c.parentElement !== g.home) g.home.append(c);
   gsap.set(c, { clearProps: "all" });
+  g.controls?.setPointScale(1);
   g.controls?.redraw();
+}
+
+const scaleOf = (c: HTMLElement) => Number(gsap.getProperty(c, "scale")) || 1;
+const maskOf = (c: HTMLElement) => parseFloat(c.style.getPropertyValue("--globe-mask")) || MOTION.globeMask.stage;
+
+/** The dots and lines at their apparent size while the carrier is shown scaled (call it whenever
+    its scale changes). */
+export const matchPoints = (g: SharedGlobe) => g.controls?.setPointScale(1 / scaleOf(g.carrier));
+
+/** Seated: laid out at the spot's own size with no transform, so it is drawn at the resolution
+    it is shown (from a small hero it was scaled up). Nothing moves; it only sharpens. */
+export function seatGlobe(g: SharedGlobe, layer: HTMLElement, spot: Spot): void {
+  if (Math.abs(scaleOf(g.carrier) - 1) < 0.03) return; // drawn at its size already
+  carryGlobe(g, layer, spotBox(spot), Number(gsap.getProperty(g.carrier, "opacity")), maskOf(g.carrier));
+}
+
+/** Where the carrier shows now, in the layer's coordinates (its layout moved by its own transform;
+    the breathing layer's scale isn't counted, it applies on top either way). */
+function shownSpot(c: HTMLElement): Spot {
+  const b = layoutBox(c);
+  const p = (k: string) => Number(gsap.getProperty(c, k)) || 0;
+  return { cx: b.left + b.width / 2 + p("x"), cy: b.top + b.height / 2 + p("y"), size: b.height * scaleOf(c) };
+}
+
+/** Laid out at `box` (the hero's, before a close takes it home) and shown where it is now. */
+export function unseatGlobe(g: SharedGlobe, layer: HTMLElement, box: Box): void {
+  const now = shownSpot(g.carrier);
+  carryGlobe(g, layer, box, Number(gsap.getProperty(g.carrier, "opacity")), maskOf(g.carrier));
+  const at = aimFrom(g.carrier, box, now, 1);
+  gsap.set(g.carrier, { x: at.x, y: at.y, scale: at.scale });
+  matchPoints(g);
 }
 
 /** The teal glow behind the globe, and the breathing layer's pivot, on the spot. */

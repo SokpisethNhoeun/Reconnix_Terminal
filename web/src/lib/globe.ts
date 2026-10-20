@@ -17,6 +17,9 @@ export type GlobeControls = {
   /** Ambient mode, behind the AI Assistant at low opacity: no bloom pass and about 30 frames a
       second, so it stays light on the GPU; on a low-power device it stops on a still frame. */
   setAmbient(on: boolean): void;
+  /** Scale its dots and lines (1: as designed), for a canvas shown at another size than it is
+      drawn (carried with a CSS scale); a still globe redraws. */
+  setPointScale(k: number): void;
   /** Draw one frame now (the still globe under reduced motion, after its canvas moved). */
   redraw(): void;
   destroy(): void;
@@ -72,8 +75,9 @@ export function mountGlobe(canvas: HTMLCanvasElement, opts: Opts): GlobeControls
     camera.updateProjectionMatrix();
     composer?.setSize(w, h);
     arcs.forEach((a) => a.mat.resolution.set(w * pr, h * pr));
-    // No loop is drawing (reduced motion, or paused): a resize cleared the canvas, so re-draw it.
-    if (booted && !running) render();
+    // A resize cleared the canvas: draw it again now, not on the loop's next (maybe skipped)
+    // frame, so it never shows blank (and when no loop draws: reduced motion, or paused).
+    if (booted) render();
   };
   const ro = new ResizeObserver(resize);
   ro.observe(canvas);
@@ -290,6 +294,10 @@ export function mountGlobe(canvas: HTMLCanvasElement, opts: Opts): GlobeControls
         holds.set("low-power", on); // behind the assistant, a still frame only (plan §10)
         sync();
       }
+    },
+    setPointScale: (k) => {
+      g.setPointScale(k);
+      if (booted && !running) render();
     },
     redraw: () => {
       if (booted && !animated) render();

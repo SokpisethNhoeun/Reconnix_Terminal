@@ -42,6 +42,7 @@ function controls() {
     pause: (r = "external") => void calls.push(`pause ${r}`),
     resume: (r = "external") => void calls.push(`resume ${r}`),
     setAmbient: (on) => void calls.push(`ambient ${on}`),
+    setPointScale: () => {},
     redraw: () => void calls.push("redraw"),
     destroy: () => void calls.push("destroy"),
   };

@@ -90,6 +90,9 @@ export interface GlobeScene {
   arcs: Arc[];
   ripples: Ripple[];
   spawnRipple: (p: THREE.Vector3) => void;
+  /** Scale every point and line width (1: as designed): a canvas drawn at another resolution
+      than it is shown keeps its dots' apparent size. */
+  setPointScale: (k: number) => void;
   disposables: { dispose(): void }[];
 }
 
@@ -326,15 +329,16 @@ export function buildScene(canvas: HTMLCanvasElement, o: { animated: boolean; pr
   nodeGeo.setAttribute("position", new THREE.Float32BufferAttribute(nodePos, 3));
   nodeGeo.setAttribute("aSize", new THREE.Float32BufferAttribute(nodeSizes, 1));
   const uNodePop = { value: animated ? 0 : 1 };
+  const uPointScale = { value: 1 }; // setPointScale
   const nodeMat = track(
     new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
-      uniforms: { uTex: { value: nodeTex }, uColor: { value: col.strong }, uPop: uNodePop, uGlow: { value: glowMul } },
-      vertexShader: `attribute float aSize; uniform float uPop; void main(){
+      uniforms: { uTex: { value: nodeTex }, uColor: { value: col.strong }, uPop: uNodePop, uScale: uPointScale, uGlow: { value: glowMul } },
+      vertexShader: `attribute float aSize; uniform float uPop; uniform float uScale; void main(){
         gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
-        gl_PointSize=aSize*uPop;
+        gl_PointSize=aSize*uPop*uScale;
       }`,
       fragmentShader: `uniform sampler2D uTex; uniform vec3 uColor; uniform float uGlow; void main(){
         float a=texture2D(uTex,gl_PointCoord).a;
@@ -360,10 +364,10 @@ export function buildScene(canvas: HTMLCanvasElement, o: { animated: boolean; pr
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
-      uniforms: { uTex: { value: ringTex }, uColor: { value: col.strong }, uPop: uNodePop, uGlow: { value: glowMul } },
-      vertexShader: `attribute float aSize; uniform float uPop; void main(){
+      uniforms: { uTex: { value: ringTex }, uColor: { value: col.strong }, uPop: uNodePop, uScale: uPointScale, uGlow: { value: glowMul } },
+      vertexShader: `attribute float aSize; uniform float uPop; uniform float uScale; void main(){
         gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
-        gl_PointSize=aSize*uPop;
+        gl_PointSize=aSize*uPop*uScale;
       }`,
       fragmentShader: `uniform sampler2D uTex; uniform vec3 uColor; uniform float uGlow; void main(){
         float a=texture2D(uTex,gl_PointCoord).a;
@@ -516,7 +520,17 @@ export function buildScene(canvas: HTMLCanvasElement, o: { animated: boolean; pr
     })
     .catch(() => {});
 
+  const setPointScale = (k: number) => {
+    landMat.uniforms.uSize.value = 2.2 * pr * k;
+    oceanMat.size = 1.4 * pr * k;
+    hsMat.uniforms.uSize.value = 4 * pr * k;
+    uPointScale.value = k;
+    starMat.uniforms.uPr.value = pr * k;
+    for (const a of arcs) a.mat.linewidth = 1.5 * k;
+  };
+
   return {
+    setPointScale,
     ...{ scene, camera, tilt, spin, cageSpin, stars, uTime, uReveal, uAtmo, uNodePop, land },
     ...{ cageGeo, cageDrawCount, arcs, ripples, spawnRipple, disposables },
   };
