@@ -1,10 +1,12 @@
-/* The conversation's scrolling rules (components/assistant/use-stick-to-bottom.ts): follow new
+/* The conversation's scrolling rules (lib/scroll/stick-rules.ts) and controller
+   (lib/scroll/stick-controller.ts) behind components/assistant/use-stick-to-bottom.ts: follow new
    content only while the reader is at the bottom, let go as soon as they scroll up, hold on again
    when they come back down, and glide (or jump, under reduced motion) on "New messages". The DOM
    part runs here on a stand-in box; the browser part (wheel, layout) is in e2e/scroll.spec.ts. */
 import { describe, expect, it } from "vitest";
 
-import { createStickToBottom, distanceToBottom, NEAR_PX, nextStick, type StickState } from "@/components/assistant/use-stick-to-bottom";
+import { createStickToBottom } from "@/lib/scroll/stick-controller";
+import { distanceToBottom, NEAR_PX, nextStick, type StickState } from "@/lib/scroll/stick-rules";
 
 const held: StickState = { pinned: true, seeking: false, lastTop: 700 };
 const at = (scrollTop: number, scrollHeight = 1000, clientHeight = 300) => ({ scrollTop, scrollHeight, clientHeight });
@@ -138,6 +140,19 @@ describe("createStickToBottom", () => {
     box.user(250); // the reader scrolls up during the glide
     expect(stick.state()).toMatchObject({ pinned: false, seeking: false });
     expect(last()).toBe(false);
+  });
+
+  it("jumps when asked to, and a click event as the argument still glides", () => {
+    const { stick, box, last } = setup();
+    box.user(100);
+    stick.scrollToBottom({ instant: true });
+    expect(box.behaviors.at(-1)).toBe("instant");
+    expect(box.scrollTop).toBe(700);
+    expect(stick.state()).toMatchObject({ pinned: true, seeking: false });
+    expect(last()).toBe(true);
+    box.user(100);
+    (stick.scrollToBottom as (e: unknown) => void)({ type: "click" }); // onClick={scrollToBottom}
+    expect(box.behaviors.at(-1)).toBe("smooth");
   });
 
   it("jumps instead of gliding under reduced motion", () => {
