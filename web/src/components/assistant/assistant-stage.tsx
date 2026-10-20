@@ -8,7 +8,9 @@
                it sits on the card, behind the welcome text, at MOTION.globeOpacity
      front   — the chat (AssistantView), always full size; its pieces fade in as the surface lands
    The transition (motion.ts) and the breathing loops (breath.ts, [data-breath]) never animate the
-   same property of the same element, so they never fight.
+   same property of the same element, so they never fight. Only the globe layer breathes here (and
+   the sidebar's icon): the card and the panel hold the chat's text, and text never moves (the
+   owner's rule: a scaled panel makes the letters vibrate while reading).
 
    It follows the address: when `view` becomes "assistant" it opens, when it leaves it closes, and
    it tells the Viewer which view to show (`setShown`). The dashboard stays on screen while the
@@ -353,8 +355,8 @@ export function AssistantStage({ view, shown, setShown }: { view: View; shown: V
     <div ref={stage} className="dash-assistant-stage" data-on={on ? "" : undefined} inert={!on} aria-hidden={!on}>
       <div ref={surface} className="dash-assistant-surface" aria-hidden>
         <div ref={fill} className="dash-assistant-fill" />
-        <div ref={card} className="dash-assistant-card" data-breath="scale">
-          <div className="dash-assistant-glow" data-breath="glow" />
+        <div ref={card} className="dash-assistant-card">
+          <div className="dash-assistant-glow" />
         </div>
       </div>
       <div ref={globeLayer} className="dash-assistant-globe" aria-hidden>
@@ -366,7 +368,7 @@ export function AssistantStage({ view, shown, setShown }: { view: View; shown: V
         </div>
       </div>
       <div ref={front} className="dash-assistant-front">
-        <div className="dash-assistant-panel" data-breath="scale">
+        <div className="dash-assistant-panel">
           <AssistantView ref={composer} onMinimize={() => leaveAssistant()} />
         </div>
       </div>

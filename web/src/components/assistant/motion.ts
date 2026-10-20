@@ -16,6 +16,17 @@ const ARRIVE = "power2.out"; // parts arriving
 // peak speed than expo.inOut itself (≈18 px a frame instead of ≈32 on the right edge at 1920)
 const GROW = "power4.inOut";
 
+/** The globe's opacity behind the assistant's welcome: 18 %, kept within 10–30 % so the text over
+    it stays readable (plan v3 §3.8: a constant, no settings screen). */
+export const GLOBE_OPACITY = 0.18;
+export const GLOBE_OPACITY_RANGE = { min: 0.1, max: 0.3 } as const;
+
+/** `value` held within GLOBE_OPACITY_RANGE (a NaN falls back to GLOBE_OPACITY). */
+export function clampGlobeOpacity(value: number): number {
+  if (Number.isNaN(value)) return GLOBE_OPACITY;
+  return Math.min(GLOBE_OPACITY_RANGE.max, Math.max(GLOBE_OPACITY_RANGE.min, value));
+}
+
 export const MOTION = {
   // ---- open: seconds from the click ----
   open: {
@@ -52,7 +63,7 @@ export const MOTION = {
   radius: 16, // the surface's corners while it is the hero's size (0 when it fills the stage)
   fillOpacity: 1, // the stage background once the assistant is open, however it opened
   // ---- the globe behind the assistant ----
-  globeOpacity: 0.18, // on the welcome screen (keep within 0.10–0.30: the text stays readable)
+  globeOpacity: clampGlobeOpacity(GLOBE_OPACITY), // on the welcome screen
   globeFit: 1, // its height as a share of the welcome's globe slot (the slot's smaller side)
   globeCentered: 0.56, // no slot: its height as a share of the stage's smaller side, centred
   globeFade: 0.6, // fading out when the conversation starts, back on New chat
@@ -65,8 +76,8 @@ export const MOTION = {
   fade: { duration: 0.3, rise: 8 },
   fadeReduced: { duration: 0.22, rise: 0 },
   // ---- breathing (breath.ts and motion.css; the cycle is BREATH_MS) ----
-  // (the loops' ranges are motion.css's keyframes: icon 1 ↔ 1.10, globe 0.98 ↔ 1.02, panel
-  // 1 ↔ 1.003 with its glow 0.35 ↔ 0.75)
+  // (the loops' ranges are motion.css's keyframes: icon 1 ↔ 1.10, globe 0.98 ↔ 1.02; the chat
+  // panel never breathes: it holds text, and text never moves)
   breath: {
     lead: 1500, // ms: the first swell, from rest to the page clock's next peak, lasts at least this
     settle: 0.45, // s: back to rest when the assistant closes

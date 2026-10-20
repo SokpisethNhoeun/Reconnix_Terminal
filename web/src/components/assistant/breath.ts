@@ -1,9 +1,11 @@
 "use client";
 
 /* One 6-second breathing cycle shared by everything that breathes: the sidebar's AI icon, the
-   globe behind the assistant, the chat panel (motion.css) and the small orbs. Every loop is
-   aligned to the page clock (performance.now() and the document timeline share an origin): rest
-   at each multiple of BREATH_MS, the peak half-way, so they swell and settle together.
+   globe behind the assistant (motion.css) and the small orbs. Nothing that holds text breathes:
+   the chat panel and its card stay still (the owner's rule: scaled text vibrates while reading).
+   Every loop is aligned to the page clock (performance.now() and the document timeline share an
+   origin): rest at each multiple of BREATH_MS, the peak half-way, so they swell and settle
+   together.
 
    The assistant's loops run on [data-breath] elements, which the open/close animation never
    moves, so the two never fight. `startBreath` turns them on once the open has settled: each one

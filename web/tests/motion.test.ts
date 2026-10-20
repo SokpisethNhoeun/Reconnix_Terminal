@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BREATH_MS, untilPeak } from "@/components/assistant/breath";
-import { MOTION } from "@/components/assistant/motion";
+import { clampGlobeOpacity, GLOBE_OPACITY, GLOBE_OPACITY_RANGE, MOTION } from "@/components/assistant/motion";
 import { aimFrom, boxSpot, globeSpot, spotBox } from "@/components/assistant/motion-globe";
 import { globeWishes, holdGlobe, publishGlobe, setGlobeAmbient, type SharedGlobe } from "@/components/assistant/use-globe";
 import type { GlobeControls } from "@/lib/globe";
@@ -84,6 +84,25 @@ describe("the shared globe's wishes", () => {
     const next = controls();
     publishGlobe(globe(next.c)); // back on the dashboard
     expect(next.calls).toEqual(["ambient false"]); // no pause carried over
+  });
+});
+
+describe("the globe's opacity behind the welcome", () => {
+  it("is 18 %, within the readable range", () => {
+    expect(GLOBE_OPACITY).toBe(0.18);
+    expect(MOTION.globeOpacity).toBe(GLOBE_OPACITY);
+    expect(GLOBE_OPACITY_RANGE).toEqual({ min: 0.1, max: 0.3 });
+  });
+
+  it("holds any value within 0.10–0.30", () => {
+    expect(clampGlobeOpacity(0.18)).toBe(0.18);
+    expect(clampGlobeOpacity(0.1)).toBe(0.1);
+    expect(clampGlobeOpacity(0.3)).toBe(0.3);
+    expect(clampGlobeOpacity(0)).toBe(0.1);
+    expect(clampGlobeOpacity(-1)).toBe(0.1);
+    expect(clampGlobeOpacity(0.5)).toBe(0.3);
+    expect(clampGlobeOpacity(1)).toBe(0.3);
+    expect(clampGlobeOpacity(Number.NaN)).toBe(GLOBE_OPACITY);
   });
 });
 
