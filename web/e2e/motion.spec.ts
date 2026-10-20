@@ -311,21 +311,23 @@ test("open and close keep the address (run and filters), the scroll position and
   await expect(page.getByRole("heading", { name: "Findings", level: 1 })).toBeVisible();
   expect(await marked()).toBe(7);
 
-  // every run's findings, scrolled: the content area is where it was
+  // every run's findings, scrolled: the list pane (its own scroller on the fixed frame, since
+  // redesign v3's Findings paging) is where it was
   await page.goto("/?view=findings&sev=HIGH,MEDIUM,LOW");
   await expect(page.getByRole("heading", { name: "Findings", level: 1 })).toBeVisible();
   await page.evaluate(() => ((window as unknown as { kept: number }).kept = 8));
   const content = page.locator(".dash-content");
-  await content.evaluate((el) => el.scrollTo({ top: 240, behavior: "instant" }));
-  const before = await content.evaluate((el) => el.scrollTop);
-  expect(before).toBeGreaterThanOrEqual(120); // the list is tall enough to scroll here
+  const rows = page.locator("ul.dash-findings-rows");
+  await rows.evaluate((el) => el.scrollTo({ top: 240, behavior: "instant" }));
+  const before = await rows.evaluate((el) => el.scrollTop);
+  expect(before).toBeGreaterThan(0); // ten rows are taller than the pane at 1440×900
   const findingsUrl = page.url();
   await tab(page).click();
   await settled(page);
   await minimize(page);
   await closed(page);
   expect(page.url()).toBe(findingsUrl);
-  expect(await content.evaluate((el) => el.scrollTop)).toBe(before);
+  expect(await rows.evaluate((el) => el.scrollTop)).toBe(before);
   expect(await marked()).toBe(8);
 
   // the Overview with a run chosen: the grow-and-shrink keeps the run and the scroll
