@@ -14,6 +14,7 @@ export async function signIn(page: Page, token = TOKEN) {
 interface SampleAssessment {
   uid: string;
   label: string;
+  target: string;
   status: string;
   waiting_for: string;
   findings: { severity: string; validation: string; title: string; status: string; cvss_score: number }[];

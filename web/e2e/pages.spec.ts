@@ -30,8 +30,37 @@ test("the overview totals every saved file by default", async ({ page }) => {
   expect(await cards.evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).toEqual(["Findings", "Assessment progress", "Tool execution", "Duration"]);
   await page.click(view("Findings"));
   await expect(findingRows(page)).toHaveCount(all.reduce((n, a) => n + a.findings.length, 0));
+  // Report and Scope sum up every run too (no run picker): a row per run, a row per target
   await page.click(view("Reports"));
-  await expect(page.getByRole("list", { name: "Saved assessments" }).getByRole("link")).toHaveCount(all.length);
+  await expect(page.getByRole("table", { name: "Saved assessments" }).getByRole("link", { name: /^Open the report of/ })).toHaveCount(all.length);
+  await expect(page.getByRole("group", { name: "Report summary" }).locator("section")).toHaveCount(4);
+  await page.click(view("Scope"));
+  await expect(page.getByRole("table", { name: "Targets tested" }).getByRole("row")).toHaveCount(new Set(all.map((a) => a.target)).size + 1);
+});
+
+test("every run's Scope and Report open a run in the same view", async ({ page }) => {
+  await signIn(page);
+  const a = newest();
+  await page.goto("/?view=scope");
+  const approvals = sample().reduce((n, x) => n + x.approvals.length, 0);
+  await expect(page.getByRole("group", { name: "Scope summary" }).getByRole("region", { name: "Approvals" })).toContainText(String(approvals));
+  // the waiting request comes first
+  const waiting = sample().find((x) => x.status === "Awaiting input")!;
+  const first = page.getByRole("list", { name: "Approval requests" }).getByRole("listitem").first();
+  await expect(first).toContainText("Waiting for approval");
+  await first.getByRole("link").click();
+  await expect(page).toHaveURL(new RegExp(`uid=${waiting.uid}`));
+  await expect(page).toHaveURL(/view=scope/);
+  await expect(page.getByRole("region", { name: "Boundary" })).toBeVisible();
+
+  await page.goto("/?view=reports");
+  await page.getByRole("link", { name: new RegExp(`^Open the report of ${a.label}`) }).first().click();
+  await expect(page).toHaveURL(new RegExp(`uid=${a.uid}`));
+  await expect(page).toHaveURL(/view=reports/);
+  // one run's report: no policy tiles, and every finding listed
+  const tiles = page.getByRole("group", { name: "Report summary" }).locator("section");
+  expect(await tiles.evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).toEqual(["Findings", "Plan steps", "Requests sent", "Masked evidence"]);
+  await expect(page.getByRole("table", { name: "Findings in this report" }).locator("tbody tr")).toHaveCount(a.findings.length);
 });
 
 test("one run's overview counts what its file holds", async ({ page }) => {
@@ -137,7 +166,7 @@ test("a waiting run shows its pending approval", async ({ page }) => {
   await expect(page.getByText("This run waits on you")).toBeVisible();
   await expect(page.getByText(/awaiting approval/).first()).toBeVisible();
   await page.click(view("Scope"));
-  const requests = page.getByRole("heading", { name: "Approval requests" }).locator("..");
+  const requests = page.getByRole("region", { name: "Approval requests" });
   await expect(requests.getByText("Waiting for approval", { exact: true })).toBeVisible();
 });
 

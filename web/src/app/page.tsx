@@ -1,6 +1,7 @@
 /* The Local Assessment Viewer at `/`, rendered per request from the assessments the Reconix
    TUI saved (src/lib/data/store.ts). With no `?uid=` the Overview totals every saved run
-   (derive-overall.ts) and Findings lists them all; `?uid=` opens one run (derive.ts). `?view=` is
+   (derive-overall.ts), Findings lists them all, and Scope and Report sum them up
+   (derive-scope.ts, derive-report.ts); `?uid=` opens one run (derive.ts). `?view=` is
    the open view, read by the client Viewer. The terminal is rendered only when the server says
    this browser may use it (lib/auth/guard.ts); the AI Assistant learns what it is about, whether
    this browser may ask (operator role), which model answers (lib/assistant/config.ts) and what
@@ -8,11 +9,12 @@
 import type { AssistantInfo } from "@/components/assistant/types";
 import { deriveDashboard } from "@/components/dashboard/derive";
 import { deriveOverall } from "@/components/dashboard/derive-overall";
+import { overallReportCards, reportCards } from "@/components/dashboard/derive-report";
+import { overallScopeCards, scopeCards } from "@/components/dashboard/derive-scope";
 import { EmptyView } from "@/components/dashboard/empty-view";
 import { FindingsView } from "@/components/dashboard/findings-view";
 import { OverviewView } from "@/components/dashboard/overview-view";
 import { ReportsView } from "@/components/dashboard/reports-view";
-import { RunPicker } from "@/components/dashboard/run-picker";
 import { ScopeView } from "@/components/dashboard/scope-view";
 import { TopBar } from "@/components/dashboard/top-bar";
 import { Viewer } from "@/components/dashboard/viewer";
@@ -50,8 +52,8 @@ export default async function Home({ searchParams }: Props) {
     model: { configured: model.configured, name: model.model, local: model.local, reason: model.reason },
   };
   const empty = <EmptyView dir={dir} problems={library.problems} compact />;
-  // Reports and Scope belong to one run: with every run shown, pick one first.
-  const pick = (title: string, about: string) => (overall ? <RunPicker title={title} about={about} items={items} /> : empty);
+  const scope = chosen ? scopeCards(chosen) : overall ? overallScopeCards(views) : null;
+  const report = chosen && dash ? reportCards(chosen, dash.findings, dash.cards.findings) : overall ? overallReportCards(views, overall.cards.findings) : null;
 
   return (
     <Viewer
@@ -84,8 +86,8 @@ export default async function Home({ searchParams }: Props) {
           empty
         )
       }
-      reports={dash ? <ReportsView dash={dash} /> : pick("Report", "Reports are made per assessment. Pick one to see its summary and downloads.")}
-      scope={dash ? <ScopeView dash={dash} /> : pick("Scope", "Each assessment has its own approved scope. Pick one to see it.")}
+      reports={report ? <ReportsView key={chosen?.uid ?? "all"} data={report} /> : empty}
+      scope={scope ? <ScopeView data={scope} /> : empty}
       terminal={<TerminalView access={access} />}
       terminalState={access}
       assistant={assistant}

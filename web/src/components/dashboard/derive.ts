@@ -58,13 +58,9 @@ export interface Dashboard {
   phases: PhaseView[];
   findingTotal: number;
   severity: FindingsSlice["severity"];
-  checks: { total: number; allowed: number; blocked: number };
-  maskedSecrets: number;
   requests: number;
   minutes: { used: number; max: number | null; over: boolean };
-  planSteps: { done: number; total: number };
   scope: ScopeView | null;
-  scopeCounts: { inScope: number; excluded: number };
   approvals: ApprovalView[];
   gate: { time: string; text: string } | null;
   findings: FindingRow[];
@@ -221,13 +217,9 @@ export function deriveDashboard(v: AssessmentView): Dashboard {
     phases: v.phases,
     findingTotal: findingCards.total,
     severity: findingCards.severity,
-    checks: v.checks,
-    maskedSecrets: log.filter((l) => l.kind === "mask").length,
     requests: v.requests,
     minutes,
-    planSteps,
     scope: v.scope,
-    scopeCounts: { inScope, excluded: v.scope?.exclude.length ?? 0 },
     approvals: v.approvals,
     gate: v.gate,
     findings,

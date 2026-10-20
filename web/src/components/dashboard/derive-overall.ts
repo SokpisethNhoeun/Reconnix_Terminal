@@ -6,7 +6,7 @@
  * The Activity Timeline counts the runs started per day (per week past MAX_DAYS days), stacked
  * by run status; the Execution Timeline lists the newest runs.
  */
-import { duration, hourMinute, longDuration, minutesLimit, shortDay } from "@/lib/data/format";
+import { duration, longDuration, minutesLimit, shortDay } from "@/lib/data/format";
 import { STATUSES } from "@/lib/data/schema";
 import { localDay } from "@/lib/data/stats";
 import type { AssessmentView, Status } from "@/lib/data/view-types";
@@ -25,6 +25,7 @@ import {
   runEntry,
   toolCaption,
 } from "./derive";
+import { runLink } from "./derive-shared";
 import type { ActivityCard, DayBar, ExecutionCard, OverviewCards, Pattern, SummaryStrip } from "./overview-types";
 
 const DAY = 86_400_000;
@@ -154,7 +155,7 @@ export function deriveOverall(views: AssessmentView[]): Overall {
 
   // findings across runs (each keyed by its run)
   const findings = views.flatMap((v) =>
-    v.findings.map((f) => findingRow(f, { uid: v.uid, label: `${v.id} · ${shortDay(v.createdMs)} ${hourMinute(v.createdMs)}` })),
+    v.findings.map((f) => findingRow(f, runLink(v))),
   );
   const findingCards = findingsSlice(findings);
 

@@ -59,6 +59,8 @@ export interface ScopeView {
   target: string;
   include: string[];
   exclude: string[];
+  ports: string[]; // allowed ports ("443"); empty: the template's defaults
+  methods: string[];
   actions: string[];
   tools: string[];
   limits: { label: string; value: string }[];

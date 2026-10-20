@@ -19,9 +19,9 @@ const SIZES = [
 ];
 const label = (s: { width: number; height: number }) => `${s.width}×${s.height}`;
 const fixedFrame = (s: { width: number; height: number }) => s.width >= 1280 && s.height >= 760;
-const RUN = newest().uid; // Reports and Scope need one run
-const VIEWS = ["overview", "findings", `reports&uid=${RUN}`, `scope&uid=${RUN}`];
-const viewName = (v: string) => v.split("&")[0];
+const RUN = newest().uid; // Reports and Scope for one run, as well as for every run
+const VIEWS = ["overview", "findings", "reports", "scope", `reports&uid=${RUN}`, `scope&uid=${RUN}`];
+const viewName = (v: string) => (v.includes("&uid=") ? `${v.split("&")[0]} (one run)` : v);
 
 /* Known faults by size and view (none today): the check for that pair is expected to FAIL, and
    fails with "remove this entry" once the fault is gone, so a stale entry can't hide a new one. */
@@ -162,13 +162,13 @@ for (const size of [SIZES[0], SIZES[2]]) {
   test.describe(`the owner's sizes, ${label(size)}`, () => {
     test.use({ viewport: size });
 
-    for (const view of ["findings", "overview"]) {
+    for (const view of ["findings", "overview", "reports"]) {
       test(`the wheel scrolls the ${view} view to its end, in the content area`, async ({ page }) => {
         await signIn(page);
         await open(page, view);
         const start = await scrollState(page);
         expect(start.kind).toBe("content"); // the fixed frame: the content area scrolls, not the page
-        if (view === "findings") expect(start.range).toBeGreaterThan(200); // the sample's findings don't fit
+        if (view !== "overview") expect(start.range).toBeGreaterThan(200); // the sample's findings and runs don't fit
         await wheelToEnd(page, size.width * 0.6, size.height * 0.6);
         expect(await page.evaluate(() => scrollY)).toBe(0);
         expect(await page.evaluate(() => document.documentElement.classList.contains("lenis"))).toBe(false);

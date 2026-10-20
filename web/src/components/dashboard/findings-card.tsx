@@ -9,11 +9,12 @@ import { FINDING_REVIEW, SEVERITY_META } from "@/lib/status";
 
 const findingsWord = (n: number) => (n === 1 ? "finding" : "findings");
 
-export function FindingsCard({ data }: { data: FindingsSlice }) {
+/** `id` names the card's heading; it must differ per view, since every view stays mounted. */
+export function FindingsCard({ data, id = "findings-card" }: { data: FindingsSlice; id?: string }) {
   const { confirmed, needsReview, closed } = data.review;
   return (
     <DashCard
-      id="findings-card"
+      id={id}
       title="Findings by Severity"
       docsHref="/docs/reference/findings"
       meta={`${data.total} ${findingsWord(data.total)}`}

@@ -1,125 +1,68 @@
-import Link from "next/link";
-import { Check, SquareArrowOutUpRight, X } from "lucide-react";
-import type { Dashboard } from "@/components/dashboard/derive";
+/* The Scope view, for one run or every saved run (ScopeCards, derive-scope.ts), in the Overview's
+   style: the summary strip, then the boundary (one run's target, ports and exclusions, or every
+   target tested), the approval requests, the permitted actions and tools, and the limits.
+   Server component. */
+import { ApprovalList } from "@/components/dashboard/approval-list";
+import { ChipPanel } from "@/components/dashboard/chip-panel";
+import { DashCard } from "@/components/dashboard/dash-card";
+import { ScopeBoundary } from "@/components/dashboard/scope-boundary";
+import { ScopeTargets } from "@/components/dashboard/scope-targets";
+import type { ScopeCards } from "@/components/dashboard/scope-types";
+import { StatMeter } from "@/components/dashboard/stat-card";
+import { StatStrip } from "@/components/dashboard/stat-strip";
+import { DocsLink, ViewHeader } from "@/components/dashboard/view-header";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { APPROVAL_STATE, type Meaning, type Tone } from "@/lib/status";
+import { TIME_LIMIT } from "@/lib/status";
 
-/** An approval's risk, coloured as the TUI does (LOW green, MEDIUM amber, HIGH red). Risk is not
-    a status, so its meaning is defined here. */
-const RISK_TONE: Record<string, Tone> = { LOW: "success", MEDIUM: "warning", HIGH: "danger" };
-function riskMeaning(risk: string): Meaning {
-  const name = risk ? `${risk[0]}${risk.slice(1).toLowerCase()}` : "Unknown";
-  return {
-    label: `${name} risk`,
-    tone: RISK_TONE[risk] ?? "info",
-    icon: "severity",
-    hint: risk === "HIGH" ? "High risk: approved only after a double check in the TUI." : `${name} risk: needs the operator's approval in the TUI.`,
-  };
-}
+const MANIFEST_DOCS = "/docs/configuration/scope-manifest";
 
-export function ScopeView({ dash }: { dash: Dashboard }) {
-  const { scope, approvals, assessment } = dash;
+export function ScopeView({ data }: { data: ScopeCards }) {
+  const { usage } = data.limits;
   return (
-    <div className="dash-view max-w-3xl">
-      <header className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-[20px] font-medium text-foreground">Scope</h1>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            {scope?.approved ? (
-              <>
-                The approved boundary · operator <span className="font-mono text-foreground">{assessment.operator}</span>.
-              </>
-            ) : scope ? (
-              <>The Scope Manifest is {scope.status.toLowerCase()}; testing waits until it is approved.</>
-            ) : (
-              <>No Scope Manifest yet: the TUI drafts one after the target and template are set.</>
-            )}
-          </p>
-        </div>
-        <Link
-          href="/docs/configuration/scope-manifest"
-          className="dash-card-open inline-flex items-center gap-1.5 rounded-md text-xs text-muted-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          Scope Manifest <SquareArrowOutUpRight className="size-3.5" aria-hidden />
-        </Link>
-      </header>
+    <div className="dash-view dash-sheet" data-mode={data.mode}>
+      <ViewHeader title="Scope" tag={data.tag} about={data.about}>
+        <DocsLink href={MANIFEST_DOCS}>Scope Manifest</DocsLink>
+      </ViewHeader>
 
-      {scope && (
+      {data.empty ? (
+        <DashCard id="scope-empty" title="No Scope Manifest" docsHref={MANIFEST_DOCS}>
+          <p className="text-sm text-muted-foreground">{data.empty}</p>
+        </DashCard>
+      ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <section className="dash-card p-4">
-              <h2 className="mb-2 text-[13px] font-medium text-foreground">In scope</h2>
-              <ul className="space-y-1.5">
-                {scope.include.map((t) => (
-                  <li key={t} className="flex items-center gap-2">
-                    <Check className="size-3.5 shrink-0 text-success" aria-hidden />
-                    <span className="truncate font-mono text-xs text-foreground">{t}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <section className="dash-card p-4">
-              <h2 className="mb-2 text-[13px] font-medium text-foreground">Excluded</h2>
-              {scope.exclude.length ? (
-                <ul className="space-y-1.5">
-                  {scope.exclude.map((t) => (
-                    <li key={t} className="flex items-center gap-2">
-                      <X className="size-3.5 shrink-0 text-danger" aria-hidden />
-                      <span className="truncate font-mono text-xs text-foreground">{t}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-muted-foreground">Nothing excluded.</p>
-              )}
-            </section>
-          </div>
-
-          <section className="dash-card mt-3 p-4">
-            <h2 className="mb-3 text-[13px] font-medium text-foreground">Permitted actions</h2>
-            <ul className="flex flex-wrap gap-2">
-              {scope.actions.map((a) => (
-                <li key={a} className="dash-chip h-[26px] border border-border px-2.5 text-xs text-foreground">
-                  {a}
-                </li>
-              ))}
-            </ul>
-            {scope.tools.length > 0 && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                Tools · <span className="font-mono text-foreground">{scope.tools.join(", ")}</span>
-              </p>
-            )}
-          </section>
-
-          {approvals.length > 0 && (
-            <section className="dash-card mt-3 p-4">
-              <h2 className="mb-3 text-[13px] font-medium text-foreground">Approval requests</h2>
-              <ul className="space-y-2">
-                {approvals.map((a) => (
-                  <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
-                    <span className="min-w-0 flex-1 basis-[200px]">
-                      <span className="block truncate text-foreground">{a.action}</span>
-                      <span className="block truncate font-mono text-[11px] text-muted-foreground">{a.target}</span>
-                    </span>
-                    <StatusBadge meaning={riskMeaning(a.risk)} />
-                    <StatusBadge meaning={APPROVAL_STATE[a.state]} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          <section className="dash-card mt-3 p-4">
-            <h2 className="mb-3 text-[13px] font-medium text-foreground">Limits</h2>
-            <dl className="grid grid-cols-3 gap-4">
-              {scope.limits.map((l) => (
-                <div key={l.label} className="flex flex-col gap-0.5">
-                  <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{l.label}</dt>
-                  <dd className="font-mono text-[15px] text-foreground">{l.value}</dd>
+          <StatStrip stats={data.stats} label="Scope summary" />
+          <div className="dash-panels">
+            {data.boundary.mode === "run" ? <ScopeBoundary data={data.boundary} /> : <ScopeTargets data={data.boundary} />}
+            <ApprovalList data={data.approvals} />
+            <ChipPanel
+              id="scope-permitted"
+              title="Permitted actions"
+              docsHref={MANIFEST_DOCS}
+              meta={data.mode === "all" ? "in how many runs" : undefined}
+              groups={[
+                { label: "Actions", chips: data.permitted.actions, empty: "No action listed." },
+                { label: "Tools", chips: data.permitted.tools, empty: "No tool approved." },
+              ]}
+            />
+            <ChipPanel
+              id="scope-limits"
+              title="Limits"
+              docsHref="/docs/configuration/policies"
+              meta={data.mode === "all" ? "in how many runs" : undefined}
+              groups={data.limits.rows.map((r) => ({ ...r, empty: r.label === "Window" ? "No time limit." : "None listed." }))}
+            >
+              {usage && (
+                <div className="mt-auto flex flex-col gap-1.5">
+                  <h3 className="dash-subhead">Time used</h3>
+                  <StatMeter frac={usage.frac} color={usage.over ? "var(--danger)" : "var(--primary)"} label="Time used of the window" />
+                  <p className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                    {usage.caption}
+                    {usage.over && <StatusBadge meaning={TIME_LIMIT.over} />}
+                  </p>
                 </div>
-              ))}
-            </dl>
-          </section>
+              )}
+            </ChipPanel>
+          </div>
         </>
       )}
     </div>

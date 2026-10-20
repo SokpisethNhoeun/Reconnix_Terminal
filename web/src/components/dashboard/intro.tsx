@@ -52,7 +52,9 @@ function countUp(el: HTMLElement, delay: number) {
 export function Intro() {
   useGSAP(() => {
     const reveal = q(".dash-reveal, .dash-overview .dash-card, .dash-navbtn");
-    const counts = q("[data-countup]");
+    // only the numbers on screen count up: a hidden view (they all stay mounted) keeps its
+    // server text, so opening it later never shows a count stuck partway
+    const counts = q("[data-countup]").filter((el) => el.getClientRects().length > 0);
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       // autoAlpha sets visibility to inherit, not visible: a hidden parent (the top bar under

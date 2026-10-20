@@ -103,6 +103,8 @@ function scopeView(a: Assessment): ScopeView | null {
     target: s.target_url || a.target,
     include: [s.target_url || a.target, ...s.allowed_ports.map((p) => `port ${p}`)],
     exclude: s.excluded_paths,
+    ports: s.allowed_ports.map(String),
+    methods: s.allowed_methods,
     actions: s.allowed_actions,
     tools: s.tools,
     limits: [

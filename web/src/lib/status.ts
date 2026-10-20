@@ -94,3 +94,32 @@ export const SEVERITY_META: Record<Severity, { label: string; color: string; hin
   LOW: { label: "Low", color: "var(--sev-low)", hint: "Minor." },
   INFO: { label: "Info", color: "var(--sev-info)", hint: "For information; not a weakness on its own." },
 };
+
+/** An approval's risk, as the TUI colours it (LOW green, MEDIUM amber, HIGH red). */
+const RISK_TONE: Record<string, Tone> = { LOW: "success", MEDIUM: "warning", HIGH: "danger" };
+export function riskMeaning(risk: string): Meaning {
+  const name = risk ? `${risk[0]}${risk.slice(1).toLowerCase()}` : "Unknown";
+  return {
+    label: `${name} risk`,
+    tone: RISK_TONE[risk] ?? "info",
+    icon: "severity",
+    hint: risk === "HIGH" ? "High risk: approved only after a double check in the TUI." : `${name} risk: needs the operator's approval in the TUI.`,
+  };
+}
+
+/** A Scope Manifest's state. Testing starts only once the operator approves it in the TUI. */
+export const SCOPE_STATE: Record<"approved" | "draft" | "none", Meaning> = {
+  approved: { label: "Approved", tone: "success", icon: "approved", hint: "The operator approved this boundary in the TUI; testing stays inside it." },
+  draft: { label: "Not approved", tone: "warning", icon: "pending", hint: "Drafted, not approved yet: testing waits until the operator approves it in the TUI." },
+  none: { label: "No scope", tone: "info", icon: "unreached", hint: "No Scope Manifest yet: the TUI drafts one after the target and template are set." },
+};
+
+/** The state of a saved scope (`APPROVED`, `DRAFT`, …), or of none. */
+export const scopeMeaning = (status: string | null): Meaning =>
+  status === null ? SCOPE_STATE.none : status === "APPROVED" ? SCOPE_STATE.approved : SCOPE_STATE.draft;
+
+/** A run's time against the limit its scope set. */
+export const TIME_LIMIT: Record<"within" | "over", Meaning> = {
+  within: { label: "Within the limit", tone: "success", icon: "done", hint: "The run ended inside the time limit its scope allowed." },
+  over: { label: "Over the time limit", tone: "danger", icon: "interrupted", hint: "The run went on past the time limit its scope allowed." },
+};
