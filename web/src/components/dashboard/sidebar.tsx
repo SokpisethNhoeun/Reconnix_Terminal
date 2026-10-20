@@ -12,7 +12,6 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
-import { useBreathPhase } from "@/components/assistant/breath";
 import type { View } from "@/components/dashboard/view-url";
 
 type NavItem = { icon: LucideIcon; label: string; view: View };
@@ -56,7 +55,6 @@ export function Sidebar({
   onSelect: (v: View) => void;
   terminalState: keyof typeof TERMINAL_HINT;
 }) {
-  const breath = useBreathPhase(); // the AI icon breathes on the assistant's shared cycle
   return (
     <aside className="dash-sidebar flex items-center border-border">
       <Link href="/" aria-label="Reconix local assessment viewer" className="grid h-16 w-full place-items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -71,13 +69,17 @@ export function Sidebar({
               key={item.view}
               type="button"
               onClick={() => onSelect(item.view)}
+              data-view={item.view}
               data-active={active === item.view ? "true" : undefined}
               aria-current={active === item.view ? "page" : undefined}
               aria-label={label}
               className="dash-navbtn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {item.view === "assistant" ? (
-                <span className="dash-ai-icon" style={breath} aria-hidden>
+                // breathes with the open assistant (breath.ts); only the icon scales, the button
+                // and its click area stay put
+                <span className="dash-ai-icon" data-breath="scale" aria-hidden>
+                  <span className="dash-ai-halo" data-breath="glow" />
                   <Icon className="size-[18px]" strokeWidth={1.6} />
                 </span>
               ) : (
