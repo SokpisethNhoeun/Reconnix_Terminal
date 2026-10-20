@@ -61,7 +61,7 @@
 /* a table-like row: one grid for the header and every row, so the columns line up */
 @media (min-width: 1024px) {
   .asm-head, .asm-row {
-    grid-template-columns: minmax(180px, 1.3fr) minmax(160px, 1fr) 150px 130px 56px;
+    grid-template-columns: minmax(170px, 1.3fr) minmax(150px, 1fr) 140px 120px 48px;
     grid-template-areas: "run target status findings plan";
     column-gap: 14px;
   }
@@ -74,7 +74,7 @@
     color: var(--muted-foreground);
   }
   .asm-head > :last-child { text-align: right; }
-  .asm-list { gap: 0; }
+  .asm-list { grid-template-columns: minmax(0, 1fr); gap: 0; } /* one row a run, not the two-up cards */
   .asm-list > li + li .asm-row { border-top-width: 0; }
   .asm-list > li:first-child .asm-row { border-radius: 10px 10px 0 0; }
   .asm-list > li:last-child .asm-row { border-radius: 0 0 10px 10px; }

@@ -116,21 +116,35 @@ test("a row opens that run's Overview: its uid in the address, no view", async (
   await expect(page.getByRole("button", { name: "Choose an assessment" })).toContainText(a.label);
 });
 
+/** How far the page and the content area scroll sideways (both must be 0). */
+const sideways = (page: Page) =>
+  page.evaluate(() => {
+    const root = document.scrollingElement!;
+    const main = document.querySelector("main")!;
+    return { page: root.scrollWidth - root.clientWidth, content: main.scrollWidth - main.clientWidth };
+  });
+
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
   test("the list reads as cards and nothing overflows sideways", async ({ page }) => {
     await open(page);
     await expect(rows(page)).toHaveCount(Math.min(all.length, PER_PAGE));
-    await page.waitForLoadState("networkidle");
-    const over = await page.evaluate(() => {
-      const root = document.scrollingElement!;
-      const main = document.querySelector("main")!;
-      return { page: root.scrollWidth - root.clientWidth, content: main.scrollWidth - main.clientWidth };
-    });
-    expect(over).toEqual({ page: 0, content: 0 });
+    expect(await sideways(page)).toEqual({ page: 0, content: 0 });
     // the cells' labels show on a card (there is no header row)
     await expect(rows(page).first().locator(".asm-k", { hasText: "Findings" })).toBeVisible();
     await expect(page.locator(".asm-head")).toBeHidden();
+  });
+});
+
+test.describe("on a 1366×768 desktop", () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+  test("the runs are rows under a header, one below the other, and nothing overflows sideways", async ({ page }) => {
+    await open(page);
+    await expect(page.locator(".asm-head")).toBeVisible();
+    expect(await sideways(page)).toEqual({ page: 0, content: 0 });
+    const boxes = await rows(page).evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [r.left, r.top]));
+    expect(new Set(boxes.map(([left]) => left)).size, "every row starts at the same left edge").toBe(1);
+    for (let i = 1; i < boxes.length; i++) expect(boxes[i][1]).toBeGreaterThan(boxes[i - 1][1]);
   });
 });
 
