@@ -16,7 +16,7 @@
 import { redact } from "@/lib/assistant/redact";
 import { clock, duration, hourMinute, minutesLimit, shortDay } from "@/lib/data/format";
 import { SEVERITIES } from "@/lib/data/schema";
-import type { ApprovalView, AssessmentView, FindingView, PhaseView, ScopeView } from "@/lib/data/view-types";
+import type { ApprovalView, AssessmentView, FindingView, PhaseView, ScopeView, Severity } from "@/lib/data/view-types";
 
 import { activityCard } from "./derive-activity";
 import { executionCard } from "./derive-execution";
@@ -90,6 +90,11 @@ export function findingRow(f: FindingView, run: FindingRow["run"] = null): Findi
   return { ...f, icon: findingIcon(f), key: run ? `${run.uid}~${f.id}` : f.id, run };
 }
 
+/** The severity rows the card always lists; the others (CRITICAL, INFO) get a row only when a
+    finding has that level. Nothing is merged: the bar, the total and the accessible name count
+    every level. */
+const ALWAYS_SHOWN: readonly Severity[] = ["HIGH", "MEDIUM", "LOW"];
+
 /** Findings by Severity: counts and shares by severity, review state and the top CVSS
     scores. False positives are left out of every count. */
 export function findingsSlice(rows: FindingRow[]): FindingsSlice {
@@ -97,7 +102,8 @@ export function findingsSlice(rows: FindingRow[]): FindingsSlice {
   const total = counted.length;
   const severity = SEVERITIES.map((level) => {
     const count = counted.filter((f) => f.severity === level).length;
-    return { level, count, share: total ? Math.round((count / total) * 100) : 0, frac: total ? count / total : 0 };
+    const hidden = count === 0 && !ALWAYS_SHOWN.includes(level);
+    return { level, count, share: total ? Math.round((count / total) * 100) : 0, frac: total ? count / total : 0, hidden };
   });
   const top = counted
     .filter((f): f is FindingRow & { score: number } => f.score !== null && f.status !== "fixed")

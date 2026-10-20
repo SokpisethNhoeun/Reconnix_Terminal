@@ -182,13 +182,15 @@ export type ExecutionCard =
 
 // --- findings by severity --------------------------------------------------------------
 
-export type SeverityCount = { level: Severity; count: number; share: number; frac: number };
+/** One severity's count and share. `hidden`: the row stays out of the card's list (an optional
+    level with no findings); it still counts in the bar, the total and the accessible name. */
+export type SeverityCount = { level: Severity; count: number; share: number; frac: number; hidden: boolean };
 export type TopFinding = { key: string; id: string; title: string; severity: Severity; score: number; run: string | null };
 
 export interface FindingsSlice {
   total: number;
-  severity: SeverityCount[];
-  words: string; // "0 critical, 3 high, …" (the bar's accessible name)
+  severity: SeverityCount[]; // every level, in the TUI's order (CRITICAL first)
+  words: string; // "0 critical, 3 high, …" (the bar's accessible name; every level)
   review: { confirmed: number; needsReview: number; closed: number };
   top: TopFinding[];
 }
