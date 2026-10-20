@@ -12,7 +12,8 @@ export type Intent =
   | "progress"
   | "tools"
   | "policy"
-  | "report";
+  | "report"
+  | "errors"; // errors, failures, crashes: the saved data records none (a notice says so)
 
 export interface Asked {
   intents: Intent[];
@@ -33,11 +34,17 @@ const RUN = /\b(run|execute|launch|start|perform|trigger|fire|re-?run)\b[^.?!\n]
 const ACT = /\b(approve|reject|deny|authori[sz]e|sign off on|grant)\b/;
 const TOP = /\b(top|worst|most (severe|critical|serious|important|dangerous|urgent)|highest|biggest|riskiest|first to fix|fix first|prioriti[sz]e)\b/;
 const FINDINGS = /\bfindings?\b|\bvuln|\bweakness|\bissues?\b|\brisks?\b|\bseverit|\bcritical\b|\bcvss\b|\bcwe\b|\bowasp\b|\bcve\b|\bexploitable\b|\banaly[sz]|\bwhat did (it|you|reconix) find\b|\bfound\b|\bsummar|\boverview\b/;
-const APPROVALS = /\bapprov|\bwait(s|ing)? (on|for)\b|\bpending\b|\bdecid|\bdecision|\bgates?\b|\bon hold\b|\bneeds? (me|my|you)\b/;
+const APPROVALS =
+  /\bapprov|\bwait(s|ing)? (on|for)\b|\bpending\b|\bdecid|\bdecision|\bgates?\b|\bon hold\b|\bneeds? (me|my|you)\b|\brejected\b|\bdouble.?check|\bauthori[sz]ation|\bsign.?off|\bgated\b|\brisky (actions?|steps?)\b/;
 const PROGRESS = /\bprogress\b|\bstatus\b|\bphases?\b|\bsteps?\b|\bhow far\b|\bremaining\b|\bleft to do\b|\bcomplet|\bfinish(ed)?\b|\bexecution\b|\bplan\b|\bstages?\b|\bsummar|\boverview\b|\bwhat happened\b/;
-const TOOLS = /\btools?\b|\bnmap\b|\bsqlmap\b|\bnikto\b|\bnuclei\b|\bffuf\b|\bscanners?\b|\bwhat ran\b|\bexecuted\b|\bcommands?\b|\brequests? sent\b|\bactivity\b/;
-const POLICY = /\bpolic|\bblock(ed|s)?\b(?! on)|\bout of scope\b|\boutside (the )?scope\b|\brefus|\bdenied\b|\bforbidden\b|\bguardrails?\b|\bscope (checks?|violations?)\b/;
+const TOOLS =
+  /\btools?\b|\bnmap\b|\bsqlmap\b|\bnikto\b|\bnuclei\b|\bffuf\b|\bsemgrep\b|\bgitleaks\b|\bzap\b|\btestssl\b|\bscanners?\b|\bwhat ran\b|\bexecuted\b|\bcommands?\b|\brequests? (sent|made)\b|\bhow many requests\b|\bactivity\b|\boutputs?\b|\bresults? of\b|\bwhich (scans?|checks?) (ran|were run)\b/;
+const POLICY =
+  /\bpolic|\bblock(ed|s)?\b(?! on)|\bout of scope\b|\boutside (the )?scope\b|\brefus|\bdenied\b|\bforbidden\b|\bguardrails?\b|\bscope (checks?|violations?|rules?)\b|\brestrict|\bdisallow|\bnot allowed\b|\bverdicts?\b|\bexcluded\b|\bprevented\b/;
 const REPORT = /\breports?\b|\bexport|\bdownload|\bpdf\b|\bsarif\b|\bcsv\b|\bhtml\b|\bjson\b|\bdeliverable/;
+// errors and failures: the saved data has no error log and no failed state, so the reply says so
+// (with the runs' real states). Not "failed login" or "login failure": that is a finding.
+const ERRORS = /\berrors?\b|\bcrash|\bwent wrong\b|\bbroke(n)?\b|\bexceptions?\b|\bstack ?trace|\b(?<!login )(?<!sign-in )fail(ed|ure|ures|ing|s)?\b(?! (login|sign-in|to sign in|to log in))/;
 // "F-003", "f-3", "IMP-002"; not the "DEMO-001" inside "RCX-DEMO-001"
 const FINDING_ID = /(?<![\w-])([a-z]{1,4})-(\d{1,4})\b/gi;
 
@@ -61,6 +68,7 @@ export function readIntent(question: string): Asked {
   if (TOOLS.test(q) && !RUN.test(q)) add("tools");
   if (POLICY.test(q)) add("policy");
   if (REPORT.test(q)) add("report");
+  if (ERRORS.test(q)) add("errors");
   const findingIds = [...new Set([...question.matchAll(FINDING_ID)].map((m) => findingKey(`${m[1]}-${m[2]}`)))].slice(0, 3);
   return { intents, findingIds };
 }

@@ -1,9 +1,11 @@
-/* Approvals from the saved data: each gated action with its state and risk, and runs paused on
-   another input (a sign-in). Nothing can be approved here: decisions are made in the TUI, with
-   its double check. Operators get a way to the Terminal view. */
+/* Approvals from the saved data: each gated action with its recorded decision (Approved,
+   Rejected, Waiting for approval or Not reached, as lib/status.ts names them) and its risk, a
+   count by state, and runs paused on another input (a sign-in). Nothing can be approved here:
+   decisions are made in the TUI, with its double check. Operators get a way to the Terminal view. */
 import { Hand } from "lucide-react";
-import { APPROVAL_STATE, RUN_STATUS } from "@/lib/status";
+import { APPROVAL_STATE, riskMeaning, RUN_STATUS } from "@/lib/status";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { approvalCounts } from "@/lib/assistant/cards";
 import type { CardOf } from "@/lib/assistant/protocol";
 import { CardShell, runName } from "./card-shell";
 import { TerminalButton } from "./links";
@@ -11,11 +13,22 @@ import { TerminalButton } from "./links";
 export function ApprovalsCard({ card }: { card: CardOf<"approvals"> }) {
   const waiting = card.pending + card.waiting.length;
   const runs = new Set([...card.items, ...card.waiting].map((x) => x.run.uid)).size;
+  const counts = approvalCounts(card.items);
   return (
     <CardShell
       icon={Hand}
       title="Approvals"
-      meta={waiting ? `${waiting} waiting for you` : "Nothing waits on you"}
+      meta={
+        <>
+          {waiting ? `${waiting} waiting for you` : "Nothing waits on you"}
+          {counts.length > 0 && (
+            <span className="ai-card-meta" aria-label="Decisions recorded">
+              {" · "}
+              {counts.map((c) => `${c.count} ${APPROVAL_STATE[c.state].label.toLowerCase()}`).join(" · ")}
+            </span>
+          )}
+        </>
+      }
       footer={
         <>
           <span>Decide in the TUI. Nothing can be approved from this chat.</span>
@@ -41,7 +54,10 @@ export function ApprovalsCard({ card }: { card: CardOf<"approvals"> }) {
               <StatusBadge meaning={APPROVAL_STATE[a.state]} />
               <div className="ai-card-row-main">
                 <p className="ai-card-line">
-                  <span className="ai-mono">{a.action}</span> <span className="text-muted-foreground">· risk {a.risk}</span>
+                  <span className="ai-mono">{a.action}</span>{" "}
+                  <span className="text-muted-foreground" title={riskMeaning(a.risk).hint}>
+                    · {riskMeaning(a.risk).label.toLowerCase()}
+                  </span>
                 </p>
                 <p className="ai-card-sub">
                   <span className="ai-mono">{a.target}</span>

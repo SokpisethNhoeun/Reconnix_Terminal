@@ -3,7 +3,7 @@
    holds the saved numbers, and the model is only told which cards are shown. */
 import { describe, expect, it } from "vitest";
 
-import { approvalsCard, cardNotes, NOTICES, pickCards } from "@/lib/assistant/cards";
+import { approvalCounts, approvalsCard, cardNotes, NOTICES, pickCards, toolGroups } from "@/lib/assistant/cards";
 import { rankFindings, scopedViews } from "@/lib/assistant/insights";
 import { readIntent } from "@/lib/assistant/intent";
 import { welcomePrompts } from "@/lib/assistant/prompts";
@@ -52,6 +52,26 @@ describe("readIntent", () => {
     ["Set up a web assessment for staging", ["plan"]],
     ["Can you run a scan on the staging site?", ["run"]],
     ["Please execute sqlmap on /login", ["run"]],
+    // tool results, recorded decisions, policy restrictions and errors
+    ["Show the tool results", ["tools"]],
+    ["What were the results of Nuclei?", ["tools"]],
+    ["How many requests were made?", ["tools"]],
+    ["Which checks were run by Semgrep?", ["tools"]],
+    ["Which actions were rejected?", ["approvals"]],
+    ["Was the secret validation double-checked?", ["approvals"]],
+    ["Which gated actions needed authorization?", ["approvals"]],
+    ["Who signed off on the risky actions?", ["approvals"]],
+    ["What restrictions did the scope put on the run?", ["policy"]],
+    ["Was any request disallowed or not allowed?", ["policy"]],
+    ["List the policy verdicts", ["policy"]],
+    ["Which paths were excluded?", ["policy"]],
+    ["Were there any errors?", ["errors"]],
+    ["Did anything fail or crash?", ["errors"]],
+    ["What went wrong in the last run?", ["errors"]],
+    ["Why did the run fail?", ["errors"]],
+    // a failed login is a finding, not an error of the run
+    ["Which finding is about the failed login?", ["findings"]],
+    ["Is there a login failure in the findings?", ["findings"]],
   ])("%s → %j", (question, intents) => {
     expect(readIntent(question).intents).toEqual(intents);
   });
@@ -117,6 +137,66 @@ describe("pickCards", () => {
     expect(card.runs[0].total).toBe(toolLines.length);
     expect(card.runs[0].steps[0].time).toBe(toolLines[0].t);
     expect(card.runs[0].requests).toBe(completed.run.requests);
+  });
+  it("names each step's tool from the approved scope, and groups the steps by tool", () => {
+    const card = of(pickCards(samples, completed.uid, "Show the tool results"), "tools");
+    const tools = new Set(completed.scope!.tools);
+    for (const s of card.runs[0].steps) expect(s.tool === "—" || tools.has(s.tool)).toBe(true);
+    const named = card.runs[0].steps.filter((s) => s.tool !== "—");
+    expect(named.length).toBeGreaterThan(0);
+    const groups = toolGroups(card.runs[0].steps);
+    expect(groups.reduce((n, g) => n + g.steps, 0)).toBe(card.runs[0].steps.length);
+    for (const g of groups) expect(g.steps).toBe(card.runs[0].steps.filter((s) => s.tool === g.tool).length);
+    expect(groups.at(-1)!.tool).toBe("—"); // lines that name no tool come last
+    expect(toolGroups([{ tool: "b" }, { tool: "a" }, { tool: "—" }, { tool: "a" }])).toEqual([
+      { tool: "a", steps: 2 },
+      { tool: "b", steps: 1 },
+      { tool: "—", steps: 1 },
+    ]);
+    expect(toolGroups([])).toEqual([]);
+  });
+  it("records every approval's decision as the saved data has it, and counts them by state", () => {
+    const states = new Set<string>();
+    for (const a of samples) {
+      const card = of(pickCards(samples, a.uid, "Which actions were approved or rejected?"), "approvals");
+      const view = assessmentView(a);
+      expect(card.items.map((i) => [i.id, i.state])).toEqual(
+        [...view.approvals].sort((x, y) => ["PENDING", "NOT REACHED", "APPROVED", "REJECTED"].indexOf(x.state) - ["PENDING", "NOT REACHED", "APPROVED", "REJECTED"].indexOf(y.state)).map((x) => [x.id, x.state]),
+      );
+      for (const i of card.items) states.add(i.state);
+      const counts = approvalCounts(card.items);
+      expect(counts.reduce((n, c) => n + c.count, 0)).toBe(card.items.length);
+      for (const c of counts) expect(c.count).toBe(card.items.filter((i) => i.state === c.state).length);
+    }
+    expect([...states].sort()).toEqual(["APPROVED", "PENDING", "REJECTED"]); // what the sample data holds
+    expect(approvalCounts([{ state: "REJECTED" }, { state: "APPROVED" }, { state: "REJECTED" }])).toEqual([
+      { state: "APPROVED", count: 1 },
+      { state: "REJECTED", count: 2 },
+    ]);
+  });
+  it("lists each policy restriction with its reason, masked", () => {
+    const verdicts = [
+      { method: "GET", path: "/admin", allowed: false, reason: "Path outside approved scope", at: null },
+      { method: "POST", path: "/login?token=abc123secret", allowed: false, reason: "Method not allowed: token=abc123secret", at: null },
+      { method: "GET", path: "/api/orders", allowed: true, reason: "Inside scope", at: null },
+    ];
+    const card = of(pickCards([{ ...completed, verdicts }], null, "What restrictions did the policy apply?"), "policy");
+    expect(card.checks).toBe(3);
+    expect(card.blocked).toBe(2);
+    expect(card.items[0].text).toBe("GET /admin · Path outside approved scope");
+    expect(card.items[1].text).toContain("Method not allowed");
+    expect(card.items[1].text).not.toContain("abc123secret");
+    expect(card.items[1].text.split(MASK).length).toBeGreaterThan(2); // the path and the reason both masked
+  });
+  it("answers a question about errors with what the data records: no error log, the runs' states", () => {
+    const cards = pickCards(samples, null, "Were there any errors in the runs?");
+    expect(kinds(cards)).toEqual(["notice", "progress"]);
+    expect(of(cards, "notice")).toEqual(NOTICES.errors);
+    expect(NOTICES.errors.body).toContain("no error log");
+    expect(NOTICES.errors.action).toBeNull();
+    const withProgress = pickCards(samples, completed.uid, "What is the status, did anything fail?");
+    expect(kinds(withProgress)).toEqual(["progress", "notice"]); // the progress card once
+    expect(pickCards(samples, null, "Which finding is about the failed login?").map((c) => c.kind)).toEqual(["findings"]);
   });
   it("offers one run's downloads, or asks which run", () => {
     expect(of(pickCards(samples, completed.uid, "Generate a report"), "report").runs).toHaveLength(1);

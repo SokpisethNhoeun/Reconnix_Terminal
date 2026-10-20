@@ -1,6 +1,7 @@
 /* The cards a reply shows, picked from the question with fixed rules (intent.ts) and built from
-   the saved files only: findings, plan progress, approvals, policy blocks, tool steps, report
-   downloads, and notices for what the assistant can't do. The model never writes these; it
+   the saved files only: findings, plan progress, approvals (each recorded decision), policy blocks
+   (each with its reason), tool steps, report downloads, and notices for what the assistant can't
+   do or what the data doesn't hold (errors). The model never writes these; it
    only explains around them, so a finding, a count or a state on a card is always the saved
    one. Free text from the files is masked again (redact.ts) and cut to one line. Nothing here
    runs, approves or changes anything. Pure: the route calls it, and the unit tests drive it on
@@ -62,6 +63,15 @@ export const NOTICES = {
     steps: [],
     action: "terminal",
   },
+  // "the data doesn't contain that": the saved files hold no error log and no failed state
+  errors: {
+    kind: "notice",
+    tone: "info",
+    title: "The saved data records no errors",
+    body: "A saved run holds its activity log, policy checks, approvals and findings, and a state: not started, running, waiting for you, completed, stopped or interrupted. It has no error log and no failed state, so the assistant can't report one.",
+    steps: ["The progress card below shows each run's real state.", "A run that ended early is Stopped (by you) or Interrupted (the TUI closed)."],
+    action: null,
+  },
 } satisfies Record<string, CardOf<"notice">>;
 
 // --- builders ------------------------------------------------------------------------------
@@ -114,7 +124,8 @@ export function progressCard(views: AssessmentView[]): CardOf<"progress"> {
   };
 }
 
-const STATE_ORDER = ["PENDING", "NOT REACHED", "APPROVED", "REJECTED"];
+type ApprovalState = CardOf<"approvals">["items"][number]["state"];
+const STATE_ORDER: readonly ApprovalState[] = ["PENDING", "NOT REACHED", "APPROVED", "REJECTED"];
 
 export function approvalsCard(views: AssessmentView[]): CardOf<"approvals"> {
   const all = views
@@ -178,6 +189,21 @@ export function toolsCard(views: AssessmentView[]): CardOf<"tools"> {
   };
 }
 
+/** The shown tool steps grouped by tool, most steps first ("—" for lines that name no tool,
+    last). A reading of the card's own rows: it counts the steps shown, not the run's total. */
+export function toolGroups(steps: { tool: string }[]): { tool: string; steps: number }[] {
+  const counts = new Map<string, number>();
+  for (const s of steps) counts.set(s.tool, (counts.get(s.tool) ?? 0) + 1);
+  return [...counts]
+    .map(([tool, steps]) => ({ tool, steps }))
+    .sort((a, b) => (a.tool === "—" ? 1 : 0) - (b.tool === "—" ? 1 : 0) || b.steps - a.steps || a.tool.localeCompare(b.tool));
+}
+
+/** How many of the approvals shown are in each state, in the order the card lists them. */
+export function approvalCounts(items: { state: ApprovalState }[]): { state: ApprovalState; count: number }[] {
+  return (STATE_ORDER as ApprovalState[]).map((state) => ({ state, count: items.filter((a) => a.state === state).length })).filter((x) => x.count > 0);
+}
+
 export function reportCard(views: AssessmentView[]): CardOf<"report"> {
   return {
     kind: "report",
@@ -234,6 +260,11 @@ export function pickCards(library: Assessment[], uid: string | null, question: s
   if (has("tools")) cards.push(toolsCard(views));
   if (has("policy")) cards.push(policyCard(views.map((v) => byUid.get(v.uid)!).filter(Boolean)));
   if (has("report")) cards.push(reportCard(views));
+  // errors: the data has none; say so, and show the runs' real states
+  if (has("errors")) {
+    cards.push(NOTICES.errors);
+    if (!has("progress")) cards.push(progressCard(views));
+  }
 
   return cards.filter((c) => CardSchema.safeParse(c).success).slice(0, MAX_CARDS);
 }
