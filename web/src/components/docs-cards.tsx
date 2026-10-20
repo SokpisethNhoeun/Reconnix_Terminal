@@ -1,22 +1,18 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { slugify } from "@/components/docs-layout";
 import type { DocGroup, DocPage } from "@/lib/docs-nav";
 import { cn } from "@/lib/utils";
 
 /** Sub links a card shows before the rest fold into "+N more" (the group landing lists them all). */
 const SHOWN_LINKS = 2;
 
-/** A card's sub links: its pages, or for a single-page group its sections as #anchors. */
+/** A card's sub links: its first pages, then "+N more" to the group landing. */
 function subLinks(g: DocGroup): { label: string; href: string; more?: boolean; ariaLabel?: string }[] {
-  const all = g.pages.length
-    ? g.pages.map((p) => ({ label: p.title, href: p.href }))
-    : (g.sections ?? []).map((s) => ({ label: s, href: `${g.href}#${slugify(s)}` }));
+  const all = g.pages.map((p) => ({ label: p.title, href: p.href }));
   if (all.length <= SHOWN_LINKS) return all;
-  const kind = g.pages.length ? "pages" : "sections";
   return [
     ...all.slice(0, SHOWN_LINKS),
-    { label: `+${all.length - SHOWN_LINKS} more`, href: g.href, more: true, ariaLabel: `All ${all.length} ${g.title} ${kind}` },
+    { label: `+${all.length - SHOWN_LINKS} more`, href: g.href, more: true, ariaLabel: `All ${all.length} ${g.title} pages` },
   ];
 }
 
@@ -31,7 +27,7 @@ export function DocGroupCards({ groups }: { groups: DocGroup[] }) {
       {groups.map((g) => {
         const Icon = g.icon;
         return (
-          <li key={g.id} className="integration-card flex flex-col gap-4 rounded-2xl border p-5">
+          <li key={g.id} className="docs-card flex flex-col gap-4 rounded-2xl border p-5">
             <Link href={g.href} className="group flex items-start gap-4">
               <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
                 <Icon className="size-5" strokeWidth={1.75} aria-hidden />

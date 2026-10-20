@@ -1,17 +1,21 @@
-import { assessments } from "@/content/docs/assessments";
-import { configuration } from "@/content/docs/configuration";
+import { aiModels } from "@/content/docs/ai-models";
+import { assessmentGuide } from "@/content/docs/assessment-guide";
+import { commandsContent } from "@/content/docs/commands";
 import { gettingStarted } from "@/content/docs/getting-started";
 import { guardrails } from "@/content/docs/guardrails";
-import { interfaces } from "@/content/docs/interfaces";
-import { reference } from "@/content/docs/reference";
+import { reports } from "@/content/docs/reports";
+import { terminalGuide } from "@/content/docs/terminal-guide";
+import { troubleshooting } from "@/content/docs/troubleshooting";
 import type { GroupContent } from "@/content/docs/types";
 
 /** Content of every /docs/<group>/<slug> page, keyed by the DOCS_NAV group id, then slug. */
 export const DOCS_CONTENT: Record<string, GroupContent> = {
   "getting-started": gettingStarted,
-  assessments,
-  interfaces,
-  configuration,
+  "terminal-guide": terminalGuide,
+  "ai-models": aiModels,
+  commands: commandsContent,
+  "assessment-guide": assessmentGuide,
+  reports,
+  troubleshooting,
   guardrails,
-  reference,
 };

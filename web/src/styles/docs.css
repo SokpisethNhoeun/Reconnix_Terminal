@@ -1,2 +1,77 @@
 /* The docs view. Owner: the docs workstream (docs/WEB_REDESIGN_V3_PLAN.md). Colours only from the
-   tokens (tokens.css); meanings from lib/status.ts. */
+   tokens (tokens.css); meanings from lib/status.ts. The page frame, sidebar, search and content
+   primitives are in components/docs-*.tsx; everything else about them is Tailwind utilities. */
+
+/* ---- Prose inside a DocSection: lists, emphasis, nested lists ---- */
+.docs-prose li { margin-left: 1.25rem; list-style: disc; }
+.docs-prose ol > li { list-style: decimal; }
+.docs-prose li > ul, .docs-prose li > ol { margin-top: 0.25rem; }
+.docs-prose strong { font-weight: 600; color: var(--foreground); }
+.docs-prose table li { margin-left: 1rem; }
+/* numbered steps (Steps) keep their counter even inside a bulleted context */
+.docs-steps > li { list-style: decimal; }
+
+/* ---- Code blocks: the Copy button sits in the corner and is always reachable (never hover-only,
+   for keyboard and touch readers); it only fades a little when the block is not in use ---- */
+.docs-code .docs-copy { opacity: 0.7; transition: opacity 0.15s ease; }
+.docs-code:hover .docs-copy, .docs-code:focus-within .docs-copy { opacity: 1; }
+/* long lines stay inside the block on a phone: the block scrolls, the page never does */
+.docs-code pre { max-width: 100%; }
+
+/* ---- Two-column tables (DocTable): below sm the key sits above its meaning, each row a block,
+   so a long message or key never squeezes the other column ---- */
+@media (max-width: 639px) {
+  .docs-table thead { display: none; }
+  .docs-table tbody, .docs-table tr, .docs-table th, .docs-table td { display: block; width: 100%; box-sizing: border-box; }
+  .docs-table th[scope="row"] { max-width: none; padding-bottom: 0.25rem; }
+  .docs-table td { padding-top: 0.25rem; }
+}
+
+/* ---- The sidebar: the tree scrolls inside the sticky column on desktop (the search stays put) ---- */
+.docs-sidebar nav { scrollbar-width: thin; }
+
+/* ---- Group cards on the docs overview ---- */
+.docs-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: var(--border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--card), var(--primary) 3%),
+    color-mix(in oklab, var(--card) 70%, transparent)
+  );
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.docs-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--primary) 70%, transparent), transparent);
+  opacity: 0.35;
+  transition: opacity 0.3s ease;
+}
+.docs-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(60% 50% at 0% 0%, color-mix(in oklab, var(--primary) 10%, transparent), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.docs-card:hover {
+  border-color: color-mix(in oklab, var(--primary) 30%, var(--border));
+  box-shadow: 0 18px 40px -24px color-mix(in oklab, var(--primary) 40%, transparent);
+}
+.docs-card:hover::before,
+.docs-card:hover::after { opacity: 1; }
+
+/* ---- The command index: one row per command, the name in a fixed column ---- */
+.docs-command-row { display: grid; grid-template-columns: minmax(7rem, auto) 1fr; gap: 0.25rem 1rem; align-items: baseline; }
+@media (max-width: 480px) { .docs-command-row { grid-template-columns: 1fr; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .docs-card, .docs-card::before, .docs-card::after, .docs-code .docs-copy { transition: none; }
+}

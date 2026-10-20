@@ -1,4 +1,5 @@
-/* The documentation site's chrome: footer edge, nav dropdowns, the nav CTA and the cards. */
+/* The documentation site's chrome: footer edge, nav dropdowns and the nav CTA (the docs pages
+   themselves are styled in docs.css). */
 
 /* ---- Footer (site-footer.tsx): a faint teal light along its top edge, like the cards' lit edge ---- */
 .footer-edge {
@@ -19,54 +20,7 @@
 .nav-cta { transition: opacity 0.25s ease, transform 0.25s ease; }
 .nav-cta[data-hidden="true"] { opacity: 0; transform: translateY(-4px); pointer-events: none; }
 
-.integration-card {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  border-color: var(--border);
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--card), var(--primary) 3%),
-    color-mix(in oklab, var(--card) 70%, transparent)
-  );
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-}
-.integration-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--primary) 70%, transparent), transparent);
-  opacity: 0.35;
-  transition: opacity 0.3s ease;
-}
-.integration-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: radial-gradient(60% 50% at 0% 0%, color-mix(in oklab, var(--primary) 10%, transparent), transparent 70%);
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-.integration-card:hover {
-  border-color: color-mix(in oklab, var(--primary) 30%, var(--border));
-  box-shadow: 0 18px 40px -24px color-mix(in oklab, var(--primary) 40%, transparent);
-}
-.integration-card:hover::before,
-.integration-card:hover::after { opacity: 1; }
-
-.integration-card[data-accent] {
-  border-color: color-mix(in oklab, var(--primary) 35%, var(--border));
-  background:
-    radial-gradient(70% 120% at 50% 0%, color-mix(in oklab, var(--primary) 9%, transparent), transparent 70%),
-    linear-gradient(180deg, color-mix(in oklab, var(--card), var(--primary) 5%), color-mix(in oklab, var(--card) 80%, transparent));
-  box-shadow: 0 0 40px -18px color-mix(in oklab, var(--primary) 45%, transparent);
-}
-.integration-card[data-accent]::before { opacity: 0.8; }
-
 @media (prefers-reduced-motion: reduce) {
-  .nav-cta,
-  .integration-card, .integration-card::before, .integration-card::after { transition: none; }
+  .nav-cta { transition: none; }
   .nav-panel:not([hidden]) { animation: none; }
 }

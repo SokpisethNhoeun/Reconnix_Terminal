@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+import { DOCS_REDIRECTS } from "./src/lib/docs-redirects";
+
 /* The dashboard is local and read-only, but it shows security findings, so it ships the
    usual hardening headers. The Content-Security-Policy (with a per-request script nonce)
    is set in src/proxy.ts. */
@@ -17,6 +19,11 @@ const nextConfig: NextConfig = {
   turbopack: { root: process.cwd() },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
+  },
+  /* The documentation's old addresses (src/lib/docs-redirects.ts): permanent, so the browser
+     and search engines learn the new page. */
+  async redirects() {
+    return DOCS_REDIRECTS.map((r) => ({ ...r, permanent: true }));
   },
 };
 

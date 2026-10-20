@@ -1,5 +1,5 @@
-import { Callout, Code, DocLink, DocSection, Mono } from "@/components/docs-layout";
 import { Badge } from "@/components/ui/badge";
+import { Callout, DocLink, DocSection, Mono } from "@/components/docs-primitives";
 import type { GroupContent } from "@/content/docs/types";
 
 export const guardrails: GroupContent = {
@@ -9,244 +9,183 @@ export const guardrails: GroupContent = {
       <>
         <DocSection title="Your responsibility">
           <p>
-            Only assess targets you are authorized to test. Reconix enforces the scope you approve, but the authorization
-            itself comes from you or your organization. Keep written permission for every target.
+            Only assess targets you are authorized to test. In the scripted run Reconix enforces the scope you approve;
+            in agent mode the approved scope authorizes the target and the tool set, and methods, excluded paths, ports,
+            the time limit and the per-action approval gates are not enforced on the agent. The authorization itself
+            always comes from you or your organization. Keep written permission for every target.
           </p>
           <Callout variant="warning" title="Before you start">
-            Selecting a template never authorizes testing on its own. Nothing runs until you approve the Scope Manifest.
+            Typing a target or picking a template never authorizes testing on its own. Nothing runs until you approve the
+            scope manifest and run the plan; with the AI agent, approving the scope is what starts real tools against the
+            target.
           </Callout>
         </DocSection>
-        <DocSection title="Who it is for">
-          <p>Developers checking their own code and services, and security teams running assessments for others.</p>
+        <DocSection title="What is simulated">
+          <p>
+            Without a model and the backend harness, the run is simulated: no scanner runs and nothing is sent to the
+            target. The demo uses reserved example domains and fake, masked evidence. See{" "}
+            <DocLink href="/docs/getting-started/introduction">Introduction</DocLink>.
+          </p>
         </DocSection>
         <DocSection title="What Reconix refuses">
           <p>
-            Requests outside its predefined tasks or the approved scope. See{" "}
-            <DocLink href="/docs/guardrails/limitations">Limitations</DocLink>.
+            Requests outside the approved scope are blocked by policy and never sent. Lines that name no target do not
+            start anything. See <DocLink href="/docs/guardrails/limitations">Limitations</DocLink>.
           </p>
         </DocSection>
       </>
     ),
   },
   "scope-and-safety": {
-    lede: "Checks that run before, during and after every action.",
+    lede: "The store decides; the screens only ask. Every request is checked against the scope you approved.",
     body: (
       <>
-        <DocSection title="Scope check">
-          <p>Every target and action is compared with the approved Scope Manifest. Out-of-scope requests are blocked.</p>
-        </DocSection>
-        <DocSection title="Command validation">
+        <DocSection title="The scope check">
           <p>
-            Commands are built from validated inputs against configured templates and allowed parameters, never free text.
+            Every request the run proposes is compared with the approved scope manifest by a deterministic policy
+            engine: the method, the host, the port, the path or repository path, the excluded entries and the time
+            limit. Out-of-scope requests are blocked and recorded. See{" "}
+            <DocLink href="/docs/assessment-guide/policy-checks">Policy checks</DocLink>.
           </p>
         </DocSection>
-        <DocSection title="Untrusted input stays separate">
-          <p>Web pages, tool output, retrieved documents and uploaded files are treated as data, never as instructions.</p>
-        </DocSection>
-        <DocSection title="Execution limits">
+        <DocSection title="Canonical targets">
           <p>
-            Caps on tool calls, iterations, run time and repeated actions, checked before every call and monitored while a
-            tool runs.
+            A target is accepted only when it reduces to one canonical path on the approved host. Encoded separators,
+            double encoding, <Mono>{"//"}</Mono>, matrix parameters, whitespace, control characters, credentials in the URL and
+            paths that leave a repository are refused rather than guessed at, so case, encoding and <Mono>..</Mono> cannot
+            slip past an exclusion.
+          </p>
+        </DocSection>
+        <DocSection title="Untrusted input stays data">
+          <p>
+            Target responses, tool output, imported scan files and the model&apos;s replies are data, never instructions.
+            They are rendered as plain text (never markup), evidence is masked, and imported XML that declares a DTD or
+            entities is refused. Nothing in them can approve, widen the scope or run a tool.
           </p>
         </DocSection>
         <DocSection title="Where the checks run">
           <p>
-            In the backend, before any tool request is forwarded. See{" "}
-            <DocLink href="/docs/architecture">Architecture</DocLink> for the full path.
+            In the store, the terminal&apos;s single authority: every decision goes through a store function that
+            validates it and refuses with a plain message. The screens can pre-check for convenience (the code&apos;s six
+            digits), but they show and respect the store&apos;s verdict. With a backend, that boundary moves to the
+            server, never to the model.
           </p>
         </DocSection>
       </>
     ),
   },
   "approval-model": {
-    lede: "Two kinds of approval: the scope, once, and higher-risk actions, every time.",
+    lede: "Two kinds of approval: the scope, once, and every risky action, each time it comes up.",
     body: (
       <>
         <DocSection title="Scope approval">
           <p>
-            The terminal shows the final Scope Manifest. Testing begins only after you explicitly approve it. Without
-            approval, no tool is started.
+            The Template screen shows the drafted scope manifest. Testing begins only after you approve it and run the
+            plan; without that, no tool is started. Rejecting the scope tests nothing. See{" "}
+            <DocLink href="/docs/assessment-guide/scope">Scope manifest</DocLink>.
           </p>
         </DocSection>
         <DocSection title="Action approval">
           <p>
-            Every action is classified by the Risk Policy Table. <Badge variant="success">LOW</Badge> runs automatically;{" "}
-            <Badge variant="accent">MEDIUM</Badge> and <Badge variant="accent">HIGH</Badge> wait for your approval. See{" "}
-            <DocLink href="/docs/configuration/policies">Policies</DocLink> for the table.
+            Each gated action carries a fixed risk. <Badge variant="accent">MEDIUM</Badge> needs one decision.{" "}
+            <Badge variant="accent">HIGH</Badge> needs a double check: a confirmation step with a single-use token, a second
+            dialog that defaults to &quot;No, go back&quot;, and the matching request hash. An approval is bound to the exact
+            request shown; if the request changes, the approval does not apply. Rejecting stops the assessment. No typed
+            reason is asked for. See <DocLink href="/docs/assessment-guide/approval-gates">Approval gates</DocLink>.
           </p>
-          <p>The AI may suggest a risk level, but the backend decides. You can stop an assessment at any time.</p>
+          <p>
+            Editing where an action runs (Edit params, Edit steps) is policy-checked, rebuilds the request and its hash
+            and voids any open token; the risk and the method never change. You can stop an assessment at any time.
+          </p>
         </DocSection>
         <DocSection title="Audit">
-          <p>Every request, decision and approver lands in the audit log, which you can review in the local viewer.</p>
-        </DocSection>
-        <DocSection title="Related">
           <p>
-            <DocLink href="/docs/configuration/policies">Policies</DocLink> ·{" "}
-            <DocLink href="/docs/assessments/workflow">Assessment workflow</DocLink>
+            Every request, verdict, decision and operator lands in the activity log and the audit trail (
+            <Mono>/audit</Mono>), in the report, and in the saved copy the web dashboard shows read-only.
           </p>
         </DocSection>
       </>
     ),
   },
   "credential-handling": {
-    lede: "Secrets are masked before anything is shown or stored.",
+    lede: "Logins live in memory for the session, one-time codes are never stored, and secrets are masked everywhere.",
     body: (
       <>
-        <DocSection title="Secret masking">
+        <DocSection title="The target login">
           <p>
-            Keys, passwords, tokens and cookies are masked in output, reports and logs before they are shown or stored.
+            The approved tools decide which login the run needs (a session cookie or a test account), and the run asks
+            for it in a secure form only when testing needs it. The values are kept in memory for this assessment only
+            and are cleared when the form closes. A one-time code is a separate step: it is validated, used once and
+            never stored. The chat refuses lines while the run waits for a login, so a password cannot land in the
+            transcript by mistake.
           </p>
         </DocSection>
-        <DocSection title="Where masking runs">
+        <DocSection title="API keys">
+          <p>
+            Provider keys entered with <Mono>/provider</Mono> are encrypted (Fernet) before they reach{" "}
+            <Mono>~/.reconix/llm.db</Mono> (0600); the key file is 0600; only a hint such as <Mono>sk-…3f9a</Mono> is ever
+            shown, and the plaintext is decrypted only for the call that uses it. They are never written to{" "}
+            <Mono>.env</Mono>. See <DocLink href="/docs/ai-models/configuration">Configuration</DocLink>.
+          </p>
+        </DocSection>
+        <DocSection title="Masking">
           <ul>
-            <li>In the tool service, before results leave it.</li>
-            <li>Before results are displayed, stored or written to a report.</li>
-            <li>Evidence in findings and in the local viewer is the masked version.</li>
+            <li>Evidence in findings is masked (tokens, emails and ids partly hidden) before it is shown.</li>
+            <li>
+              Every string in a report, the saved copies for the dashboard and the context sent to a model goes through
+              redaction; reports never contain the test account.
+            </li>
+            <li>
+              The dashboard&apos;s Terminal page never logs what is typed, and the sign-in link is printed only to a
+              terminal, never to <Mono>~/.reconix/web.log</Mono>.
+            </li>
           </ul>
-        </DocSection>
-        <DocSection title="Your own keys">
-          <p>
-            Service keys such as <Mono>NVD_API_KEY</Mono> live in <Mono>.env</Mono>. See{" "}
-            <DocLink href="/docs/getting-started/configuration">Configuration</DocLink>.
-          </p>
         </DocSection>
       </>
     ),
   },
   "llm-data-handling": {
-    lede: "What the model sees, and what it never does.",
+    lede: "What a model sees, where it goes, and what it can never do.",
     body: (
       <>
-        <DocSection title="Language steps only">
+        <DocSection title="What the model sees">
           <p>
-            The LLM is called only in steps that need language understanding, with a short context rather than raw tool output.
-            Tools run in the tool service, and only after the backend&apos;s scope, command, risk and limit checks.
+            When a model is active, a chat line typed during a run is sent with a fixed system prompt, a short
+            description of the assessment state (target, template, scope status, phase, waiting gate, the findings&apos;
+            ids, severities and titles, the approval decisions) and the last 40 chat turns. Every piece of text is
+            cleaned and redacted first. The model gets no tools. Its reply is stripped of control characters, redacted and
+            capped at 8,000 characters before it is shown.
+          </p>
+          <p>
+            With the backend harness, the AI agent behind <Mono>/assess</Mono> sees the target, the tool output it
+            gathers and your answers to its questions. A username and password it asks for are exchanged host-side for a
+            session (the raw password never reaches the model), but that session (a header with its bearer token or
+            cookie), like a token or cookie you give it directly, is returned to the agent as the tool&apos;s result, so
+            it reaches the model and its provider.
           </p>
         </DocSection>
-        <DocSection title="Where the model runs">
-          <p>
-            By default a local model served by vLLM, on your own server. You can point <Mono>LLM_BASE_URL</Mono> at any
-            OpenAI-compatible endpoint instead. See <DocLink href="/docs/guardrails/model-switching">Model switching</DocLink>.
-          </p>
+        <DocSection title="Where it goes">
           <Callout variant="warning">
-            If you use an external endpoint, the short context for each language step is sent to that endpoint.
+            The context is sent to the provider you configured: a local Ollama or endpoint stays on your machine; OpenAI,
+            Anthropic, DeepSeek or a remote endpoint receive it, and with the AI agent so does a token or cookie you type
+            into its login form, or the session token or cookie minted from the username and password you type. Check
+            that this is acceptable for the data in your assessment before activating a remote model.
           </Callout>
-        </DocSection>
-        <DocSection title="Untrusted content">
           <p>
-            Never treated as instructions. See{" "}
-            <DocLink href="/docs/guardrails/scope-and-safety">Scope &amp; safety</DocLink>.
+            Chat lines and replies are kept in <Mono>~/.reconix/llm.db</Mono> (redacted). The dashboard&apos;s AI Assistant
+            is separate: it is configured in <Mono>web/.env.local</Mono>, builds its context from the saved files with no
+            evidence, and masks the questions before they leave.
           </p>
         </DocSection>
-        <DocSection title="Grounded answers">
+        <DocSection title="What it never does">
           <ul>
-            <li>Before the model explains an impact or recommends a fix, Reconix retrieves matching knowledge with hybrid search.</li>
-            <li>Internal knowledge comes first, filtered by the user&apos;s role.</li>
-            <li>Missing facts are filled from the knowledge base or the NVD API, or clearly marked unknown.</li>
+            <li>Approve or reject an action, change the scope, run a tool or give credentials: a human decides every gated step.</li>
+            <li>Change a policy verdict: the policy engine ignores it.</li>
+            <li>Supply a number on the dashboard: every count is computed from the saved data.</li>
           </ul>
           <p>
-            More in <DocLink href="/docs/guardrails/knowledge-and-rag">Knowledge &amp; RAG</DocLink>.
-          </p>
-        </DocSection>
-      </>
-    ),
-  },
-  "model-switching": {
-    lede: "Run the bundled local model, or point Reconix at any OpenAI-compatible endpoint.",
-    draft: true,
-    body: (
-      <>
-        <DocSection title="Where the model runs">
-          <ul>
-            <li>
-              <strong>Default:</strong> a local model served by vLLM, running as a container on your own server. A GPU is
-              recommended.
-            </li>
-            <li>
-              <strong>Alternative:</strong> any OpenAI-compatible endpoint. The AI service talks to the model through an
-              OpenAI-compatible client, so it works with either.
-            </li>
-          </ul>
-        </DocSection>
-        <DocSection title="Switch the model">
-          <ol className="space-y-2 [&_li]:ml-5 [&_li]:list-decimal">
-            <li>
-              Open <Mono>.env</Mono>.
-            </li>
-            <li>
-              Set <Mono>LLM_BASE_URL</Mono> to the endpoint you want. Leave the default to keep the bundled vLLM service.
-            </li>
-            <li>
-              Restart the services with <Mono>docker compose up -d</Mono>.
-            </li>
-          </ol>
-          <Code>{`# .env
-LLM_BASE_URL=https://llm.example.com/v1   # any OpenAI-compatible endpoint`}</Code>
-          <Callout variant="draft">
-            The settings for the model name and the endpoint&apos;s API key are still to document.
-          </Callout>
-        </DocSection>
-        <DocSection title="What switching does not change">
-          <p>
-            The model only handles the steps that need language understanding. Scope checks, command validation, the Risk
-            Policy Table and the execution limits run in the backend, so a different model never changes what is allowed to
-            run. The AI may suggest a risk level, but the backend decides.
-          </p>
-        </DocSection>
-        <DocSection title="External endpoints">
-          <Callout variant="warning">
-            With an external endpoint, the short context for each language step is sent to that endpoint. Check that this is
-            acceptable for the data in your assessment.
-          </Callout>
-          <p>
-            What that context contains is covered in{" "}
-            <DocLink href="/docs/guardrails/llm-data-handling">LLM data handling</DocLink>.
-          </p>
-        </DocSection>
-      </>
-    ),
-  },
-  "knowledge-and-rag": {
-    lede: "Before the model explains an impact or recommends a fix, Reconix retrieves matching knowledge, your own documents first.",
-    draft: true,
-    body: (
-      <>
-        <DocSection title="How retrieval works">
-          <ol className="space-y-2 [&_li]:ml-5 [&_li]:list-decimal">
-            <li>A finding needs an explanation of its impact or a recommended fix.</li>
-            <li>Reconix runs a hybrid search over the knowledge base: BGE-M3 embeddings stored in Qdrant.</li>
-            <li>Internal documents come first, filtered by the user&apos;s role.</li>
-            <li>Public sources fill in the rest: OWASP, CWE, CVE/NVD and advisories.</li>
-            <li>The model answers from what was retrieved. Facts it cannot find are marked unknown, never guessed.</li>
-          </ol>
-        </DocSection>
-        <DocSection title="Your own documents">
-          <p>
-            Internal documents live in the same knowledge base as the public sources and rank ahead of them, so explanations
-            and fixes follow your organization&apos;s own guidance. Retrieval is filtered by role: a user only gets passages
-            from documents their role allows.
-          </p>
-          <Callout variant="draft">
-            How to add, update and remove documents, the supported formats and how roles are assigned are still to document.
-          </Callout>
-        </DocSection>
-        <DocSection title="Retrieved text is data">
-          <p>
-            Retrieved documents are never treated as instructions, whatever they contain. See{" "}
-            <DocLink href="/docs/guardrails/scope-and-safety">Scope &amp; safety</DocLink>.
-          </p>
-        </DocSection>
-        <DocSection title="CVE lookups">
-          <p>
-            CVE details come from the NVD API. Set <Mono>NVD_API_KEY</Mono> in <Mono>.env</Mono> to raise the rate limit. See{" "}
-            <DocLink href="/docs/getting-started/configuration">Configuration</DocLink>.
-          </p>
-        </DocSection>
-        <DocSection title="Related">
-          <p>
-            <DocLink href="/docs/guardrails/llm-data-handling">LLM data handling</DocLink> ·{" "}
-            <DocLink href="/docs/reference/findings">Findings</DocLink> ·{" "}
-            <DocLink href="/docs/architecture">Architecture</DocLink>
+            Tool output, target data and imported files are untrusted data to the model as well: it is told to summarize
+            them, never to obey instructions found inside them. A different model never changes what is allowed to run.
           </p>
         </DocSection>
       </>
@@ -259,16 +198,33 @@ LLM_BASE_URL=https://llm.example.com/v1   # any OpenAI-compatible endpoint`}</Co
         <DocSection title="Known limitations">
           <ul>
             <li>
-              Findings generated with AI can be wrong. Classifications with confidence below 0.80 are marked{" "}
-              <Mono>NEEDS_REVIEW</Mono> for a person to check.
+              <strong>The scripted run is a simulation.</strong> Its findings are demo data for the template, not the state
+              of your target. Real findings come from imported tool output or from the AI agent.
             </li>
             <li>
-              Severity is never guessed. Without a scanner rating or a CVSS score, a finding is marked <Mono>UNKNOWN</Mono>.
+              <strong>Findings generated with AI can be wrong.</strong> A finding whose validation is not CONFIRMED is
+              marked as needing review; the agent&apos;s findings are CONFIRMED only when it verified them.
             </li>
-            <li>Reconix supports predefined tasks. Requests outside those tasks, or outside the approved scope, are refused.</li>
+            <li>
+              <strong>Severity is never guessed.</strong> It comes from the tool or from the analyst&apos;s override; a
+              CVSS score of 0.0 means not scored.
+            </li>
+            <li>
+              <strong>The policy engine is only as good as the scope.</strong> It enforces the manifest you approved; it
+              cannot know what you meant to exclude.
+            </li>
+            <li>
+              <strong>A stopped assessment cannot resume</strong>, and only a completed one can be exported. Partial
+              findings are kept.
+            </li>
+            <li>
+              <strong>The terminal keeps its assessments in memory</strong> for the session; the saved copies in{" "}
+              <Mono>~/.reconix/assessments</Mono> are for the dashboard to read, not for the terminal to reopen.
+            </li>
           </ul>
           <p>
-            More on severity and confidence in <DocLink href="/docs/reference/findings">Findings</DocLink>.
+            More on fields and validation in{" "}
+            <DocLink href="/docs/reports/understanding-findings">Understanding findings</DocLink>.
           </p>
         </DocSection>
       </>
