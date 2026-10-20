@@ -42,6 +42,8 @@ export default defineConfig({
         RECONIX_TERM_COMMAND: "sh -c 'echo READY; exec cat'",
         // keep the test server's sign-in link out of ~/.reconix/web.url (a running dashboard's)
         RECONIX_WEB_URL_FILE: path.join(tmpdir(), `reconix-e2e-${PORT}.url`),
+        // the AI Assistant's saved conversations go to a test folder, never ~/.reconix/assistant
+        RECONIX_ASSISTANT_DIR: path.join(tmpdir(), `reconix-e2e-assistant-${PORT}`),
         // the AI Assistant asks the stand-in, never a real model (these override web/.env.local)
         LLM_BASE_URL: `http://127.0.0.1:${LLM_PORT}/v1`,
         LLM_MODEL: "stub-model",
