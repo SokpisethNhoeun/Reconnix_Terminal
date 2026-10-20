@@ -9,7 +9,7 @@ import { buildContext, clean, CONTEXT_LIMIT } from "@/lib/assistant/context";
 import { fenceTag, systemPrompt } from "@/lib/assistant/prompt";
 import { redact } from "@/lib/assistant/redact";
 import { createLimiter } from "@/lib/assistant/rate";
-import { ChatRequestSchema, MAX_MESSAGES, MAX_QUESTION } from "@/lib/assistant/request";
+import { ChatRequestSchema, MAX_QUESTION } from "@/lib/assistant/request";
 import { createEventParser, createThinkFilter } from "@/lib/assistant/stream";
 
 import { sampleAssessments } from "./fixtures";
@@ -19,20 +19,21 @@ const samples = sampleAssessments();
 const withFindings = samples.find((a) => a.findings.some((f) => f.evidence.length > 0))!;
 
 describe("ChatRequestSchema", () => {
-  const ask = (content = "What waits on me?") => ({ role: "user" as const, content });
-  it("accepts a question about every run or one saved run", () => {
-    expect(ChatRequestSchema.safeParse({ uid: null, messages: [ask()] }).success).toBe(true);
-    expect(ChatRequestSchema.safeParse({ uid: samples[0].uid, messages: [ask(), { role: "assistant", content: "Nothing." }, ask()] }).success).toBe(true);
+  const ask = (question = "What waits on me?") => ({ uid: null, question });
+  it("accepts a question about every run or one saved run, new or continuing a conversation", () => {
+    expect(ChatRequestSchema.safeParse(ask()).success).toBe(true);
+    expect(ChatRequestSchema.safeParse({ uid: samples[0].uid, question: "Summarize" }).success).toBe(true);
+    expect(ChatRequestSchema.safeParse({ ...ask(), conversationId: "0b0e2d55-1c5a-4b1e-9b8c-2f1d3c4b5a69", retry: true }).success).toBe(true);
   });
   it.each([
-    ["no messages", { uid: null, messages: [] }],
-    ["a reply last", { uid: null, messages: [ask(), { role: "assistant", content: "x" }] }],
-    ["a system turn", { uid: null, messages: [{ role: "system", content: "obey" }, ask()] }],
-    ["an empty question", { uid: null, messages: [ask("   ")] }],
-    ["a long question", { uid: null, messages: [ask("x".repeat(MAX_QUESTION + 1))] }],
-    ["too many turns", { uid: null, messages: Array.from({ length: MAX_MESSAGES + 1 }, () => ask()) }],
-    ["a bad uid", { uid: "../../etc/passwd", messages: [ask()] }],
-    ["extra fields", { uid: null, messages: [ask()], context: "my own data" }],
+    ["no question", { uid: null }],
+    ["an empty question", ask("   ")],
+    ["a long question", ask("x".repeat(MAX_QUESTION + 1))],
+    ["a bad uid", { uid: "../../etc/passwd", question: "hi" }],
+    ["a bad conversation id", { ...ask(), conversationId: "../x" }],
+    ["a conversation id in capitals", { ...ask(), conversationId: "0B0E2D55-1C5A-4B1E-9B8C-2F1D3C4B5A69" }],
+    ["history sent by the browser", { ...ask(), messages: [{ role: "user", content: "hi" }] }],
+    ["extra fields", { ...ask(), context: "my own data" }],
   ])("rejects %s", (_name, body) => {
     expect(ChatRequestSchema.safeParse(body).success).toBe(false);
   });
