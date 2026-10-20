@@ -6,7 +6,7 @@
    frame that moves, with room for a slow (2–4 core) machine. */
 import { expect, type Page, test } from "@playwright/test";
 
-import { signIn } from "./support";
+import { counted, newest, sample as savedRuns, signIn } from "./support";
 
 test.use({
   launchOptions: {
@@ -22,6 +22,13 @@ const composer = (page: Page) => page.getByRole("textbox", { name: /^Ask about/ 
 const settled = (page: Page) => expect(page.locator(".dash-frame[data-breathing]")).toHaveCount(1, { timeout: 8000 });
 const closed = (page: Page) => expect(page.locator(".dash-assistant-stage[data-on]")).toHaveCount(0, { timeout: 8000 });
 const canvas = (page: Page) => page.locator(".dash-globe-canvas");
+const log = (page: Page) => page.getByRole("log", { name: "Conversation" });
+/** The active marker of the sidebar's `name` item (its ::after), as the page draws it now. */
+const marker = (page: Page, name: string) =>
+  nav(page, name).evaluate((el) => {
+    const cs = getComputedStyle(el, "::after");
+    return { opacity: cs.opacity, transform: cs.transform, duration: cs.transitionDuration, animation: cs.animationName };
+  });
 const carrierOpacity = (page: Page) => page.locator(".dash-globe-carrier").evaluate((el) => Number(getComputedStyle(el).opacity));
 
 // The Overview's groups, by the data-motion contract only (the first "fade" is the hero's title),
@@ -222,6 +229,132 @@ test("the one globe sits behind the welcome at about 0.18, fades out once the co
   await expect(page.locator(`.dash-globe-wrap ${PARTS.carrier}`)).toHaveCount(1); // home again
   await expect.poll(() => carrierOpacity(page)).toBe(1);
   await expect(canvas(page)).toHaveAttribute("data-globe-mode", "full");
+});
+
+test("text never moves: once a conversation shows, the panel, the card and everything around a message hold still", async ({ page }) => {
+  await ready(page);
+  await tab(page).click();
+  await settled(page);
+  // on the welcome the icon and the globe breathe (they hold no text); the panel and its card never do
+  await expect(page.locator(".dash-ai-icon")).toHaveCSS("animation-name", "dash-breath-icon-in, dash-breath-icon");
+  await expect(page.locator(".dash-assistant-globe-breath")).toHaveCSS("animation-name", "dash-breath-globe-in, dash-breath-globe");
+  for (const still of [".dash-assistant-panel", ".dash-assistant-card", ".dash-assistant-glow"]) {
+    await expect(page.locator(still)).toHaveCSS("animation-name", "none");
+    await expect(page.locator(still)).toHaveCSS("transform", "none");
+  }
+  await composer(page).fill("Which runs wait on me?");
+  await composer(page).press("Enter");
+  await expect(log(page).locator(".ai-row-assistant")).toHaveCount(1); // the reply (streaming or done)
+  // every 100 ms for 1.6 s: the panel, the card, every ancestor of a message and every element
+  // in the messages that holds text has no transform (or the identity) and no animation at all
+  const samples = await page.evaluate(async () => {
+    const messages = document.querySelector(".ai-messages")!;
+    const chain: Element[] = [];
+    for (let el: Element | null = messages; el; el = el.parentElement) chain.push(el);
+    const textful = [...messages.querySelectorAll("*")].filter((el) => (el.textContent ?? "").trim() !== "");
+    const layers = [".dash-assistant-panel", ".dash-assistant-card", ".dash-assistant-glow"].map((s) => document.querySelector(s)!);
+    const all = [...new Set([...chain, ...textful, ...layers])];
+    const name = (el: Element) => `${el.tagName.toLowerCase()}.${el.className && typeof el.className === "string" ? el.className.split(" ")[0] : ""}`;
+    const moving = (el: Element) => {
+      const cs = getComputedStyle(el);
+      const t = cs.transform;
+      const still = t === "none" || new DOMMatrixReadOnly(t).isIdentity;
+      return still && cs.animationName === "none" ? null : `${name(el)} transform=${t} animation=${cs.animationName}`;
+    };
+    const out: { at: number; moving: string[] }[] = [];
+    const start = performance.now();
+    while (performance.now() - start < 1600) {
+      await new Promise((r) => setTimeout(r, 100));
+      out.push({ at: Math.round(performance.now() - start), moving: all.map(moving).filter((m): m is string => m !== null) });
+    }
+    return { count: all.length, out };
+  });
+  expect(samples.count).toBeGreaterThan(10);
+  expect(samples.out.length).toBeGreaterThanOrEqual(15);
+  for (const s of samples.out) expect(s.moving, `at ${s.at} ms`).toEqual([]);
+  await expect(log(page)).toContainText("Stub answer");
+  // the loops that hold no text carry on meanwhile (the sidebar's icon), and the frame still
+  // counts as breathing
+  await expect(page.locator(".dash-ai-icon")).toHaveCSS("animation-name", "dash-breath-icon-in, dash-breath-icon");
+  await expect(page.locator(".dash-frame[data-breathing]")).toHaveCount(1);
+  // a saved conversation opened again shows still text too
+  await page.reload();
+  await expect(log(page)).toContainText("Stub answer");
+  await settled(page);
+  for (const still of [".dash-assistant-panel", ".dash-assistant-card"]) {
+    await expect(page.locator(still)).toHaveCSS("animation-name", "none");
+    await expect(page.locator(still)).toHaveCSS("transform", "none");
+  }
+});
+
+test("open and close keep the address (run and filters), the scroll position and the page", async ({ page }) => {
+  await signIn(page);
+  await hideCanvas(page);
+  const marked = () => page.evaluate(() => (window as unknown as { kept?: number }).kept);
+  // one run with Findings filters: the address comes back exactly, without a reload
+  const run = [...savedRuns()].sort((a, b) => counted(b).length - counted(a).length)[0];
+  await page.goto(`/?uid=${run.uid}&view=findings&sev=HIGH,MEDIUM&val=review&q=api`);
+  await expect(page.getByRole("heading", { name: "Findings", level: 1 })).toBeVisible();
+  await page.evaluate(() => ((window as unknown as { kept: number }).kept = 7));
+  const url = page.url();
+  await tab(page).click();
+  await settled(page);
+  await expect(page).toHaveURL(/view=assistant/);
+  await expect(page).toHaveURL(new RegExp(`uid=${run.uid}`)); // the run stays chosen
+  await expect(page).toHaveURL(/sev=HIGH%2CMEDIUM|sev=HIGH,MEDIUM/);
+  await minimize(page);
+  await closed(page);
+  expect(page.url()).toBe(url);
+  await expect(page.getByRole("heading", { name: "Findings", level: 1 })).toBeVisible();
+  expect(await marked()).toBe(7);
+
+  // every run's findings, scrolled: the content area is where it was
+  await page.goto("/?view=findings&sev=HIGH,MEDIUM,LOW");
+  await expect(page.getByRole("heading", { name: "Findings", level: 1 })).toBeVisible();
+  await page.evaluate(() => ((window as unknown as { kept: number }).kept = 8));
+  const content = page.locator(".dash-content");
+  await content.evaluate((el) => el.scrollTo({ top: 240, behavior: "instant" }));
+  const before = await content.evaluate((el) => el.scrollTop);
+  expect(before).toBeGreaterThanOrEqual(120); // the list is tall enough to scroll here
+  const findingsUrl = page.url();
+  await tab(page).click();
+  await settled(page);
+  await minimize(page);
+  await closed(page);
+  expect(page.url()).toBe(findingsUrl);
+  expect(await content.evaluate((el) => el.scrollTop)).toBe(before);
+  expect(await marked()).toBe(8);
+
+  // the Overview with a run chosen: the grow-and-shrink keeps the run and the scroll
+  await page.goto(`/?uid=${newest().uid}`);
+  await expect(page.getByRole("heading", { name: "Assessment Operations Center" })).toBeVisible();
+  await page.evaluate(() => ((window as unknown as { kept: number }).kept = 9));
+  const overviewUrl = page.url();
+  const scrolled = await content.evaluate((el) => el.scrollTop);
+  await tab(page).click();
+  await settled(page);
+  await minimize(page);
+  await closed(page);
+  expect(page.url()).toBe(overviewUrl);
+  expect(await content.evaluate((el) => el.scrollTop)).toBe(scrolled);
+  expect(await marked()).toBe(9);
+});
+
+test("the sidebar's active marker slides in once, over 0.2 s, and nothing on it loops", async ({ page }) => {
+  await ready(page);
+  await hideCanvas(page);
+  expect(await marker(page, "Overview")).toMatchObject({ opacity: "1", transform: "none", animation: "none" });
+  expect(await marker(page, "Findings")).toMatchObject({ opacity: "0", animation: "none" });
+  await nav(page, "Findings").click();
+  await expect.poll(() => marker(page, "Findings").then((m) => m.opacity)).toBe("1");
+  await expect.poll(() => marker(page, "Findings").then((m) => m.transform)).toBe("none"); // landed, nothing left over
+  const findings = await marker(page, "Findings");
+  expect(findings.duration).toBe("0.2s, 0.2s");
+  expect(findings.animation).toBe("none");
+  expect(await marker(page, "Overview")).toMatchObject({ opacity: "0", animation: "none" });
+  // the item itself (icon and label) never moves
+  await expect(nav(page, "Findings")).toHaveCSS("transform", "none");
+  await expect(nav(page, "Findings").locator("svg")).toHaveCSS("animation-name", "none");
 });
 
 test("opened from another view with a conversation, the globe stays home and doesn't draw", async ({ page }) => {
@@ -444,8 +577,10 @@ test.describe("with reduced motion", () => {
     const [fadeStart, fadeEnd] = moves(open, (f) => f.front!.o, 0.01);
     expect(fadeEnd - fadeStart).toBeLessThan(500);
     await settled(page);
-    const loops = [".dash-ai-icon", ".dash-ai-halo", ".dash-assistant-panel", ".dash-assistant-card", ".dash-assistant-globe-breath"];
-    for (const selector of loops) await expect(page.locator(selector).first()).toHaveCSS("animation-name", "none");
+    const loops = [".dash-ai-icon", ".dash-ai-halo", ".dash-assistant-globe-breath", ".dash-assistant-halo-glow"];
+    const still = [".dash-assistant-panel", ".dash-assistant-card", ".dash-assistant-glow"]; // never loop, motion or not
+    for (const selector of [...loops, ...still]) await expect(page.locator(selector).first()).toHaveCSS("animation-name", "none");
+    expect(await marker(page, "AI Assistant")).toMatchObject({ opacity: "1", transform: "none", duration: "0s", animation: "none" });
     await expect.poll(() => page.locator(".dash-ai-halo").evaluate((el) => Number(getComputedStyle(el).opacity))).toBeGreaterThan(0.3);
     await minimize(page);
     await closed(page);
