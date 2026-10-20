@@ -22,9 +22,8 @@ export const MOTION = {
     heroFade: { at: 0, duration: 0.3 }, // the hero title and the Ask bar fade where they are
     topbar: { at: 0, duration: 0.85 }, // up by its own height
     top: { at: 0.06, duration: 0.85, travel: 48 }, // the summary strip, up
-    left: { at: 0.12, duration: 0.85, travel: 140 },
-    right: { at: 0.12, duration: 0.85, travel: 140 },
-    bottom: { at: 0.18, duration: 0.85, travel: 140 },
+    right: { at: 0.12, duration: 0.85, travel: 140 }, // Findings by Severity
+    bottom: { at: 0.18, duration: 0.85, travel: 140 }, // the timelines
     leave: LEAVE,
     surface: { at: 0.15, duration: 1.3, ease: GROW }, // hero box → the stage (ends 1.45)
     fill: { at: 0.25, duration: 0.8 }, // the stage background comes in (to MOTION.fillOpacity)
@@ -44,7 +43,6 @@ export const MOTION = {
     globe: { at: 0.08, duration: 0.92, ease: GROW }, // home by 1.0, before the hero text returns
     halo: { at: 0, duration: 0.45 },
     bottom: { at: 0.4, duration: 0.85 },
-    left: { at: 0.45, duration: 0.85 },
     right: { at: 0.45, duration: 0.85 },
     top: { at: 0.5, duration: 0.85 },
     topbar: { at: 0.55, duration: 0.85 }, // ends 1.4
@@ -91,36 +89,29 @@ export function boxIn(el: Element | null, stage: HTMLElement): Box | null {
 export interface Parts {
   topbar: HTMLElement | null; // the frame's top bar
   top: HTMLElement[]; // the summary strip
-  left: HTMLElement[];
   right: HTMLElement[]; // Findings by Severity
   bottom: HTMLElement[]; // the timelines row
   hero: HTMLElement | null; // the globe + Ask bar box the surface grows from
-  fade: HTMLElement[]; // hero text that only fades
+  fade: HTMLElement[]; // the hero's title and the Ask bar: they only fade
 }
 
-/** The Overview's groups by their `data-motion` attribute (phase 0 contract 2), and the top bar
-    (the frame's <header>). */
+/** The Overview's groups by their `data-motion` attribute only (phase 0 contract 2: the
+    dashboard marks top, hero, fade, right and bottom), and the top bar: the frame's own <header>
+    (TopBar, which the Viewer renders as a child of the frame). */
 export function findParts(frame: HTMLElement): Parts {
   const root = frame.querySelector<HTMLElement>('[data-view-pane="overview"]') ?? frame;
-  const all = (selector: string) => [...root.querySelectorAll<HTMLElement>(selector)];
-  // TEMPORARY fallback, until the dashboard branch (which adds data-motion) is merged: the
-  // current class names. The main agent removes this after integration.
-  const legacy = root.querySelector("[data-motion]") === null;
-  const pick = (motion: string, fallback?: string) =>
-    legacy ? (fallback ? all(fallback) : []) : all(`[data-motion="${motion}"]`);
+  const pick = (motion: string) => [...root.querySelectorAll<HTMLElement>(`[data-motion="${motion}"]`)];
   return {
     topbar: frame.querySelector<HTMLElement>(":scope > header"),
     top: pick("top"),
-    left: pick("left", ".dash-timeline-card"),
-    right: pick("right", ".dash-right"),
-    bottom: pick("bottom", ".dash-bottom"),
-    hero: pick("hero", ".dash-hero")[0] ?? null,
-    fade: pick("fade", ".dash-hero-title, .dash-askbar"),
+    right: pick("right"),
+    bottom: pick("bottom"),
+    hero: pick("hero")[0] ?? null,
+    fade: pick("fade"),
   };
 }
 
-const moving = (p: Parts) =>
-  [p.topbar, ...p.top, ...p.left, ...p.right, ...p.bottom, ...p.fade].filter((e): e is HTMLElement => e !== null);
+const moving = (p: Parts) => [p.topbar, ...p.top, ...p.right, ...p.bottom, ...p.fade].filter((e): e is HTMLElement => e !== null);
 
 /** The parts where the open animation leaves them: gone, and out of the way. */
 export function setPartsOut(p: Parts): void {
@@ -128,7 +119,6 @@ export function setPartsOut(p: Parts): void {
   const out = { overwrite: "auto" as const }; // the intro may still be bringing some in
   if (p.topbar) gsap.set(p.topbar, { yPercent: -100, autoAlpha: 0, ...out });
   if (p.top.length) gsap.set(p.top, { y: -o.top.travel, autoAlpha: 0, ...out });
-  if (p.left.length) gsap.set(p.left, { x: -o.left.travel, autoAlpha: 0, ...out });
   if (p.right.length) gsap.set(p.right, { x: o.right.travel, autoAlpha: 0, ...out });
   if (p.bottom.length) gsap.set(p.bottom, { y: o.bottom.travel, autoAlpha: 0, ...out });
   if (p.fade.length) gsap.set(p.fade, { autoAlpha: 0, ...out });
@@ -208,7 +198,6 @@ export function openTimeline(o: {
   if (p.fade.length) tl.to(p.fade, { autoAlpha: 0, duration: m.heroFade.duration, ...leave }, m.heroFade.at);
   if (p.topbar) tl.to(p.topbar, { yPercent: -100, autoAlpha: 0, duration: m.topbar.duration, ...leave }, m.topbar.at);
   if (p.top.length) tl.to(p.top, { y: -m.top.travel, autoAlpha: 0, duration: m.top.duration, ...leave }, m.top.at);
-  if (p.left.length) tl.to(p.left, { x: -m.left.travel, autoAlpha: 0, duration: m.left.duration, ...leave }, m.left.at);
   if (p.right.length) tl.to(p.right, { x: m.right.travel, autoAlpha: 0, duration: m.right.duration, ...leave }, m.right.at);
   if (p.bottom.length) tl.to(p.bottom, { y: m.bottom.travel, autoAlpha: 0, duration: m.bottom.duration, ...leave }, m.bottom.at);
 
@@ -252,7 +241,6 @@ export function closeTimeline(o: {
   }
   const arrive = { ease: m.arrive, overwrite: "auto" as const };
   if (p.bottom.length) tl.to(p.bottom, { y: 0, autoAlpha: 1, duration: m.bottom.duration, ...arrive }, m.bottom.at);
-  if (p.left.length) tl.to(p.left, { x: 0, autoAlpha: 1, duration: m.left.duration, ...arrive }, m.left.at);
   if (p.right.length) tl.to(p.right, { x: 0, autoAlpha: 1, duration: m.right.duration, ...arrive }, m.right.at);
   if (p.top.length) tl.to(p.top, { y: 0, autoAlpha: 1, duration: m.top.duration, ...arrive }, m.top.at);
   if (p.topbar) tl.to(p.topbar, { yPercent: 0, autoAlpha: 1, duration: m.topbar.duration, ...arrive }, m.topbar.at);
