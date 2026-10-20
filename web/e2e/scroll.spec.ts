@@ -3,7 +3,9 @@
    scroller, elsewhere the window is. Real wheel, keyboard and touch input move it; nothing
    overflows sideways or hangs out of reach; the docs still glide with Lenis; and the assistant's
    conversation scrolls on its own with the composer in view. The wheel tests run with motion on,
-   because the old bug (Lenis taking the wheel on the dashboard) only existed with motion on. */
+   because the old bug (Lenis taking the wheel on the dashboard) only existed with motion on.
+   The long view they scroll is the every-run Report: on the fixed frame the Findings view
+   scrolls its list pane, not the content area (e2e/findings.spec.ts). */
 import { type CDPSession, expect, type Page, test } from "@playwright/test";
 
 import { newest, signIn } from "./support";
@@ -162,7 +164,7 @@ for (const size of [SIZES[0], SIZES[2]]) {
   test.describe(`the owner's sizes, ${label(size)}`, () => {
     test.use({ viewport: size });
 
-    for (const view of ["findings", "overview", "reports"]) {
+    for (const view of ["overview", "reports"]) {
       test(`the wheel scrolls the ${view} view to its end, in the content area`, async ({ page }) => {
         await signIn(page);
         await open(page, view);
@@ -218,9 +220,9 @@ for (const size of SIZES) {
   test.describe(`the wheel at ${label(size)}, motion on`, () => {
     test.use({ viewport: size });
 
-    test("scrolls the findings view to its end", async ({ page }) => {
+    test("scrolls the reports view to its end", async ({ page }) => {
       await signIn(page);
-      await open(page, "findings");
+      await open(page, "reports");
       const end = await wheelToEnd(page, size.width * 0.6, size.height * 0.7);
       expect(end.kind).toBe(fixedFrame(size) ? "content" : "window");
       expect(end.range).toBeGreaterThan(0);
@@ -235,17 +237,15 @@ test.describe("on the fixed frame (1366×768)", () => {
 
   test("PageDown, Space, the arrows, End and Home scroll the content once it has focus", async ({ page }) => {
     await signIn(page);
-    await open(page, "findings");
-    await page.getByRole("heading", { name: "Findings", level: 1 }).click(); // focus lands in the content
+    await open(page, "scope"); // every run's Scope: about a screen of range here, so each key is tried from the top
+    await page.getByRole("heading", { name: "Scope", level: 1 }).click(); // focus lands in the content
     const top = async () => (await scrollState(page)).top;
-    await page.keyboard.press("PageDown");
-    await expect.poll(top).toBeGreaterThan(200);
-    const afterPage = await top();
-    await page.keyboard.press("Space");
-    await expect.poll(top).toBeGreaterThan(afterPage + 200);
-    const afterSpace = await top();
-    await page.keyboard.press("ArrowDown");
-    await expect.poll(top).toBeGreaterThan(afterSpace);
+    for (const [key, least] of [["PageDown", 200], ["Space", 200], ["ArrowDown", 1]] as const) {
+      await page.keyboard.press(key);
+      await expect.poll(top, { message: `${key} scrolls the content` }).toBeGreaterThanOrEqual(least);
+      await page.keyboard.press("Home");
+      await expect.poll(top).toBe(0);
+    }
     await page.keyboard.press("End");
     await expect.poll(async () => { const s = await scrollState(page); return s.range - s.top; }).toBeLessThanOrEqual(1);
     await page.keyboard.press("Home");
@@ -257,9 +257,9 @@ for (const size of [{ width: 1366, height: 768 }, { width: 390, height: 844 }]) 
   test.describe(`touch at ${label(size)}`, () => {
     test.use({ viewport: size, hasTouch: true, isMobile: size.width < 768 });
 
-    test("a swipe scrolls the findings view", async ({ page, context }) => {
+    test("a swipe scrolls the reports view", async ({ page, context }) => {
       await signIn(page);
-      await open(page, "findings");
+      await open(page, "reports");
       const cdp = await context.newCDPSession(page);
       await swipeUp(page, cdp, size.width * 0.6, size.height * 0.8, size.height * 0.3);
       await expect.poll(async () => (await scrollState(page)).top).toBeGreaterThan(100);
@@ -308,7 +308,7 @@ test.describe("the docs", () => {
     await page.getByRole("banner").getByRole("link").first().click(); // the nav's logo: back to the dashboard
     await page.waitForURL((url) => url.pathname === "/");
     await expect(page.locator("html.lenis")).toHaveCount(0);
-    await page.locator('nav[aria-label="Views"] button[aria-label="Findings"]').click();
+    await page.locator('nav[aria-label="Views"] button[aria-label="Reports"]').click();
     await settled(page);
     const end = await wheelToEnd(page, 900, 600);
     expect(end.range).toBeGreaterThan(0);

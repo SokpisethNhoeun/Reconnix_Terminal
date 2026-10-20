@@ -1,0 +1,219 @@
+/* The Findings view (docs/WEB_REDESIGN_V3_PLAN.md, E2): ten rows a page with Previous / Next,
+   a deep link that opens on its finding's page, filters that go back to the first page,
+   Previous / Next finding across a page end, the notice for a finding that is hidden or unknown,
+   the list pane that scrolls on its own on the fixed frame while the detail keeps its header,
+   and the phone's list → detail → Back (a history entry). The every-run list of the sample data
+   is the one with more than one page. */
+import { expect, type Page, test } from "@playwright/test";
+
+import { PER_PAGE } from "../src/lib/paging";
+import { sample, signIn } from "./support";
+
+const list = (page: Page) => page.getByRole("list", { name: "Findings", exact: true });
+const rows = (page: Page) => list(page).getByRole("listitem");
+const selected = (page: Page) => list(page).locator('button[aria-current="true"]');
+const pager = (page: Page) => page.getByRole("navigation", { name: "Finding pages" });
+const detail = (page: Page) => page.getByRole("article", { name: /^Finding / });
+/** A row's finding ID and severity, as the row shows them. */
+const rowId = (page: Page, i: number) => rows(page).nth(i).locator("button span span span").first().innerText();
+const rowSeverity = async (page: Page, i: number) => (await rows(page).nth(i).locator("button span span span").nth(1).innerText()).toUpperCase();
+const param = (page: Page, key: string) => new URL(page.url()).searchParams.get(key);
+
+const TOTAL = sample().reduce((n, a) => n + a.findings.length, 0);
+const PAGES = Math.ceil(TOTAL / PER_PAGE);
+test.beforeAll(() => expect(PAGES, "the sample data needs more than one page of findings").toBeGreaterThan(1));
+
+test("ten findings a page, with Previous and Next under the list", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/?view=findings");
+  await expect(rows(page)).toHaveCount(PER_PAGE);
+  await expect(pager(page)).toContainText(`Page 1 of ${PAGES} · ${TOTAL} results`);
+  await expect(pager(page).getByRole("button", { name: "Previous page" })).toBeDisabled();
+  await expect(selected(page)).toHaveCount(1);
+
+  await pager(page).getByRole("button", { name: "Next page" }).click();
+  await expect(page).toHaveURL(/page=2/);
+  await expect(rows(page)).toHaveCount(Math.min(PER_PAGE, TOTAL - PER_PAGE));
+  await expect(pager(page)).toContainText(`Page 2 of ${PAGES}`);
+  // the new page's first row is selected: the detail never shows a row that is not listed
+  await expect(selected(page)).toHaveCount(1);
+  const first = await rows(page).first().locator("button").getAttribute("aria-current");
+  expect(first).toBe("true");
+
+  await pager(page).getByRole("button", { name: "Previous page" }).click();
+  await expect(page).not.toHaveURL(/page=/); // the first page is the plain address
+  await expect(rows(page)).toHaveCount(PER_PAGE);
+});
+
+test("a deep link opens the page that holds its finding, and the selection stays while it is on the page", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/?view=findings&page=2");
+  await rows(page).nth(1).locator("button").click(); // the second row of page 2
+  const key = param(page, "finding")!;
+  expect(key).toContain("~"); // every run's list: keyed by run
+  await expect(selected(page)).toHaveCount(1);
+
+  // the link alone, and with the wrong page: both land on page 2 with the row selected
+  for (const url of [`/?view=findings&finding=${encodeURIComponent(key)}`, `/?view=findings&page=1&finding=${encodeURIComponent(key)}`]) {
+    await page.goto(url);
+    await expect(pager(page)).toContainText(`Page 2 of ${PAGES}`);
+    await expect(selected(page)).toHaveCount(1);
+    await expect(detail(page)).toContainText(key.split("~")[1]);
+  }
+
+  // paging away drops the selection for that page's first row; paging back does not restore it
+  await pager(page).getByRole("button", { name: "Previous page" }).click();
+  await expect(page).not.toHaveURL(/finding=/);
+  await expect(selected(page)).toHaveCount(1);
+});
+
+test("a filter goes back to the first page; Previous and Next finding cross the page end", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/?view=findings&page=2");
+  await expect(pager(page)).toContainText("Page 2 of");
+  const sev = await rowSeverity(page, 0);
+  await page.getByRole("group", { name: "Severity" }).getByRole("button", { name: new RegExp(`^${sev.toLowerCase()}`) }).click();
+  await expect(page).toHaveURL(new RegExp(`sev=${sev}`));
+  await expect(page).not.toHaveURL(/page=/);
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(rows(page)).toHaveCount(PER_PAGE);
+
+  // the last row of page 1 → Next finding → the first row of page 2 (and back)
+  await rows(page).last().locator("button").click();
+  const last = param(page, "finding")!;
+  await detail(page).getByRole("button", { name: "Next finding" }).click();
+  await expect(pager(page)).toContainText(`Page 2 of ${PAGES}`);
+  expect(param(page, "finding")).not.toBe(last);
+  await expect(detail(page)).toContainText(`${PER_PAGE + 1} of ${TOTAL}`);
+  await expect(selected(page)).toHaveCount(1);
+  await detail(page).getByRole("button", { name: "Previous finding" }).click();
+  await expect(pager(page)).toContainText(`Page 1 of ${PAGES}`);
+  expect(param(page, "finding")).toBe(last);
+  await expect(detail(page)).toContainText(`${PER_PAGE} of ${TOTAL}`);
+  // the ends are disabled, not dead
+  await page.goto("/?view=findings");
+  await expect(detail(page).getByRole("button", { name: "Previous finding" })).toBeDisabled();
+});
+
+test("a finding the address names but the list lacks falls back to the first row, with a way out", async ({ page }) => {
+  await signIn(page);
+  // unknown: nothing by that name in any run
+  await page.goto("/?view=findings&finding=no-such-finding");
+  await expect(page.getByRole("status").filter({ hasText: "No finding" })).toContainText("no-such-finding");
+  await expect(selected(page)).toHaveCount(1);
+  await expect(detail(page)).toBeVisible();
+  await page.getByRole("button", { name: "Dismiss" }).click();
+  await expect(page).not.toHaveURL(/finding=/);
+
+  // hidden by a filter: Show it clears the filters and keeps it selected
+  const a = sample().find((x) => new Set(x.findings.map((f) => f.severity)).size > 1)!;
+  await page.goto(`/?uid=${a.uid}&view=findings`);
+  const fid = await rowId(page, 0);
+  const sev = await rowSeverity(page, 0);
+  const other = a.findings.find((x) => x.severity !== sev)!.severity;
+  await page.goto(`/?uid=${a.uid}&view=findings&sev=${other}&finding=${fid}`);
+  await expect(page.getByRole("status").filter({ hasText: "hidden by the filters" })).toContainText(fid);
+  await page.getByRole("button", { name: "Show it" }).click();
+  await expect(page).not.toHaveURL(/sev=/);
+  await expect(page).toHaveURL(new RegExp(`finding=${fid}`));
+  await expect(selected(page)).toContainText(fid);
+  await expect(page.getByRole("status")).toHaveCount(0);
+});
+
+test.describe("on the fixed frame (1366×768)", () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+
+  test("the list pane scrolls on its own, the page does not, and the detail keeps its header", async ({ page }) => {
+    await signIn(page);
+    await page.goto("/?view=findings");
+    await expect(rows(page)).toHaveCount(PER_PAGE);
+    const main = page.locator("main.dash-content");
+    const state = () =>
+      page.evaluate(() => {
+        const ul = document.querySelector<HTMLElement>('ul[aria-label="Findings"]')!;
+        const main = document.querySelector<HTMLElement>("main.dash-content")!;
+        return { list: ul.scrollTop, listRange: ul.scrollHeight - ul.clientHeight, main: main.scrollTop, mainRange: main.scrollHeight - main.clientHeight, win: scrollY };
+      });
+    const before = await state();
+    expect(before.listRange, "ten rows do not fit the frame: the list pane must scroll").toBeGreaterThan(100);
+    expect(before.mainRange, "the content area must not scroll because of the list").toBeLessThanOrEqual(1);
+
+    const box = (await list(page).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, 600);
+    await expect.poll(async () => (await state()).list).toBeGreaterThan(100);
+    const after = await state();
+    expect(after.main).toBe(0);
+    expect(after.win).toBe(0);
+    expect(await main.evaluate((el) => el.scrollTop)).toBe(0);
+    // the keys scroll the list once a row has focus, and the page still stays put
+    await rows(page).first().locator("button").click();
+    await page.keyboard.press("Home");
+    await expect.poll(async () => (await state()).list).toBe(0);
+    await page.keyboard.press("PageDown");
+    await expect.poll(async () => (await state()).list).toBeGreaterThan(100);
+    expect((await state()).main).toBe(0);
+    // the pager stays in reach under the scrolled list
+    const pagerBox = (await pager(page).boundingBox())!;
+    expect(pagerBox.y + pagerBox.height).toBeLessThanOrEqual(768);
+
+    // the detail: its header (ID, severity, CVSS, title) stays in view when its body scrolls
+    const head = detail(page).locator("header").first();
+    const headBefore = (await head.boundingBox())!;
+    expect(headBefore.y).toBeGreaterThanOrEqual(0);
+    const body = (await detail(page).boundingBox())!;
+    await page.mouse.move(body.x + body.width / 2, body.y + body.height - 40);
+    await page.mouse.wheel(0, 600);
+    await page.waitForTimeout(200);
+    const headAfter = (await head.boundingBox())!;
+    expect(Math.round(headAfter.y)).toBe(Math.round(headBefore.y));
+    expect(await main.evaluate((el) => el.scrollTop)).toBe(0);
+    expect(await page.evaluate(() => scrollY)).toBe(0);
+  });
+});
+
+test.describe("on a phone (390×844)", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("the list first; a row opens the detail with Back, and the browser's Back returns to the list", async ({ page }) => {
+    await signIn(page);
+    await page.goto("/?view=findings");
+    await expect(list(page)).toBeVisible();
+    await expect(detail(page)).toBeHidden();
+    const back = page.getByRole("button", { name: "Back to the findings" });
+
+    await rows(page).nth(2).locator("button").tap();
+    await expect(detail(page)).toBeVisible();
+    await expect(back).toBeVisible();
+    await expect(list(page)).toBeHidden();
+    await expect(page).toHaveURL(/finding=/);
+    await expect(page.getByRole("searchbox", { name: "Search findings" })).toBeHidden(); // the filters belong to the list
+
+    await page.goBack();
+    await expect(page).not.toHaveURL(/finding=/);
+    await expect(list(page)).toBeVisible();
+    await expect(detail(page)).toBeHidden();
+
+    await rows(page).nth(1).locator("button").tap();
+    await expect(detail(page)).toBeVisible();
+    await back.tap();
+    await expect(list(page)).toBeVisible();
+    await expect(page).not.toHaveURL(/finding=/);
+
+    // a link straight to a finding: Back has nothing behind it and still returns to the list
+    const key = await rows(page).first().locator("button").evaluate(() => new URL(location.href).searchParams.get("finding"));
+    expect(key).toBeNull();
+    await rows(page).first().locator("button").tap();
+    const direct = page.url();
+    await page.goto(direct);
+    await expect(detail(page)).toBeVisible();
+    await back.tap();
+    await expect(list(page)).toBeVisible();
+
+    // paging by touch
+    await pager(page).getByRole("button", { name: "Next page" }).tap();
+    await expect(page).toHaveURL(/page=2/);
+    await expect(rows(page)).toHaveCount(Math.min(PER_PAGE, TOTAL - PER_PAGE));
+    await expect(list(page)).toBeVisible();
+  });
+});

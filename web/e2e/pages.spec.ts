@@ -3,6 +3,7 @@
    playwright.config.ts instead of the TUI). */
 import { expect, type Page, test } from "@playwright/test";
 
+import { PER_PAGE } from "../src/lib/paging";
 import { counted, newest, sample, signIn, toolSteps } from "./support";
 
 const view = (name: string) => `nav[aria-label="Views"] button[aria-label^="${name}"]`;
@@ -29,7 +30,7 @@ test("the overview totals every saved file by default", async ({ page }) => {
   await expect(cards).toHaveCount(4);
   expect(await cards.evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).toEqual(["Findings", "Assessment progress", "Tool execution", "Duration"]);
   await page.click(view("Findings"));
-  await expect(findingRows(page)).toHaveCount(all.reduce((n, a) => n + a.findings.length, 0));
+  await expect(findingRows(page)).toHaveCount(Math.min(PER_PAGE, all.reduce((n, a) => n + a.findings.length, 0))); // ten a page
   // Report and Scope sum up every run too (no run picker): a row per run, a row per target
   await page.click(view("Reports"));
   await expect(page.getByRole("table", { name: "Saved assessments" }).getByRole("link", { name: /^Open the report of/ })).toHaveCount(all.length);
