@@ -3,38 +3,33 @@
  * card data as deriveDashboard (OverviewCards), totalled over all runs, plus the counts the top
  * bar shows. Pure, like derive.ts: no I/O, no invented numbers.
  *
- * The time axis runs from the first saved run to the last (at least an hour wide); each run
- * sits at the time it was created. Position 0 is the oldest run, 1 the newest.
+ * The Activity Timeline counts the runs started per day (per week past MAX_DAYS days), stacked
+ * by run status; the Execution Timeline lists the newest runs.
  */
-import { hourMinute, shortDay } from "@/lib/data/format";
+import { dayKey, duration, hourMinute, longDuration, minutesLimit, shortDay } from "@/lib/data/format";
 import { STATUSES } from "@/lib/data/schema";
-import type { AssessmentView, Tone } from "@/lib/data/view-types";
+import type { AssessmentView, Status } from "@/lib/data/view-types";
+import { RUN_STATUS, toneColor } from "@/lib/status";
 
+import { countTicks } from "./axis";
+import { toolsNamed } from "./event-kinds";
 import {
-  type ActivityBar,
-  BINS,
-  bracketsAt,
   type FindingRow,
   findingRow,
   findingsSlice,
-  findingsStat,
-  GAUGE_TICKS,
+  findingsSummary,
   initials,
-  type Lane,
-  litTicks,
   MAX_QUESTIONS,
-  type Marker,
-  type OverviewCards,
-  type Peak,
-  type Ring,
-  type StatCard,
-  thinLanes,
+  plural,
+  runEntry,
   toolCaption,
 } from "./derive";
+import type { ActivityCard, DayBar, ExecutionCard, OverviewCards, SummaryStrip } from "./overview-types";
 
-const HOUR = 3_600_000;
-const MIN_SPAN = HOUR; // one run (or runs minutes apart) still gets a readable axis
-const DAY_LABELS_AFTER = 36 * HOUR; // a wider axis is labelled with days, not clock times
+const DAY = 86_400_000;
+const MAX_DAYS = 45; // a wider span is counted per week
+const MAX_TICKS = 8; // labels along the day axis
+export const LATEST_RUNS = 8; // rows of the Execution Timeline
 
 export type CountRow = { name: string; count: number };
 
@@ -60,128 +55,134 @@ function countRows(values: string[]): CountRow[] {
   return [...counts.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
 }
 
-/** Labels for evenly placed ticks, dropping one that repeats its neighbour ("5 Oct", "5 Oct"). */
-function ticksAt(positions: number[], labelAt: (pos: number) => string): Marker[] {
-  const ticks = positions.map((pos) => ({ pos, label: labelAt(pos) }));
-  return ticks.filter((t, i) => i === 0 || t.label !== ticks[i - 1].label);
+/** Local midnight of the day `ms` falls on. */
+function midnight(ms: number): number {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+/** Runs started per day (or week), oldest first, every slot in between included. */
+function activityDays(views: AssessmentView[]): ActivityCard {
+  const oldestFirst = [...views].sort((a, b) => a.createdMs - b.createdMs);
+  const first = midnight(oldestFirst[0].createdMs);
+  const last = midnight(oldestFirst[oldestFirst.length - 1].createdMs);
+  const dayCount = Math.round((last - first) / DAY) + 1; // DST shifts round away
+  const unit = dayCount > MAX_DAYS ? "week" : "day";
+  const per = unit === "week" ? 7 : 1;
+  const slots = Math.ceil(dayCount / per);
+  const slotOf = (ms: number) => Math.floor(Math.round((midnight(ms) - first) / DAY) / per);
+  const width = 1 / slots;
+  const days: DayBar[] = Array.from({ length: slots }, (_, i) => {
+    const startMs = new Date(first).setDate(new Date(first).getDate() + i * per);
+    const here = oldestFirst.filter((v) => slotOf(v.createdMs) === i);
+    const label = unit === "week" ? `week of ${shortDay(startMs)}` : shortDay(startMs);
+    const segments = STATUSES.map((status) => ({
+      status,
+      count: here.filter((v) => v.status === status).length,
+      color: toneColor(RUN_STATUS[status].tone),
+    })).filter((s) => s.count > 0);
+    const states = segments.map((s) => `${s.count} ${RUN_STATUS[s.status].label.toLowerCase()}`).join(", ");
+    return {
+      key: dayKey(startMs),
+      label,
+      pos: (i + 0.5) * width,
+      width,
+      total: here.length,
+      segments,
+      title: here.length ? `${label} · ${plural(here.length, "run")}: ${states}` : `${label} · no runs`,
+      runs: here.map(runEntry),
+    };
+  });
+  const step = Math.ceil(slots / MAX_TICKS);
+  const busiest = Math.max(1, ...days.map((d) => d.total));
+  const axis = countTicks(busiest);
+  const present = STATUSES.filter((s) => views.some((v) => v.status === s));
+  const window = first === last ? shortDay(first) : `${shortDay(first)} → ${shortDay(last)}`;
+  return {
+    mode: "days",
+    days,
+    ticks: days.filter((_, i) => i % step === 0).map((d) => ({ pos: d.pos, label: unit === "week" ? d.label.replace("week of ", "") : d.label })),
+    yTicks: axis.ticks,
+    max: axis.top,
+    unit,
+    total: views.length,
+    window,
+    summary: `Assessments started per ${unit}, ${window}: ${plural(views.length, "run")}, busiest ${unit} ${busiest}.`,
+    legend: present.map((s) => ({ label: RUN_STATUS[s].label, color: toneColor(RUN_STATUS[s].tone), hint: RUN_STATUS[s].hint, shape: "bar" as const })),
+  };
+}
+
+/** The newest runs, one row each. */
+function executionRuns(views: AssessmentView[]): ExecutionCard {
+  const newest = [...views].sort((a, b) => b.createdMs - a.createdMs).slice(0, LATEST_RUNS);
+  return {
+    mode: "runs",
+    runs: newest.map(runEntry),
+    caption: views.length > newest.length ? `Latest ${newest.length} of ${views.length} runs` : plural(views.length, "run"),
+    summary: `The ${plural(newest.length, "newest run")}: ${newest.map((v) => `${v.id} ${RUN_STATUS[v.status].label.toLowerCase()} ${v.progress}%`).join(", ")}.`,
+    legend: [{ label: "Plan done", color: "var(--primary)", hint: "How much of the run's plan finished.", shape: "bar" }],
+  };
 }
 
 /** Every saved run's Overview. `views` is the library (newest first); it must not be empty. */
 export function deriveOverall(views: AssessmentView[]): Overall {
   const n = views.length;
-  const oldestFirst = [...views].sort((a, b) => a.createdMs - b.createdMs);
-  const first = oldestFirst[0].createdMs;
-  const last = oldestFirst[n - 1].createdMs;
-  const span = Math.max(last - first, MIN_SPAN);
-  const t0 = first - (span - (last - first)) / 2; // a narrow set of runs sits in the middle
-  const pos = (ms: number) => Math.min(1, Math.max(0, (ms - t0) / span));
-  const labelAt = (p: number) => {
-    const ms = t0 + p * span;
-    return span > DAY_LABELS_AFTER ? shortDay(ms) : hourMinute(ms);
-  };
-  const when = (ms: number) => `${shortDay(ms)} ${hourMinute(ms)}`;
-  const binOf = (ms: number) => Math.round(pos(ms) * (BINS - 1));
-  const binPos = (i: number) => i / (BINS - 1);
-
-  // what each run adds, oldest first along the axis
-  const runs = oldestFirst.map((v) => {
-    const real = v.findings.filter((f) => !f.falsePositive);
-    return {
-      v,
-      at: pos(v.createdMs),
-      bin: binOf(v.createdMs),
-      when: when(v.createdMs),
-      real: real.length,
-      severe: real.some((f) => f.severity === "CRITICAL" || f.severity === "HIGH"),
-      waiting: v.status === "Awaiting input",
-      tools: v.log.filter((l) => l.kind === "tool").length,
-    };
-  });
-  const waiting = runs.filter((r) => r.waiting).length;
+  const waiting = views.filter((v) => v.status === "Awaiting input").length;
   const completed = views.filter((v) => v.status === "Completed").length;
-  const live = views.some((v) => v.unfinished);
 
   // findings across runs (each keyed by its run)
-  const findings = views.flatMap((v) => v.findings.map((f) => findingRow(f, { uid: v.uid, label: `${v.id} · ${when(v.createdMs)}` })));
+  const findings = views.flatMap((v) =>
+    v.findings.map((f) => findingRow(f, { uid: v.uid, label: `${v.id} · ${shortDay(v.createdMs)} ${hourMinute(v.createdMs)}` })),
+  );
   const findingCards = findingsSlice(findings);
-  const findingTotal = findingCards.severity.reduce((s, x) => s + x.count, 0);
 
-  // activity: runs started per slot (taller = more runs); amber = waits on you, red = high risk
-  const perBin = Array.from({ length: BINS }, (_, i) => runs.filter((r) => r.bin === i));
-  const busiest = Math.max(1, ...perBin.map((b) => b.length));
-  const bars: ActivityBar[] = perBin.map((here, i) => {
-    if (!here.length) return { pos: binPos(i), heightPct: 10, tone: "dim", title: labelAt(binPos(i)), hasEvent: false };
-    const tone: Tone = here.some((r) => r.waiting) ? "accent" : here.some((r) => r.severe) ? "danger" : "primary";
-    const ids = here.slice(0, 3).map((r) => r.v.id).join(", ") + (here.length > 3 ? ` +${here.length - 3}` : "");
-    const runsWord = here.length === 1 ? "1 run" : `${here.length} runs`;
-    return { pos: binPos(i), heightPct: Math.round(35 + (65 * here.length) / busiest), tone, title: `${here[0].when} · ${runsWord} · ${ids}`, hasEvent: true };
-  });
-  const peaks: Peak[] = runs.flatMap((r) => [
-    ...(r.real ? [{ pos: r.at, tone: "danger" as Tone, title: `${r.v.id} · ${r.when} · ${r.real === 1 ? "1 finding" : `${r.real} findings`}` }] : []),
-    ...(r.waiting ? [{ pos: r.at, tone: "accent" as Tone, title: `${r.v.id} · ${r.when} · waits on you` }] : []),
-  ]);
-  const lastNotable = [...runs].reverse().find((r) => r.real || r.waiting);
-
-  // execution: one mark per run; one still going runs on to now (amber and pulsing if it waits)
-  const lanes: Lane[] = runs.map((r) => ({
-    key: r.v.uid,
-    label: `${r.v.id} · ${r.v.template}`,
-    kind: r.v.unfinished ? "segment" : "dot",
-    start: r.at,
-    end: r.v.unfinished ? 1 : r.at,
-    tone: r.waiting ? "accent" : r.v.status === "Completed" || r.v.unfinished ? "primary" : "dim",
-    pulse: r.waiting,
-    title: `${r.when} · ${r.v.status}${r.real ? ` · ${r.real === 1 ? "1 finding" : `${r.real} findings`}` : ""}`,
-  }));
-  const phasesDone = views.reduce((s, v) => s + v.phases.filter((p) => p.status === "done").length, 0);
-  const phasesTotal = views.reduce((s, v) => s + v.phases.length, 0);
-  const rings: Ring[] = [
-    { used: completed, max: n, label: "Runs completed" },
-    ...(phasesTotal > 0 ? [{ used: phasesDone, max: phasesTotal, label: "Plan steps" }] : []),
-  ];
-  const sameDay = shortDay(first) === shortDay(last);
-  const chip = sameDay
-    ? `${shortDay(first)} ${hourMinute(first)}${n > 1 && hourMinute(first) !== hourMinute(last) ? `–${hourMinute(last)}` : ""}`
-    : `${shortDay(first)} → ${shortDay(last)}`;
-
-  // tool steps over time, every run
-  const toolTotal = runs.reduce((s, r) => s + r.tools, 0);
+  // tools and time, every run
+  const toolSteps = views.reduce((s, v) => s + v.log.filter((l) => l.kind === "tool").length, 0);
+  const tools = [...new Set(views.flatMap((v) => toolsNamed(v.log.filter((l) => l.kind === "tool").map((l) => l.text), v.scope?.tools ?? [])))];
   const requests = views.reduce((s, v) => s + v.requests, 0);
-  const toolBars = Array.from({ length: BINS }, (_, i) => ({
-    pos: binPos(i),
-    value: runs.filter((r) => r.bin <= i).reduce((s, r) => s + r.tools, 0),
-    last: i === BINS - 1,
-  }));
+  const totalSec = views.reduce((s, v) => s + v.durationSec, 0);
+  const longest = views.reduce((a, b) => (b.durationSec > a.durationSec ? b : a));
+  const overLimit = views.filter((v) => v.scope && v.durationSec > v.scope.windowMinutes * 60).length;
+  const unfinished = STATUSES.filter((s) => s !== "Completed")
+    .map((status: Status) => ({ status, count: views.filter((v) => v.status === status).length }))
+    .filter((s) => s.count > 0)
+    .sort((a, b) => b.count - a.count);
 
-  // policy
-  const checks = views.reduce((s, v) => s + v.checks.total, 0);
-  const allowed = views.reduce((s, v) => s + v.checks.allowed, 0);
-  const blocked = views.reduce((s, v) => s + v.checks.blocked, 0);
-  const statCards: StatCard[] = [
-    findingsStat(findingCards.severity),
-    { label: "Policy checks", value: String(checks), chip: `${allowed} allowed`, tone: "primary" },
-    { label: "Blocked by policy", value: String(blocked), chip: "not executed", tone: "accent" },
-    {
-      label: "Assessments",
-      value: String(n),
-      chip: waiting ? `${waiting} waiting` : `${completed} completed`,
-      tone: waiting ? "accent" : "primary",
+  const summary: SummaryStrip = {
+    findings: findingsSummary(findingCards),
+    progress: {
+      pct: Math.round((completed / n) * 100),
+      caption: `${completed} of ${plural(n, "run")} completed`,
+      status: null,
+      other: unfinished[0] ?? null,
     },
-  ];
+    tools: {
+      steps: toolSteps,
+      tools,
+      requests,
+      running: views.some((v) => v.status === "Running"),
+      caption: toolCaption(requests),
+    },
+    duration: {
+      value: longDuration(totalSec),
+      countup: totalSec < 3600,
+      caption: `in total · longest ${duration(longest.durationSec)}${longest.scope ? ` of ${minutesLimit(longest.scope.windowMinutes)}` : ""}`,
+      frac: longest.scope && longest.scope.windowMinutes > 0 ? Math.min(1, longest.durationSec / (longest.scope.windowMinutes * 60)) : null,
+      over: overLimit,
+    },
+  };
 
   const approvedScopes = views.filter((v) => v.scope?.approved).length;
   const targets = countRows(views.map((v) => v.target || "—"));
   const operators = [...new Set(views.map((v) => v.operator).filter((o) => o && o !== "—"))];
   const operator = operators[0] ?? "—";
-  const value = Math.round((completed / n) * 100);
-  const start = labelAt(0);
-  const end = labelAt(1);
+  const severe = findingCards.severity.some((s) => (s.level === "CRITICAL" || s.level === "HIGH") && s.count > 0);
 
   return {
     runs: n,
     waiting,
     completed,
-    findingTotal,
+    findingTotal: findingCards.total,
     operator,
     operators,
     operatorInitials: initials(operator),
@@ -190,14 +191,8 @@ export function deriveOverall(views: AssessmentView[]): Overall {
     statuses: STATUSES.map((s) => ({ name: s, count: views.filter((v) => v.status === s).length })).filter((s) => s.count > 0),
     findings,
     cards: {
-      activity: {
-        bars,
-        peaks,
-        lastPeak: lastNotable ? { pos: lastNotable.at, label: lastNotable.when } : null,
-        brackets: bracketsAt(runs.map((r) => r.at), labelAt),
-        summary: `Assessments started from ${start} to ${end}: ${n === 1 ? "1 run" : `${n} runs`}.`,
-        idle: "no findings yet",
-      },
+      mode: "all",
+      summary,
       ask: {
         label: "Ask about your assessments",
         scope: {
@@ -205,41 +200,23 @@ export function deriveOverall(views: AssessmentView[]): Overall {
           text: approvedScopes === n ? "Every scope approved" : `${approvedScopes} of ${n} scopes approved`,
         },
         reach: targets.length === 1 ? "1 target" : `${targets.length} targets`,
-        questions: overallQuestions({ n, waiting, blocked, severe: runs.some((r) => r.severe), review: findingCards.review.needsReview }),
+        questions: overallQuestions({
+          n,
+          waiting,
+          blocked: views.some((v) => v.checks.blocked > 0),
+          severe,
+          review: findingCards.review.needsReview,
+        }),
       },
-      statCards,
-      execution: {
-        lanes: thinLanes(lanes),
-        currentPos: runs[n - 1].at,
-        ticks: ticksAt([0, 0.25, 0.5, 0.75], labelAt),
-        rings,
-        chip,
-        summary: `Assessments from ${start} to ${end}: ${n} runs, ${completed} completed, ${waiting} waiting.`,
-      },
-      gauge: {
-        value,
-        caption: `${completed} of ${n} completed`,
-        live,
-        ticks: GAUGE_TICKS,
-        lit: litTicks(value),
-        summary: `${value}% of ${n} assessments completed`,
-      },
-      tools: {
-        bars: toolBars,
-        used: toolTotal,
-        max: Math.max(1, toolTotal),
-        ticks: ticksAt([0, 0.5, 1], labelAt),
-        caption: toolCaption(toolTotal, requests),
-        live,
-        summary: `Tool steps across ${n} assessments, reaching ${toolTotal}.`,
-      },
+      activity: activityDays(views),
+      execution: executionRuns(views),
       findings: findingCards,
     },
   };
 }
 
 /** Example questions for the Ask bar, about what the saved runs hold. */
-function overallQuestions(s: { n: number; waiting: number; blocked: number; severe: boolean; review: number }): string[] {
+function overallQuestions(s: { n: number; waiting: number; blocked: boolean; severe: boolean; review: number }): string[] {
   const out: string[] = [];
   if (s.waiting) out.push("Which assessments are waiting on me?");
   if (s.severe) out.push("Which runs found high-risk issues?");

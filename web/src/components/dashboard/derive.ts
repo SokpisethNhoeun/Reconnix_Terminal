@@ -4,74 +4,48 @@
  * this returns; none holds a literal number. If a design element needs a value the saved
  * assessment doesn't record, it does not go on the page.
  *
- * The Overview's cards read only `cards` (OverviewCards): derive-overall.ts makes the same
- * shape from every saved run at once, so one set of cards draws either.
+ * The Overview reads only `cards` (OverviewCards, overview-types.ts): derive-overall.ts makes
+ * the same shape from every saved run at once, so one set of components draws either.
  *
  * Runs on the server (src/app/page.tsx) and hands plain data to the views, so every label,
- * including clock times, is computed once, here. Positions on the time axis are fractions
- * (0 = the run's first log line, 1 = its last).
+ * including clock times, is computed once, here. Log text is masked again here
+ * (lib/assistant/redact.ts) on top of what the TUI's snapshot already masked. Positions on the
+ * time axis are fractions (0 = the run's first log line, 1 = its last).
  */
-import { clock, duration } from "@/lib/data/format";
+import { redact } from "@/lib/assistant/redact";
+import { clock, duration, hourMinute, minutesLimit, shortDay, stamp } from "@/lib/data/format";
 import { SEVERITIES } from "@/lib/data/schema";
-import type {
-  ApprovalView,
-  AssessmentView,
-  FindingView,
-  LogKind,
-  LogLine,
-  PhaseView,
-  ScopeView,
-  Severity,
-  Tone,
-} from "@/lib/data/view-types";
+import type { ApprovalView, AssessmentView, FindingView, LogLine, PhaseView, ScopeView, Severity } from "@/lib/data/view-types";
+import { APPROVAL_STATE, RUN_STATUS, STEP_STATUS, toneColor } from "@/lib/status";
 
-export type { Tone };
+import { cluster, mergeNarrow, type Segment, segmentLabel, ticksAt } from "./axis";
+import { EVENT_KIND, eventBadge, eventLabel, LANE_ORDER, toolLabel, toolsNamed } from "./event-kinds";
+import type {
+  ActivityCard,
+  ActivityEvent,
+  ActivityLane,
+  ExecutionCard,
+  FindingsSlice,
+  LegendItem,
+  OverviewCards,
+  RunEntry,
+  SummaryStrip,
+  ToolSegment,
+} from "./overview-types";
+
+export type * from "./overview-types";
 
 /** The assessment templates the TUI offers (the Template chip lists them). */
 export const TEMPLATES = ["Network", "API", "Source Code", "Web URL"] as const;
 
-export const BINS = 46; // bars across the activity charts
-export const GAUGE_TICKS = 60;
-const TOP_FINDINGS = 3;
-const MIN_LABEL_GAP = 0.25; // two clock labels closer than this (fraction of the axis) overlap
-const MAX_LANES = 28; // more marks than this on the execution timeline stop being readable
 export const MAX_QUESTIONS = 3;
+const TOP_FINDINGS = 8; // the card shows as many as its height allows (3 at least)
+const AXIS_TICKS = [0, 0.25, 0.5, 0.75, 1];
 
-export type ActivityBar = { pos: number; heightPct: number; tone: Tone; title: string; hasEvent: boolean };
-export type Peak = { pos: number; tone: Tone; title: string };
-export type Marker = { pos: number; label: string };
-export type Lane = {
-  key: string;
-  label: string;
-  kind: "dot" | "segment";
-  start: number;
-  end: number;
-  tone: Tone;
-  pulse: boolean;
-  title: string;
-};
-export type Ring = { used: number; max: number; label: string; over?: boolean };
-export type ToolBar = { pos: number; value: number; last: boolean };
 export type FindingIcon = "bug" | "code" | "database";
 /** A finding as listed: `key` is unique in the list (the ID for one run, `<uid>~<ID>` across
     runs) and `run` names the assessment it came from when the list spans several. */
-export type FindingRow = FindingView & { tone: Tone; icon: FindingIcon; key: string; run: { uid: string; label: string } | null };
-export type SeverityCount = { level: Severity; count: number; share: number; tone: Tone };
-export type TopFinding = { key: string; id: string; title: string; severity: Severity; score: number; icon: FindingIcon; run: string | null };
-/** A drill-down: which view a number opens, with which filters (see view-url.ts). */
-export type DrillDown = { view: "findings"; filters: Record<string, string>; label: string };
-export type StatCard = { label: string; value: string; chip: string; tone: Tone; isDuration?: boolean; link?: DrillDown };
-
-/** What the Overview's cards draw, for one run or for every saved run. */
-export interface OverviewCards {
-  activity: { bars: ActivityBar[]; peaks: Peak[]; lastPeak: Marker | null; brackets: Marker[]; summary: string; idle: string };
-  ask: { label: string; scope: { ok: boolean; text: string }; reach: string; questions: string[] };
-  statCards: StatCard[];
-  execution: { lanes: Lane[]; currentPos: number; ticks: Marker[]; rings: Ring[]; chip: string; summary: string };
-  gauge: { value: number; caption: string; live: boolean; ticks: number; lit: number; summary: string };
-  tools: { bars: ToolBar[]; used: number; max: number; ticks: Marker[]; caption: string; live: boolean; summary: string };
-  findings: { severity: SeverityCount[]; words: string; review: { confirmed: number; needsReview: number }; top: TopFinding[] };
-}
+export type FindingRow = FindingView & { icon: FindingIcon; key: string; run: { uid: string; label: string } | null };
 
 export interface Dashboard {
   assessment: {
@@ -80,7 +54,7 @@ export interface Dashboard {
     name: string;
     target: string;
     template: string;
-    status: string;
+    status: AssessmentView["status"];
     unfinished: boolean;
     progress: number;
     startedAt: string;
@@ -92,7 +66,7 @@ export interface Dashboard {
   operatorInitials: string;
   phases: PhaseView[];
   findingTotal: number;
-  severity: SeverityCount[];
+  severity: FindingsSlice["severity"];
   checks: { total: number; allowed: number; blocked: number };
   maskedSecrets: number;
   requests: number;
@@ -108,28 +82,7 @@ export interface Dashboard {
   cards: OverviewCards;
 }
 
-// --- shared maps and helpers (derive-overall.ts uses them too) ---------------------------
-
-export const SEV_TONE: Record<Severity, Tone> = {
-  CRITICAL: "danger",
-  HIGH: "danger",
-  MEDIUM: "accent",
-  LOW: "success",
-  INFO: "dim",
-};
-const KIND_HEIGHT: Record<LogKind, number> = { info: 35, user: 45, mask: 40, scope: 50, policy: 55, tool: 70, finding: 90, gate: 100 };
-const KIND_TONE: Record<LogKind, Tone> = {
-  info: "primary",
-  user: "primary",
-  scope: "primary",
-  policy: "primary",
-  mask: "primary",
-  tool: "primary",
-  finding: "danger",
-  gate: "accent",
-};
-// Lane heights cycle so neighbouring segments float at different levels.
-export const LANE_FRAC = [0.3, 0.55, 0.22, 0.62, 0.42, 0.5, 0.36, 0.68];
+// --- shared helpers (derive-overall.ts uses them too) ------------------------------------
 
 export const initials = (name: string) =>
   name
@@ -140,7 +93,7 @@ export const initials = (name: string) =>
     .slice(0, 2)
     .toUpperCase() || "—";
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 function findingIcon(f: FindingView): FindingIcon {
   const about = `${f.category} ${f.title}`;
@@ -151,63 +104,201 @@ function findingIcon(f: FindingView): FindingIcon {
 
 /** A finding as a list row; `run` set when the list spans several assessments. */
 export function findingRow(f: FindingView, run: FindingRow["run"] = null): FindingRow {
-  return { ...f, tone: SEV_TONE[f.severity], icon: findingIcon(f), key: run ? `${run.uid}~${f.id}` : f.id, run };
+  return { ...f, icon: findingIcon(f), key: run ? `${run.uid}~${f.id}` : f.id, run };
 }
 
-/** The Findings card: counts by severity, review state and the top CVSS scores. False
-    positives are left out of every count. */
-export function findingsSlice(rows: FindingRow[]): OverviewCards["findings"] {
+/** Findings by Severity: counts and shares by severity, review state and the top CVSS
+    scores. False positives are left out of every count. */
+export function findingsSlice(rows: FindingRow[]): FindingsSlice {
   const counted = rows.filter((f) => !f.falsePositive);
   const total = counted.length;
   const severity = SEVERITIES.map((level) => {
     const count = counted.filter((f) => f.severity === level).length;
-    return { level, count, share: total ? Math.round((count / total) * 100) : 0, tone: SEV_TONE[level] };
+    return { level, count, share: total ? Math.round((count / total) * 100) : 0, frac: total ? count / total : 0 };
   });
   const top = counted
     .filter((f): f is FindingRow & { score: number } => f.score !== null && f.status !== "fixed")
     .sort((a, b) => b.score - a.score)
     .slice(0, TOP_FINDINGS)
-    .map((f) => ({ key: f.key, id: f.id, title: f.title, severity: f.severity, score: f.score, icon: f.icon, run: f.run?.label ?? null }));
+    .map((f) => ({ key: f.key, id: f.id, title: f.title, severity: f.severity, score: f.score, run: f.run?.label ?? null }));
+  const confirmed = counted.filter((f) => f.confirmed).length;
+  const needsReview = counted.filter((f) => f.needsReview).length;
   return {
+    total,
     severity,
     words: severity.map((s) => `${s.count} ${s.level.toLowerCase()}`).join(", "),
-    review: { confirmed: counted.filter((f) => f.confirmed).length, needsReview: counted.filter((f) => f.needsReview).length },
+    review: { confirmed, needsReview, closed: total - confirmed - needsReview },
     top,
   };
 }
 
-/** The "Findings" stat card: the total, the worst severity present, and a way into the list. */
-export function findingsStat(severity: SeverityCount[]): StatCard {
-  const total = severity.reduce((n, s) => n + s.count, 0);
-  const top = severity.find((s) => s.count > 0) ?? null;
+/** The summary strip's Findings card: the total and the worst severity present. */
+export function findingsSummary(slice: FindingsSlice): SummaryStrip["findings"] {
+  const worst = slice.severity.find((s) => s.count > 0) ?? null;
   return {
-    label: "Findings",
-    value: String(total),
-    chip: top ? `${top.count} ${top.level.toLowerCase()}` : "none yet",
-    tone: top && top.tone !== "dim" ? top.tone : "primary",
+    total: slice.total,
+    worst: worst ? { level: worst.level, count: worst.count } : null,
+    needsReview: slice.review.needsReview,
     link: { view: "findings", filters: {}, label: "Open all findings" },
   };
 }
 
-/** Markers at the first and last of `positions`; two close markers keep only the later label. */
-export function bracketsAt(positions: number[], labelAt: (pos: number) => string): Marker[] {
-  const at = [...new Set(positions.length ? [positions[0], positions[positions.length - 1]] : [])];
-  return at.map((p, i) => ({ pos: p, label: i === 0 && at.length > 1 && at[1] - p < MIN_LABEL_GAP ? "" : labelAt(p) }));
+/** The "requests sent" part of the Tool execution card. */
+export const toolCaption = (requests: number) => `${plural(requests, "request")} sent by the tools`;
+
+/** A saved run as a row: the execution rows (every run) and a day's runs. */
+export function runEntry(v: AssessmentView): RunEntry {
+  return {
+    uid: v.uid,
+    id: v.id,
+    template: v.template,
+    time: hourMinute(v.createdMs),
+    when: `${shortDay(v.createdMs)} ${hourMinute(v.createdMs)}`,
+    status: v.status,
+    progress: v.progress,
+    steps: { done: v.phases.filter((p) => p.status === "done").length, total: v.phases.length },
+    findings: v.findings.filter((f) => !f.falsePositive).length,
+    target: redact(v.target),
+    waiting: v.gate ? redact(v.gate.text) : "",
+  };
 }
 
-export const toolCaption = (used: number, requests: number) =>
-  `${used === 1 ? "tool step" : "tool steps"} · ${plural(requests, "request")} sent`;
+/** Legend entries for the plan step states. */
+const STEP_LEGEND: LegendItem[] = (["done", "active", "pending"] as const).map((s) => ({
+  label: STEP_STATUS[s].label,
+  color: toneColor(STEP_STATUS[s].tone),
+  hint: STEP_STATUS[s].hint,
+  shape: "bar",
+}));
 
-export const litTicks = (pct: number) => Math.round((GAUGE_TICKS * pct) / 100);
+// --- the activity timeline (one run) ---------------------------------------------------
 
-/** The tool a TOOL log line is about: a tool from the approved scope if the line names one,
-    else the line itself, shortened ("Executing baseline request" → "baseline request"). */
-function toolLabel(text: string, tools: string[]): string {
-  const named = tools.find((t) => text.toLowerCase().includes(t.toLowerCase()));
-  if (named) return named;
-  const part = text.split(" · ")[0].split(":")[0];
-  const short = part.replace(/^(executing|running|continuing on)\s+/i, "").replace(/…$/, "");
-  return short.length > 22 ? `${short.slice(0, 21)}…` : short;
+function activityCard(v: AssessmentView, pos: (sec: number) => number, labelAt: (p: number) => string): ActivityCard {
+  const log = v.log;
+  const tools = v.scope?.tools ?? [];
+  const lastGate = [...log].reverse().find((l) => l.kind === "gate");
+  const lastTool = [...log].reverse().find((l) => l.kind === "tool");
+  const severityOf = (id: string): Severity | undefined => v.findings.find((f) => f.id === id)?.severity;
+  const event = (l: LogLine, i: number): ActivityEvent => {
+    const ms = v.startMs + l.sec * 1000;
+    return {
+      key: String(i),
+      time: l.t,
+      when: l.t === "—" ? "time not recorded" : stamp(ms),
+      kind: l.kind,
+      label: redact(eventLabel(l.kind, l.text, tools)),
+      badge: eventBadge(l.kind, l.text, {
+        pendingGate: v.gate !== null && l === lastGate,
+        liveTool: v.status === "Running" && l === lastTool,
+        severityOf,
+      }),
+      text: redact(l.text),
+    };
+  };
+  const events = log.map((l, i) => ({ line: l, event: event(l, i) }));
+  const lanes: ActivityLane[] = LANE_ORDER.map((kind) => {
+    const here = events.filter((e) => e.line.kind === kind);
+    const groups = cluster(here.map((e) => ({ pos: pos(e.line.sec), item: e })));
+    const meaning = EVENT_KIND[kind];
+    return {
+      kind,
+      label: meaning.label,
+      hint: meaning.hint,
+      color: toneColor(meaning.tone),
+      count: here.length,
+      marks: groups.map((g) => {
+        const first = g.items[0].event;
+        const last = g.items[g.items.length - 1].event;
+        const span = g.items.length > 1 && first.time !== last.time ? `${first.time}–${last.time}` : first.time;
+        return {
+          key: `${kind}-${first.key}`,
+          start: g.start,
+          end: g.end,
+          count: g.items.length,
+          pending: g.items.some((e) => e.event.badge.type === "status" && e.event.badge.meaning === APPROVAL_STATE.PENDING),
+          title: g.items.length > 1 ? `${span} · ${g.items.length} ${meaning.label.toLowerCase()} events` : `${span} · ${first.label}`,
+          events: g.items.map((e) => e.event),
+        };
+      }),
+    };
+  });
+  const start = labelAt(0);
+  const end = labelAt(1);
+  const pending = lanes.some((l) => l.marks.some((m) => m.pending));
+  return {
+    mode: "events",
+    lanes,
+    ticks: log.length ? ticksAt(AXIS_TICKS, labelAt) : [],
+    total: log.length,
+    window: log.length ? `${start} → ${end} · ${duration(v.spanSec)}` : "No activity yet",
+    summary: `Activity timeline from ${start} to ${end}: ${plural(log.length, "log event")} in ${lanes.filter((l) => l.count).length} kinds.`,
+    legend: [
+      { label: "One event", color: "var(--muted-foreground)", hint: "A single log line.", shape: "dot" },
+      { label: "Events close together", color: "var(--muted-foreground)", hint: "Several lines too close to draw apart; the number counts them.", shape: "count" },
+      ...(pending ? [{ label: "Waits on you", color: toneColor(APPROVAL_STATE.PENDING.tone), hint: APPROVAL_STATE.PENDING.hint, shape: "ring" as const }] : []),
+    ],
+    empty: log.length ? null : "Nothing logged yet: the timeline fills in as the run goes.",
+  };
+}
+
+// --- the execution timeline (one run) --------------------------------------------------
+
+function executionCard(v: AssessmentView, pos: (sec: number) => number, labelAt: (p: number) => string): ExecutionCard {
+  const log = v.log;
+  const tools = v.scope?.tools ?? [];
+  const nextStop = (afterSec: number) => log.find((l) => (l.kind === "tool" || l.kind === "gate") && l.sec > afterSec)?.sec ?? v.spanSec;
+  // tool steps as segments that last until the next tool step or gate; the same tool again
+  // right after itself extends its segment
+  const segments: Segment[] = [];
+  log.forEach((l, i) => {
+    if (l.kind !== "tool") return;
+    const label = toolLabel(l.text, tools);
+    const prev = segments[segments.length - 1];
+    const start = pos(l.sec);
+    if (prev && prev.tools.length === 1 && prev.tools[0] === label && prev.end >= start) {
+      prev.end = pos(nextStop(l.sec));
+      prev.steps += 1;
+      prev.times.push(l.t);
+    } else segments.push({ key: String(i), tools: [label], start, end: pos(nextStop(l.sec)), steps: 1, times: [l.t] });
+  });
+  const live = v.status === "Running";
+  const shown = mergeNarrow(segments);
+  const toolSegments: ToolSegment[] = shown.map((s, i) => ({
+    key: s.key,
+    label: redact(segmentLabel(s.tools)),
+    start: s.start,
+    end: Math.max(s.end, s.start),
+    steps: s.steps,
+    title: redact(`${segmentLabel(s.tools)} · ${s.times[0]}${s.steps > 1 ? `–${s.times[s.times.length - 1]} · ${s.steps} steps` : ""}`),
+    live: live && i === shown.length - 1,
+  }));
+  const lastGate = [...log].reverse().find((l) => l.kind === "gate");
+  const approval = v.approvals.find((a) => a.state === "PENDING");
+  const gate = v.gate
+    ? {
+        pos: lastGate ? pos(lastGate.sec) : null,
+        time: v.gate.time,
+        text: redact(v.gate.text),
+        meaning: approval ? APPROVAL_STATE.PENDING : RUN_STATUS["Awaiting input"],
+      }
+    : null;
+  const done = v.phases.filter((p) => p.status === "done").length;
+  return {
+    mode: "phases",
+    phases: v.phases,
+    tools: toolSegments,
+    ticks: log.length ? ticksAt(AXIS_TICKS, labelAt) : [],
+    gate,
+    caption: v.phases.length ? `${done} of ${plural(v.phases.length, "plan step")} done` : "No plan yet",
+    summary: v.phases.length
+      ? `Execution: ${v.phases.map((p) => `${p.label} ${STEP_STATUS[p.status].label.toLowerCase()} ${p.pct}%`).join(", ")}; ${plural(toolSegments.length, "tool segment")}.`
+      : "Execution: no plan yet.",
+    legend: [
+      ...STEP_LEGEND.filter((item) => v.phases.some((p) => STEP_STATUS[p.status].label === item.label)),
+      { label: "Tool step", color: toneColor(EVENT_KIND.tool.tone), hint: EVENT_KIND.tool.hint, shape: "bar" },
+      ...(gate ? [{ label: gate.meaning.label, color: toneColor(gate.meaning.tone), hint: gate.meaning.hint, shape: "diamond" as const }] : []),
+    ],
+  };
 }
 
 // --- the dashboard -------------------------------------------------------------------------
@@ -215,104 +306,52 @@ function toolLabel(text: string, tools: string[]): string {
 export function deriveDashboard(v: AssessmentView): Dashboard {
   const pos = (sec: number) => Math.min(1, Math.max(0, sec / v.spanSec));
   const clockAt = (p: number) => clock(v.startMs + p * v.spanSec * 1000);
-  const binOf = (sec: number) => Math.round(pos(sec) * (BINS - 1));
-  const binPos = (i: number) => i / (BINS - 1);
+  // a run of ten minutes or more is labelled in minutes ("14:03"), a short one in seconds
+  const labelAt = (p: number) => (v.spanSec >= 600 ? hourMinute(v.startMs + p * v.spanSec * 1000) : clockAt(p));
   const log = v.log;
 
   // findings (false positives are left out of every count)
   const findings = v.findings.map((f) => findingRow(f));
   const findingCards = findingsSlice(findings);
-  const severity = findingCards.severity;
-  const findingTotal = severity.reduce((n, s) => n + s.count, 0);
 
   // run budget
-  const windowLimit = v.scope ? v.scope.limits.find((l) => l.label === "Window")?.value ?? null : null;
+  const windowLimit = v.scope ? minutesLimit(v.scope.windowMinutes) : null;
   const usedMinutes = Math.round(v.durationSec / 60);
   const maxMinutes = v.scope ? v.scope.windowMinutes : null;
-  const minutes = { used: usedMinutes, max: maxMinutes, over: maxMinutes !== null && usedMinutes > maxMinutes };
+  const over = maxMinutes !== null && v.durationSec > maxMinutes * 60;
+  const minutes = { used: usedMinutes, max: maxMinutes, over };
   const planSteps = { done: v.phases.filter((p) => p.status === "done").length, total: v.phases.length };
 
-  // activity timeline: one bar per bin, its height from the most notable kind in it
-  const activityBars: ActivityBar[] = Array.from({ length: BINS }, (_, i) => {
-    const events = log.filter((l) => binOf(l.sec) === i);
-    if (!events.length) return { pos: binPos(i), heightPct: 10, tone: "dim", title: clockAt(binPos(i)), hasEvent: false };
-    const lead = events.reduce((a, b) => (KIND_HEIGHT[b.kind] > KIND_HEIGHT[a.kind] ? b : a));
-    const more = events.length > 1 ? ` (+${events.length - 1} more)` : "";
-    return {
-      pos: binPos(i),
-      heightPct: KIND_HEIGHT[lead.kind],
-      tone: KIND_TONE[lead.kind],
-      title: `${lead.t} · ${lead.kind} · ${lead.text}${more}`,
-      hasEvent: true,
-    };
-  });
-  const activityPeaks: Peak[] = log
-    .filter((l) => l.kind === "finding" || l.kind === "gate")
-    .map((l) => ({ pos: pos(l.sec), tone: KIND_TONE[l.kind], title: `${l.t} · ${l.text}` }));
-  const lastPeakLine = [...log].reverse().find((l) => l.kind === "finding" || l.kind === "gate");
-  const lastPeak = lastPeakLine ? { pos: pos(lastPeakLine.sec), label: lastPeakLine.t } : null;
-
-  // execution timeline: scope check, policy blocks, tool segments and approval gates
-  const tools = v.scope?.tools ?? [];
-  const nextStop = (afterSec: number) =>
-    log.find((l) => (l.kind === "tool" || l.kind === "gate") && l.sec > afterSec)?.sec ?? v.spanSec;
-  const lastGate = [...log].reverse().find((l) => l.kind === "gate");
-  const lanes: Lane[] = [];
-  const firstScope = log.find((l) => l.kind === "scope");
-  log.forEach((l, i) => {
-    const key = `${i}`;
-    const base = { key, start: pos(l.sec), end: pos(l.sec), pulse: false, title: `${l.t} · ${l.text}` };
-    if (l === firstScope) lanes.push({ ...base, label: "scope", kind: "dot", tone: "primary" });
-    else if (l.kind === "policy") lanes.push({ ...base, label: "policy block", kind: "dot", tone: "danger" });
-    else if (l.kind === "tool") {
-      const label = toolLabel(l.text, tools);
-      const prev = lanes[lanes.length - 1];
-      // the same tool again right after itself: one longer segment, not two
-      if (prev && prev.kind === "segment" && prev.tone === "primary" && prev.label === label && prev.end >= base.start) prev.end = pos(nextStop(l.sec));
-      else lanes.push({ ...base, label, kind: "segment", end: pos(nextStop(l.sec)), tone: "primary" });
-    }
-    else if (l.kind === "gate") {
-      const pending = v.gate !== null && l === lastGate;
-      lanes.push({ ...base, label: "gate", kind: pending ? "segment" : "dot", end: pending ? 1 : base.end, tone: "accent", pulse: pending });
-    }
-  });
-  const executionLanes = thinLanes(lanes);
-  const toolStarts = lanes.filter((l) => l.kind === "segment" && l.tone === "primary").map((l) => l.start);
-
-  // tool activity: cumulative tool steps over the run
   const toolLines = log.filter((l) => l.kind === "tool");
-  const toolBars = Array.from({ length: BINS }, (_, i) => ({
-    pos: binPos(i),
-    value: toolLines.filter((l) => binOf(l.sec) <= i).length,
-    last: i === BINS - 1,
-  }));
-
+  const tools = v.scope?.tools ?? [];
   const durationText = duration(v.durationSec);
-  const statCards: StatCard[] = [
-    findingsStat(severity),
-    {
-      label: "Policy checks",
-      value: String(v.checks.total),
-      chip: `${v.checks.allowed} allowed`,
-      tone: "primary",
+  const summary: SummaryStrip = {
+    findings: findingsSummary(findingCards),
+    progress: {
+      pct: v.progress,
+      caption: planSteps.total ? `${planSteps.done} of ${plural(planSteps.total, "plan step")} done` : "No plan yet",
+      status: v.status,
+      other: null,
     },
-    {
-      label: "Blocked by policy",
-      value: String(v.checks.blocked),
-      chip: "not executed",
-      tone: "accent",
+    tools: {
+      steps: toolLines.length,
+      tools: toolsNamed(toolLines.map((l) => l.text), tools),
+      requests: v.requests,
+      running: v.status === "Running",
+      caption: toolCaption(v.requests),
     },
-    { label: "Duration", value: durationText, chip: windowLimit ? `of ${windowLimit}` : "no time limit", tone: "primary", isDuration: true },
-  ];
+    duration: {
+      value: durationText,
+      countup: true,
+      caption: windowLimit ? `of the ${windowLimit} limit` : "no time limit",
+      frac: maxMinutes ? Math.min(1, v.durationSec / (maxMinutes * 60)) : null,
+      over: over ? 1 : 0,
+    },
+  };
 
   const window = { start: clockAt(0), end: clockAt(1) };
-  const laneLabels = executionLanes.map((l) => l.label);
   const scopeApproved = v.scope?.approved ?? false;
   const inScope = v.scope?.include.length ?? 0;
-  const rings: Ring[] = [
-    ...(maxMinutes !== null ? [{ used: minutes.used, max: maxMinutes, label: "Minutes", over: minutes.over }] : []),
-    ...(planSteps.total > 0 ? [{ used: planSteps.done, max: planSteps.total, label: "Plan steps" }] : []),
-  ];
 
   return {
     assessment: {
@@ -332,8 +371,8 @@ export function deriveDashboard(v: AssessmentView): Dashboard {
     },
     operatorInitials: initials(v.operator),
     phases: v.phases,
-    findingTotal,
-    severity,
+    findingTotal: findingCards.total,
+    severity: findingCards.severity,
     checks: v.checks,
     maskedSecrets: log.filter((l) => l.kind === "mask").length,
     requests: v.requests,
@@ -347,62 +386,19 @@ export function deriveDashboard(v: AssessmentView): Dashboard {
     log,
     window,
     cards: {
-      activity: {
-        bars: activityBars,
-        peaks: activityPeaks,
-        lastPeak,
-        brackets: bracketsAt(toolStarts, clockAt),
-        summary: `Activity timeline from ${window.start} to ${window.end}: ${plural(log.length, "log event")}.`,
-        idle: "no findings or gates yet",
-      },
+      mode: "run",
+      summary,
       ask: {
         label: "Ask about this assessment",
         scope: { ok: scopeApproved, text: scopeApproved ? `Scope approved · ${v.operator}` : "Scope not approved yet" },
         reach: `${inScope} in scope`,
         questions: questionsFor(v, findingCards.top[0]?.id),
       },
-      statCards,
-      execution: {
-        lanes: executionLanes,
-        currentPos: v.gate && lastGate ? pos(lastGate.sec) : 1,
-        ticks: log.length ? [0, 0.25, 0.5, 0.75].map((p) => ({ pos: p, label: clockAt(p) })) : [],
-        rings,
-        chip: windowLimit ? `Window ${windowLimit}` : "No time limit",
-        summary: laneLabels.length
-          ? `Execution timeline from ${window.start} to ${window.end}: ${laneLabels.join(", ")}.`
-          : `Execution timeline from ${window.start}: no steps yet.`,
-      },
-      gauge: {
-        value: v.progress,
-        caption: `${v.status} · ${v.id}`,
-        live: v.unfinished,
-        ticks: GAUGE_TICKS,
-        lit: litTicks(v.progress),
-        summary: `Assessment progress ${v.progress}%, ${v.status.toLowerCase()}`,
-      },
-      tools: {
-        bars: toolBars,
-        used: toolLines.length,
-        max: Math.max(1, toolLines.length),
-        ticks: log.length ? [0, 0.5, 1].map((p) => ({ pos: p, label: clockAt(p) })) : [],
-        caption: toolCaption(toolLines.length, v.requests),
-        live: v.unfinished,
-        summary: `Cumulative tool steps over the run, reaching ${toolLines.length}.`,
-      },
+      activity: activityCard(v, pos, labelAt),
+      execution: executionCard(v, pos, labelAt),
       findings: findingCards,
     },
   };
-}
-
-/** At most MAX_LANES marks: the first scope check and pending marks always stay, the rest are
-    sampled evenly across the axis so a long run (or many runs) still shows its whole shape. */
-export function thinLanes(lanes: Lane[]): Lane[] {
-  if (lanes.length <= MAX_LANES) return lanes;
-  const keep = new Set<Lane>(lanes.filter((l) => l.pulse || l.label === "scope").slice(0, 2));
-  const rest = lanes.filter((l) => !keep.has(l));
-  const room = MAX_LANES - keep.size;
-  for (let i = 0; i < room; i++) keep.add(rest[Math.round((i * (rest.length - 1)) / Math.max(1, room - 1))]);
-  return lanes.filter((l) => keep.has(l));
 }
 
 /** Example questions for the Ask bar, about what this run actually holds. */

@@ -8,8 +8,6 @@ export type { Severity, Status };
 /** What a log line is about; it picks the line's chip, colour and chart height. */
 export type LogKind = "scope" | "policy" | "tool" | "finding" | "mask" | "gate" | "user" | "info";
 
-export type Tone = "primary" | "accent" | "success" | "danger" | "dim";
-
 export interface LogLine {
   t: string; // local clock "14:03:09", or "—" when the line has no time
   sec: number; // seconds since the first line of the run

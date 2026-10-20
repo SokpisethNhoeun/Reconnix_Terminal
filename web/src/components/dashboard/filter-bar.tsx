@@ -10,7 +10,8 @@ export interface ChipOption {
   value: string;
   label: string;
   count: number;
-  tone?: string; // a colour token name, e.g. "danger"
+  color?: string; // its meaning's colour (a CSS variable), shown as a dot beside the label
+  hint?: string; // what it means (the tooltip)
 }
 
 const CHIP =
@@ -39,7 +40,7 @@ export function FilterChips({
       <span className="mr-0.5 text-[11px] text-muted-foreground">{label}</span>
       {options.map((o) => {
         const on = selected.includes(o.value);
-        const color = o.tone ? `var(--${o.tone})` : "var(--primary)";
+        const color = o.color ?? "var(--primary)";
         return (
           <button
             key={o.value}
@@ -47,10 +48,11 @@ export function FilterChips({
             aria-pressed={on}
             disabled={o.count === 0 && !on}
             onClick={() => toggle(o.value)}
+            title={o.hint}
             className={cn(CHIP, on ? "text-foreground" : "border-border text-muted-foreground hover:text-foreground")}
             style={on ? { borderColor: `color-mix(in oklab, ${color} 55%, transparent)`, background: `color-mix(in oklab, ${color} 12%, transparent)` } : undefined}
           >
-            {o.tone && <span aria-hidden className="inline-block size-1.5 rounded-full" style={{ background: color }} />}
+            {o.color && <span aria-hidden className="inline-block size-1.5 rounded-full" style={{ background: color }} />}
             {o.label}
             <span className="tabnums text-muted-foreground">{o.count}</span>
           </button>

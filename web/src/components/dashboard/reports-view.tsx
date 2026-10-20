@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { SquareArrowOutUpRight } from "lucide-react";
 import type { Dashboard } from "@/components/dashboard/derive";
+import { SeverityBadge, StatusBadge } from "@/components/ui/status-badge";
 import { EXPORT_FORMATS, downloadHref } from "@/lib/report/formats";
+import { RUN_STATUS, SEVERITY_META } from "@/lib/status";
 
-function Meta({ k, v }: { k: string; v: string }) {
+function Meta({ k, v }: { k: string; v: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{k}</dt>
-      <dd className="font-mono text-[13px] text-foreground">{v}</dd>
+      <dd className="font-mono text-[13px] text-foreground [overflow-wrap:anywhere]">{v}</dd>
     </div>
   );
 }
@@ -51,7 +53,7 @@ export function ReportsView({ dash }: { dash: Dashboard }) {
             <Meta k="Assessment" v={assessment.id} />
             <Meta k="Target" v={assessment.target} />
             <Meta k="Template" v={assessment.template} />
-            <Meta k="Status" v={assessment.status} />
+            <Meta k="Status" v={<StatusBadge meaning={RUN_STATUS[assessment.status]} />} />
             <Meta k="Started" v={assessment.startedAt} />
             <Meta k="Duration" v={assessment.duration} />
             <Meta k="Operator" v={assessment.operator} />
@@ -78,10 +80,10 @@ export function ReportsView({ dash }: { dash: Dashboard }) {
           <div className="mt-4 space-y-1.5">
             {severity.map((s) => (
               <div key={s.level} className="flex items-center gap-3 text-xs">
-                <span className="w-16 capitalize text-muted-foreground">{s.level.toLowerCase()}</span>
+                <SeverityBadge level={s.level} className="w-[84px]" />
                 <span className="tabnums w-5 text-right text-foreground">{s.count}</span>
                 <span className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                  <span className="block h-full rounded-full" style={{ width: `${s.share}%`, background: `var(--${s.tone === "dim" ? "muted-foreground" : s.tone})` }} />
+                  <span className="block h-full rounded-full" style={{ width: `${s.share}%`, background: SEVERITY_META[s.level].color }} />
                 </span>
                 <span className="tabnums w-8 text-right text-muted-foreground">{s.share}%</span>
               </div>
@@ -109,7 +111,7 @@ export function ReportsView({ dash }: { dash: Dashboard }) {
                   <tr key={f.id} className="border-t border-border">
                     <td className="py-2 pr-3 font-mono text-foreground">{f.id}</td>
                     <td className="py-2 pr-3">
-                      <span style={{ color: `var(--${f.tone === "dim" ? "muted-foreground" : f.tone})` }}>{f.severity}</span>
+                      <SeverityBadge level={f.severity} />
                     </td>
                     <td className="py-2 pr-3 text-foreground">{f.title}</td>
                     <td className="py-2 pr-3 font-mono text-muted-foreground">{f.tool}</td>
