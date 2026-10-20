@@ -13,6 +13,8 @@
 
 /* ---- The column ---- */
 .dash-findings { display: flex; flex-direction: column; min-height: 0; }
+/* until the view has mounted (data-ready) its buttons take no clicks: see findings-view.tsx */
+.dash-findings:not([data-ready]) button { pointer-events: none; }
 .dash-findings > * { flex: none; }
 .dash-findings > .ui-split { flex: 1 1 auto; min-height: 0; }
 

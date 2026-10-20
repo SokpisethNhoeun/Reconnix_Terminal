@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import type { FindingRow } from "@/components/dashboard/derive";
@@ -50,6 +50,10 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
   const [p, update] = useQueryParams(KEYS);
   const detail = useRef<HTMLElement>(null);
   const pushed = useRef(false); // this page pushed the entry the phone's detail pane sits on
+  // The buttons take clicks once the view has mounted: a click replayed from before hydration
+  // would change the address before the router listens for it, and the view would not follow.
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
 
   const filter = parseFindingFilter(p);
   const active = filterActive(filter);
@@ -101,7 +105,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
   });
 
   return (
-    <div className="dash-view dash-findings" data-pane={pane}>
+    <div className="dash-view dash-findings" data-pane={pane} data-ready={ready ? "" : undefined}>
       <header className="mb-3">
         <h1 className="text-[20px] font-medium text-foreground">Findings</h1>
         <p className="mt-0.5 text-[13px] text-muted-foreground">
