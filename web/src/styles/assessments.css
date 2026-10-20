@@ -82,6 +82,7 @@
   .asm-row { padding: 8px 12px; }
   .asm-row:hover, .asm-row:focus-visible { position: relative; z-index: 1; }
   /* the cells' labels: for screen readers only (the header row carries them) */
+  .asm-cell { position: relative; }
   .asm-k { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .asm-run .asm-k, .asm-status .asm-k { display: block; }
 }

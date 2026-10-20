@@ -101,7 +101,7 @@ test("the template chips and the search narrow the runs together, and a stale pa
   await expect(rows(page)).toHaveCount(Math.min(both.length, PER_PAGE));
   await page.getByRole("searchbox", { name: "Search saved assessments" }).fill("no-such-run-zzz");
   await expect(page.getByRole("status")).toContainText("No saved run matches these filters.");
-  await page.getByRole("status").getByRole("button", { name: "Clear filters" }).click();
+  await page.getByRole("button", { name: "Clear filters" }).click(); // the filter summary's, the one Clear
   await expect(page).not.toHaveURL(/[?&](q|status|template)=/);
   await expect(rows(page)).toHaveCount(Math.min(all.length, PER_PAGE));
 });

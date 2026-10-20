@@ -5,11 +5,10 @@
    address (`?view=assessments&q=api&status=Completed&template=API&page=2`), so a reload or a link
    lands on the same rows. A row opens that run's Overview. The page shows EmptyView instead when
    nothing is saved; here the rows are never empty, only the match can be. */
-import { X } from "lucide-react";
 import { useRef } from "react";
 
 import { AssessmentsFilters } from "@/components/dashboard/assessments-filters-bar";
-import { filterRuns, parseRunFilter, runFilterActive } from "@/components/dashboard/assessments-filters";
+import { ASSESSMENT_KEYS, filterRuns, parseRunFilter, runFilterActive } from "@/components/dashboard/assessments-filters";
 import { AssessmentsRows } from "@/components/dashboard/assessments-rows";
 import { plural } from "@/components/dashboard/derive-shared";
 import type { ReportRunRow } from "@/components/dashboard/report-types";
@@ -18,11 +17,9 @@ import { useQueryParams } from "@/components/dashboard/view-url";
 import { Pagination } from "@/components/ui/pagination";
 import { paginate, slicePage } from "@/lib/paging";
 
-const KEYS = ["q", "status", "template", "page"] as const;
-const CLEARED = { q: "", status: "", template: "", page: "" };
 
 export function AssessmentsView({ rows }: { rows: ReportRunRow[] }) {
-  const [p, update] = useQueryParams(KEYS);
+  const [p, update] = useQueryParams(ASSESSMENT_KEYS);
   const top = useRef<HTMLDivElement>(null);
   const filter = parseRunFilter(p, rows);
   const active = runFilterActive(filter);
@@ -54,12 +51,9 @@ export function AssessmentsView({ rows }: { rows: ReportRunRow[] }) {
       <AssessmentsFilters rows={rows} filter={filter} active={active} shown={shown.length} onChange={(patch) => update({ ...patch, page: "" })} />
 
       {shown.length === 0 ? (
-        <div className="asm-empty" role="status">
-          <p>No saved run matches these filters.</p>
-          <button type="button" onClick={() => update(CLEARED)} className="asm-clear">
-            <X className="size-3" aria-hidden /> Clear filters
-          </button>
-        </div>
+        <p className="asm-empty" role="status">
+          No saved run matches these filters.
+        </p>
       ) : (
         <>
           <AssessmentsRows rows={page} />

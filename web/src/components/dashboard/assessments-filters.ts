@@ -7,6 +7,10 @@ import { RUN_STATUS } from "@/lib/status";
 
 import { countBy, list, runMatches } from "./filters";
 
+/** The address keys the view owns (view-url.ts VIEW_FILTERS.assessments lists the same: a
+    drill-down link clears exactly these). */
+export const ASSESSMENT_KEYS = ["q", "status", "template", "page"] as const;
+
 /** The statuses in the order their chips are listed (lib/status.ts). */
 export const RUN_STATUS_ORDER = Object.keys(RUN_STATUS) as Status[];
 

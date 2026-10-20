@@ -2,9 +2,10 @@
    sample runs, and the rows it lists (derive-report.ts runRow) paged ten at a time. */
 import { describe, expect, it } from "vitest";
 
-import { filterRuns, parseRunFilter, RUN_STATUS_ORDER, runFilterActive, runFilterMatches, statusCounts, templateCounts } from "@/components/dashboard/assessments-filters";
+import { ASSESSMENT_KEYS, filterRuns, parseRunFilter, RUN_STATUS_ORDER, runFilterActive, runFilterMatches, statusCounts, templateCounts } from "@/components/dashboard/assessments-filters";
 import { runRow } from "@/components/dashboard/derive-report";
 import { runOverviewHref } from "@/components/dashboard/assessments-rows";
+import { VIEW_FILTERS } from "@/components/dashboard/view-url";
 import { assessmentView } from "@/lib/data/adapt";
 import { paginate, PER_PAGE, slicePage } from "@/lib/paging";
 import { RUN_STATUS } from "@/lib/status";
@@ -113,5 +114,11 @@ describe("the rows", () => {
     const one = paginate(rows.length, "");
     expect(one.pages).toBe(1);
     expect(slicePage(rows, one)).toHaveLength(rows.length);
+  });
+});
+
+describe("address keys", () => {
+  it("are the same list view-url.ts clears on a drill-down", () => {
+    expect([...ASSESSMENT_KEYS]).toEqual([...(VIEW_FILTERS.assessments ?? [])]);
   });
 });

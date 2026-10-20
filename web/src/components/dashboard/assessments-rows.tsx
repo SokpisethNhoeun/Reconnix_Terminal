@@ -21,7 +21,7 @@ export function AssessmentsRows({ rows }: { rows: ReportRunRow[] }) {
           <span key={c}>{c}</span>
         ))}
       </div>
-      <ul aria-label="Saved assessments" className="asm-list">
+      <ul role="list" aria-label="Saved assessments" className="asm-list">
         {rows.map((r) => (
           <li key={r.uid}>
             <Link
