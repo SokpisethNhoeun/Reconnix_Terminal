@@ -27,7 +27,7 @@ export const MOTION = {
     bottom: { at: 0.18, duration: 0.85, travel: 140 },
     leave: LEAVE,
     surface: { at: 0.15, duration: 1.3, ease: GROW }, // hero box → the stage (ends 1.45)
-    fill: { at: 0.25, duration: 0.8, opacity: 0.9 }, // the stage background comes in
+    fill: { at: 0.25, duration: 0.8 }, // the stage background comes in (to MOTION.fillOpacity)
     card: { at: 0.3, duration: 0.85 }, // the chat panel's frame
     // hero → behind the welcome; it leaves the hero once the hero's glass cards have faded
     // (heroFade), so lifting it above them into the stage never shows (ends 1.45)
@@ -52,6 +52,7 @@ export const MOTION = {
     arrive: ARRIVE,
   },
   radius: 16, // the surface's corners while it is the hero's size (0 when it fills the stage)
+  fillOpacity: 1, // the stage background once the assistant is open, however it opened
   // ---- the globe behind the assistant ----
   globeOpacity: 0.18, // on the welcome screen (keep within 0.10–0.30: the text stays readable)
   globeFit: 1, // its height as a share of the welcome's globe slot (the slot's smaller side)
@@ -118,7 +119,8 @@ export function findParts(frame: HTMLElement): Parts {
   };
 }
 
-const moving = (p: Parts) => [p.topbar, ...p.top, ...p.left, ...p.right, ...p.bottom, ...p.fade].filter((e): e is HTMLElement => e !== null);
+const moving = (p: Parts) =>
+  [p.topbar, ...p.top, ...p.left, ...p.right, ...p.bottom, ...p.fade].filter((e): e is HTMLElement => e !== null);
 
 /** The parts where the open animation leaves them: gone, and out of the way. */
 export function setPartsOut(p: Parts): void {
@@ -165,7 +167,24 @@ export interface GlobeAim {
   after?: () => void; // once it has landed (hand it back to the hero)
 }
 
-export const surfaceBox = (b: Box, radius: number) => ({ left: b.left, top: b.top, width: b.width, height: b.height, borderRadius: radius });
+export const surfaceBox = (b: Box, radius: number) => ({
+  left: b.left,
+  top: b.top,
+  width: b.width,
+  height: b.height,
+  borderRadius: radius,
+});
+
+/** The carried globe's tween to `g` (open or close). */
+const globeTo = (g: GlobeAim, t: { duration: number; ease: string }) => ({
+  x: g.x,
+  y: g.y,
+  scale: g.scale,
+  opacity: g.opacity,
+  "--globe-mask": `${g.mask}%`,
+  duration: t.duration,
+  ease: t.ease,
+});
 
 /** Open: the dashboard leaves and the surface grows from `from` (the hero's box) to `to`. */
 export function openTimeline(o: {
@@ -194,12 +213,12 @@ export function openTimeline(o: {
   if (p.bottom.length) tl.to(p.bottom, { y: m.bottom.travel, autoAlpha: 0, duration: m.bottom.duration, ...leave }, m.bottom.at);
 
   tl.to(l.surface, { ...surfaceBox(o.to, 0), duration: m.surface.duration, ease: m.surface.ease }, m.surface.at);
-  tl.to(l.fill, { opacity: m.fill.opacity, duration: m.fill.duration, ease: LEAVE }, m.fill.at);
+  tl.to(l.fill, { opacity: MOTION.fillOpacity, duration: m.fill.duration, ease: LEAVE }, m.fill.at);
   tl.to(l.card, { opacity: 1, duration: m.card.duration, ease: LEAVE }, m.card.at);
   if (o.globe) {
     const g = o.globe;
     if (g.before) tl.call(g.before, undefined, m.globe.at);
-    tl.to(g.carrier, { x: g.x, y: g.y, scale: g.scale, opacity: g.opacity, "--globe-mask": `${g.mask}%`, duration: m.globe.duration, ease: m.globe.ease }, m.globe.at);
+    tl.to(g.carrier, globeTo(g, m.globe), m.globe.at);
     tl.to(l.halo, { opacity: g.opacity > 0 ? 1 : 0, duration: m.halo.duration, ease: LEAVE }, m.halo.at);
   }
   tl.set(l.front, { opacity: 1 }, m.pieces.at);
@@ -209,11 +228,18 @@ export function openTimeline(o: {
 
 /** Close: the pieces go, the surface shrinks back to `to` (the hero's box), the globe returns to
     the hero and the dashboard comes back. */
-export function closeTimeline(o: { parts: Parts; layers: Layers; to: Box; globe: GlobeAim | null; onComplete: () => void }): gsap.core.Timeline {
+export function closeTimeline(o: {
+  parts: Parts;
+  layers: Layers;
+  to: Box;
+  globe: GlobeAim | null;
+  onComplete: () => void;
+}): gsap.core.Timeline {
   const m = MOTION.close;
   const { parts: p, layers: l } = o;
   const tl = gsap.timeline({ onComplete: o.onComplete });
-  tl.to([...l.pieces].reverse(), { opacity: 0, y: m.pieces.sink, duration: m.pieces.duration, stagger: m.pieces.stagger, ease: m.pieces.ease }, m.pieces.at);
+  const out = { opacity: 0, y: m.pieces.sink, duration: m.pieces.duration, stagger: m.pieces.stagger, ease: m.pieces.ease };
+  tl.to([...l.pieces].reverse(), out, m.pieces.at);
   tl.set(l.front, { opacity: 0 }, m.pieces.at + m.pieces.duration + m.pieces.stagger * 2);
   tl.to(l.surface, { ...surfaceBox(o.to, MOTION.radius), duration: m.surface.duration, ease: m.surface.ease }, m.surface.at);
   tl.to(l.card, { opacity: 0, duration: m.card.duration, ease: LEAVE }, m.card.at);
@@ -221,7 +247,7 @@ export function closeTimeline(o: { parts: Parts; layers: Layers; to: Box; globe:
   tl.to(l.halo, { opacity: 0, duration: m.halo.duration, ease: LEAVE }, m.halo.at);
   if (o.globe) {
     const g = o.globe;
-    tl.to(g.carrier, { x: g.x, y: g.y, scale: g.scale, opacity: g.opacity, "--globe-mask": `${g.mask}%`, duration: m.globe.duration, ease: m.globe.ease }, m.globe.at);
+    tl.to(g.carrier, globeTo(g, m.globe), m.globe.at);
     if (g.after) tl.call(g.after, undefined, m.globe.at + m.globe.duration);
   }
   const arrive = { ease: m.arrive, overwrite: "auto" as const };
@@ -255,7 +281,8 @@ export function fadeTimeline(o: {
     }
     // from wherever an interrupted close left things; the layers come in together
     tl.to(l.surface, { ...surfaceBox(o.to, 0), duration: f.duration, ease: ARRIVE }, 0);
-    tl.to([l.fill, l.card, l.front, l.globe], { opacity: 1, duration: f.duration, ease: ARRIVE }, 0);
+    tl.to(l.fill, { opacity: MOTION.fillOpacity, duration: f.duration, ease: ARRIVE }, 0);
+    tl.to([l.card, l.front, l.globe], { opacity: 1, duration: f.duration, ease: ARRIVE }, 0);
     tl.to(l.pieces, { opacity: 1, y: 0, duration: f.duration, ease: ARRIVE }, 0);
     if (o.globe) {
       tl.to(o.globe.carrier, { opacity: o.globe.opacity, duration: f.duration, ease: ARRIVE, overwrite: "auto" }, 0);

@@ -19,13 +19,12 @@ export const BREATH_MS = 6_000;
 export const breathDelay = () => `-${Math.round(performance.now() % BREATH_MS)}ms`;
 
 /** `{ animationDelay }` for a breathing element, set after mount (the server has no clock). */
-export function useBreathPhase(active = true): React.CSSProperties | undefined {
+export function useBreathPhase(): React.CSSProperties | undefined {
   const [delay, setDelay] = useState<string>();
   useEffect(() => {
-    if (!active) return;
     const id = requestAnimationFrame(() => setDelay(breathDelay()));
     return () => cancelAnimationFrame(id);
-  }, [active]);
+  }, []);
   return delay ? { animationDelay: delay } : undefined;
 }
 
@@ -47,9 +46,9 @@ export function startBreath(frame: HTMLElement, swell: number): void {
 }
 
 /** Stop the loops cleanly: each [data-breath] element keeps the value its loop has right now,
-    then eases back to rest over `seconds`. data-breath="scale" elements breathe their transform,
-    "glow" ones their opacity; only that property is held, so the transition's own tweens on the
-    same elements are left alone. */
+    then eases back to rest over `seconds` (0: at once, for reduced motion). data-breath="scale"
+    elements breathe their transform, "glow" ones their opacity; only that property is held, so
+    the transition's own tweens on the same elements are left alone. */
 export function stopBreath(frame: HTMLElement, seconds: number): void {
   if (!frame.hasAttribute(BREATHING)) return;
   const held = [...frame.querySelectorAll<HTMLElement>("[data-breath]")].map((el) => {
@@ -58,12 +57,16 @@ export function stopBreath(frame: HTMLElement, seconds: number): void {
   });
   frame.removeAttribute(BREATHING);
   for (const { el, kind, transform, opacity } of held) {
+    gsap.killTweensOf(el, kind === "scale" ? "scale,transform" : "opacity");
     if (kind === "scale") {
       const scale = transform && transform !== "none" ? new DOMMatrixReadOnly(transform).a : 1;
-      gsap.fromTo(el, { scale }, { scale: 1, duration: seconds, ease: "power2.out", overwrite: "auto", clearProps: "transform" });
+      if (seconds > 0) gsap.fromTo(el, { scale }, { scale: 1, duration: seconds, ease: "power2.out", clearProps: "transform" });
+      else gsap.set(el, { clearProps: "transform" });
     } else if (kind === "glow") {
-      const rest = getComputedStyle(el).opacity; // the loop is off now: this is its resting value
-      gsap.fromTo(el, { opacity: Number(opacity) }, { opacity: Number(rest), duration: seconds, ease: "power2.out", overwrite: "auto", clearProps: "opacity" });
+      if (seconds > 0) {
+        const rest = Number(getComputedStyle(el).opacity); // the loop is off now: its resting value
+        gsap.fromTo(el, { opacity: Number(opacity) }, { opacity: rest, duration: seconds, ease: "power2.out", clearProps: "opacity" });
+      } else gsap.set(el, { clearProps: "opacity" });
     }
   }
 }

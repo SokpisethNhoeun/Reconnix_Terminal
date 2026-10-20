@@ -12,7 +12,11 @@
   border-radius: 10px;
   border: 1px solid transparent;
   color: var(--muted-foreground);
-  transition: color 0.2s ease, background-color 0.35s var(--ease-in-out), border-color 0.35s var(--ease-in-out), box-shadow 0.35s var(--ease-in-out);
+  transition:
+    color 0.2s ease,
+    background-color 0.35s var(--ease-in-out),
+    border-color 0.35s var(--ease-in-out),
+    box-shadow 0.35s var(--ease-in-out);
 }
 .dash-navbtn:hover { color: var(--foreground); background: color-mix(in oklab, var(--foreground) 5%, transparent); }
 .dash-navbtn[data-active="true"] {
@@ -61,7 +65,16 @@
 }
 .dash-navbtn[data-active="true"]::after { opacity: 1; transform: scaleY(1); }
 @media (max-width: 767.98px) {
-  .dash-navbtn::after { left: 50%; top: auto; bottom: -6px; width: 18px; height: 3px; margin: 0 0 0 -9px; border-radius: 3px 3px 0 0; transform: scaleX(0); }
+  .dash-navbtn::after {
+    left: 50%;
+    top: auto;
+    bottom: -6px;
+    width: 18px;
+    height: 3px;
+    margin: 0 0 0 -9px;
+    border-radius: 3px 3px 0 0;
+    transform: scaleX(0);
+  }
   .dash-navbtn[data-active="true"]::after { transform: scaleX(1); }
 }
 
@@ -113,7 +126,11 @@
 }
 .dash-assistant-card {
   border: 1px solid color-mix(in oklab, var(--primary) 18%, var(--border));
-  background: linear-gradient(180deg, color-mix(in oklab, var(--card) 90%, transparent), color-mix(in oklab, var(--card-2) 94%, transparent));
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--card) 90%, transparent),
+    color-mix(in oklab, var(--card-2) 94%, transparent)
+  );
 }
 .dash-assistant-glow {
   position: absolute;
@@ -147,7 +164,11 @@
    round vignette (--globe-mask, MOTION.globeMask: wide at the hero) that closes in as it travels. */
 .dash-assistant-globe .dash-globe-carrier {
   inset: auto;
-  --globe-round: radial-gradient(closest-side circle at 50% 50%, var(--foreground) calc(var(--globe-mask, 100%) * 0.78), transparent var(--globe-mask, 100%));
+  --globe-round: radial-gradient(
+    closest-side circle at 50% 50%,
+    var(--foreground) calc(var(--globe-mask, 100%) * 0.78),
+    transparent var(--globe-mask, 100%)
+  );
   --globe-rows: linear-gradient(to bottom, transparent, var(--foreground) 4%, var(--foreground) 96%, transparent);
   --globe-cols: linear-gradient(to right, transparent, var(--foreground) 4%, var(--foreground) 96%, transparent);
   -webkit-mask-image: var(--globe-round), var(--globe-rows), var(--globe-cols);

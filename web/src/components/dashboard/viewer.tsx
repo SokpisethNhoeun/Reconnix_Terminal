@@ -54,10 +54,12 @@ export function Viewer({
 
   useEffect(() => watchHistory(), []);
 
-  // The sidebar: the assistant gets its own history entry; leaving it goes back that entry.
+  // The sidebar: the assistant gets its own history entry; leaving it goes back that entry. It
+  // reads the address, not this render's `view`, which can lag a quick click behind.
   const select = (target: View) => {
+    const now = parseView(new URLSearchParams(window.location.search).get("view"));
     if (target === "assistant") openAssistant();
-    else if (view === "assistant") leaveAssistant(target);
+    else if (now === "assistant") leaveAssistant(target);
     else showView(target);
   };
 
