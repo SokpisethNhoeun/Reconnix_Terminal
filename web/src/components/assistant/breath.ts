@@ -18,14 +18,16 @@ export const BREATH_MS = 6_000;
 /** A negative delay that puts a loop started now in phase with the page clock (the orbs). */
 export const breathDelay = () => `-${Math.round(performance.now() % BREATH_MS)}ms`;
 
-/** `{ animationDelay }` for a breathing element, set after mount (the server has no clock). */
-export function useBreathPhase(): React.CSSProperties | undefined {
+/** `{ animationDelay }` for a breathing element, set after mount (the server has no clock), and
+    only while it is `active` (a still orb needs no phase; it gets one as it starts). */
+export function useBreathPhase(active = true): React.CSSProperties | undefined {
   const [delay, setDelay] = useState<string>();
   useEffect(() => {
+    if (!active) return;
     const id = requestAnimationFrame(() => setDelay(breathDelay()));
     return () => cancelAnimationFrame(id);
-  }, []);
-  return delay ? { animationDelay: delay } : undefined;
+  }, [active]);
+  return active && delay ? { animationDelay: delay } : undefined;
 }
 
 const BREATHING = "data-breathing";
