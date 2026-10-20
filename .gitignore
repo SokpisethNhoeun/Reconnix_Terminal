@@ -24,6 +24,15 @@ htmlcov/
 # Env files (never commit secrets/config)
 .env
 .env.*
+!.env.example
 
 # generated reports
 reports/
+
+# local runtime data (encrypted keys, databases, logs)
+.reconix/
+*.db
+*.key
+
+# working / reference docs (not part of the branch)
+/Copy of Reconix*.md

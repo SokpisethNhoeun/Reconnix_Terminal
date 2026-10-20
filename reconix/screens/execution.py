@@ -108,6 +108,11 @@ class ExecutionScreen(ReconixScreen):
         Binding("end", "follow", "follow the live output", show=False),
     ]
 
+    def view_state(self) -> object:
+        # The task rows are built per plan key; rebuild if the plan's task set changes
+        # (the agent revises its plan live). Statuses are handled by refresh_live.
+        return tuple(task.key for task in store.plan_tasks())
+
     def compose_body(self) -> ComposeResult:
         tasks = store.plan_tasks()
         yield Static(Text.assemble(("◆ reconix ", theme.CYAN), (
@@ -142,7 +147,11 @@ class ExecutionScreen(ReconixScreen):
         state = run_state()
         tasks = store.plan_tasks()
         for task in tasks:
-            self.query_one(f"#task-{task.key}", Static).update(task_line(task, state))
+            # The plan's task set can change (the agent revises it); a reload rebuilds the
+            # rows, but an event may redraw before it lands — skip rows not yet mounted.
+            rows = self.query(f"#task-{task.key}")
+            if rows:
+                rows.first(Static).update(task_line(task, state))
         self._draw_spinner(tasks)
         panel = self.query_one("#exec-panel", Vertical)
         title, color = PANEL_TITLE[state]
