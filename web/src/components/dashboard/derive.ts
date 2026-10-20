@@ -5,7 +5,8 @@
  * assessment doesn't record, it does not go on the page.
  *
  * The Overview reads only `cards` (OverviewCards, overview-types.ts): derive-overall.ts makes
- * the same shape from every saved run at once, so one set of components draws either.
+ * the same shape from every saved run at once, so one set of components draws either. The two
+ * timelines are derived in derive-activity.ts and derive-execution.ts.
  *
  * Runs on the server (src/app/page.tsx) and hands plain data to the views, so every label,
  * including clock times, is computed once, here. Log text is masked again here
@@ -13,34 +14,24 @@
  * time axis are fractions (0 = the run's first log line, 1 = its last).
  */
 import { redact } from "@/lib/assistant/redact";
-import { clock, duration, hourMinute, minutesLimit, shortDay, stamp } from "@/lib/data/format";
+import { clock, duration, hourMinute, minutesLimit, shortDay } from "@/lib/data/format";
 import { SEVERITIES } from "@/lib/data/schema";
-import type { ApprovalView, AssessmentView, FindingView, LogLine, PhaseView, ScopeView, Severity } from "@/lib/data/view-types";
-import { APPROVAL_STATE, RUN_STATUS, STEP_STATUS, toneColor } from "@/lib/status";
+import type { ApprovalView, AssessmentView, FindingView, PhaseView, ScopeView } from "@/lib/data/view-types";
 
-import { cluster, mergeNarrow, type Segment, segmentLabel, ticksAt } from "./axis";
-import { EVENT_KIND, eventBadge, eventLabel, LANE_ORDER, toolLabel, toolsNamed } from "./event-kinds";
-import type {
-  ActivityCard,
-  ActivityEvent,
-  ActivityLane,
-  ExecutionCard,
-  FindingsSlice,
-  LegendItem,
-  OverviewCards,
-  RunEntry,
-  SummaryStrip,
-  ToolSegment,
-} from "./overview-types";
+import { activityCard } from "./derive-activity";
+import { executionCard } from "./derive-execution";
+import { plural } from "./derive-shared";
+import { toolsNamed } from "./event-kinds";
+import type { FindingsSlice, OverviewCards, RunEntry, SummaryStrip } from "./overview-types";
 
 export type * from "./overview-types";
+export { plural };
 
 /** The assessment templates the TUI offers (the Template chip lists them). */
 export const TEMPLATES = ["Network", "API", "Source Code", "Web URL"] as const;
 
 export const MAX_QUESTIONS = 3;
 const TOP_FINDINGS = 8; // the card shows as many as its height allows (3 at least)
-const AXIS_TICKS = [0, 0.25, 0.5, 0.75, 1];
 
 export type FindingIcon = "bug" | "code" | "database";
 /** A finding as listed: `key` is unique in the list (the ID for one run, `<uid>~<ID>` across
@@ -90,8 +81,6 @@ export const initials = (name: string) =>
     .join("")
     .slice(0, 2)
     .toUpperCase() || "—";
-
-export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 function findingIcon(f: FindingView): FindingIcon {
   const about = `${f.category} ${f.title}`;
@@ -158,145 +147,6 @@ export function runEntry(v: AssessmentView): RunEntry {
     findings: v.findings.filter((f) => !f.falsePositive).length,
     target: redact(v.target),
     waiting: v.gate ? redact(v.gate.text) : "",
-  };
-}
-
-/** Legend entries for the plan step states. */
-const STEP_LEGEND: LegendItem[] = (["done", "active", "pending"] as const).map((s) => ({
-  label: STEP_STATUS[s].label,
-  color: toneColor(STEP_STATUS[s].tone),
-  hint: STEP_STATUS[s].hint,
-  shape: "bar",
-}));
-
-// --- the activity timeline (one run) ---------------------------------------------------
-
-function activityCard(v: AssessmentView, pos: (sec: number) => number, labelAt: (p: number) => string): ActivityCard {
-  const log = v.log;
-  const tools = v.scope?.tools ?? [];
-  const lastGate = [...log].reverse().find((l) => l.kind === "gate");
-  const lastTool = [...log].reverse().find((l) => l.kind === "tool");
-  const severityOf = (id: string): Severity | undefined => v.findings.find((f) => f.id === id)?.severity;
-  const event = (l: LogLine, i: number): ActivityEvent => {
-    const ms = v.startMs + l.sec * 1000;
-    return {
-      key: String(i),
-      time: l.t,
-      when: l.t === "—" ? "time not recorded" : stamp(ms),
-      kind: l.kind,
-      label: redact(eventLabel(l.kind, l.text, tools)),
-      badge: eventBadge(l.kind, l.text, {
-        who: l.who,
-        pendingGate: v.gate !== null && l === lastGate,
-        liveTool: v.status === "Running" && l === lastTool,
-        severityOf,
-      }),
-      text: redact(l.text),
-    };
-  };
-  const events = log.map((l, i) => ({ line: l, event: event(l, i) }));
-  const lanes: ActivityLane[] = LANE_ORDER.map((kind) => {
-    const here = events.filter((e) => e.line.kind === kind);
-    const groups = cluster(here.map((e) => ({ pos: pos(e.line.sec), item: e })));
-    const meaning = EVENT_KIND[kind];
-    return {
-      kind,
-      label: meaning.label,
-      hint: meaning.hint,
-      color: toneColor(meaning.tone),
-      count: here.length,
-      marks: groups.map((g) => {
-        const first = g.items[0].event;
-        const last = g.items[g.items.length - 1].event;
-        const span = g.items.length > 1 && first.time !== last.time ? `${first.time}–${last.time}` : first.time;
-        return {
-          key: `${kind}-${first.key}`,
-          start: g.start,
-          end: g.end,
-          count: g.items.length,
-          pending: g.items.some((e) => e.event.badge.type === "status" && e.event.badge.meaning === APPROVAL_STATE.PENDING),
-          title: g.items.length > 1 ? `${span} · ${g.items.length} ${meaning.label.toLowerCase()} events` : `${span} · ${first.label}`,
-          events: g.items.map((e) => e.event),
-        };
-      }),
-    };
-  });
-  const start = labelAt(0);
-  const end = labelAt(1);
-  const pending = lanes.some((l) => l.marks.some((m) => m.pending));
-  return {
-    mode: "events",
-    lanes,
-    ticks: log.length ? ticksAt(AXIS_TICKS, labelAt) : [],
-    total: log.length,
-    window: log.length ? `${start} → ${end} · ${duration(v.spanSec)}` : "No activity yet",
-    summary: `Activity timeline from ${start} to ${end}: ${plural(log.length, "log event")} in ${lanes.filter((l) => l.count).length} kinds.`,
-    legend: [
-      { label: "One event", color: "var(--muted-foreground)", hint: "A single log line.", shape: "dot" },
-      { label: "Events close together", color: "var(--muted-foreground)", hint: "Several lines too close to draw apart; the number counts them.", shape: "count" },
-      ...(pending ? [{ label: "Waits on you", color: toneColor(APPROVAL_STATE.PENDING.tone), hint: APPROVAL_STATE.PENDING.hint, shape: "ring" as const }] : []),
-    ],
-    empty: log.length ? null : "Nothing logged yet: the timeline fills in as the run goes.",
-  };
-}
-
-// --- the execution timeline (one run) --------------------------------------------------
-
-function executionCard(v: AssessmentView, pos: (sec: number) => number, labelAt: (p: number) => string): ExecutionCard {
-  const log = v.log;
-  const tools = v.scope?.tools ?? [];
-  const nextStop = (afterSec: number) => log.find((l) => (l.kind === "tool" || l.kind === "gate") && l.sec > afterSec)?.sec ?? v.spanSec;
-  // tool steps as segments that last until the next tool step or gate; the same tool again
-  // right after itself extends its segment
-  const segments: Segment[] = [];
-  log.forEach((l, i) => {
-    if (l.kind !== "tool") return;
-    const label = toolLabel(l.text, tools);
-    const prev = segments[segments.length - 1];
-    const start = pos(l.sec);
-    if (prev && prev.tools.length === 1 && prev.tools[0] === label && prev.end >= start) {
-      prev.end = pos(nextStop(l.sec));
-      prev.steps += 1;
-      prev.times.push(l.t);
-    } else segments.push({ key: String(i), tools: [label], start, end: pos(nextStop(l.sec)), steps: 1, times: [l.t] });
-  });
-  const live = v.status === "Running";
-  const shown = mergeNarrow(segments);
-  const toolSegments: ToolSegment[] = shown.map((s, i) => ({
-    key: s.key,
-    label: redact(segmentLabel(s.tools)),
-    start: s.start,
-    end: Math.max(s.end, s.start),
-    steps: s.steps,
-    title: redact(`${segmentLabel(s.tools)} · ${s.times[0]}${s.steps > 1 ? `–${s.times[s.times.length - 1]} · ${s.steps} steps` : ""}`),
-    live: live && i === shown.length - 1,
-  }));
-  const lastGate = [...log].reverse().find((l) => l.kind === "gate");
-  const approval = v.approvals.find((a) => a.state === "PENDING");
-  const gate = v.gate
-    ? {
-        pos: lastGate ? pos(lastGate.sec) : null,
-        time: v.gate.time,
-        text: redact(v.gate.text),
-        meaning: approval ? APPROVAL_STATE.PENDING : RUN_STATUS["Awaiting input"],
-      }
-    : null;
-  const done = v.phases.filter((p) => p.status === "done").length;
-  return {
-    mode: "phases",
-    phases: v.phases,
-    tools: toolSegments,
-    ticks: log.length ? ticksAt(AXIS_TICKS, labelAt) : [],
-    gate,
-    caption: v.phases.length ? `${done} of ${plural(v.phases.length, "plan step")} done` : "No plan yet",
-    summary: v.phases.length
-      ? `Execution: ${v.phases.map((p) => `${p.label} ${STEP_STATUS[p.status].label.toLowerCase()} ${p.pct}%`).join(", ")}; ${plural(toolSegments.length, "tool segment")}.`
-      : "Execution: no plan yet.",
-    legend: [
-      ...STEP_LEGEND.filter((item) => v.phases.some((p) => STEP_STATUS[p.status].label === item.label)),
-      { label: "Tool step", color: toneColor(EVENT_KIND.tool.tone), hint: EVENT_KIND.tool.hint, shape: "bar" },
-      ...(gate ? [{ label: gate.meaning.label, color: toneColor(gate.meaning.tone), hint: gate.meaning.hint, shape: "diamond" as const }] : []),
-    ],
   };
 }
 

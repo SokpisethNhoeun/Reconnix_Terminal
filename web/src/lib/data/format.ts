@@ -35,12 +35,6 @@ export function stamp(ms: number): string {
   return `${day(ms)} · ${clock(ms)}`;
 }
 
-/** The local calendar day of `ms` as a sortable key ("2026-10-05"). */
-export function dayKey(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
 /** "18m 27s" (minutes keep counting past the hour, which the count-up animation parses). */
 export function duration(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));

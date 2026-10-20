@@ -277,6 +277,27 @@ describe("deriveDashboard", () => {
     expect((d.cards.activity as Extract<ActivityCard, { mode: "events" }>).empty).toBeTruthy();
   });
 
+  it("reads a run with no plan, no scope and a single log line", () => {
+    const bare = { ...completed, plan: [], scope: null, findings: [], run: { ...completed.run, progress: {} }, timeline: [line(completed, 0, "SYS", "Session started · policy engine ready")] };
+    const d = deriveDashboard(assessmentView(bare));
+    const act = activityOf(bare);
+    const exe = executionOf(bare);
+    expect(act.total).toBe(1);
+    expect(act.lanes.find((l) => l.kind === "info")!.marks).toHaveLength(1);
+    expect(act.lanes.flatMap((l) => l.marks).every((m) => inAxis(m.start))).toBe(true);
+    expect(act.empty).toBeNull();
+    expect(exe.phases).toEqual([]);
+    expect(exe.caption).toBe("No plan yet");
+    expect(exe.tools).toEqual([]);
+    expect(d.cards.summary.progress.caption).toBe("No plan yet");
+    expect(d.cards.summary.tools.tools).toEqual([]);
+    expect(d.cards.summary.duration.meter).toBeNull();
+    expect(d.cards.summary.duration.caption).toBe("no time limit");
+    expect(d.cards.ask.scope.ok).toBe(false);
+    expect(d.cards.findings.total).toBe(0);
+    expect(d.cards.findings.severity.every((x) => x.frac === 0)).toBe(true);
+  });
+
   it("leaves false positives out of the counts, and keeps the shares whole", () => {
     const one = { ...completed, findings: completed.findings.map((f, i) => (i === 0 ? { ...f, status: "false-positive" } : f)) };
     const d = deriveDashboard(assessmentView(one));
@@ -347,6 +368,28 @@ describe("deriveOverall", () => {
     const weeks = deriveOverall(spread).cards.activity as Extract<ActivityCard, { mode: "days" }>;
     expect(weeks.unit).toBe("week");
     expect(weeks.days.reduce((n, d) => n + d.total, 0)).toBe(spread.length);
+  });
+
+  it("groups runs by local day across midnight and daylight-saving changes", () => {
+    const zone = process.env.TZ;
+    process.env.TZ = "Europe/Berlin"; // DST starts 29 Mar 2026 and ends 25 Oct 2026
+    try {
+      const at = (iso: string) => ({ ...views[0], uid: iso, createdMs: Date.parse(iso) });
+      const dayOf = (list: ReturnType<typeof at>[]) => deriveOverall(list).cards.activity as Extract<ActivityCard, { mode: "days" }>;
+      // 23:30 and 00:30 local are two days, though only an hour apart
+      const midnight = dayOf([at("2026-06-10T21:30:00Z"), at("2026-06-10T22:30:00Z")]);
+      expect(midnight.days.map((d) => [d.label, d.total])).toEqual([["10 Jun", 1], ["11 Jun", 1]]);
+      // a 23-hour and a 25-hour day keep one slot each, labelled by their own date
+      const spring = dayOf([at("2026-03-28T11:00:00Z"), at("2026-03-30T10:00:00Z")]);
+      expect(spring.days.map((d) => [d.label, d.total])).toEqual([["28 Mar", 1], ["29 Mar", 0], ["30 Mar", 1]]);
+      // 00:30 (summer time) and 23:30 (winter time) on 25 Oct are 24 h apart and the same day
+      const autumn = dayOf([at("2026-10-24T22:30:00Z"), at("2026-10-25T22:30:00Z"), at("2026-10-26T12:00:00Z")]);
+      expect(autumn.days.map((d) => [d.label, d.total])).toEqual([["25 Oct", 2], ["26 Oct", 1]]);
+      expect(new Set(autumn.days.map((d) => d.key)).size).toBe(autumn.days.length);
+    } finally {
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    }
   });
 
   it("keeps a single run readable", () => {

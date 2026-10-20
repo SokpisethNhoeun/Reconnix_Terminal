@@ -6,8 +6,9 @@
  * The Activity Timeline counts the runs started per day (per week past MAX_DAYS days), stacked
  * by run status; the Execution Timeline lists the newest runs.
  */
-import { dayKey, duration, hourMinute, longDuration, minutesLimit, shortDay } from "@/lib/data/format";
+import { duration, hourMinute, longDuration, minutesLimit, shortDay } from "@/lib/data/format";
 import { STATUSES } from "@/lib/data/schema";
+import { localDay } from "@/lib/data/stats";
 import type { AssessmentView, Status } from "@/lib/data/view-types";
 import { RUN_STATUS, toneColor } from "@/lib/status";
 
@@ -96,7 +97,7 @@ function activityDays(views: AssessmentView[]): ActivityCard {
     })).filter((s) => s.count > 0);
     const states = segments.map((s) => `${s.count} ${RUN_STATUS[s.status].label.toLowerCase()}`).join(", ");
     return {
-      key: dayKey(startMs),
+      key: localDay(new Date(startMs)),
       label,
       pos: (i + 0.5) * width,
       width,
