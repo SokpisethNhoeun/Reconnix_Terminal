@@ -24,14 +24,15 @@ const closed = (page: Page) => expect(page.locator(".dash-assistant-stage[data-o
 const canvas = (page: Page) => page.locator(".dash-globe-canvas");
 const carrierOpacity = (page: Page) => page.locator(".dash-globe-carrier").evaluate((el) => Number(getComputedStyle(el).opacity));
 
-// The Overview's groups, by the data-motion contract. TEMPORARY: or by today's class names until
-// the dashboard branch (which adds data-motion) is merged; the main agent removes the fallback.
+// The Overview's groups, by the data-motion contract only (the first "fade" is the hero's title),
+// and the frame's own top bar.
 const PARTS = {
   topbar: ".dash-frame > header",
-  right: ':is([data-motion="right"], .dash-right)',
-  bottom: ':is([data-motion="bottom"], .dash-bottom)',
-  hero: ':is([data-motion="hero"], .dash-hero)',
-  fade: ':is([data-motion="fade"], .dash-hero-title)',
+  top: '[data-motion="top"]',
+  right: '[data-motion="right"]',
+  bottom: '[data-motion="bottom"]',
+  hero: '[data-motion="hero"]',
+  fade: '[data-motion="fade"]',
   surface: ".dash-assistant-surface",
   front: ".dash-assistant-front",
   stage: ".dash-assistant-stage",
@@ -97,7 +98,7 @@ async function ready(page: Page) {
         const key = () => {
           const frame = document.querySelector(".dash-frame");
           if (!frame || getComputedStyle(frame).transform !== "none") return null;
-          const els = [parts.topbar, parts.right, parts.bottom, parts.hero, parts.fade, ".dash-navbtn"].map((s) =>
+          const els = [parts.topbar, parts.top, parts.right, parts.bottom, parts.hero, parts.fade, ".dash-navbtn"].map((s) =>
             document.querySelector<HTMLElement>(s),
           );
           if (els.some((el) => !el || getComputedStyle(el).opacity !== "1")) return null;
@@ -132,17 +133,23 @@ test("opening grows the hero into the assistant while the dashboard leaves, clos
 
   // the four directions, all fading
   expect(last.topbar!.ty).toBeLessThanOrEqual(-first.topbar!.box.h + 1);
+  expect(last.top!.ty).toBeLessThanOrEqual(-40); // the summary strip, up
   expect(last.right!.tx).toBeGreaterThanOrEqual(100);
   expect(last.bottom!.ty).toBeGreaterThanOrEqual(100);
-  for (const part of ["topbar", "right", "bottom", "fade"] as const) expect(last[part]!.o).toBe(0);
-  // from the first frame that moves: the hero text goes first; the top bar, right column and
-  // bottom row leave in that order, overlapping
+  for (const part of ["topbar", "top", "right", "bottom", "fade"] as const) expect(last[part]!.o).toBe(0);
+  // from the first frame that moves: the hero text goes first; the top bar, the summary strip,
+  // the right column and the bottom row leave in that order, overlapping
   const [t0] = moves(open, (f) => f.topbar!.ty);
   const after = (f: Frame) => f.t - t0;
   expect(after(open.find((f) => f.fade!.o === 0)!)).toBeLessThan(650);
-  const [rightStart] = moves(open, (f) => f.right!.tx);
-  const [bottomStart, bottomEnd] = moves(open, (f) => f.bottom!.ty);
-  expect(rightStart).toBeGreaterThanOrEqual(t0);
+  // each one's start: 3% of its own travel (the strip moves 48 px, the others 140)
+  const started = (pick: (f: Frame) => number, travel: number) => open.find((f) => Math.abs(pick(f)) > travel * 0.03)!.t;
+  const topStart = started((f) => f.top!.ty, 48);
+  const rightStart = started((f) => f.right!.tx, 140);
+  const bottomStart = started((f) => f.bottom!.ty, 140);
+  const [, bottomEnd] = moves(open, (f) => f.bottom!.ty);
+  expect(topStart).toBeGreaterThanOrEqual(t0);
+  expect(rightStart).toBeGreaterThanOrEqual(topStart);
   expect(bottomStart).toBeGreaterThanOrEqual(rightStart);
   expect(bottomEnd - t0).toBeGreaterThan(700);
   expect(bottomEnd - t0).toBeLessThan(1500);
@@ -177,7 +184,8 @@ test("opening grows the hero into the assistant while the dashboard leaves, clos
   const onHero = close.find((f) => f.t > c0 && Math.abs(f.surface!.box.w - hero.w) < 6 && Math.abs(f.surface!.box.h - hero.h) < 6)!;
   expect(onHero.t - c0).toBeGreaterThan(600);
   expect(onHero.t - c0).toBeLessThan(1500);
-  const back = close.find((f) => f.t > c0 + 200 && f.topbar!.ty === 0 && f.right!.tx === 0 && f.bottom!.ty === 0 && f.fade!.o === 1)!;
+  const atRest = (f: Frame) => f.topbar!.ty === 0 && f.top!.ty === 0 && f.right!.tx === 0 && f.bottom!.ty === 0 && f.fade!.o === 1;
+  const back = close.find((f) => f.t > c0 + 200 && atRest(f))!;
   expect(back.t - c0).toBeGreaterThan(1000);
   expect(back.t - c0).toBeLessThan(2000);
   await closed(page);
@@ -322,7 +330,7 @@ test("no reload, one history entry per open, and rapid clicks leave nothing stuc
   }
   const state = () =>
     page.evaluate((parts) => {
-      const inline = [parts.topbar, parts.right, parts.bottom, parts.fade].filter((s) => {
+      const inline = [parts.topbar, parts.top, parts.right, parts.bottom, parts.fade].filter((s) => {
         const el = document.querySelector<HTMLElement>(s)!;
         return el.style.transform || el.style.opacity;
       });
@@ -370,6 +378,32 @@ test("a click on the Ask bar's background opens it, and focus comes back to the 
   await closed(page);
   await expect(page.locator(".dash-askbar input")).toBeFocused();
 });
+
+for (const [width, height] of [
+  [1024, 768],
+  [390, 844],
+] as const) {
+  test.describe(`at ${width}×${height}`, () => {
+    test.use({ viewport: { width, height } });
+
+    test("the stage keeps a screen's height through the crossfade, with no jump as it lands", async ({ page }) => {
+      await ready(page);
+      await hideCanvas(page);
+      const recording = sample(page, 1400);
+      await tab(page).click();
+      const open = await recording;
+      await settled(page);
+      const landed = (await page.locator(PARTS.stage).boundingBox())!;
+      expect(landed.y + landed.height).toBeGreaterThan(height - 40); // it reaches the screen's foot
+      expect(landed.y + landed.height).toBeLessThanOrEqual(height);
+      const [fadeStart] = moves(open, (f) => f.front!.o, 0.01);
+      for (const f of open.filter((f) => f.t > fadeStart)) {
+        expect(Math.abs(f.stage!.box.h - landed.height)).toBeLessThan(2); // never short, never stretched
+        expect(Math.abs(f.stage!.box.y - landed.y)).toBeLessThan(2);
+      }
+    });
+  });
+}
 
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
