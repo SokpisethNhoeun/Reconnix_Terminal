@@ -1,0 +1,59 @@
+"""The docs' command reference (web/src/content/docs/commands.json) is generated from COMMANDS.
+
+The file on disk must equal what the exporter builds now, so a command added, renamed or
+re-described in `reconix/commands/builtin.py` without `python scripts/export_commands.py`
+fails here instead of leaving the docs stale.
+"""
+
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+from reconix.commands import COMMANDS
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _exporter():
+    spec = importlib.util.spec_from_file_location(
+        "export_commands", ROOT / "scripts" / "export_commands.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules.setdefault("export_commands", module)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_commands_json_matches_the_exporter():
+    exporter = _exporter()
+    on_disk = exporter.OUT.read_text(encoding="utf-8")
+    assert on_disk == exporter.render(exporter.build()), (
+        "web/src/content/docs/commands.json is stale: run python scripts/export_commands.py")
+
+
+def test_every_command_is_listed_once_with_its_facts():
+    exporter = _exporter()
+    data = exporter.build()
+    listed = [c["name"] for g in data["groups"] for c in g["commands"]]
+    assert sorted(listed) == sorted(c.name for c in COMMANDS)
+    assert len(listed) == len(set(listed)) == data["count"] == len(COMMANDS)
+    assert all(g["commands"] for g in data["groups"])
+    by_name = {c.name: c for c in COMMANDS}
+    for group in data["groups"]:
+        for entry in group["commands"]:
+            command = by_name[entry["name"]]
+            assert entry["aliases"] == list(command.aliases)
+            assert entry["description"] == command.description
+            assert entry["takes_argument"] == command.takes_argument
+    # the facts the docs rely on
+    flat = {c["name"]: c for g in data["groups"] for c in g["commands"]}
+    assert flat["template"]["takes_argument"] and not flat["template"]["ask"]
+    assert flat["finding"]["ask"] and flat["finding"]["empty"]
+    assert flat["export"]["question"] == "Export the report as…"
+    assert flat["new"]["takes_argument"] is False
+
+
+def test_the_file_is_valid_json_in_group_order():
+    exporter = _exporter()
+    data = json.loads(exporter.OUT.read_text(encoding="utf-8"))
+    assert [g["id"] for g in data["groups"]] == [gid for gid, _, _ in exporter.GROUPS]
