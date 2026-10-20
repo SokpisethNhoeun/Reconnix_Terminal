@@ -3,14 +3,14 @@
    holds the saved numbers, and the model is only told which cards are shown. */
 import { describe, expect, it } from "vitest";
 
-import { approvalCounts, approvalsCard, cardNotes, NOTICES, pickCards, toolGroups } from "@/lib/assistant/cards";
+import { approvalsCard, cardNotes, NOTICES, pickCards, STATE_ORDER, toolGroups } from "@/lib/assistant/cards";
 import { rankFindings, scopedViews } from "@/lib/assistant/insights";
 import { readIntent } from "@/lib/assistant/intent";
 import { welcomePrompts } from "@/lib/assistant/prompts";
 import { type Card, CardSchema } from "@/lib/assistant/protocol";
 import { MASK } from "@/lib/assistant/redact";
 import { assessmentView } from "@/lib/data/adapt";
-import type { Assessment } from "@/lib/data/schema";
+import { type Assessment, STATUSES } from "@/lib/data/schema";
 
 import { sampleAssessments } from "./fixtures";
 
@@ -58,20 +58,31 @@ describe("readIntent", () => {
     ["How many requests were made?", ["tools"]],
     ["Which checks were run by Semgrep?", ["tools"]],
     ["Which actions were rejected?", ["approvals"]],
-    ["Was the secret validation double-checked?", ["approvals"]],
-    ["Which gated actions needed authorization?", ["approvals"]],
+    ["Was the HIGH-risk action double-checked?", ["findings", "approvals"]], // "risk" is findings vocabulary too
+    ["Which gated actions needed authorization?", ["findings", "approvals"]], // authorization: a weakness class too
     ["Who signed off on the risky actions?", ["approvals"]],
     ["What restrictions did the scope put on the run?", ["policy"]],
     ["Was any request disallowed or not allowed?", ["policy"]],
     ["List the policy verdicts", ["policy"]],
     ["Which paths were excluded?", ["policy"]],
-    ["Were there any errors?", ["errors"]],
-    ["Did anything fail or crash?", ["errors"]],
+    ["Were there any errors in the run?", ["errors"]],
+    ["Did anything fail or crash during the scan?", ["errors"]],
     ["What went wrong in the last run?", ["errors"]],
     ["Why did the run fail?", ["errors"]],
-    // a failed login is a finding, not an error of the run
+    ["Did a tool crash?", ["tools", "errors"]],
+    // errors are about the run itself: never a finding's vocabulary, never without the run
+    ["Were there any errors?", []],
     ["Which finding is about the failed login?", ["findings"]],
     ["Is there a login failure in the findings?", ["findings"]],
+    ["Show broken access control findings", ["findings"]],
+    ["Which findings expose a stack trace?", ["findings"]],
+    ["Is there error-based SQL injection?", ["findings"]],
+    ["Is there verbose error message disclosure?", ["findings"]],
+    ["Show insecure authorization findings", ["findings"]],
+    ["Which findings are rejected as false positives?", ["findings"]],
+    ["Any restricted admin endpoints exposed?", ["findings"]],
+    ["What is the output encoding issue?", ["findings"]],
+    ["Did the scan find an authentication weakness?", ["findings"]],
   ])("%s → %j", (question, intents) => {
     expect(readIntent(question).intents).toEqual(intents);
   });
@@ -155,24 +166,33 @@ describe("pickCards", () => {
     ]);
     expect(toolGroups([])).toEqual([]);
   });
-  it("records every approval's decision as the saved data has it, and counts them by state", () => {
+  it("records every approval's decision as the saved data has it, and counts every state on the server", () => {
     const states = new Set<string>();
     for (const a of samples) {
       const card = of(pickCards(samples, a.uid, "Which actions were approved or rejected?"), "approvals");
       const view = assessmentView(a);
       expect(card.items.map((i) => [i.id, i.state])).toEqual(
-        [...view.approvals].sort((x, y) => ["PENDING", "NOT REACHED", "APPROVED", "REJECTED"].indexOf(x.state) - ["PENDING", "NOT REACHED", "APPROVED", "REJECTED"].indexOf(y.state)).map((x) => [x.id, x.state]),
+        [...view.approvals].sort((x, y) => STATE_ORDER.indexOf(x.state) - STATE_ORDER.indexOf(y.state)).map((x) => [x.id, x.state]),
       );
       for (const i of card.items) states.add(i.state);
-      const counts = approvalCounts(card.items);
-      expect(counts.reduce((n, c) => n + c.count, 0)).toBe(card.items.length);
-      for (const c of counts) expect(c.count).toBe(card.items.filter((i) => i.state === c.state).length);
+      expect(card.counts).toBeDefined();
+      for (const state of STATE_ORDER) expect(card.counts![state]).toBe(view.approvals.filter((x) => x.state === state).length);
+      expect(card.more).toBe(0);
     }
     expect([...states].sort()).toEqual(["APPROVED", "PENDING", "REJECTED"]); // what the sample data holds
-    expect(approvalCounts([{ state: "REJECTED" }, { state: "APPROVED" }, { state: "REJECTED" }])).toEqual([
-      { state: "APPROVED", count: 1 },
-      { state: "REJECTED", count: 2 },
-    ]);
+  });
+  it("keeps the counts whole when the rows are cut: a rejected decision sorts last and drops first", () => {
+    const all = views.flatMap((v) => v.approvals);
+    expect(all.length).toBeGreaterThan(6); // every run: 12 in the sample data
+    const rejected = all.filter((a) => a.state === "REJECTED").length;
+    expect(rejected).toBeGreaterThan(0);
+    const card = of(pickCards(samples, null, "Which actions were rejected?"), "approvals");
+    expect(card.items).toHaveLength(6);
+    expect(card.more).toBe(all.length - 6);
+    expect(card.items.at(-1)!.state).not.toBe("REJECTED"); // cut from the rows…
+    expect(card.counts!.REJECTED).toBe(rejected); // …but counted
+    expect(Object.values(card.counts!).reduce((n, c) => n + c, 0)).toBe(all.length);
+    for (const i of card.items) expect(i.risk).toMatch(/^(LOW|MEDIUM|HIGH)$/);
   });
   it("lists each policy restriction with its reason, masked", () => {
     const verdicts = [
@@ -183,10 +203,12 @@ describe("pickCards", () => {
     const card = of(pickCards([{ ...completed, verdicts }], null, "What restrictions did the policy apply?"), "policy");
     expect(card.checks).toBe(3);
     expect(card.blocked).toBe(2);
-    expect(card.items[0].text).toBe("GET /admin · Path outside approved scope");
-    expect(card.items[1].text).toContain("Method not allowed");
-    expect(card.items[1].text).not.toContain("abc123secret");
-    expect(card.items[1].text.split(MASK).length).toBeGreaterThan(2); // the path and the reason both masked
+    expect(card.items[0]).toMatchObject({ text: "GET /admin · Path outside approved scope", method: "GET", path: "/admin", reason: "Path outside approved scope" });
+    expect(card.items[1].method).toBe("POST");
+    expect(card.items[1].path).toContain(MASK);
+    expect(card.items[1].reason).toContain("Method not allowed");
+    expect(card.items[1].reason).toContain(MASK);
+    for (const field of [card.items[1].text, card.items[1].path, card.items[1].reason]) expect(field).not.toContain("abc123secret");
   });
   it("answers a question about errors with what the data records: no error log, the runs' states", () => {
     const cards = pickCards(samples, null, "Were there any errors in the runs?");
@@ -194,9 +216,20 @@ describe("pickCards", () => {
     expect(of(cards, "notice")).toEqual(NOTICES.errors);
     expect(NOTICES.errors.body).toContain("no error log");
     expect(NOTICES.errors.action).toBeNull();
-    const withProgress = pickCards(samples, completed.uid, "What is the status, did anything fail?");
-    expect(kinds(withProgress)).toEqual(["progress", "notice"]); // the progress card once
+    const withProgress = pickCards(samples, completed.uid, "What is the status of the run, did anything fail?");
+    expect(kinds(withProgress)).toEqual(["notice", "progress"]); // the notice first, the progress card once
     expect(pickCards(samples, null, "Which finding is about the failed login?").map((c) => c.kind)).toEqual(["findings"]);
+  });
+  it("stays true: the data has no error or failed state, tone or log kind (else the notice must go)", () => {
+    const noError = (value: string) => expect(value).not.toMatch(/error|fail/i);
+    for (const status of STATUSES) noError(status);
+    for (const a of samples) {
+      noError(a.status);
+      for (const e of a.timeline) noError(e.tone);
+      for (const p of a.plan) noError(p.status);
+    }
+    for (const v of views) for (const l of v.log) noError(l.kind);
+    for (const label of ["Not started", "Running", "Waiting for you", "Completed", "Stopped", "Interrupted"]) expect(NOTICES.errors.body.toLowerCase()).toContain(label.split(" ")[0].toLowerCase());
   });
   it("offers one run's downloads, or asks which run", () => {
     expect(of(pickCards(samples, completed.uid, "Generate a report"), "report").runs).toHaveLength(1);

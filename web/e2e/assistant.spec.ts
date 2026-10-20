@@ -274,10 +274,13 @@ test.describe("when the model fails", () => {
     await page.reload();
     await expect(log(page).getByRole("region", { name: "The model returned nothing" })).toBeVisible();
     await expect(log(page).getByRole("button", { name: "Retry" })).toBeVisible();
-    // a question with cards gets them: the empty text is then not an empty reply
+    // a question with cards gets them; the empty text under them is "no explanation", with Retry
     await ask(page, "Analyze the findings [stub:empty]");
     await expect(log(page).getByRole("region", { name: "Findings" })).toBeVisible();
-    await expect(log(page).getByRole("region", { name: "The model returned nothing" })).toHaveCount(1); // the earlier one only
+    const none = log(page).getByRole("region", { name: "The model added no explanation" });
+    await expect(none).toBeVisible();
+    await expect(none.getByRole("button", { name: "Retry" })).toBeVisible();
+    await expect(log(page).getByRole("region", { name: "The assistant couldn't answer" })).toHaveCount(0);
   });
 
   test("the reply says why, keeps its cards, and Retry replaces the failed turn", async ({ page }) => {

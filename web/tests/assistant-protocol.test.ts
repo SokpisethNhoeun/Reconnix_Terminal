@@ -58,6 +58,26 @@ describe("frames", () => {
     expect(isConversationId(ID)).toBe(true);
     for (const bad of ["", "x", ID.toUpperCase(), `${ID}x`, "00000000-0000-1000-8000-000000000000", 42]) expect(isConversationId(bad)).toBe(false);
   });
+  it("carries the approvals' counts over every decision, as non-negative whole numbers", () => {
+    const card = pickCards(samples, null, "What waits on my approval?").find((c) => c.kind === "approvals")!;
+    expect(card.kind === "approvals" && card.counts).toEqual({ APPROVED: expect.any(Number), REJECTED: expect.any(Number), PENDING: expect.any(Number), "NOT REACHED": expect.any(Number) });
+    expect(CardSchema.safeParse(card).success).toBe(true);
+    const bad = (counts: unknown) => CardSchema.safeParse({ ...card, counts }).success;
+    expect(bad({ APPROVED: -1, REJECTED: 0, PENDING: 0, "NOT REACHED": 0 })).toBe(false);
+    expect(bad({ APPROVED: 1.5, REJECTED: 0, PENDING: 0, "NOT REACHED": 0 })).toBe(false);
+    expect(bad({ APPROVED: 1, REJECTED: 0, PENDING: 0 })).toBe(false); // a state missing
+    expect(bad({ APPROVED: 1, REJECTED: 0, PENDING: 0, "NOT REACHED": 0, FAILED: 0 })).toBe(false); // a state that isn't one
+    expect(bad(undefined)).toBe(true); // a card saved before the field
+  });
+  it("carries a blocked request's method, path and reason, each a line, or an older card's text alone", () => {
+    const card = pickCards(samples, null, "What did the policy block?").find((c) => c.kind === "policy")!;
+    expect(card.kind === "policy" && card.items[0]).toMatchObject({ method: expect.any(String), path: expect.any(String), reason: expect.any(String) });
+    expect(CardSchema.safeParse(card).success).toBe(true);
+    if (card.kind !== "policy") throw new Error("not a policy card");
+    const { run, time, text } = card.items[0]; // a card saved before the three fields
+    expect(CardSchema.safeParse({ ...card, items: [{ run, time, text }] }).success).toBe(true);
+    expect(CardSchema.safeParse({ ...card, items: [{ ...card.items[0], reason: "x".repeat(401) }] }).success).toBe(false);
+  });
   it("lets every built notice pass", () => {
     for (const notice of Object.values(NOTICES)) expect(CardSchema.safeParse(notice).success).toBe(true);
   });

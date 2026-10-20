@@ -277,6 +277,9 @@ test("text never moves: once a conversation shows, the panel, the card and every
   // counts as breathing
   await expect(page.locator(".dash-ai-icon")).toHaveCSS("animation-name", "dash-breath-icon-in, dash-breath-icon");
   await expect(page.locator(".dash-frame[data-breathing]")).toHaveCount(1);
+  // the globe, faded out behind the conversation, stops its loop too (nothing runs unseen)
+  await expect(page.locator(".dash-assistant-globe-breath[data-idle]")).toHaveCount(1);
+  await expect(page.locator(".dash-assistant-globe-breath")).toHaveCSS("animation-name", "none");
   // a saved conversation opened again shows still text too
   await page.reload();
   await expect(log(page)).toContainText("Stub answer");
