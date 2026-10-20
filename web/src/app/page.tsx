@@ -3,7 +3,8 @@
    (derive-overall.ts) and Findings lists them all; `?uid=` opens one run (derive.ts). `?view=` is
    the open view, read by the client Viewer. The terminal is rendered only when the server says
    this browser may use it (lib/auth/guard.ts); the AI Assistant learns what it is about, whether
-   this browser may ask (operator role) and which model answers (lib/assistant/config.ts). */
+   this browser may ask (operator role), which model answers (lib/assistant/config.ts) and what
+   to suggest, from the data in scope (lib/assistant/prompts.ts). */
 import type { AssistantInfo } from "@/components/assistant/types";
 import { deriveDashboard } from "@/components/dashboard/derive";
 import { deriveOverall } from "@/components/dashboard/derive-overall";
@@ -17,6 +18,9 @@ import { TopBar } from "@/components/dashboard/top-bar";
 import { Viewer } from "@/components/dashboard/viewer";
 import { TerminalView } from "@/components/terminal/terminal-view";
 import { modelSummary } from "@/lib/assistant/config";
+import { retentionDays } from "@/lib/assistant/history-store";
+import { runRef, scopedViews, scopeOf } from "@/lib/assistant/insights";
+import { welcomePrompts } from "@/lib/assistant/prompts";
 import { currentRole, terminalAccess } from "@/lib/auth/guard";
 import { hasRole } from "@/lib/auth/session";
 import { assessmentView, libraryItem } from "@/lib/data/adapt";
@@ -37,21 +41,15 @@ export default async function Home({ searchParams }: Props) {
   const terminal = access === "operator";
   const model = modelSummary();
   const assistant: AssistantInfo = {
-    scope: dash
-      ? {
-          uid: dash.assessment.uid,
-          label: dash.assessment.id,
-          detail: [dash.assessment.template, dash.assessment.target, dash.assessment.status].join(" · "),
-          chips: [`${dash.findingTotal} findings`, `${dash.checks.blocked} blocked`, `${dash.assessment.progress}% done`],
-        }
-      : {
-          uid: null,
-          label: "All assessments",
-          detail: overall ? `${overall.runs} saved ${overall.runs === 1 ? "run" : "runs"}` : "nothing saved yet",
-          chips: overall ? [`${overall.findingTotal} findings`, `${overall.waiting} waiting`, `${overall.completed} completed`] : [],
-        },
-    questions: (dash ?? overall)?.cards.ask.questions ?? [],
+    scope: {
+      ...scopeOf(chosen),
+      detail: chosen ? [chosen.template, chosen.target].join(" · ") : views.length ? `${views.length} saved ${views.length === 1 ? "run" : "runs"}` : "nothing saved yet",
+    },
+    runs: scopedViews(views, null).map((v) => ({ ...runRef(v), status: v.status })),
+    prompts: welcomePrompts(scopedViews(views, chosen?.uid ?? null)),
     operator: hasRole(role, "operator"),
+    terminal,
+    retentionDays: retentionDays(),
     model: { configured: model.configured, name: model.model, local: model.local, reason: model.reason },
   };
   const empty = <EmptyView dir={dir} problems={library.problems} compact />;
