@@ -140,7 +140,9 @@
   opacity: 0.35;
   pointer-events: none;
 }
-.dash-assistant-globe { position: absolute; inset: 0; pointer-events: none; }
+/* clipped to the stage: on phones the stage starts below the top bar and the views strip, and the
+   globe (following a welcome scrolled up) must never draw over them */
+.dash-assistant-globe { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .dash-assistant-globe-breath { position: absolute; inset: 0; }
 .dash-assistant-halo { position: absolute; border-radius: 50%; opacity: 0; }
 .dash-assistant-halo-glow {
