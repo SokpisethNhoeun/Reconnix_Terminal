@@ -9,7 +9,7 @@ import type { CardOf } from "@/lib/assistant/protocol";
 import { AssistantOrb } from "./assistant-orb";
 import { CardView, NoticeCard } from "./cards";
 import { CopyButton } from "@/components/ui/copy-button";
-import { EMPTY_REPLY, isEmptyReply } from "./empty-reply";
+import { EMPTY_REPLY, isEmptyReply, NO_EXPLANATION } from "./empty-reply";
 import { MessageText } from "./message-text";
 import type { ChatMessage } from "./types";
 
@@ -21,7 +21,7 @@ const failed = (detail: string | undefined): CardOf<"notice"> => ({
   steps: [],
   action: null,
 });
-const empty = (): CardOf<"notice"> => ({ kind: "notice", tone: "info", title: EMPTY_REPLY.title, body: EMPTY_REPLY.body, steps: [], action: null });
+const empty = (withCards: boolean): CardOf<"notice"> => ({ kind: "notice", tone: "info", ...(withCards ? NO_EXPLANATION : EMPTY_REPLY), steps: [], action: null });
 
 export function Message({ m, onRetry }: { m: ChatMessage; onRetry?: () => void }) {
   if (m.role === "user") {
@@ -47,7 +47,7 @@ export function Message({ m, onRetry }: { m: ChatMessage; onRetry?: () => void }
             <span />
           </span>
         )}
-        {m.state === "error" && <NoticeCard card={isEmptyReply(m) ? empty() : failed(m.detail)} onRetry={onRetry} />}
+        {m.state === "error" && <NoticeCard card={isEmptyReply(m) ? empty((m.cards?.length ?? 0) > 0) : failed(m.detail)} onRetry={onRetry} />}
         {m.state === "stopped" && (
           <span className="ai-stopped">
             <CircleStop className="size-3.5" aria-hidden /> Stopped

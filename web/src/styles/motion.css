@@ -12,7 +12,7 @@
   border-radius: 10px;
   border: 1px solid transparent;
   color: var(--muted-foreground);
-  /* the active state's own fade: one short transition, never a loop (motion.css NAV_ACTIVE) */
+  /* the active state's own fade: one short transition, never a loop (the marker is ::after below) */
   transition:
     color 0.2s ease,
     background-color 0.2s var(--ease-in-out),
@@ -48,7 +48,7 @@
 .dash-navbtn:hover .dash-tip,
 .dash-navbtn:focus-visible .dash-tip { opacity: 1; transform: translateX(0); }
 
-/* The active view's marker (NAV_ACTIVE): a bar on the sidebar's edge that slides and fades in
+/* The active view's marker: a bar on the sidebar's edge that slides and fades in
    once, over 0.2 s, when the view changes (under the strip on phones). It moves only the bar,
    never the icon or the label, and it never loops. */
 .dash-navbtn::after {
@@ -210,6 +210,9 @@
 .dash-frame[data-breathing] .dash-ai-halo { animation-name: dash-breath-icon-halo-in, dash-breath-icon-halo; }
 .dash-frame[data-breathing] .dash-assistant-globe-breath { animation-name: dash-breath-globe-in, dash-breath-globe; }
 .dash-frame[data-breathing] .dash-assistant-halo-glow { animation-name: dash-breath-globe-glow-in, dash-breath-globe-glow; }
+/* faded out behind a conversation (use-globe-aim.ts sets data-idle): no loop runs unseen */
+.dash-frame[data-breathing] .dash-assistant-globe-breath[data-idle],
+.dash-frame[data-breathing] .dash-assistant-globe-breath[data-idle] .dash-assistant-halo-glow { animation: none; }
 /* each pair: the first swell (rest → peak), then the loop (peak → trough → peak) */
 @keyframes dash-breath-icon-in { from { transform: scale(1); } to { transform: scale(1.1); } }
 @keyframes dash-breath-icon { 0%, 100% { transform: scale(1.1); } 50% { transform: scale(1); } }

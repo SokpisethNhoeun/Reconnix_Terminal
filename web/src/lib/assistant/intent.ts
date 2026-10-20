@@ -33,18 +33,22 @@ const PLAN = new RegExp(
 const RUN = /\b(run|execute|launch|start|perform|trigger|fire|re-?run)\b[^.?!\n]{0,30}\b(scans?|nmap|sqlmap|nikto|nuclei|ffuf|exploits?|attacks?|payloads?|brute.?force)\b|\bscan\s+(https?:\/\/|[a-z0-9-]+\.[a-z]{2,})/;
 const ACT = /\b(approve|reject|deny|authori[sz]e|sign off on|grant)\b/;
 const TOP = /\b(top|worst|most (severe|critical|serious|important|dangerous|urgent)|highest|biggest|riskiest|first to fix|fix first|prioriti[sz]e)\b/;
-const FINDINGS = /\bfindings?\b|\bvuln|\bweakness|\bissues?\b|\brisks?\b|\bseverit|\bcritical\b|\bcvss\b|\bcwe\b|\bowasp\b|\bcve\b|\bexploitable\b|\banaly[sz]|\bwhat did (it|you|reconix) find\b|\bfound\b|\bsummar|\boverview\b/;
+const FINDINGS =
+  /\bfindings?\b|\bvuln|\bweakness|\bissues?\b|\brisks?\b|\bseverit|\bcritical\b|\bcvss\b|\bcwe\b|\bowasp\b|\bcve\b|\bexploitable\b|\banaly[sz]|\bwhat did (it|you|reconix) find\b|\bfound\b|\bsummar|\boverview\b|\binjection\b|\bxss\b|\bcross.site\b|\bcsrf\b|\bssrf\b|\bidor\b|\baccess control\b|\bauthori[sz]ation\b|\bauthentication\b|\bdisclosure\b|\bmisconfig|\bencoding\b|\bexpos(e|es|ed|ure)\b|\binsecure\b|\btraversal\b|\bdeserializ|\bcredentials?\b|\bsecrets?\b|\bfalse positives?\b/;
 const APPROVALS =
-  /\bapprov|\bwait(s|ing)? (on|for)\b|\bpending\b|\bdecid|\bdecision|\bgates?\b|\bon hold\b|\bneeds? (me|my|you)\b|\brejected\b|\bdouble.?check|\bauthori[sz]ation|\bsign.?off|\bgated\b|\brisky (actions?|steps?)\b/;
+  /\bapprov|\bwait(s|ing)? (on|for)\b|\bpending\b|\bdecid|\bdecision|\bgates?\b|\bgated\b|\bon hold\b|\bneeds? (me|my|you)\b|\bdouble.?check|\bsign.?off|\brisky (actions?|steps?)\b|\brejected (actions?|steps?|approvals?|requests?)\b|\b(actions?|steps?|approvals?|requests?) (were |was |got )?rejected\b|\bauthori[sz]ed by\b|\b(needed|needs|required|requires|given|gave) authori[sz]ation\b|\bauthori[sz]ation (needed|required|given|gates?)\b/;
 const PROGRESS = /\bprogress\b|\bstatus\b|\bphases?\b|\bsteps?\b|\bhow far\b|\bremaining\b|\bleft to do\b|\bcomplet|\bfinish(ed)?\b|\bexecution\b|\bplan\b|\bstages?\b|\bsummar|\boverview\b|\bwhat happened\b/;
 const TOOLS =
-  /\btools?\b|\bnmap\b|\bsqlmap\b|\bnikto\b|\bnuclei\b|\bffuf\b|\bsemgrep\b|\bgitleaks\b|\bzap\b|\btestssl\b|\bscanners?\b|\bwhat ran\b|\bexecuted\b|\bcommands?\b|\brequests? (sent|made)\b|\bhow many requests\b|\bactivity\b|\boutputs?\b|\bresults? of\b|\bwhich (scans?|checks?) (ran|were run)\b/;
+  /\btools?\b|\bnmap\b|\bsqlmap\b|\bnikto\b|\bnuclei\b|\bffuf\b|\bsemgrep\b|\bgitleaks\b|\bzap\b|\btestssl\b|\bscanners?\b|\bwhat ran\b|\bexecuted\b|\bcommands?\b|\brequests? (sent|made)\b|\bhow many requests\b|\bactivity\b|\b(tool|scan|scanner) outputs?\b|\boutputs? of\b|\bresults? of\b|\bwhich (scans?|checks?) (ran|were run)\b/;
 const POLICY =
-  /\bpolic|\bblock(ed|s)?\b(?! on)|\bout of scope\b|\boutside (the )?scope\b|\brefus|\bdenied\b|\bforbidden\b|\bguardrails?\b|\bscope (checks?|violations?|rules?)\b|\brestrict|\bdisallow|\bnot allowed\b|\bverdicts?\b|\bexcluded\b|\bprevented\b/;
+  /\bpolic|\bblock(ed|s)?\b(?! on)|\bout of scope\b|\boutside (the )?scope\b|\brefus|\bdenied\b|\bforbidden\b|\bguardrails?\b|\bscope (checks?|violations?|rules?)\b|\b(scope|policy) restrict|\brestrict\w* (did|does|on|of|by|from) (the )?(scope|policy|run)\b|\bdisallow|\bnot allowed\b|\bverdicts?\b|\bexcluded\b|\bprevented\b/;
 const REPORT = /\breports?\b|\bexport|\bdownload|\bpdf\b|\bsarif\b|\bcsv\b|\bhtml\b|\bjson\b|\bdeliverable/;
-// errors and failures: the saved data has no error log and no failed state, so the reply says so
-// (with the runs' real states). Not "failed login" or "login failure": that is a finding.
-const ERRORS = /\berrors?\b|\bcrash|\bwent wrong\b|\bbroke(n)?\b|\bexceptions?\b|\bstack ?trace|\b(?<!login )(?<!sign-in )fail(ed|ure|ures|ing|s)?\b(?! (login|sign-in|to sign in|to log in))/;
+// errors and failures of the run itself: the saved data has no error log and no failed state, so
+// the reply says so (with the runs' real states). Only with the run in the sentence, and never
+// when the question is about findings ("error-based SQL injection", "broken access control",
+// "verbose error message disclosure" are weaknesses, not errors of the run).
+const ERRORS = /\berrors?\b|\bfail(ed|ure|ures|ing|s)?\b|\bcrash(ed|es)?\b|\bwent wrong\b/;
+const RUN_WORDS = /\b(runs?|assessments?|scans?|steps?|tools?|phases?|execution|pentests?|tui)\b/;
 // "F-003", "f-3", "IMP-002"; not the "DEMO-001" inside "RCX-DEMO-001"
 const FINDING_ID = /(?<![\w-])([a-z]{1,4})-(\d{1,4})\b/gi;
 
@@ -68,7 +72,7 @@ export function readIntent(question: string): Asked {
   if (TOOLS.test(q) && !RUN.test(q)) add("tools");
   if (POLICY.test(q)) add("policy");
   if (REPORT.test(q)) add("report");
-  if (ERRORS.test(q)) add("errors");
+  if (ERRORS.test(q) && RUN_WORDS.test(q) && !FINDINGS.test(q) && !TOP.test(q)) add("errors");
   const findingIds = [...new Set([...question.matchAll(FINDING_ID)].map((m) => findingKey(`${m[1]}-${m[2]}`)))].slice(0, 3);
   return { intents, findingIds };
 }

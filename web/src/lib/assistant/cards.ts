@@ -124,26 +124,28 @@ export function progressCard(views: AssessmentView[]): CardOf<"progress"> {
   };
 }
 
-type ApprovalState = CardOf<"approvals">["items"][number]["state"];
-const STATE_ORDER: readonly ApprovalState[] = ["PENDING", "NOT REACHED", "APPROVED", "REJECTED"];
+export const STATE_ORDER = ["PENDING", "NOT REACHED", "APPROVED", "REJECTED"] as const;
 
 export function approvalsCard(views: AssessmentView[]): CardOf<"approvals"> {
   const all = views
     .flatMap((v, i) => v.approvals.map((a) => ({ a, v, i })))
     .sort((x, y) => STATE_ORDER.indexOf(x.a.state) - STATE_ORDER.indexOf(y.a.state) || x.i - y.i);
   const { approvals, inputs } = waitingOn(views);
+  const counts = { APPROVED: 0, REJECTED: 0, PENDING: 0, "NOT REACHED": 0 };
+  for (const { a } of all) counts[a.state] += 1;
   return {
     kind: "approvals",
     items: all.slice(0, APPROVALS_SHOWN).map(({ a, v }) => ({
       run: runRef(v),
       id: cut(a.id, 120),
       action: safe(a.action, 120),
-      risk: cut(a.risk, 120),
+      risk: safe(a.risk, 120),
       target: safe(a.target, 400),
       state: a.state,
     })),
     waiting: inputs.slice(0, RUNS_SHOWN).map((v) => ({ run: runRef(v), text: safe(v.gate?.text ?? "", 400) })),
     pending: approvals,
+    counts,
     more: Math.max(0, all.length - APPROVALS_SHOWN),
   };
 }
@@ -154,7 +156,14 @@ export function policyCard(runs: { a: Assessment; v: AssessmentView }[]): CardOf
       .filter((x) => !x.allowed)
       .map((x) => {
         const at = parseTime(x.at);
-        return { run: runRef(v), time: at === null ? "—" : clock(at), text: safe(`${x.method} ${x.path} · ${x.reason}`, 400) };
+        return {
+          run: runRef(v),
+          time: at === null ? "—" : clock(at),
+          text: safe(`${x.method} ${x.path} · ${x.reason}`, 400),
+          method: safe(x.method, 120),
+          path: safe(x.path, 400),
+          reason: safe(x.reason, 400),
+        };
       }),
   );
   return {
@@ -170,7 +179,7 @@ export function policyCard(runs: { a: Assessment; v: AssessmentView }[]): CardOf
 function toolOf(text: string, tools: string[]): string {
   const lower = text.toLowerCase();
   const named = [...tools].sort((a, b) => b.length - a.length).find((t) => t && lower.includes(t.toLowerCase()));
-  return named ? cut(named, 120) : "—";
+  return named ? safe(named, 120) : "—";
 }
 
 export function toolsCard(views: AssessmentView[]): CardOf<"tools"> {
@@ -197,11 +206,6 @@ export function toolGroups(steps: { tool: string }[]): { tool: string; steps: nu
   return [...counts]
     .map(([tool, steps]) => ({ tool, steps }))
     .sort((a, b) => (a.tool === "—" ? 1 : 0) - (b.tool === "—" ? 1 : 0) || b.steps - a.steps || a.tool.localeCompare(b.tool));
-}
-
-/** How many of the approvals shown are in each state, in the order the card lists them. */
-export function approvalCounts(items: { state: ApprovalState }[]): { state: ApprovalState; count: number }[] {
-  return (STATE_ORDER as ApprovalState[]).map((state) => ({ state, count: items.filter((a) => a.state === state).length })).filter((x) => x.count > 0);
 }
 
 export function reportCard(views: AssessmentView[]): CardOf<"report"> {
@@ -238,6 +242,7 @@ export function pickCards(library: Assessment[], uid: string | null, question: s
   if (has("plan")) return [NOTICES.plan];
   if (has("run")) cards.push(NOTICES.run);
   if (has("act")) cards.push(NOTICES.act);
+  if (has("errors")) cards.push(NOTICES.errors); // the data has none: say so first
 
   // findings named by id (false positives too: the operator asked for them), then the top one
   const named: Located[] = [];
@@ -260,11 +265,7 @@ export function pickCards(library: Assessment[], uid: string | null, question: s
   if (has("tools")) cards.push(toolsCard(views));
   if (has("policy")) cards.push(policyCard(views.map((v) => byUid.get(v.uid)!).filter(Boolean)));
   if (has("report")) cards.push(reportCard(views));
-  // errors: the data has none; say so, and show the runs' real states
-  if (has("errors")) {
-    cards.push(NOTICES.errors);
-    if (!has("progress")) cards.push(progressCard(views));
-  }
+  if (has("errors") && !has("progress")) cards.push(progressCard(views)); // the runs' real states
 
   return cards.filter((c) => CardSchema.safeParse(c).success).slice(0, MAX_CARDS);
 }

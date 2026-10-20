@@ -42,7 +42,10 @@ export function useGlobeAim({ stage, front, halo, breath }: GlobeAimRefs, phase:
     if (!g || !s || !fr || !h || !b) return;
     const target = opacity();
     const carried = isCarried(g, b);
+    // its breathing loop (motion.css) runs only while it can be seen: data-idle stops it at 0
+    if (target > 0) delete b.dataset.idle;
     if (!carried && target === 0) {
+      b.dataset.idle = "";
       holdGlobe("faded", true); // a conversation and it never came in: it stays home, not drawing
       return;
     }
@@ -73,7 +76,14 @@ export function useGlobeAim({ stage, front, halo, breath }: GlobeAimRefs, phase:
     const duration = reducedMotion() ? MOTION.fadeReduced.duration : MOTION.globeFade;
     if (target > 0) holdGlobe("faded", false);
     const fade = { duration, ease: "power2.inOut", overwrite: "auto" as const };
-    gsap.to(g.carrier, { opacity: target, ...fade, onComplete: () => holdGlobe("faded", target === 0) });
+    gsap.to(g.carrier, {
+      opacity: target,
+      ...fade,
+      onComplete: () => {
+        holdGlobe("faded", target === 0);
+        if (target === 0) b.dataset.idle = "";
+      },
+    });
     gsap.to(h, { opacity: target > 0 ? 1 : 0, ...fade });
   };
 
