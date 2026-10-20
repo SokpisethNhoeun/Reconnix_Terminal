@@ -61,10 +61,14 @@ reconix viewer   # start the read-only local viewer`}</Code>
           <ul>
             <li>Current and past assessments.</li>
             <li>Findings filtered by severity, target, category and tool.</li>
-            <li>Masked evidence, validation status and the full audit trail.</li>
+            <li>Masked evidence, validation status, and the activity timeline of every run.</li>
+            <li>An AI Assistant that answers from the saved assessment data (it never runs or approves anything).</li>
             <li>Reports, exported as PDF with scope, findings and remediation.</li>
           </ul>
-          <p>The viewer is read-only: assessments are started and approved in the terminal.</p>
+          <p>
+            The viewer never changes an assessment: assessments are started and approved in the terminal. It keeps only its own
+            AI Assistant conversations.
+          </p>
         </DocSection>
         <DocSection title="Start it">
           <Code>{`reconix viewer

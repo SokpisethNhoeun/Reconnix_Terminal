@@ -2,7 +2,7 @@
   "name": "reconix-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Read-only local analysis dashboard for assessments saved by the Reconix TUI",
+  "description": "Local analysis dashboard and AI Assistant for assessments saved by the Reconix TUI",
   "scripts": {
     "dev": "node scripts/serve.mjs dev",
     "build": "next build",

@@ -1,6 +1,6 @@
 # Web redesign v2 plan: cinematic transition, ChatGPT-style assistant, clearer dashboard
 
-2026-10-20. Status: **plan only, waiting for the owner's START.** Nothing here is built yet.
+2026-10-20. Status: **built** (the owner said START, 2026-10-20); see "Results" at the end.
 The owner's brief covers 11 points (slower animation, a faint globe behind the assistant, an
 assistant like ChatGPT/Claude, clear colours and labels, three main analytics panels, removing
 two cards and the Audit Log page, fixing scrolling, breathing effects, worktrees and
@@ -333,7 +333,7 @@ Each worktree:
      asset.
 2. **Microphone: removed** everywhere (no controls that don't work).
 3. **Conversation history: persistent**, kept on this machine by the dashboard's server, not
-   in browser storage. The design is below and **is waiting for the owner's OK**.
+   in browser storage. The design below was approved; it supersedes §5's "History in this tab".
 4. **Cards: chosen by the server.** The model only explains; findings, severities, tool states,
    execution results and statistics come only from the saved data. Still read-only for
    assessments: nothing is scanned or approved.
@@ -352,7 +352,7 @@ Additional notes:
 - **B:** a minimal, professional assistant. *(The rest of this part of the owner's message was
   cut off. It will be added when the owner sends it again.)*
 
-## Conversation storage (proposed, waiting for the owner's OK)
+## Conversation storage (approved by the owner, built)
 
 The smallest solution that fits: **plain files written by the dashboard's own server, with no
 database or new service.**

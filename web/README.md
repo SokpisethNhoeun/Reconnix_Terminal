@@ -2,23 +2,32 @@
 
 A local dashboard for what the Reconix terminal app did, opened from the TUI with `/web`. It
 reads the assessments the TUI saves to `~/.reconix/assessments/` and shows them as the
-**Assessment Operations Center** (the globe UI from the reconix-web-ui site): an Overview
-with a three.js globe, activity and execution timelines, progress, tool steps and findings
-by severity, plus Findings, Audit log, Reports and Scope views, all switched in-page
-(`?view=`). By default the Overview totals **every saved run** (`derive-overall.ts`) and
-Findings lists them all, each naming its run; the Assessment switcher in the top bar opens one
-run instead (`?uid=`) and searches every saved run. Audit log, Reports and Scope belong to one
-run, so with every run shown they ask you to pick one. The page re-reads the files every 10 s.
+**Assessment Operations Center** (the globe UI from the reconix-web-ui site), with Findings,
+Reports, Scope, Terminal and AI Assistant views, all switched in-page (`?view=`). By default
+the Overview totals **every saved run** (`derive-overall.ts`) and Findings lists them all, each
+naming its run; the Assessment switcher in the top bar opens one run instead (`?uid=`) and
+searches every saved run. Reports and Scope belong to one run, so with every run shown they ask
+you to pick one. The page re-reads the files every 10 s.
 
+- **Overview:** a summary strip (Findings with the worst severity, Assessment progress with its
+  state, Tool execution, Duration against the time limit) over the globe hero with the Ask bar;
+  three panels: **Findings by Severity** (a stacked bar, one row per severity, review state,
+  top CVSS findings), the **Activity Timeline** (lanes by kind with clustered marks that expand,
+  masked text; with every run shown, runs per day stacked by status) and the **Execution
+  Timeline** (a row per plan step, a shared tool track and the waiting gate; with every run
+  shown, the newest 8 runs).
+- **Meanings:** every status, step, approval, policy decision and severity is a badge with an
+  icon, a label and a tooltip from `lib/status.ts` (`components/ui/status-badge.tsx`); severity
+  uses the TUI's own scale. Colour is never the only signal; every chart has a legend.
 - **Findings** filter by severity and validation and search title, ID, CWE and target; the
   filters and the open finding live in the address (`?sev=HIGH,LOW&val=review&q=sql&finding=F-001`).
-- **Audit log** filters by kind and author and searches text and time (`?kind=&who=&aq=`).
-- **Drill-down:** the Overview's severity tiles, top findings and the Findings, Policy checks
-  and Blocked-by-policy numbers open the matching filtered view.
+- **Drill-down:** the Findings card opens every finding, a severity row opens Findings filtered
+  to it, a top finding opens itself.
 - **The bell** lists what the open run waits on and every other saved run that waits on a
-  decision; the switcher says when a saved file was skipped and why. Those views never change anything. The
-**Terminal** view runs the TUI itself in the browser, so every gate and decision still goes
-through the TUI's store. `/docs` holds the project's documentation.
+  decision; the switcher says when a saved file was skipped and why. Those views never change
+  anything. The **Terminal** view runs the TUI itself in the browser, so every gate and
+  decision still goes through the TUI's store. `/docs` holds the project's documentation.
+  (The Audit log view was removed; the audit data stays in the saved files and the TUI.)
 
 Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind v4 · GSAP · Lenis ·
 three.js · zod · lucide-react. Dark only. See `../docs/WEB_GLOBE_UI_PLAN.md` for how it
@@ -76,10 +85,20 @@ The page asks `POST /api/terminal/ticket` for a single-use ticket valid for 60 s
 ## AI Assistant
 
 The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
-(`?view=assistant`; `/assistant` redirects there). The dashboard animates into it: the top bar,
-left card, right column and bottom row slide out, and the globe/Ask-bar area grows into the
-chat (desktop frame; elsewhere and with reduced motion it fades). Values to tune live in
-`components/assistant/motion.ts` (`MOTION`) and the 4 s breathing loops in `globals.css`.
+(`?view=assistant`; `/assistant` redirects there; one history entry, so Back returns).
+
+- **Transition** (`components/assistant/motion.ts`, `MOTION`): about 1.6 s to open and 1.4 s to
+  close on the fixed desktop frame. The top bar and summary strip go up, Findings by Severity
+  right, the timelines down, all fading, while the surface grows from the hero box to the area
+  beside the sidebar; the assistant's header, conversation and composer come in last. Phones,
+  tablets and a direct load crossfade (0.3 s); reduced motion is a 0.22 s fade.
+- **One globe:** the hero's three.js globe is carried into the assistant (never a second WebGL
+  context; `use-globe.ts`) and sits behind the welcome at about 18 % opacity; once a
+  conversation has messages it fades out and stops drawing (also when hidden, or on low-power
+  devices, where it holds a still frame).
+- **Breathing** (`breath.ts`, `styles/motion.css`): one 6 s cycle shared by the sidebar's AI
+  icon, the globe/orb and the whole chat panel (scale 1 → 1.003 and its glow), started once the
+  open has settled, on its own layer; reduced motion shows a still halo instead.
 
 - **Model:** any OpenAI-compatible endpoint, as the product docs' "Model switching": set
   `LLM_BASE_URL` and `LLM_MODEL` in the environment `/web` starts from or in `web/.env.local`
@@ -87,17 +106,29 @@ chat (desktop frame; elsewhere and with reduced motion it fades). Values to tune
   An endpoint off this machine also needs `LLM_ALLOW_REMOTE=1` (assessment data goes there; the
   screen says so) and takes `LLM_API_KEY` over https only. The key stays in the Next.js
   process: the terminal helper and the TUI it runs never get `LLM_*`. Unset, the screen says how.
-- **Route:** `POST /api/assistant`, operators only (proxy and handler), same origin, zod-checked
-  body (the run in scope and at most 30 turns), 12 questions a minute and 2 replies at once.
-  The server builds the model's context from the saved files itself (no evidence lines; every
-  value one line with no `<`/`>` or invisible characters, cut, ≈14,000 characters at most) inside
-  a fence with a new random tag per question, framed as untrusted data, and streams the reply
-  back as text. Questions are masked with the TUI's secret patterns (`lib/assistant/redact.ts`,
-  vectors shared with `reconix/store/redact.py` in `tests/redact-vectors.json`). Nothing is
-  written or logged.
-- **Conversation:** one per tab (`sessionStorage`), shared by the Ask bar and the composer,
-  kept across views, the live refresh and reloads; only the turns about the same run go back
-  to the model with a question. Plan: `docs/WEB_AI_ASSISTANT_PLAN.md`.
+- **Route:** `POST /api/assistant` takes `{ conversationId?, uid, question, retry? }`: operators
+  only (proxy and handler), same origin, zod-checked, a byte cap, 12 questions a minute and 2
+  replies at once (`RECONIX_ASSISTANT_RATE_PER_MINUTE`, `RECONIX_ASSISTANT_RATE_RUNNING`). The
+  browser never sends history: the server reads it from the conversation file. It builds the
+  model's context from the saved files itself (no evidence lines; every value one line with no
+  `<`/`>` or invisible characters, cut, ≈14,000 characters at most) inside a fence with a new
+  random tag per question, framed as untrusted data. The reply streams as NDJSON frames
+  (`lib/assistant/protocol.ts`: `meta`, `card`, `text`, `error`, `done`).
+- **Cards the server picks** (`lib/assistant/cards.ts`, `intent.ts`): findings, a finding,
+  progress, approvals, policy blocks, tools used, report downloads and notices, built from the
+  saved data only; the model writes the explanation and never the numbers. Nothing can be run
+  or approved from the chat: approvals say "Decide in the TUI", with Open Terminal for
+  operators. Questions are masked with the TUI's secret patterns (`lib/assistant/redact.ts`,
+  vectors shared with `reconix/store/redact.py` in `tests/redact-vectors.json`).
+- **Saved conversations** (`lib/assistant/history-store.ts`): one `<uuid>.json` per
+  conversation in `~/.reconix/assistant/` (`RECONIX_ASSISTANT_DIR`; the folder `0700`, files
+  `0600`, the parent not writable by others), written atomically, read like the saved
+  assessments. A conversation keeps the run it began with; its title is the first question.
+  History, rename, delete and "Delete all" through `/api/assistant/conversations[/<id>]`
+  (operators; changes need the page's origin). Kept 30 days after last use
+  (`RECONIX_ASSISTANT_RETENTION_DAYS`, `0` keeps them), at most 100 conversations and 200
+  messages each. The tab keeps only the open conversation's id and the masked unsent draft.
+  Plans: `docs/WEB_AI_ASSISTANT_PLAN.md`, `docs/WEB_REDESIGN_V2_PLAN.md`.
 
 ## Develop
 
@@ -109,8 +140,16 @@ npm run check:data   # print everything derive.ts computes from a saved file (de
 npm run globe:points # rebuild public/globe/land.bin (dev only; the build doesn't run it)
 npm run lint && npm run typecheck   # typecheck needs `npx next typegen` (or a build) first
 npm run build && npm run e2e        # Playwright on sample-data (npx playwright install chromium,
-                                    #   or CHROMIUM_PATH=/usr/bin/chromium)
+                                    #   or CHROMIUM_PATH=/usr/bin/chromium); E2E_PORT moves its
+                                    #   ports (default 3199, plus 3198 and 3195)
 ```
+
+The e2e specs: `access` (roles, origin), `pages` (views, switcher, filters, drill-downs),
+`assistant` (with the stand-in model `e2e/llm-stub.mjs`; `[stub:markdown]`, `[stub:long]` and
+`[stub:fail]` pick its answers), `motion` (directions, timing, the globe, history), `scroll`
+(the wheel and keys at six sizes, no sideways scroll) and `a11y` (axe via
+`@axe-core/playwright`, focus order). Known faults are listed in the specs as expected
+failures that fail with "remove this entry" once fixed.
 
 `sample-data/` is generated by `python scripts/make_sample_data.py` (repo root), which plays
 the four templates through the real TUI store, so it always matches the saved format.
@@ -121,14 +160,14 @@ the four templates through the real TUI store, so it always matches the saved fo
 src/
 ├── proxy.ts                 # Host allowlist, viewer role on every route, operator for the terminal, nonce CSP
 ├── app/
-│   ├── layout.tsx           # fonts (Inter, JetBrains Mono), Lenis, metadata
+│   ├── layout.tsx           # fonts (Inter, JetBrains Mono), metadata (no Lenis: the dashboard scrolls natively)
 │   ├── page.tsx             # the viewer: loads the saved runs, every run or ?uid=, derives the dashboard
-│   ├── docs/                # documentation (layout checks the viewer role; content in src/content/docs/)
+│   ├── docs/                # documentation (layout checks the viewer role, mounts Lenis; content in src/content/docs/)
 │   ├── terminal/            # /terminal → /?view=terminal (operators)
 │   ├── assistant/           # /assistant → /?view=assistant
 │   ├── login/               # sign-in (token from the link's #fragment) → the Overview
 │   └── api/                 # session (sign-in), assessments/[uid] (JSON), assessments/[uid]/export,
-│                            #   terminal/ticket and assistant (operators)
+│                            #   terminal/ticket, assistant and assistant/conversations (operators)
 ├── lib/
 │   ├── data/                # schema.ts (zod), store.ts (server-only reader), stats.ts (pure), export.ts,
 │   │                        #   adapt.ts (a saved run → the viewer's terms), view-types.ts, format.ts
@@ -137,20 +176,31 @@ src/
 │   │                        #   (+ terminalAccess), origin.ts (same-origin check), ticket.ts (terminal tickets)
 │   ├── terminal/            # config.ts (on/off, helper port), paths.ts, protocol.ts (frames, close codes),
 │   │                        #   screen-text.ts (what Copy output copies)
-│   ├── assistant/           # config.ts (the model, server only), request.ts (zod), context.ts (what the
-│   │                        #   model sees), prompt.ts, llm.ts + stream.ts (streamed reply), rate.ts, paths.ts
-│   └── globe.ts (three.js globe), docs-nav.ts (the docs structure), site.ts, templates.ts, utils.ts
+│   ├── assistant/           # config.ts (the model), request.ts (zod), context.ts (what the model sees),
+│   │                        #   prompt.ts, llm.ts + stream.ts + reply.ts (the streamed reply), protocol.ts
+│   │                        #   (NDJSON frames), intent.ts + cards.ts + insights.ts + prompts.ts (cards and
+│   │                        #   prompts from saved data), history-store.ts + history-schema.ts (saved
+│   │                        #   conversations), redact.ts, markdown.ts, rate.ts, access.ts, client.ts
+│   ├── scroll/              # stick-rules.ts + stick-controller.ts (the conversation follows its end)
+│   ├── status.ts            # what every status, step, approval, policy decision and severity means
+│   └── globe*.ts (three.js globe: scene, post, holds), docs-nav.ts, site.ts, templates.ts, utils.ts
 ├── components/
-│   ├── dashboard/           # Viewer, Sidebar, TopBar, the views, cards and charts; derive.ts holds every
-│   │                        #   number they show; view-url.ts (?view=), live-refresh.tsx, intro.tsx (GSAP)
-│   ├── assistant/           # AssistantProvider (conversation), AssistantStage + motion.ts (the transition),
-│   │                        #   AssistantView, Composer, MessageText, AssistantOrb, breath.ts
+│   ├── dashboard/           # Viewer, Sidebar, TopBar, the views, the summary strip and the three panels;
+│   │                        #   derive*.ts hold every number they show (overview-types.ts); axis.ts,
+│   │                        #   event-kinds.ts, legend.tsx, hint.tsx, chart-tooltip.tsx, mark-details.tsx;
+│   │                        #   view-url.ts (?view=), live-refresh.tsx, intro.tsx (GSAP, by data-motion)
+│   ├── assistant/           # AssistantProvider (+ use-* hooks: open, asking, history, tab memory),
+│   │                        #   AssistantStage + motion*.ts + use-globe*.ts (the transition and the globe),
+│   │                        #   AssistantView, header, welcome, prompt cards, messages, cards/, composer,
+│   │                        #   conversation menu, breath.ts, use-stick-to-bottom.ts + scroll-to-bottom.tsx
 │   ├── terminal/            # TerminalView, TerminalPanel, TerminalToolbar, RestartButton, TerminalNotice,
 │   │                        #   ScrollToLatest, useXterm, useTerminalSession, useTerminalView, useLeaveWarning
 │   ├── ui/                  # Button, Card, Badge, StatusChip, IconButton (cva + cn)
 │   └── docs-*.tsx, site-nav.tsx, site-footer.tsx, nav-*.ts(x)   # the docs' chrome
 ├── content/docs/            # the documentation pages
-└── styles/tokens.css        # GENERATED from reconix/theme.py (scripts/export_tokens.py)
+└── styles/                  # tokens.css (GENERATED from reconix/theme.py by scripts/export_tokens.py), then one
+                             #   file per area: frame (page and scrolling), dashboard, motion, assistant,
+                             #   terminal, site (imported in that order from app/globals.css)
 public/globe/land.bin        # the globe's land dots (scripts/build-globe-points.mjs)
 ```
 
@@ -164,16 +214,17 @@ already-masked data; `lib/report/formats.ts` is the single list of formats.
 
 ## Rules
 
-- **Read-only, except the Terminal page.** No route writes, deletes or starts anything;
-  decisions belong in the TUI. The one exception is the Terminal page, which runs the TUI
-  itself (its ticket route only hands out a ticket; the helper starts the session). The AI
-  Assistant's route writes nothing either; it is the one place saved data leaves the machine,
-  and only to the model the operator configured.
+- **Read-only for assessments.** No route writes, deletes or starts anything the TUI reads;
+  decisions belong in the TUI. Two exceptions: the Terminal page runs the TUI itself (its
+  ticket route only hands out a ticket; the helper starts the session), and the AI Assistant
+  writes **its own conversation files** in `~/.reconix/assistant` (and nothing else). The
+  assistant's route is also the one place saved data leaves the machine, and only to the model
+  the operator configured.
 - **One data source.** Pages read through `lib/data/store.ts` only; it accepts regular files
   named `<YYYYMMDD-HHMMSS-xxxx>_<id>.json` up to 5 MB that pass `AssessmentSchema`.
   Change `schema.ts` together with `reconix/store/snapshot.py`.
 - **Access.** Every page and route needs the `viewer` role, and `/terminal`,
-  `/api/terminal/*` and `/api/assistant` need `operator` (`proxy.ts`, and pages / handlers check again; the
+  `/api/terminal/*` and `/api/assistant` (with everything under it) need `operator` (`proxy.ts`, and pages / handlers check again; the
   page renders the Terminal view only for operators). The
   sign-in link grants `operator` while the terminal is on (`--no-terminal`: `viewer`). The
   dashboard binds to 127.0.0.1 and refuses other Host headers; so does the terminal helper.
@@ -181,10 +232,20 @@ already-masked data; `lib/report/formats.ts` is the single list of formats.
   rendered by React as text (`MessageText` turns a small markdown subset into elements);
   never use `dangerouslySetInnerHTML`.
 - **Colors** come only from `tokens.css`; add a token in `reconix/theme.py` (`WEB_TOKENS`)
-  and re-run `scripts/export_tokens.py`. `globals.css` holds no colour literals.
+  and re-run `scripts/export_tokens.py`. No stylesheet holds colour literals. Meanings come
+  from `lib/status.ts` (teal = AI and progress, green = done, amber = waiting or to review,
+  red = errors and blocked, slate = informational; severity on the TUI's scale).
+- **Scrolling.** Lenis smooth scrolling only on the docs pages; the dashboard scrolls
+  natively. On the fixed desktop frame (≥1280×760) `.dash-content` is the one scroller,
+  elsewhere the window; never `overflow: hidden` on the page to fix scrolling.
 - **Numbers come from the saved run.** Every value on the dashboard is computed in
-  `components/dashboard/derive.ts` from `lib/data/adapt.ts`; components hold no literal
-  numbers, and nothing the snapshot doesn't record is shown.
+  `components/dashboard/derive*.ts` from `lib/data/adapt.ts`, and every number on an assistant
+  card in `lib/assistant/cards.ts`; components hold no literal numbers, and nothing the snapshot
+  doesn't record is shown (there is no "failed" state: the data has none).
+- **Motion hooks.** The transition and the intro find the Overview's groups by
+  `data-motion` (`top`, `hero`, `fade`, `right`, `bottom`), never by class names; the
+  assistant view keeps `data-assistant-piece` on its header, conversation and composer, and
+  the welcome's `data-globe-slot`.
 - **Filters are client-side** over data the page already has (`components/dashboard/filters.ts`,
   unit-tested); they never add a route or a request.
 - **No inline scripts.** The intro's hide-before-animate state is CSS

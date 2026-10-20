@@ -1,5 +1,11 @@
 # Web AI Assistant plan — an animated chat screen on the dashboard
 
+> **Updated by `docs/WEB_REDESIGN_V2_PLAN.md` (2026-10-20):** the transition is now ≈1.6 s / 1.4 s with
+> the one globe carried behind the welcome and a 6 s breathing cycle; the route streams NDJSON
+> with server-picked cards and **writes the assistant's own conversation files** in
+> `~/.reconix/assistant` ("the route writes nothing" below no longer holds); the microphone is
+> gone. The rest of this plan still describes the model, the context and the security model.
+
 2026-10-20. Owner's request: an **AI Assistant** that the Overview's chat entry and a new sidebar
 tab both open. The dashboard animates into it (panels slide out by side, the globe/chat area
 grows into the screen) and back. Answers come from **a real AI model** (owner's choice).

@@ -159,22 +159,34 @@ Key invariants:
 
 ## Web dashboard (`web/`)
 
-Next.js 16 / React 19 with GSAP, Lenis and a three.js globe (the UI came from the
-reconix-web-ui site, see `docs/WEB_GLOBE_UI_PLAN.md`). `/` is one viewer page whose views
-(Overview, Findings, Audit log, Reports, Scope, Terminal) switch in-page via `?view=`; with no
-`?uid=` the Overview totals every saved run (`components/dashboard/derive-overall.ts`), with one
-it shows that run (`derive.ts`); both produce the cards' `OverviewCards` over `lib/data/adapt.ts`,
-and every number comes from them; `/docs` is the documentation. Dark only; colours come from
-`theme.WEB_TOKENS` through `scripts/export_tokens.py`. The **AI Assistant** (`?view=assistant`,
-`components/assistant/`, plan `docs/WEB_AI_ASSISTANT_PLAN.md`) opens from the Ask bar and its
-sidebar tab with a GSAP transition; `POST /api/assistant` (operators) asks the OpenAI-compatible
+Next.js 16 / React 19 with GSAP, Lenis (docs pages only) and a three.js globe (the UI came from
+the reconix-web-ui site, see `docs/WEB_GLOBE_UI_PLAN.md`; the v2 redesign in
+`docs/WEB_REDESIGN_V2_PLAN.md`). `/` is one viewer page whose views (Overview, Findings,
+Reports, Scope, Terminal, AI Assistant) switch in-page via `?view=` (no Audit log view: the
+audit data stays in the saved files and the TUI); with no `?uid=` the Overview totals every
+saved run (`components/dashboard/derive-overall.ts`), with one it shows that run (`derive.ts`);
+both produce `OverviewCards` (`overview-types.ts`: the summary strip, Findings by Severity, the
+Activity and Execution Timelines) over `lib/data/adapt.ts`, and every number comes from them;
+`/docs` is the documentation. Dark only; colours come from `theme.WEB_TOKENS` through
+`scripts/export_tokens.py` (meanings and the TUI's severity scale: `web/src/lib/status.ts` with
+`StatusBadge` / `SeverityBadge`, never colour alone). Styles are one file per area in
+`web/src/styles/`. The transition and intro find the Overview by `data-motion`
+(`top|hero|fade|right|bottom`), never by class names. The dashboard scrolls natively: on the
+fixed desktop frame `.dash-content` is the one scroller, elsewhere the window. The **AI
+Assistant** (`?view=assistant`, `components/assistant/`) opens from the Ask bar and its sidebar
+tab with a ≈1.6 s GSAP transition (`MOTION` in `motion.ts`) that carries the one WebGL globe
+(never mount a second) behind the welcome; `POST /api/assistant` (operators) asks the OpenAI-compatible
 model named by `LLM_BASE_URL` / `LLM_MODEL` (`web/.env.local`; off this machine only with
 `LLM_ALLOW_REMOTE=1`), with a context the server builds from the saved files
 (`lib/assistant/context.ts`: no evidence, every value cleaned, framed as untrusted data) and
 questions masked by `lib/assistant/redact.ts` (a port of `store/redact.py`: change both, the
-vectors in `web/tests/redact-vectors.json` check both). `webterm` drops `LLM_*` from the TUI's env.
-**Read-only except the Terminal view**: no route writes or deletes
-anything, and the only thing started is the Terminal page's TUI (the ticket route hands out
+vectors in `web/tests/redact-vectors.json` check both), streams NDJSON frames with cards the
+server builds from the saved data (`lib/assistant/cards.ts`; the model never supplies numbers,
+and nothing is run or approved from the chat), and keeps conversations on disk
+(`lib/assistant/history-store.ts`, `~/.reconix/assistant`, 0700/0600, 30-day retention).
+`webterm` drops `LLM_*` from the TUI's env.
+**Read-only for assessments**: no route writes or deletes anything the TUI reads; the only
+writes are the assistant's own conversation files, and the only thing started is the Terminal page's TUI (the ticket route hands out
 a ticket; `reconix/webterm`, started by `web/scripts/serve.mjs`, runs the TUI), so its gates
 are the store's gates. Minting a ticket needs the operator session cookie **and** the
 terminal key cookie (`Path=/api/terminal`, signed differently); the helper proves itself
@@ -184,7 +196,7 @@ it dies with the helper (on Windows the TUI runs in a ConPTY console the helper 
 Read `web/CLAUDE.md` and `web/README.md` (Rules) before changing it. This Next.js version
 differs from older ones, so check `web/node_modules/next/dist/docs/` before writing code.
 Every page and route needs the `viewer` role; `/terminal`, `/api/terminal/*` and
-`/api/assistant` need `operator` (`proxy.ts`, and the pages / handlers check again; the Terminal view is rendered
+`/api/assistant` (and everything under it) need `operator` (`proxy.ts`, and the pages / handlers check again; the Terminal view is rendered
 only for operators, and guarded pages read the cookies first so none is prerendered). The ticket format lives in
 both `web/src/lib/auth/ticket.ts` and `reconix/webterm/ticket.py` (shared test vector), and
 the frame protocol in `web/src/lib/terminal/protocol.ts` and `reconix/webterm/protocol.py`:
