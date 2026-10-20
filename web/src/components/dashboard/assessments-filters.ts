@@ -21,7 +21,7 @@ export interface ChipCount {
   count: number;
 }
 
-const isStatus = (value: string): value is Status => value in RUN_STATUS;
+const isStatus = (value: string): value is Status => Object.hasOwn(RUN_STATUS, value);
 
 /** The filter the address names: unknown statuses and templates nobody ran are dropped. */
 export function parseRunFilter(params: { q: string; status: string; template: string }, rows: LibraryItem[]): RunFilter {

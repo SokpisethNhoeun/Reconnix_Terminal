@@ -17,7 +17,7 @@ const none = { q: "", status: "", template: "" };
 
 describe("parseRunFilter", () => {
   it("keeps only statuses the dashboard knows and templates some run used", () => {
-    const f = parseRunFilter({ q: " api ", status: "Completed,Failed,<script>,Stopped", template: "API,Nope" }, rows);
+    const f = parseRunFilter({ q: " api ", status: "Completed,Failed,<script>,constructor,__proto__,Stopped", template: "API,Nope" }, rows);
     expect(f).toEqual({ q: " api ", status: ["Completed", "Stopped"], template: ["API"] });
     expect(runFilterActive(f)).toBe(true);
   });
