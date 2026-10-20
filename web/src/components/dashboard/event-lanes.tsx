@@ -44,7 +44,7 @@ export function EventLanes({ data }: { data: Events }) {
   const hint = useId();
   const group = useRef<HTMLDivElement>(null);
   const marks = data.lanes.flatMap((l) => l.marks);
-  const nav = useMarkNav(marks[0]?.key ?? null);
+  const nav = useMarkNav(marks.map((m) => m.key));
   const { tip, show, hide } = useTip();
   const [open, setOpen] = useState<string | null>(null);
   const opened = marks.find((m) => m.key === open) ?? null;

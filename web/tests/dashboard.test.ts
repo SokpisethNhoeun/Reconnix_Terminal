@@ -9,6 +9,7 @@ import { deriveDashboard } from "@/components/dashboard/derive";
 import { deriveOverall, LATEST_RUNS } from "@/components/dashboard/derive-overall";
 import { eventBadge, LANE_ORDER, toolsNamed } from "@/components/dashboard/event-kinds";
 import type { ActivityCard, ExecutionCard } from "@/components/dashboard/overview-types";
+import { tabStop } from "@/components/dashboard/use-mark-nav";
 import { MASK } from "@/lib/assistant/redact";
 import { assessmentView, findingView, kindOf } from "@/lib/data/adapt";
 import type { Assessment, Finding } from "@/lib/data/schema";
@@ -312,5 +313,14 @@ describe("deriveOverall", () => {
     expect(oneDays.days).toHaveLength(1);
     expect(oneDays.days[0].pos).toBeCloseTo(0.5);
     expect(one.cards.ask.reach).toBe("1 target");
+  });
+});
+
+describe("chart tab stop", () => {
+  it("keeps the remembered mark while it exists, else falls back to the first", () => {
+    expect(tabStop(null, ["a", "b"])).toBe("a");
+    expect(tabStop("b", ["a", "b"])).toBe("b");
+    expect(tabStop("gone", ["a", "b"])).toBe("a"); // merged away by a refresh, or another run
+    expect(tabStop("b", [])).toBeNull();
   });
 });

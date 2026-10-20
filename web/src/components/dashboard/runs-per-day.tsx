@@ -45,7 +45,7 @@ export function RunsPerDay({ data }: { data: Days }) {
   const group = useRef<HTMLDivElement>(null);
   const href = useRunHref();
   const bars = data.days.filter((d) => d.total > 0);
-  const nav = useMarkNav(bars[0]?.key ?? null);
+  const nav = useMarkNav(bars.map((d) => d.key));
   const { tip, show, hide } = useTip();
   const [open, setOpen] = useState<string | null>(null);
   const opened = bars.find((d) => d.key === open) ?? null;

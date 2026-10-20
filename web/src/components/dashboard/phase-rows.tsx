@@ -21,7 +21,7 @@ export function PhaseRows({ data }: { data: Phases }) {
   const hint = useId();
   const group = useRef<HTMLDivElement>(null);
   const keys = [...data.tools.map((s) => s.key), ...(data.gate?.pos != null ? ["gate"] : [])];
-  const nav = useMarkNav(keys[0] ?? null);
+  const nav = useMarkNav(keys);
   const { tip, show, hide } = useTip();
   const gate = data.gate;
   const gateTitle = gate ? `${gate.meaning.label} · ${gate.text} · ${gate.time}` : "";
