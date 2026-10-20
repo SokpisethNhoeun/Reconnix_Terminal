@@ -212,6 +212,12 @@ dashboard machine (`RECONIX_CHROME` names one); without a browser the route says
 the HTML report can be printed to PDF from any browser. All formats come from the saved,
 already-masked data; `lib/report/formats.ts` is the single list of formats.
 
+With every run shown, the Reports view's **Combine runs** panel picks up to five saved runs,
+previews them as one report (the same HTML the PDF prints, in a sandboxed frame) and generates
+one PDF from `/api/reports/combined?uids=a,b&format=pdf|html&evidence=1&low=1&appendix=1`
+(`lib/report/combined/`). A finding with the same title, CWE and target in several runs counts
+once, with each run as an occurrence; what a run lacks is listed under Limitations.
+
 ## Rules
 
 - **Read-only for assessments.** No route writes, deletes or starts anything the TUI reads;

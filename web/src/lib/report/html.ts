@@ -4,7 +4,8 @@
 
    Every value is HTML-escaped (tool output and operator text read as text, never markup),
    the document carries no scripts (the dashboard's CSP would block them anyway), and the
-   evidence it shows was masked before it was saved. */
+   evidence it shows was masked before it was saved. The helpers and the stylesheet are
+   exported for the combined report (combined/html.ts), which must look the same. */
 import type { Assessment, Finding } from "@/lib/data/schema";
 
 const SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
@@ -14,6 +15,13 @@ const STATUS_CLASS: Record<string, string> = { open: "open", fixed: "fixed", acc
 const STATUS_LABEL: Record<string, string> = { open: "Open", fixed: "Fixed", accepted: "Accepted", "false-positive": "False+" };
 
 const escapeMap: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#x27;" };
+
+/** `map[key]`, but only the map's own entries (a status named "constructor" is not one). */
+const own = (map: Record<string, string>, key: string, fallback: string) => (Object.hasOwn(map, key) ? map[key] : fallback);
+
+/** The document's own policy, for the downloaded file and the printer's temp copy: no scripts,
+    no requests, only its inline styles and data: images. */
+export const META_CSP = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">`;
 
 /** Escape one line of text, collapsing runs of whitespace (for inline copy). */
 export function esc(value: unknown): string {
@@ -25,34 +33,36 @@ export function esc(value: unknown): string {
 }
 
 /** Escape text but keep its spacing, for evidence shown in a <pre> block. */
-function escPre(value: unknown): string {
+export function escPre(value: unknown): string {
   return String(value ?? "").replace(/[&<>"']/g, (c) => escapeMap[c]);
 }
 
-const shortDate = (iso: string | null | undefined) => (iso ? iso.split("T")[0] : "—");
-const title = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
-const sevRank = (s: string) => {
+export const shortDate = (iso: string | null | undefined) => (iso ? iso.split("T")[0] : "—");
+export const title = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
+export const sevRank = (s: string) => {
   const i = (SEV_ORDER as readonly string[]).indexOf(s.toUpperCase());
   return i < 0 ? SEV_ORDER.length : i;
 };
+/** The CSS class of a severity ("crit", "high", …; unknown ones read as info). */
+export const sevClass = (severity: string) => own(SEV_CLASS, severity.toUpperCase(), "info");
 
-function counts(findings: Finding[]): Record<string, number> {
+function counts(findings: Pick<Finding, "severity">[]): Record<string, number> {
   const out: Record<string, number> = Object.fromEntries(SEV_ORDER.map((s) => [s, 0]));
-  for (const f of findings) if (f.severity in out) out[f.severity] += 1;
+  for (const f of findings) if (Object.hasOwn(out, f.severity)) out[f.severity] += 1;
   return out;
 }
 
-const pill = (severity: string) => `<span class="sev ${SEV_CLASS[severity.toUpperCase()] ?? "info"}">${esc(title(severity))}</span>`;
-const validation = (state: string) =>
-  `<span class="val ${VALIDATION_CLASS[state.toUpperCase()] ?? "inconclusive"}">${esc(title(state))}</span>`;
-const status = (f: Finding) => {
+export const pill = (severity: string) => `<span class="sev ${sevClass(severity)}">${esc(title(severity))}</span>`;
+export const validation = (state: string) =>
+  `<span class="val ${own(VALIDATION_CLASS, state.toUpperCase(), "inconclusive")}">${esc(title(state))}</span>`;
+export const status = (f: Pick<Finding, "status">) => {
   const s = f.status || "open";
-  return `<span class="st ${STATUS_CLASS[s] ?? "open"}">${esc(STATUS_LABEL[s] ?? s)}</span>`;
+  return `<span class="st ${own(STATUS_CLASS, s, "open")}">${esc(own(STATUS_LABEL, s, s))}</span>`;
 };
 const cvss = (f: Finding) => (f.cvss_score ? f.cvss_score.toFixed(1) : "—");
 
 /* --- the fixed stylesheet (identical to the TUI's report) ----------------------------------- */
-const CSS = `
+export const CSS = `
 *{box-sizing:border-box}
 :root{
   --paper:#fff; --ink:#141a24; --ink-soft:#434d5c; --muted:#7c8699; --faint:#a4adbd;
@@ -193,7 +203,7 @@ function masthead(a: Assessment, generated: string): string {
   );
 }
 
-function severityBlock(findings: Finding[]): string {
+export function severityBlock(findings: Pick<Finding, "severity">[]): string {
   const c = counts(findings);
   const total = findings.length || 1;
   const present = SEV_ORDER.filter((s) => c[s]);
@@ -244,7 +254,7 @@ function findingsTable(findings: Finding[]): string {
   );
 }
 
-const chips = (items: string[], cls = "") => items.map((x) => `<span class="chip${cls}">${esc(x)}</span>`).join("");
+export const chips = (items: string[], cls = "") => items.map((x) => `<span class="chip${cls}">${esc(x)}</span>`).join("");
 
 function scopeBlock(a: Assessment): string {
   const s = a.scope;
@@ -262,7 +272,7 @@ function scopeBlock(a: Assessment): string {
 }
 
 function findingCard(f: Finding): string {
-  const cls = SEV_CLASS[f.severity.toUpperCase()] ?? "info";
+  const cls = sevClass(f.severity);
   const mapping = esc([...f.owasp, ...f.cwe, ...f.cve].join(", ") || "—");
   const badge = f.cvss_score ? `<span class="find-cvss">CVSS ${f.cvss_score.toFixed(1)}</span>` : "";
   const vector = f.cvss_vector ? `<div><dt>CVSS vector</dt><dd>${esc(f.cvss_vector)}</dd></div>` : "";
@@ -333,7 +343,7 @@ export function renderReportHtml(a: Assessment, now: Date = new Date()): string 
     `${governance(a)}</section><div class="pfoot"><span>Reconix — Confidential</span><span>${engagement} · End of report</span></div></section>` +
     `</main>`;
   return (
-    `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
+    `<!doctype html>\n<html lang="en"><head><meta charset="utf-8">${META_CSP}<meta name="viewport" content="width=device-width, initial-scale=1">` +
     `<title>Reconix Report — ${engagement}</title><style>${CSS}</style></head><body>${body}</body></html>\n`
   );
 }
