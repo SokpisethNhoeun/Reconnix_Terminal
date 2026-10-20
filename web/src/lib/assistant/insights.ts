@@ -5,6 +5,7 @@ import { hourMinute, shortDay } from "../data/format";
 import type { Severity } from "../data/schema";
 import type { AssessmentView, FindingView } from "../data/view-types";
 import type { RunRef, ScopeRef } from "./protocol";
+import { redact } from "./redact";
 
 export const SEVERITY_ORDER: readonly Severity[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
 const rank = (s: Severity) => SEVERITY_ORDER.indexOf(s);
@@ -14,11 +15,12 @@ export function runRef(v: AssessmentView): RunRef {
   return { uid: v.uid, label: cut(v.id, 120), when: `${shortDay(v.createdMs)} ${hourMinute(v.createdMs)}` };
 }
 
-/** What a conversation about one run (or every run) is about, as its header names it. */
+/** What a conversation about one run (or every run) is about, as its header names it: the
+    whole label (id and date) within the protocol's 120 characters. */
 export function scopeOf(v: AssessmentView | null): ScopeRef {
   if (!v) return { uid: null, label: "All assessments" };
   const ref = runRef(v);
-  return { uid: ref.uid, label: `${ref.label} · ${ref.when}` };
+  return { uid: ref.uid, label: cut(`${ref.label} · ${ref.when}`, 120) };
 }
 
 /** One line of text, cut to `max` characters. */
@@ -29,6 +31,9 @@ export function cut(value: unknown, max: number): string {
     .trim();
   return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
 }
+
+/** Saved free text shown to the operator: masked again (redact.ts) and made one line. */
+export const safe = (value: unknown, max: number) => cut(redact(String(value ?? "")), max);
 
 /** The runs a question is about: one run, or every run (newest first). */
 export function scopedViews(views: AssessmentView[], uid: string | null): AssessmentView[] {
@@ -83,4 +88,6 @@ export function waitingOn(views: AssessmentView[]): { approvals: number; inputs:
   return { approvals, inputs };
 }
 
+// Its own small copy: the dashboard's (components/dashboard/derive.ts) isn't exported, and lib
+// code doesn't import from components.
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

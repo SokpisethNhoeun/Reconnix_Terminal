@@ -9,10 +9,9 @@ import { assessmentView } from "../data/adapt";
 import { clock, parseTime } from "../data/format";
 import type { Assessment } from "../data/schema";
 import type { AssessmentView, FindingView } from "../data/view-types";
-import { cut, type Located, rankFindings, reviewOf, runRef, scopedViews, severityCounts, waitingOn } from "./insights";
+import { cut, type Located, rankFindings, reviewOf, runRef, safe, scopedViews, severityCounts, waitingOn } from "./insights";
 import { findingKey, readIntent } from "./intent";
 import { type Card, type CardOf, CardSchema, type FindingItem, MAX_CARDS } from "./protocol";
-import { redact } from "./redact";
 
 const FINDINGS_SHOWN = 5;
 const RUNS_SHOWN = 8;
@@ -21,8 +20,6 @@ const STEPS_SHOWN = 10;
 const APPROVALS_SHOWN = 6;
 const BLOCKS_SHOWN = 8;
 
-/** Saved free text, masked again and made one line. */
-const safe = (value: unknown, max: number) => cut(redact(String(value ?? "")), max);
 const pct = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
 // --- notices -------------------------------------------------------------------------------

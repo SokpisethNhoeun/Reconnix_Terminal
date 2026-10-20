@@ -183,3 +183,20 @@ describe("welcomePrompts", () => {
     for (const p of welcomePrompts(scopedViews(views, null))) expect(kinds(pickCards(samples, null, p.question))).toContain(want[p.kind]);
   });
 });
+
+describe("saved text in labels", () => {
+  it("keeps a long run id's scope label within 120 characters", async () => {
+    const { scopeOf } = await import("@/lib/assistant/insights");
+    const long = { ...views[0], id: "R".repeat(200) };
+    const scope = scopeOf(long);
+    expect(scope.label.length).toBeLessThanOrEqual(120);
+    expect(scope.label.endsWith("…")).toBe(true);
+  });
+  it("masks and cuts what a run waits on in the welcome suggestion", () => {
+    const leaky = { ...assessmentView(waiting), gate: { time: "—", text: `sign-in with password=hunter2 ${"x".repeat(300)}` } };
+    const prompt = welcomePrompts([leaky]).find((p) => p.kind === "approvals")!;
+    expect(prompt.detail).not.toContain("hunter2");
+    expect(prompt.detail).toContain(MASK);
+    expect(prompt.detail.length).toBeLessThanOrEqual(160);
+  });
+});

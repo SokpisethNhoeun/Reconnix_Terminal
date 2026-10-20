@@ -1,10 +1,10 @@
 /* The welcome screen's suggestions, built on the server from what the runs in scope hold: each
    one names real numbers (no suggestion about findings when there are none, no "what waits on
    me" when nothing waits), and its question is worded so the server shows the matching cards
-   (intent.ts). Pure. */
+   (intent.ts). Saved text in it is masked and cut as on the cards. Pure. */
 import { RUN_STATUS, SEVERITY_META } from "../status";
 import type { AssessmentView } from "../data/view-types";
-import { plural, rankFindings, severityCounts, waitingOn, worstWords } from "./insights";
+import { cut, plural, rankFindings, safe, severityCounts, waitingOn, worstWords } from "./insights";
 
 export type PromptKind = "findings" | "top" | "progress" | "approvals" | "report" | "plan";
 
@@ -32,7 +32,7 @@ export function welcomePrompts(views: AssessmentView[]): WelcomePrompt[] {
     out.push({
       kind: "top",
       title: "Explain the top finding",
-      detail: `${top.finding.id} · ${SEVERITY_META[top.finding.severity].label}${one ? "" : ` · ${top.view.id}`}`,
+      detail: `${cut(top.finding.id, 40)} · ${SEVERITY_META[top.finding.severity].label}${one ? "" : ` · ${cut(top.view.id, 80)}`}`,
       question: "Explain the top finding",
     });
   }
@@ -49,7 +49,7 @@ export function welcomePrompts(views: AssessmentView[]): WelcomePrompt[] {
   }
   const { approvals, inputs } = waitingOn(views);
   if (approvals || inputs.length) {
-    const gate = one?.gate?.text;
+    const gate = one?.gate ? safe(one.gate.text, 160) : null; // masked and cut like the cards
     const runsWaiting = views.filter((v) => v.gate || v.approvals.some((a) => a.state === "PENDING")).length;
     out.push({
       kind: "approvals",
