@@ -2,7 +2,7 @@
 
 /* The assessment's Export ▾ menu: one entry per format, each opening the preview page
    where the file is checked before it is downloaded. */
-import { Braces, ChevronDown, Download, FileCode2, FileText, Globe, type LucideIcon, Table2 } from "lucide-react";
+import { Braces, ChevronDown, Download, FileText, FileType2, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 import { EXPORT_FORMATS, type ExportFormat, previewHref } from "@/lib/report/formats";
@@ -19,10 +19,8 @@ import {
 
 export const FORMAT_ICONS: Record<ExportFormat, LucideIcon> = {
   pdf: FileText,
-  html: Globe,
+  docx: FileType2,
   json: Braces,
-  csv: Table2,
-  sarif: FileCode2,
 };
 
 export function ExportMenu({ uid }: { uid: string }) {

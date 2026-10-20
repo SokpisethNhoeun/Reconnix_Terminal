@@ -2,8 +2,8 @@
    the preview page and the API route all read, so they can never disagree. Pure metadata and
    URL helpers; safe to import from client components. */
 
-export type ExportFormat = "pdf" | "html" | "json" | "csv" | "sarif";
-export type PreviewKind = "frame" | "table" | "code";
+export type ExportFormat = "pdf" | "docx" | "json";
+export type PreviewKind = "frame" | "document" | "code";
 
 export interface ExportSpec {
   id: ExportFormat;
@@ -32,14 +32,14 @@ export const EXPORT_FORMATS: readonly ExportSpec[] = [
     preview: "frame",
   },
   {
-    id: "html",
-    label: "HTML",
-    title: "HTML report",
-    ext: "html",
-    media: "text/html; charset=utf-8",
-    blurb: "The same report as one self-contained web page: open it anywhere, or print it yourself.",
-    contents: "executive summary, findings table, detailed findings, scope, policy & governance",
-    preview: "frame",
+    id: "docx",
+    label: "DOCX",
+    title: "Word document",
+    ext: "docx",
+    media: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    blurb: "The report as an editable Word document: open it in Word, LibreOffice or Google Docs.",
+    contents: "engagement details, executive summary, findings table, detailed findings",
+    preview: "document",
   },
   {
     id: "json",
@@ -49,26 +49,6 @@ export const EXPORT_FORMATS: readonly ExportSpec[] = [
     media: "application/json; charset=utf-8",
     blurb: "The complete saved assessment, exactly as the terminal app wrote it (evidence already masked).",
     contents: "findings, timeline, scope, policy verdicts, approvals, plan",
-    preview: "code",
-  },
-  {
-    id: "csv",
-    label: "CSV",
-    title: "CSV spreadsheet",
-    ext: "csv",
-    media: "text/csv; charset=utf-8",
-    blurb: "Findings as a spreadsheet: one row per finding, for tracking and triage outside Reconix.",
-    contents: "one row per finding: id, severity, CVSS, status, category, location, CWE/OWASP, remediation",
-    preview: "table",
-  },
-  {
-    id: "sarif",
-    label: "SARIF",
-    title: "SARIF 2.1",
-    ext: "sarif",
-    media: "application/sarif+json; charset=utf-8",
-    blurb: "Findings for CI and code-scanning dashboards (SARIF 2.1, one result per finding).",
-    contents: "a Reconix tool run with one rule per weakness and one result per finding",
     preview: "code",
   },
 ];
@@ -88,9 +68,8 @@ export const exportFileName = (uid: string, id: ExportFormat) => `${uid}.${expor
 export const downloadHref = (uid: string, id: ExportFormat) =>
   `/api/assessments/${encodeURIComponent(uid)}/export?format=${id}`;
 
-/** The same file shown in the browser (PDF and HTML only); the PDF hides the viewer toolbar. */
-export const openHref = (uid: string, id: ExportFormat) =>
-  id === "pdf" ? `${downloadHref(uid, id)}&inline=1` : downloadHref(uid, id);
+/** The PDF shown in the browser instead of downloaded (the preview frames it). */
+export const openHref = (uid: string) => `${downloadHref(uid, "pdf")}&inline=1`;
 
 /** The preview page for one format. */
 export const previewHref = (uid: string, id: ExportFormat) =>

@@ -22,8 +22,9 @@ import {
   openHref,
   previewHref,
 } from "@/lib/report/formats";
+import { renderDocx } from "@/lib/report/docx";
 import { chromeBinary } from "@/lib/report/pdf";
-import { renderText } from "@/lib/report/render";
+import { renderJson } from "@/lib/report/render";
 import { param } from "@/lib/utils";
 
 export async function generateMetadata(props: PageProps<"/assessments/[uid]/export">): Promise<Metadata> {
@@ -41,13 +42,14 @@ export default async function ExportPage(props: PageProps<"/assessments/[uid]/ex
   const format = isExportFormat(requested) ? requested : DEFAULT_EXPORT;
   const spec = exportSpec(format);
   const pdfReady = chromeBinary() !== null;
-  const text = format === "pdf" ? null : renderText(format, a);
+  const text = format === "json" ? renderJson(a) : null;
+  const bytes = text !== null ? Buffer.byteLength(text, "utf8") : format === "docx" ? renderDocx(a).length : null;
   const fileName = exportFileName(a.uid, format);
   const canDownload = format !== "pdf" || pdfReady;
   const facts: [string, string][] = [
     ["File", fileName],
     ["Type", spec.media.split(";")[0]],
-    ["Size", text === null ? (pdfReady ? "A4 · made when you download" : "—") : formatBytes(Buffer.byteLength(text, "utf8"))],
+    ["Size", bytes === null ? (pdfReady ? "A4 · made when you download" : "—") : formatBytes(bytes)],
     ["Findings", plural(a.findings.length, "finding")],
   ];
 
@@ -66,7 +68,7 @@ export default async function ExportPage(props: PageProps<"/assessments/[uid]/ex
           />
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {spec.preview === "frame" && canDownload && (
-              <a className={buttonVariants({ size: "sm" })} href={openHref(a.uid, format)} target="_blank" rel="noopener">
+              <a className={buttonVariants({ size: "sm" })} href={openHref(a.uid)} target="_blank" rel="noopener">
                 <ExternalLink aria-hidden />
                 Open in new tab
               </a>

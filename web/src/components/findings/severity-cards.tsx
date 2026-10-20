@@ -1,11 +1,13 @@
-/* The five severity tiles at the top of the Findings page. Each is a toggle: click one to
-   filter to that severity, click the lit one again to clear it. */
+/* The severity tiles at the top of the Findings page, Critical to Low (Info has no tile).
+   Each is a toggle: click one to filter to that severity, click the lit one again to clear it. */
 import Link from "next/link";
 
 import { type Severity, SEVERITIES } from "@/lib/data/schema";
 import { cn } from "@/lib/utils";
 
 import { Dot } from "../neu/chips";
+
+const TILES = SEVERITIES.filter((s) => s !== "INFO");
 
 const LABEL: Record<Severity, string> = {
   CRITICAL: "Critical",
@@ -23,8 +25,8 @@ interface Props {
 
 export function SeverityCards({ counts, current, hrefFor }: Props) {
   return (
-    <section className="grid grid-cols-2 gap-[14px] sm:grid-cols-3 xl:grid-cols-5" aria-label="Filter by severity">
-      {SEVERITIES.map((s) => {
+    <section className="grid grid-cols-2 gap-[14px] xl:grid-cols-4" aria-label="Filter by severity">
+      {TILES.map((s) => {
         const active = current === s;
         return (
           <Link

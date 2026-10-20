@@ -1,16 +1,16 @@
 /* Export one assessment (viewer role), generated from the saved, already-redacted data.
-   `?format=` is one of lib/report/formats.ts (pdf, html, json, csv, sarif); the HTML is
-   served inline, the PDF too with `inline=1` (the preview page frames it), everything else
-   as a download. The PDF needs a headless Chrome on this machine: 501 with a hint otherwise. */
+   `?format=` is one of lib/report/formats.ts (pdf, docx, json); the PDF is served inline with
+   `inline=1` (the preview page frames it), everything else as a download. The PDF needs a headless Chrome on this machine: 501 with a hint otherwise. */
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { COOKIE, hasRole, launchToken, readRole } from "@/lib/auth/session";
 import { loadAssessment } from "@/lib/data/store";
 import { downloadHref, exportFileName, exportSpec, isExportFormat } from "@/lib/report/formats";
+import { renderDocx } from "@/lib/report/docx";
 import { renderReportHtml } from "@/lib/report/html";
 import { renderPdf } from "@/lib/report/pdf";
-import { renderText } from "@/lib/report/render";
+import { renderJson } from "@/lib/report/render";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
@@ -28,7 +28,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ uid: string
   if (!assessment) return NextResponse.json({ detail: "No such assessment." }, { status: 404 });
 
   const spec = exportSpec(format);
-  const inline = format === "html" || (format === "pdf" && url.searchParams.get("inline") === "1");
+  const inline = format === "pdf" && url.searchParams.get("inline") === "1";
   const headers = {
     "Content-Type": spec.media,
     "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${exportFileName(assessment.uid, format)}"`,
@@ -42,13 +42,14 @@ export async function GET(request: Request, ctx: { params: Promise<{ uid: string
         {
           detail:
             "PDF export needs a Chrome/Chromium browser on the dashboard machine (set RECONIX_CHROME). " +
-            "Open the HTML report instead and print it to PDF.",
-          html: downloadHref(assessment.uid, "html"),
+            "Download the Word document instead.",
+          docx: downloadHref(assessment.uid, "docx"),
         },
         { status: 501 },
       );
     }
     return new NextResponse(pdf, { headers });
   }
-  return new NextResponse(renderText(format, assessment), { headers });
+  if (format === "docx") return new NextResponse(new Uint8Array(renderDocx(assessment)), { headers });
+  return new NextResponse(renderJson(assessment), { headers });
 }

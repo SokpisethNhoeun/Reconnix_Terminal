@@ -1,4 +1,4 @@
-/* The PDF or HTML report shown in place, framed from the same-origin export route. */
+/* The PDF report shown in place, framed from the same-origin export route. */
 export function FramePreview({ src, title }: { src: string; title: string }) {
   return (
     <iframe
