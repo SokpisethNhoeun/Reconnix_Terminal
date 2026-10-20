@@ -30,10 +30,28 @@ export function shortDay(ms: number): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
+/** "5 Oct 2026 · 14:03:09": a log line's full time, for its details. */
+export function stamp(ms: number): string {
+  return `${day(ms)} · ${clock(ms)}`;
+}
+
+/** The local calendar day of `ms` as a sortable key ("2026-10-05"). */
+export function dayKey(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 /** "18m 27s" (minutes keep counting past the hour, which the count-up animation parses). */
 export function duration(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
   return `${Math.floor(s / 60)}m ${pad(s % 60)}s`;
+}
+
+/** A long total: "2h 05m", or "18m 27s" under an hour. */
+export function longDuration(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 3600) return duration(s);
+  return `${Math.floor(s / 3600)}h ${pad(Math.floor((s % 3600) / 60))}m`;
 }
 
 /** A scope time limit: "30 min", "2 h", "1 h 30 min". */
