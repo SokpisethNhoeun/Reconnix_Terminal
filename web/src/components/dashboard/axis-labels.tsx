@@ -3,12 +3,15 @@
 import type { Marker } from "@/components/dashboard/overview-types";
 import { cn } from "@/lib/utils";
 
+/** A tick this close to either end is aligned inward, so its label stays inside the chart. */
+const EDGE = 0.02;
+
 export function Axis({ ticks, className }: { ticks: Marker[]; className?: string }) {
   if (!ticks.length) return null;
   return (
     <div aria-hidden className={cn("dash-axis", className)}>
       {ticks.map((t) => (
-        <span key={t.pos} data-edge={t.pos <= 0.02 ? "start" : t.pos >= 0.98 ? "end" : undefined} style={{ left: `${t.pos * 100}%` }}>
+        <span key={t.pos} data-edge={t.pos <= EDGE ? "start" : t.pos >= 1 - EDGE ? "end" : undefined} style={{ left: `${t.pos * 100}%` }}>
           {t.label}
         </span>
       ))}

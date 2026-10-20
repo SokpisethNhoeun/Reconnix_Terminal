@@ -25,7 +25,7 @@ export const EVENT_KIND: Record<LogKind, Meaning> = {
     icon: "blocked",
     hint: "Requests the policy blocked: outside the approved scope, so never sent.",
   },
-  tool: { label: "Tool", tone: "primary", icon: "done", hint: "Tool steps the run executed inside the scope." },
+  tool: { label: "Tool", tone: "primary", icon: "new", hint: "Tool steps the run executed inside the scope." },
   finding: { label: "Finding", tone: "warning", icon: "review", hint: "Candidate findings the AI recorded, to review." },
   gate: {
     label: "Approval gate",
