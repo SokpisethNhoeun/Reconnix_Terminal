@@ -2,9 +2,10 @@
 
 /* The charts' tooltip: shown while a mark is hovered or focused, above it (below when there is
    no room), kept on screen. It repeats the mark's accessible name for sighted users, so it is
-   hidden from screen readers. Fixed to the viewport, so no card or scroller clips it; it hides
-   on Esc, and when anything scrolls or the window resizes. */
-import { useCallback, useEffect, useState } from "react";
+   hidden from screen readers. Fixed to the viewport, so no card or scroller clips it: when
+   anything scrolls or the window resizes it follows its mark (focusing a mark may scroll it into
+   view), and it hides on Esc or once the mark is gone. */
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface Tip {
   x: number;
@@ -17,29 +18,50 @@ export interface Tip {
 const EDGE = 150; // keep the tooltip's centre this far from the window's sides
 const ROOM = 96; // flip below the mark when there is less room than this above it
 
+function place(el: Element, title: string, lines: string[]): Tip {
+  const r = el.getBoundingClientRect();
+  const below = r.top < ROOM;
+  const x = Math.min(Math.max(r.left + r.width / 2, EDGE), window.innerWidth - EDGE);
+  return { x, y: below ? r.bottom : r.top, below, title, lines };
+}
+
 export function useTip() {
   const [tip, setTip] = useState<Tip | null>(null);
+  const anchor = useRef<Element | null>(null);
   const show = useCallback((el: Element, title: string, lines: string[] = []) => {
-    const r = el.getBoundingClientRect();
-    const below = r.top < ROOM;
-    const x = Math.min(Math.max(r.left + r.width / 2, EDGE), window.innerWidth - EDGE);
-    setTip({ x, y: below ? r.bottom : r.top, below, title, lines });
+    anchor.current = el;
+    setTip(place(el, title, lines));
   }, []);
-  const hide = useCallback(() => setTip(null), []);
+  const hide = useCallback(() => {
+    anchor.current = null;
+    setTip(null);
+  }, []);
+  const shown = tip !== null;
   useEffect(() => {
-    if (!tip) return;
+    if (!shown) return;
+    let frame = 0;
+    const follow = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const el = anchor.current;
+        if (!el || !el.isConnected) return hide();
+        setTip((t) => (t ? place(el, t.title, t.lines) : t));
+      });
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") hide();
     };
-    window.addEventListener("scroll", hide, true);
-    window.addEventListener("resize", hide);
+    window.addEventListener("scroll", follow, true);
+    window.addEventListener("resize", follow);
     window.addEventListener("keydown", onKey);
     return () => {
-      window.removeEventListener("scroll", hide, true);
-      window.removeEventListener("resize", hide);
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", follow, true);
+      window.removeEventListener("resize", follow);
       window.removeEventListener("keydown", onKey);
     };
-  }, [tip, hide]);
+  }, [shown, hide]);
   return { tip, show, hide };
 }
 

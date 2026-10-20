@@ -91,6 +91,12 @@ test("with every run shown, a day lists its runs and a run row opens that run", 
   const dialog = page.getByRole("dialog", { name: /runs?$/ });
   await expect(dialog.getByRole("link").first()).toBeVisible();
   await page.keyboard.press("Escape");
+  // a legend entry's meaning is reachable by keyboard, and Esc closes it
+  const entry = page.getByRole("list", { name: /run status/ }).getByRole("button").first();
+  await entry.focus();
+  await expect(page.locator(".dash-tooltip")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".dash-tooltip")).toHaveCount(0);
   const rows = page.getByRole("list", { name: /^The \d+ newest runs?/ }).getByRole("link");
   await expect(rows).toHaveCount(Math.min(8, all.length));
   const target = [...all].sort((x, y) => y.created_at.localeCompare(x.created_at))[1];
