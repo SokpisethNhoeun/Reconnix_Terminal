@@ -42,6 +42,7 @@ test("every run's Scope and Report open a run in the same view", async ({ page }
   await signIn(page);
   const a = newest();
   await page.goto("/?view=scope");
+  await page.waitForLoadState("networkidle"); // hydrated: the links are client-side navigations
   const approvals = sample().reduce((n, x) => n + x.approvals.length, 0);
   await expect(page.getByRole("group", { name: "Scope summary" }).getByRole("region", { name: "Approvals" })).toContainText(String(approvals));
   // the waiting request comes first
@@ -54,6 +55,7 @@ test("every run's Scope and Report open a run in the same view", async ({ page }
   await expect(page.getByRole("region", { name: "Boundary" })).toBeVisible();
 
   await page.goto("/?view=reports");
+  await page.waitForLoadState("networkidle");
   await page.getByRole("link", { name: new RegExp(`^Open the report of ${a.label}`) }).first().click();
   await expect(page).toHaveURL(new RegExp(`uid=${a.uid}`));
   await expect(page).toHaveURL(/view=reports/);
