@@ -25,17 +25,30 @@ function write(params: URLSearchParams): void {
   window.history.replaceState(null, "", query ? `?${query}` : window.location.pathname);
 }
 
-/** Open `view`, keeping the chosen assessment. With `filters`, the view's old filters are
-    replaced by these (a drill-down); without, they stay as they were (back to where you left). */
-export function showView(view: View, filters?: ViewParams): void {
-  const params = new URLSearchParams(window.location.search);
+/** The address after opening `view` from the one `search` holds (pure; showView's rule). The
+    chosen assessment stays. Changing view drops the view left behind's own filters (and the
+    selected finding), so a `page` or `q` never leaks into another view that uses the same key.
+    With `filters`, the opened view's old filters are replaced by these (a drill-down); without,
+    they stay as they were (back to where you left). */
+export function viewSearch(search: string, view: View, filters?: ViewParams): string {
+  const params = new URLSearchParams(search);
+  const from = parseView(params.get("view"));
+  if (from !== view) {
+    for (const key of VIEW_FILTERS[from] ?? []) params.delete(key);
+    params.delete("finding");
+  }
   if (view === "overview") params.delete("view");
   else params.set("view", view);
   if (filters) {
     for (const key of VIEW_FILTERS[view] ?? []) params.delete(key);
     for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value);
   }
-  write(params);
+  return params.toString();
+}
+
+/** Open `view` (viewSearch) in place. */
+export function showView(view: View, filters?: ViewParams): void {
+  write(new URLSearchParams(viewSearch(window.location.search, view, filters)));
 }
 
 /** The current value of some query parameters, and a setter that changes only those. */
@@ -53,18 +66,23 @@ export function useQueryParams<K extends string>(keys: readonly K[]): [Record<K,
   return [values, update];
 }
 
-/** Links that open one saved run (`uid`), or every run (`null`), keeping the open view and its
-    filters but not the selected finding (it belongs to the run left behind). */
+/** The link that opens one saved run (`uid`), or every run (`null`), from the address `search`
+    (pure): the open view and its filters stay, but not the selected finding or the page (they
+    belong to the run left behind: another run has other findings and fewer or more pages). */
+export function runHref(search: string, uid: string | null): string {
+  const next = new URLSearchParams(search);
+  if (uid) next.set("uid", uid);
+  else next.delete("uid");
+  next.delete("finding");
+  next.delete("page");
+  const query = next.toString();
+  return query ? `/?${query}` : "/";
+}
+
+/** runHref from the current address. */
 export function useRunHref(): (uid: string | null) => string {
   const search = useSearchParams();
-  return (uid) => {
-    const next = new URLSearchParams(search.toString());
-    if (uid) next.set("uid", uid);
-    else next.delete("uid");
-    next.delete("finding");
-    const query = next.toString();
-    return query ? `/?${query}` : "/";
-  };
+  return (uid) => runHref(search.toString(), uid);
 }
 
 // --- the AI Assistant's history entry ----------------------------------------------------

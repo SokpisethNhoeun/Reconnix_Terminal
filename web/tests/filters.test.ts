@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { deriveDashboard } from "@/components/dashboard/derive";
-import { countBy, findingMatches, list, reviewLabel, runMatches, sortFindings, validationOf } from "@/components/dashboard/filters";
+import { SEVERITY_ORDER, countBy, findingMatches, list, reviewLabel, runMatches, sortFindings, validationOf } from "@/components/dashboard/filters";
 import { assessmentView, libraryItem } from "@/lib/data/adapt";
 
 import { sampleAssessments } from "./fixtures";
@@ -40,6 +40,18 @@ describe("findingMatches", () => {
     expect(reviewLabel({ ...open, needsReview: false, confirmed: false, falsePositive: true, status: "false-positive" })).toBe("False positive");
     expect(reviewLabel({ ...open, needsReview: false, confirmed: true })).toBe("Confirmed");
   });
+  it("never reads a closed reason off Object's own names", () => {
+    const open = findings.find((f) => f.needsReview)!;
+    for (const status of ["constructor", "toString", "__proto__", "hasOwnProperty", "unknown-status"]) {
+      expect(reviewLabel({ ...open, needsReview: false, confirmed: false, status })).toBe("Closed");
+    }
+  });
+  it("searches the run's label and the references too", () => {
+    const withRun = { ...findings[0], run: { uid: "run-1", label: "RCX-DEMO-009 · 1 Jan 00:00" }, references: ["OWASP A07:2021", "CWE-798"] };
+    expect(findingMatches(withRun, { ...none, q: "demo-009" })).toBe(true);
+    expect(findingMatches(withRun, { ...none, q: "a07:2021" })).toBe(true);
+    expect(findingMatches({ ...withRun, run: null, references: [] }, { ...none, q: "demo-009" })).toBe(false);
+  });
   it("buckets every finding once", () => {
     expect(findings.every((f) => ["confirmed", "review", "closed"].includes(validationOf(f)))).toBe(true);
   });
@@ -61,6 +73,12 @@ describe("helpers", () => {
   it("list() splits an address value and drops blanks", () => {
     expect(list("HIGH,,LOW, ")).toEqual(["HIGH", "LOW"]);
     expect(list("")).toEqual([]);
+  });
+  it("countBy() counts every finding once by severity, in the severity order", () => {
+    const counts = countBy(findings, (f) => f.severity, SEVERITY_ORDER);
+    expect(counts.map((c) => c.value)).toEqual([...SEVERITY_ORDER]);
+    expect(counts.reduce((n, c) => n + c.count, 0)).toBe(findings.length);
+    expect(countBy([], (x: string) => x, ["a"])).toEqual([{ value: "a", count: 0 }]);
   });
   it("countBy() keeps the given order and adds unknown buckets after it", () => {
     expect(countBy(["b", "a", "b", "z"], (x) => x, ["a", "b", "c"])).toEqual([
