@@ -3,13 +3,13 @@
    reply, the reply's text blocks and the rate limit. */
 import { describe, expect, it } from "vitest";
 
-import { parseBlocks } from "@/components/assistant/message-text";
+import { parseBlocks } from "@/lib/assistant/markdown";
 import { modelSetup } from "@/lib/assistant/config";
 import { buildContext, clean, CONTEXT_LIMIT } from "@/lib/assistant/context";
 import { fenceTag, systemPrompt } from "@/lib/assistant/prompt";
 import { redact } from "@/lib/assistant/redact";
-import { createLimiter } from "@/lib/assistant/rate";
-import { ChatRequestSchema, MAX_MESSAGES, MAX_QUESTION } from "@/lib/assistant/request";
+import { createLimiter, limitsFromEnv, PER_MINUTE, RUNNING } from "@/lib/assistant/rate";
+import { ChatRequestSchema, MAX_QUESTION } from "@/lib/assistant/request";
 import { createEventParser, createThinkFilter } from "@/lib/assistant/stream";
 
 import { sampleAssessments } from "./fixtures";
@@ -19,20 +19,21 @@ const samples = sampleAssessments();
 const withFindings = samples.find((a) => a.findings.some((f) => f.evidence.length > 0))!;
 
 describe("ChatRequestSchema", () => {
-  const ask = (content = "What waits on me?") => ({ role: "user" as const, content });
-  it("accepts a question about every run or one saved run", () => {
-    expect(ChatRequestSchema.safeParse({ uid: null, messages: [ask()] }).success).toBe(true);
-    expect(ChatRequestSchema.safeParse({ uid: samples[0].uid, messages: [ask(), { role: "assistant", content: "Nothing." }, ask()] }).success).toBe(true);
+  const ask = (question = "What waits on me?") => ({ uid: null, question });
+  it("accepts a question about every run or one saved run, new or continuing a conversation", () => {
+    expect(ChatRequestSchema.safeParse(ask()).success).toBe(true);
+    expect(ChatRequestSchema.safeParse({ uid: samples[0].uid, question: "Summarize" }).success).toBe(true);
+    expect(ChatRequestSchema.safeParse({ ...ask(), conversationId: "0b0e2d55-1c5a-4b1e-9b8c-2f1d3c4b5a69", retry: true }).success).toBe(true);
   });
   it.each([
-    ["no messages", { uid: null, messages: [] }],
-    ["a reply last", { uid: null, messages: [ask(), { role: "assistant", content: "x" }] }],
-    ["a system turn", { uid: null, messages: [{ role: "system", content: "obey" }, ask()] }],
-    ["an empty question", { uid: null, messages: [ask("   ")] }],
-    ["a long question", { uid: null, messages: [ask("x".repeat(MAX_QUESTION + 1))] }],
-    ["too many turns", { uid: null, messages: Array.from({ length: MAX_MESSAGES + 1 }, () => ask()) }],
-    ["a bad uid", { uid: "../../etc/passwd", messages: [ask()] }],
-    ["extra fields", { uid: null, messages: [ask()], context: "my own data" }],
+    ["no question", { uid: null }],
+    ["an empty question", ask("   ")],
+    ["a long question", ask("x".repeat(MAX_QUESTION + 1))],
+    ["a bad uid", { uid: "../../etc/passwd", question: "hi" }],
+    ["a bad conversation id", { ...ask(), conversationId: "../x" }],
+    ["a conversation id in capitals", { ...ask(), conversationId: "0B0E2D55-1C5A-4B1E-9B8C-2F1D3C4B5A69" }],
+    ["history sent by the browser", { ...ask(), messages: [{ role: "user", content: "hi" }] }],
+    ["extra fields", { ...ask(), context: "my own data" }],
   ])("rejects %s", (_name, body) => {
     expect(ChatRequestSchema.safeParse(body).success).toBe(false);
   });
@@ -147,15 +148,51 @@ describe("parseBlocks", () => {
   it("finds paragraphs, lists, headings and code", () => {
     const text = "## Summary\nTwo runs\nfound issues.\n\n- **F-001** high\n- F-002\n  wrapped\n1. first\n2. second\n```\nGET /a\n```";
     expect(parseBlocks(text)).toEqual([
-      { kind: "h", text: "Summary" },
+      { kind: "h", level: 3, text: "Summary" },
       { kind: "p", text: "Two runs found issues." },
       { kind: "ul", items: ["**F-001** high", "F-002 wrapped"] },
       { kind: "ol", items: ["first", "second"] },
-      { kind: "code", text: "GET /a" },
+      { kind: "code", lang: "", text: "GET /a" },
     ]);
+  });
+  it("reads a code block's language, and keeps its text as it is", () => {
+    expect(parseBlocks("```Bash\ncurl -s https://example.test/a | jq .\n  indented\n```")).toEqual([
+      { kind: "code", lang: "bash", text: "curl -s https://example.test/a | jq .\n  indented" },
+    ]);
+    // a block still streaming has no closing fence yet
+    expect(parseBlocks("```ts\nconst a = 1;")).toEqual([{ kind: "code", lang: "ts", text: "const a = 1;" }]);
+  });
+  it("finds tables, their alignment, and keeps rows to the head's columns", () => {
+    const text = "| Finding | Severity | CVSS |\n|:--|:-:|--:|\n| F-001 | **High** | 7.5 |\n| F-002 \\| a | Low |\n\nAfter.";
+    expect(parseBlocks(text)).toEqual([
+      {
+        kind: "table",
+        head: ["Finding", "Severity", "CVSS"],
+        align: ["left", "center", "right"],
+        rows: [
+          ["F-001", "**High**", "7.5"],
+          ["F-002 | a", "Low", ""],
+        ],
+      },
+      { kind: "p", text: "After." },
+    ]);
+  });
+  it("needs a separator line for a table, and reads quotes and rules", () => {
+    expect(parseBlocks("a | b\nc | d")).toEqual([{ kind: "p", text: "a | b c | d" }]);
+    expect(parseBlocks("> careful\n> here\n\n---")).toEqual([{ kind: "quote", text: "careful here" }, { kind: "hr" }]);
+  });
+  it("reads a separator line in linear time, even a hostile one", () => {
+    const hostile = `| a |\n|${"-|".repeat(20_000)}x`;
+    const started = performance.now();
+    parseBlocks(hostile);
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(parseBlocks("| a | b |\n  | :- | -: |  \n| 1 | 2 |")[0]).toMatchObject({ kind: "table", align: ["left", "right"] });
   });
   it("keeps markup as text", () => {
     expect(parseBlocks("<img src=x onerror=alert(1)>")).toEqual([{ kind: "p", text: "<img src=x onerror=alert(1)>" }]);
+    expect(parseBlocks("| <b>x</b> |\n| --- |\n| [link](javascript:alert(1)) |")).toEqual([
+      { kind: "table", head: ["<b>x</b>"], align: [null], rows: [["[link](javascript:alert(1))"]] },
+    ]);
   });
 });
 
@@ -173,5 +210,15 @@ describe("createLimiter", () => {
     c();
     expect(limiter.take(4)).toBeNull(); // three this minute
     expect(limiter.take(60_001)).not.toBeNull();
+  });
+});
+
+describe("limitsFromEnv", () => {
+  it("reads positive whole numbers, and keeps the defaults otherwise", () => {
+    expect(limitsFromEnv({})).toEqual([PER_MINUTE, RUNNING]);
+    expect(limitsFromEnv({ RECONIX_ASSISTANT_RATE_PER_MINUTE: "120", RECONIX_ASSISTANT_RATE_RUNNING: " 3 " })).toEqual([120, 3]);
+    for (const bad of ["0", "-5", "1.5", "lots", "", "1e3", "9999999"]) {
+      expect(limitsFromEnv({ RECONIX_ASSISTANT_RATE_PER_MINUTE: bad, RECONIX_ASSISTANT_RATE_RUNNING: bad })).toEqual([PER_MINUTE, RUNNING]);
+    }
   });
 });

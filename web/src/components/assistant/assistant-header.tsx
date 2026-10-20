@@ -1,0 +1,54 @@
+"use client";
+
+/* The assistant's header: its name, what the open conversation is about (a run, or every run)
+   with that scope's status, the model that answers (local or remote), History, New chat and
+   minimize (back to the dashboard). */
+import { Crosshair, Minimize2, SquarePen } from "lucide-react";
+import { IconButton } from "@/components/ui/icon-button";
+import { AssistantOrb } from "./assistant-orb";
+import { useAssistant } from "./assistant-provider";
+import { ConversationMenu } from "./conversation-menu";
+import { ScopeBadge } from "./scope-badge";
+
+export function AssistantHeader({ onMinimize }: { onMinimize: () => void }) {
+  const { info, conversation, messages, newChat, busy } = useAssistant();
+  const { model } = info;
+  const empty = !conversation.id && messages.length === 0;
+  const modelTitle = model.configured
+    ? model.local
+      ? `${model.name}: a local endpoint (LLM_BASE_URL on this machine)`
+      : `${model.name}: a remote model. Questions and the assessment data they need are sent to it.`
+    : model.reason;
+
+  return (
+    <header data-assistant-piece className="ai-header">
+      <div className="ai-brand">
+        <AssistantOrb size={26} className="shrink-0" />
+        <h1 className="ai-title">Reconix AI Assistant</h1>
+      </div>
+      <span className="ai-divider" aria-hidden />
+      <div className="ai-context" title={`${conversation.id ? "This conversation is" : "A new conversation will be"} about ${conversation.scope.label}`}>
+        <Crosshair className="size-3.5 shrink-0" aria-hidden />
+        <span className="sr-only">About</span>
+        <span className="ai-context-label">{conversation.scope.label}</span>
+        <ScopeBadge scope={conversation.scope} runs={info.runs} />
+      </div>
+      <div className="ai-tools">
+        <span className="hidden md:inline-flex">
+          <span className="ai-chip" title={modelTitle}>
+            <span className="ai-dot" data-tone={model.configured ? "success" : "warning"} aria-hidden />
+            <span>{model.configured ? `${model.name} · ${model.local ? "local" : "remote"}` : "No model set up"}</span>
+          </span>
+        </span>
+        <ConversationMenu />
+        <button type="button" onClick={newChat} disabled={empty && !busy} className="ai-btn" title={empty ? "This is a new chat already" : "Start a new chat (this one stays in History)"}>
+          <SquarePen className="size-4" aria-hidden />
+          <span className="ai-btn-label">New chat</span>
+        </button>
+        <IconButton label="Back to the dashboard" onClick={onMinimize}>
+          <Minimize2 aria-hidden />
+        </IconButton>
+      </div>
+    </header>
+  );
+}

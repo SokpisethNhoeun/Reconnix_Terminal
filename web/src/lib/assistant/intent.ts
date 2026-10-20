@@ -1,0 +1,66 @@
+/* What a question asks for, read from its words with fixed rules (no model): the server picks
+   the reply's cards from this (cards.ts), so the same question always gets the same verified
+   cards. Pure. */
+
+export type Intent =
+  | "plan" // plan or start a new assessment: guidance only (planning happens in the TUI)
+  | "run" // run a scan or a tool: nothing runs from the dashboard
+  | "act" // approve or reject: only ever in the TUI
+  | "top" // the finding to fix first
+  | "findings"
+  | "approvals"
+  | "progress"
+  | "tools"
+  | "policy"
+  | "report";
+
+export interface Asked {
+  intents: Intent[];
+  findingIds: string[]; // finding ids named in the question, as findingKey() spells them
+}
+
+// planning: a planning verb right before its object ("plan a security assessment", "start a
+// scan"), or new/another right before the noun ("a new assessment"). Never "new" alone, so
+// "which findings are new in this assessment?" is about findings.
+const KINDS = "(?:security |web |api |network |source code )?";
+const NOUN = "(?:assessments?|pentests?|penetration tests?|security tests?|engagements?|scans?|tests?|runs?)";
+const PLAN = new RegExp(
+  `\\b(?:plan|design|prepare|set ?up|create|start|begin|launch|kick ?off|schedule)\\s+(?:an? |the |my )?(?:(?:new|another|fresh|next) )?${KINDS}${NOUN}\\b|\\b(?:new|another) ${KINDS}${NOUN}\\b`,
+);
+// running something: a run verb with a named tool or attack, or "scan <target>". Not "do", not
+// "tools" alone, so "how do I see which tools were used?" is about tools.
+const RUN = /\b(run|execute|launch|start|perform|trigger|fire|re-?run)\b[^.?!\n]{0,30}\b(scans?|nmap|sqlmap|nikto|nuclei|ffuf|exploits?|attacks?|payloads?|brute.?force)\b|\bscan\s+(https?:\/\/|[a-z0-9-]+\.[a-z]{2,})/;
+const ACT = /\b(approve|reject|deny|authori[sz]e|sign off on|grant)\b/;
+const TOP = /\b(top|worst|most (severe|critical|serious|important|dangerous|urgent)|highest|biggest|riskiest|first to fix|fix first|prioriti[sz]e)\b/;
+const FINDINGS = /\bfindings?\b|\bvuln|\bweakness|\bissues?\b|\brisks?\b|\bseverit|\bcritical\b|\bcvss\b|\bcwe\b|\bowasp\b|\bcve\b|\bexploitable\b|\banaly[sz]|\bwhat did (it|you|reconix) find\b|\bfound\b|\bsummar|\boverview\b/;
+const APPROVALS = /\bapprov|\bwait(s|ing)? (on|for)\b|\bpending\b|\bdecid|\bdecision|\bgates?\b|\bon hold\b|\bneeds? (me|my|you)\b/;
+const PROGRESS = /\bprogress\b|\bstatus\b|\bphases?\b|\bsteps?\b|\bhow far\b|\bremaining\b|\bleft to do\b|\bcomplet|\bfinish(ed)?\b|\bexecution\b|\bplan\b|\bstages?\b|\bsummar|\boverview\b|\bwhat happened\b/;
+const TOOLS = /\btools?\b|\bnmap\b|\bsqlmap\b|\bnikto\b|\bnuclei\b|\bffuf\b|\bscanners?\b|\bwhat ran\b|\bexecuted\b|\bcommands?\b|\brequests? sent\b|\bactivity\b/;
+const POLICY = /\bpolic|\bblock(ed|s)?\b(?! on)|\bout of scope\b|\boutside (the )?scope\b|\brefus|\bdenied\b|\bforbidden\b|\bguardrails?\b|\bscope (checks?|violations?)\b/;
+const REPORT = /\breports?\b|\bexport|\bdownload|\bpdf\b|\bsarif\b|\bcsv\b|\bhtml\b|\bjson\b|\bdeliverable/;
+// "F-003", "f-3", "IMP-002"; not the "DEMO-001" inside "RCX-DEMO-001"
+const FINDING_ID = /(?<![\w-])([a-z]{1,4})-(\d{1,4})\b/gi;
+
+/** A finding id in one spelling: "F-003" and "f-3" are both "F-3". */
+export const findingKey = (id: string) => id.toUpperCase().replace(/^([A-Z]{1,4})-0*(\d)/, "$1-$2");
+
+export function readIntent(question: string): Asked {
+  const q = question.toLowerCase();
+  const intents: Intent[] = [];
+  const add = (i: Intent) => {
+    if (!intents.includes(i)) intents.push(i);
+  };
+  const planning = PLAN.test(q) && !/\b(progress|status)\b/.test(q);
+  if (planning) add("plan");
+  if (!planning && RUN.test(q)) add("run");
+  if (ACT.test(q)) add("act");
+  if (TOP.test(q)) add("top");
+  if (FINDINGS.test(q)) add("findings");
+  if (APPROVALS.test(q) || ACT.test(q)) add("approvals");
+  if (PROGRESS.test(q) && !(planning && !/\bprogress\b/.test(q))) add("progress");
+  if (TOOLS.test(q) && !RUN.test(q)) add("tools");
+  if (POLICY.test(q)) add("policy");
+  if (REPORT.test(q)) add("report");
+  const findingIds = [...new Set([...question.matchAll(FINDING_ID)].map((m) => findingKey(`${m[1]}-${m[2]}`)))].slice(0, 3);
+  return { intents, findingIds };
+}
