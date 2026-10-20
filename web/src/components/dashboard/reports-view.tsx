@@ -7,7 +7,7 @@ import { RUN_STATUS, SEVERITY_META } from "@/lib/status";
 
 function Meta({ k, v }: { k: string; v: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex min-w-0 flex-col gap-0.5">
       <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{k}</dt>
       <dd className="font-mono text-[13px] text-foreground [overflow-wrap:anywhere]">{v}</dd>
     </div>
