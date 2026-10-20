@@ -1,47 +1,79 @@
-/* The dashboard ↔ assistant transition, as GSAP timelines (the intro uses GSAP too). Open: the
-   top bar goes up, the left card left, the right column right, the bottom row down, all fading,
-   while the surface grows from the hero's box (globe + Ask bar) to the whole stage and the
-   assistant's pieces fade up as it settles. Close is the same in reverse. Every tween goes *to*
-   a value, so a timeline started mid-way carries on from where things are. Adjust the feel here. */
+/* The dashboard ↔ assistant transition, as GSAP timelines (the intro uses GSAP too).
+
+   Open (≈1.6 s, plan §3): the hero text fades, the top bar goes up, the summary strip up, the
+   right column right, the bottom row down (all fading), while the surface grows from the hero's
+   box (globe + Ask bar) to the whole stage beside the sidebar and the globe is carried from the
+   hero to sit behind the welcome; the assistant's pieces then fade in and rise. Close (≈1.4 s) is
+   the same in reverse. The phases overlap, so the motion is continuous rather than delayed.
+
+   Every tween goes *to* a value, so a timeline started mid-way (a click during a transition)
+   carries on from wherever things are. Every value lives in MOTION; adjust the feel there. */
 import { gsap } from "gsap";
 
+const LEAVE = "power2.inOut"; // parts leaving
+const ARRIVE = "power2.out"; // parts arriving
+// the surface and the globe: the expo family's shape (a slow start, a long settle) with a lower
+// peak speed than expo.inOut itself (≈18 px a frame instead of ≈32 on the right edge at 1920)
+const GROW = "power4.inOut";
+
 export const MOTION = {
-  ease: "power3.inOut",
-  travel: 96, // px the side panels move as they leave
-  groupDuration: 0.48,
-  stagger: 0.045, // between top, left, right and bottom
-  surfaceAt: 0.04,
-  surfaceDuration: 0.62,
-  piecesAt: 0.42, // header, messages, composer
-  pieceStagger: 0.05,
-  pieceDuration: 0.28, // open ≈ 0.42 + 2 × 0.05 + 0.28 = 0.8 s
-  closeDuration: 0.58,
-  fade: 0.24, // the plain fade (no dashboard to grow from, phones)
-  fadeReduced: 0.12, // reduced motion: a short fade only
+  // ---- open: seconds from the click ----
+  open: {
+    heroFade: { at: 0, duration: 0.3 }, // the hero title and the Ask bar fade where they are
+    topbar: { at: 0, duration: 0.85 }, // up by its own height
+    top: { at: 0.06, duration: 0.85, travel: 48 }, // the summary strip, up
+    right: { at: 0.12, duration: 0.85, travel: 140 }, // Findings by Severity
+    bottom: { at: 0.18, duration: 0.85, travel: 140 }, // the timelines
+    leave: LEAVE,
+    surface: { at: 0.15, duration: 1.3, ease: GROW }, // hero box → the stage (ends 1.45)
+    fill: { at: 0.25, duration: 0.8 }, // the stage background comes in (to MOTION.fillOpacity)
+    card: { at: 0.3, duration: 0.85 }, // the chat panel's frame
+    // hero → behind the welcome; it leaves the hero once the hero's glass cards have faded
+    // (heroFade), so lifting it above them into the stage never shows (ends 1.45)
+    globe: { at: 0.3, duration: 1.15, ease: GROW },
+    halo: { at: 0.6, duration: 0.85 }, // its teal glow
+    pieces: { at: 1.05, duration: 0.41, stagger: 0.07, rise: 12, ease: ARRIVE }, // ends 1.6
+  },
+  // ---- close: the reverse, ≈1.4 s ----
+  close: {
+    pieces: { at: 0, duration: 0.26, stagger: 0.04, sink: 8, ease: LEAVE },
+    surface: { at: 0.08, duration: 0.92, ease: GROW }, // back onto the hero box (ends 1.0)
+    card: { at: 0.28, duration: 0.62 },
+    fill: { at: 0.35, duration: 0.63 }, // gone by 0.98, before the globe drops back under it
+    globe: { at: 0.08, duration: 0.92, ease: GROW }, // home by 1.0, before the hero text returns
+    halo: { at: 0, duration: 0.45 },
+    bottom: { at: 0.4, duration: 0.85 },
+    right: { at: 0.45, duration: 0.85 },
+    top: { at: 0.5, duration: 0.85 },
+    topbar: { at: 0.55, duration: 0.85 }, // ends 1.4
+    heroFade: { at: 1.02, duration: 0.38 },
+    arrive: ARRIVE,
+  },
+  radius: 16, // the surface's corners while it is the hero's size (0 when it fills the stage)
+  fillOpacity: 1, // the stage background once the assistant is open, however it opened
+  // ---- the globe behind the assistant ----
+  globeOpacity: 0.18, // on the welcome screen (keep within 0.10–0.30: the text stays readable)
+  globeFit: 1, // its height as a share of the welcome's globe slot (the slot's smaller side)
+  globeCentered: 0.56, // no slot: its height as a share of the stage's smaller side, centred
+  globeFade: 0.6, // fading out when the conversation starts, back on New chat
+  globeShift: 0.35, // s: moving to a new spot while it shows (the welcome reflowed)
+  haloSize: 1.5, // its teal halo, as a share of the globe's height
+  // its round mask in the stage (motion.css), in % of the canvas's half height: none at the
+  // hero, closing in as it travels, so the canvas's edges never show over the chat
+  globeMask: { hero: 300, stage: 100 },
+  // ---- plain crossfade (no hero to grow from, phones and tablets, reduced motion) ----
+  fade: { duration: 0.3, rise: 8 },
+  fadeReduced: { duration: 0.22, rise: 0 },
+  // ---- breathing (breath.ts and motion.css; the cycle is BREATH_MS) ----
+  // (the loops' ranges are motion.css's keyframes: icon 1 ↔ 1.10, globe 0.98 ↔ 1.02, panel
+  // 1 ↔ 1.003 with its glow 0.35 ↔ 0.75)
+  breath: {
+    lead: 1500, // ms: the first swell, from rest to the page clock's next peak, lasts at least this
+    settle: 0.45, // s: back to rest when the assistant closes
+  },
 } as const;
 
 export type Box = { left: number; top: number; width: number; height: number };
-
-export interface Parts {
-  topbar: HTMLElement | null;
-  left: HTMLElement | null;
-  right: HTMLElement | null;
-  bottom: HTMLElement | null;
-  hero: HTMLElement[]; // the title and the Ask bar: they fade where they are
-  globe: HTMLElement | null;
-}
-
-export function findParts(frame: HTMLElement): Parts {
-  const one = (s: string) => frame.querySelector<HTMLElement>(s);
-  return {
-    topbar: one(".dash-topbar"),
-    left: one(".dash-timeline-card"),
-    right: one(".dash-right"),
-    bottom: one(".dash-bottom"),
-    hero: [one(".dash-hero-title"), one(".dash-askbar")].filter((e): e is HTMLElement => e !== null),
-    globe: one(".dash-globe-wrap"),
-  };
-}
 
 /** `el`'s box relative to `stage`, or null when it isn't laid out (hidden). */
 export function boxIn(el: Element | null, stage: HTMLElement): Box | null {
@@ -52,81 +84,209 @@ export function boxIn(el: Element | null, stage: HTMLElement): Box | null {
   return { left: r.left - s.left, top: r.top - s.top, width: r.width, height: r.height };
 }
 
-const all = (p: Parts) => [p.topbar, p.left, p.right, p.bottom, p.globe, ...p.hero].filter((e): e is HTMLElement => e !== null);
+// --- the dashboard's parts ----------------------------------------------------------------
 
-/** The dashboard parts where the open animation leaves them. */
+export interface Parts {
+  topbar: HTMLElement | null; // the frame's top bar
+  top: HTMLElement[]; // the summary strip
+  right: HTMLElement[]; // Findings by Severity
+  bottom: HTMLElement[]; // the timelines row
+  hero: HTMLElement | null; // the globe + Ask bar box the surface grows from
+  fade: HTMLElement[]; // the hero's title and the Ask bar: they only fade
+}
+
+/** The Overview's groups by their `data-motion` attribute only (phase 0 contract 2: the
+    dashboard marks top, hero, fade, right and bottom), and the top bar: the frame's own <header>
+    (TopBar, which the Viewer renders as a child of the frame). */
+export function findParts(frame: HTMLElement): Parts {
+  const root = frame.querySelector<HTMLElement>('[data-view-pane="overview"]') ?? frame;
+  const pick = (motion: string) => [...root.querySelectorAll<HTMLElement>(`[data-motion="${motion}"]`)];
+  return {
+    topbar: frame.querySelector<HTMLElement>(":scope > header"),
+    top: pick("top"),
+    right: pick("right"),
+    bottom: pick("bottom"),
+    hero: pick("hero")[0] ?? null,
+    fade: pick("fade"),
+  };
+}
+
+const moving = (p: Parts) => [p.topbar, ...p.top, ...p.right, ...p.bottom, ...p.fade].filter((e): e is HTMLElement => e !== null);
+
+/** The parts where the open animation leaves them: gone, and out of the way. */
 export function setPartsOut(p: Parts): void {
-  const t = MOTION.travel;
-  if (p.topbar) gsap.set(p.topbar, { yPercent: -110, opacity: 0 });
-  if (p.left) gsap.set(p.left, { x: -t, opacity: 0 });
-  if (p.right) gsap.set(p.right, { x: t, opacity: 0 });
-  if (p.bottom) gsap.set(p.bottom, { y: t, opacity: 0 });
-  if (p.globe) gsap.set(p.globe, { scale: 0.86, opacity: 0 });
-  gsap.set(p.hero, { opacity: 0 });
+  const o = MOTION.open;
+  const out = { overwrite: "auto" as const }; // the intro may still be bringing some in
+  if (p.topbar) gsap.set(p.topbar, { yPercent: -100, autoAlpha: 0, ...out });
+  if (p.top.length) gsap.set(p.top, { y: -o.top.travel, autoAlpha: 0, ...out });
+  if (p.right.length) gsap.set(p.right, { x: o.right.travel, autoAlpha: 0, ...out });
+  if (p.bottom.length) gsap.set(p.bottom, { y: o.bottom.travel, autoAlpha: 0, ...out });
+  if (p.fade.length) gsap.set(p.fade, { autoAlpha: 0, ...out });
 }
 
+/** The parts back to their own styles: no inline transform or opacity, and visibility
+    "inherit", as the intro leaves them (dashboard.css hides cards until the intro shows them). */
 export function clearParts(p: Parts): void {
-  gsap.set(all(p), { clearProps: "transform,opacity" });
+  const els = moving(p);
+  gsap.killTweensOf(els);
+  gsap.set(els, { clearProps: "transform,opacity" });
+  gsap.set(els, { visibility: "inherit" });
 }
+
+// --- the assistant's layers -----------------------------------------------------------------
 
 export interface Layers {
-  surface: HTMLElement;
+  surface: HTMLElement; // the growing box: fill + card
   fill: HTMLElement;
-  panel: HTMLElement;
-  pieces: HTMLElement[];
+  card: HTMLElement;
+  globe: HTMLElement; // the layer the globe is carried into
+  halo: HTMLElement; // the globe's teal glow there
+  front: HTMLElement; // the chat itself, always full size
+  pieces: HTMLElement[]; // header, conversation, composer ([data-assistant-piece])
 }
 
-/** Open: the dashboard leaves and the surface grows from `from` to `to`. */
-export function openTimeline(p: Parts, l: Layers, from: Box | null, to: Box, fresh: boolean, onComplete: () => void): gsap.core.Timeline {
-  const m = MOTION;
-  if (fresh) {
-    gsap.set(l.surface, { ...(from ?? to), borderRadius: 16 });
-    gsap.set(l.fill, { opacity: 0 });
-    gsap.set(l.panel, { opacity: 0 });
-    gsap.set(l.pieces, { opacity: 0, y: 14 });
+/** Where the carried globe goes: a transform of its carrier, and how visible it ends up. */
+export interface GlobeAim {
+  carrier: HTMLElement;
+  x: number;
+  y: number;
+  scale: number;
+  opacity: number;
+  mask: number; // MOTION.globeMask.*
+  before?: () => void; // as it starts moving (carry it into the stage)
+  after?: () => void; // once it has landed (hand it back to the hero)
+  onUpdate?: () => void; // every frame it moves (keep its dots' apparent size)
+}
+
+export const surfaceBox = (b: Box, radius: number) => ({
+  left: b.left,
+  top: b.top,
+  width: b.width,
+  height: b.height,
+  borderRadius: radius,
+});
+
+/** The carried globe's tween to `g` (open or close). */
+const globeTo = (g: GlobeAim, t: { duration: number; ease: string }) => ({
+  x: g.x,
+  y: g.y,
+  scale: g.scale,
+  opacity: g.opacity,
+  "--globe-mask": `${g.mask}%`,
+  duration: t.duration,
+  ease: t.ease,
+  onUpdate: g.onUpdate,
+});
+
+/** Open: the dashboard leaves and the surface grows from `from` (the hero's box) to `to`. */
+export function openTimeline(o: {
+  parts: Parts;
+  layers: Layers;
+  from: Box;
+  to: Box;
+  fresh: boolean; // false: carry on from a close that was interrupted
+  globe: GlobeAim | null;
+  onComplete: () => void;
+}): gsap.core.Timeline {
+  const m = MOTION.open;
+  const { parts: p, layers: l } = o;
+  if (o.fresh) {
+    gsap.set(l.surface, surfaceBox(o.from, MOTION.radius));
+    gsap.set([l.fill, l.card, l.front, l.halo], { opacity: 0 });
+    gsap.set(l.pieces, { opacity: 0, y: m.pieces.rise });
   }
-  const tl = gsap.timeline({ defaults: { ease: m.ease }, onComplete });
-  if (p.topbar) tl.to(p.topbar, { yPercent: -110, opacity: 0, duration: m.groupDuration }, 0);
-  if (p.left) tl.to(p.left, { x: -m.travel, opacity: 0, duration: m.groupDuration }, m.stagger);
-  if (p.right) tl.to(p.right, { x: m.travel, opacity: 0, duration: m.groupDuration }, m.stagger * 2);
-  if (p.bottom) tl.to(p.bottom, { y: m.travel, opacity: 0, duration: m.groupDuration }, m.stagger * 3);
-  if (p.hero.length) tl.to(p.hero, { opacity: 0, duration: 0.24, ease: "power2.out" }, 0);
-  if (p.globe) tl.to(p.globe, { scale: 0.86, opacity: 0, duration: m.surfaceDuration }, m.surfaceAt);
-  tl.to(l.surface, { ...to, borderRadius: 0, duration: m.surfaceDuration }, m.surfaceAt);
-  tl.to(l.fill, { opacity: 1, duration: m.surfaceDuration * 0.75 }, m.surfaceAt + 0.08);
-  tl.to(l.panel, { opacity: 1, duration: 0.3, ease: "power2.out" }, m.surfaceAt + 0.22);
-  tl.to(l.pieces, { opacity: 1, y: 0, duration: m.pieceDuration, stagger: m.pieceStagger, ease: "power2.out" }, m.piecesAt);
+  const tl = gsap.timeline({ onComplete: o.onComplete });
+  const leave = { ease: m.leave, overwrite: "auto" as const };
+  if (p.fade.length) tl.to(p.fade, { autoAlpha: 0, duration: m.heroFade.duration, ...leave }, m.heroFade.at);
+  if (p.topbar) tl.to(p.topbar, { yPercent: -100, autoAlpha: 0, duration: m.topbar.duration, ...leave }, m.topbar.at);
+  if (p.top.length) tl.to(p.top, { y: -m.top.travel, autoAlpha: 0, duration: m.top.duration, ...leave }, m.top.at);
+  if (p.right.length) tl.to(p.right, { x: m.right.travel, autoAlpha: 0, duration: m.right.duration, ...leave }, m.right.at);
+  if (p.bottom.length) tl.to(p.bottom, { y: m.bottom.travel, autoAlpha: 0, duration: m.bottom.duration, ...leave }, m.bottom.at);
+
+  tl.to(l.surface, { ...surfaceBox(o.to, 0), duration: m.surface.duration, ease: m.surface.ease }, m.surface.at);
+  tl.to(l.fill, { opacity: MOTION.fillOpacity, duration: m.fill.duration, ease: LEAVE }, m.fill.at);
+  tl.to(l.card, { opacity: 1, duration: m.card.duration, ease: LEAVE }, m.card.at);
+  if (o.globe) {
+    const g = o.globe;
+    if (g.before) tl.call(g.before, undefined, m.globe.at);
+    tl.to(g.carrier, globeTo(g, m.globe), m.globe.at);
+    tl.to(l.halo, { opacity: g.opacity > 0 ? 1 : 0, duration: m.halo.duration, ease: LEAVE }, m.halo.at);
+  }
+  tl.set(l.front, { opacity: 1 }, m.pieces.at);
+  tl.to(l.pieces, { opacity: 1, y: 0, duration: m.pieces.duration, stagger: m.pieces.stagger, ease: m.pieces.ease }, m.pieces.at);
   return tl;
 }
 
-/** Close: the surface shrinks back to `to` (the hero's box) and the dashboard returns. */
-export function closeTimeline(p: Parts, l: Layers, to: Box, onComplete: () => void): gsap.core.Timeline {
-  const m = MOTION;
-  const tl = gsap.timeline({ defaults: { ease: m.ease }, onComplete });
-  tl.to(l.pieces, { opacity: 0, y: 10, duration: 0.18, stagger: 0.03, ease: "power2.in" }, 0);
-  tl.to(l.panel, { opacity: 0, duration: 0.22, ease: "power2.in" }, 0.1);
-  tl.to(l.surface, { ...to, borderRadius: 16, duration: m.closeDuration }, 0.06);
-  tl.to(l.fill, { opacity: 0, duration: m.closeDuration * 0.7 }, 0.22);
-  if (p.globe) tl.to(p.globe, { scale: 1, opacity: 1, duration: m.closeDuration }, 0.12);
-  if (p.bottom) tl.to(p.bottom, { y: 0, opacity: 1, duration: m.groupDuration }, 0.16);
-  if (p.right) tl.to(p.right, { x: 0, opacity: 1, duration: m.groupDuration }, 0.16 + m.stagger);
-  if (p.left) tl.to(p.left, { x: 0, opacity: 1, duration: m.groupDuration }, 0.16 + m.stagger * 2);
-  if (p.topbar) tl.to(p.topbar, { yPercent: 0, opacity: 1, duration: m.groupDuration }, 0.16 + m.stagger * 3);
-  if (p.hero.length) tl.to(p.hero, { opacity: 1, duration: 0.3, ease: "power2.out" }, 0.42);
+/** Close: the pieces go, the surface shrinks back to `to` (the hero's box), the globe returns to
+    the hero and the dashboard comes back. */
+export function closeTimeline(o: {
+  parts: Parts;
+  layers: Layers;
+  to: Box;
+  globe: GlobeAim | null;
+  onComplete: () => void;
+}): gsap.core.Timeline {
+  const m = MOTION.close;
+  const { parts: p, layers: l } = o;
+  const tl = gsap.timeline({ onComplete: o.onComplete });
+  const out = { opacity: 0, y: m.pieces.sink, duration: m.pieces.duration, stagger: m.pieces.stagger, ease: m.pieces.ease };
+  tl.to([...l.pieces].reverse(), out, m.pieces.at);
+  tl.set(l.front, { opacity: 0 }, m.pieces.at + m.pieces.duration + m.pieces.stagger * 2);
+  tl.to(l.surface, { ...surfaceBox(o.to, MOTION.radius), duration: m.surface.duration, ease: m.surface.ease }, m.surface.at);
+  tl.to(l.card, { opacity: 0, duration: m.card.duration, ease: LEAVE }, m.card.at);
+  tl.to(l.fill, { opacity: 0, duration: m.fill.duration, ease: LEAVE }, m.fill.at);
+  tl.to(l.halo, { opacity: 0, duration: m.halo.duration, ease: LEAVE }, m.halo.at);
+  if (o.globe) {
+    const g = o.globe;
+    tl.to(g.carrier, globeTo(g, m.globe), m.globe.at);
+    if (g.after) tl.call(g.after, undefined, m.globe.at + m.globe.duration);
+  }
+  const arrive = { ease: m.arrive, overwrite: "auto" as const };
+  if (p.bottom.length) tl.to(p.bottom, { y: 0, autoAlpha: 1, duration: m.bottom.duration, ...arrive }, m.bottom.at);
+  if (p.right.length) tl.to(p.right, { x: 0, autoAlpha: 1, duration: m.right.duration, ...arrive }, m.right.at);
+  if (p.top.length) tl.to(p.top, { y: 0, autoAlpha: 1, duration: m.top.duration, ...arrive }, m.top.at);
+  if (p.topbar) tl.to(p.topbar, { yPercent: 0, autoAlpha: 1, duration: m.topbar.duration, ...arrive }, m.topbar.at);
+  if (p.fade.length) tl.to(p.fade, { autoAlpha: 1, duration: m.heroFade.duration, ...arrive }, m.heroFade.at);
   return tl;
 }
 
-/** The plain fade: the surface fills the stage; it fades in (or out). */
-export function fadeTimeline(l: Layers, show: boolean, reduced: boolean, onComplete: () => void): gsap.core.Timeline {
-  const d = reduced ? MOTION.fadeReduced : MOTION.fade;
-  const tl = gsap.timeline({ onComplete });
-  if (show) {
-    gsap.set(l.surface, { clearProps: "left,top,width,height,borderRadius" });
-    gsap.set([l.fill, l.panel], { opacity: 1 });
-    tl.fromTo(l.surface, { opacity: 0 }, { opacity: 1, duration: d, ease: "power2.out" });
-    if (!reduced) tl.fromTo(l.pieces, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.24, stagger: 0.04, ease: "power2.out" }, 0.06);
+/** The plain crossfade: the surface fills the stage and every layer fades in (or out). */
+export function fadeTimeline(o: {
+  layers: Layers;
+  show: boolean;
+  fresh: boolean; // showing from closed (not from an interrupted close)
+  to: Box;
+  reduced: boolean;
+  globe: { carrier: HTMLElement; opacity: number } | null; // carried in with it: fade it in too
+  onComplete: () => void;
+}): gsap.core.Timeline {
+  const { layers: l } = o;
+  const f = o.reduced ? MOTION.fadeReduced : MOTION.fade;
+  const tl = gsap.timeline({ onComplete: o.onComplete });
+  if (o.show) {
+    if (o.fresh) {
+      gsap.set(l.surface, surfaceBox(o.to, 0));
+      gsap.set([l.fill, l.card, l.front, l.halo], { opacity: 0 });
+      gsap.set(l.pieces, { opacity: 0, y: f.rise });
+    }
+    // from wherever an interrupted close left things; the layers come in together
+    tl.to(l.surface, { ...surfaceBox(o.to, 0), duration: f.duration, ease: ARRIVE }, 0);
+    tl.to(l.fill, { opacity: MOTION.fillOpacity, duration: f.duration, ease: ARRIVE }, 0);
+    tl.to([l.card, l.front, l.globe], { opacity: 1, duration: f.duration, ease: ARRIVE }, 0);
+    tl.to(l.pieces, { opacity: 1, y: 0, duration: f.duration, ease: ARRIVE }, 0);
+    if (o.globe) {
+      tl.to(o.globe.carrier, { opacity: o.globe.opacity, duration: f.duration, ease: ARRIVE, overwrite: "auto" }, 0);
+      tl.to(l.halo, { opacity: o.globe.opacity > 0 ? 1 : 0, duration: f.duration, ease: ARRIVE }, 0);
+    }
   } else {
-    tl.to(l.surface, { opacity: 0, duration: d, ease: "power2.in" });
+    tl.to([l.fill, l.card, l.front, l.halo, l.globe], { opacity: 0, duration: f.duration, ease: LEAVE }, 0);
   }
   return tl;
+}
+
+/** The layers back to their own styles, ready for the next open. */
+export function resetLayers(l: Layers): void {
+  const els = [l.surface, l.fill, l.card, l.globe, l.halo, l.front, ...l.pieces];
+  gsap.killTweensOf(els);
+  gsap.set(els, { clearProps: "left,top,width,height,borderRadius,opacity,transform,visibility" });
 }
