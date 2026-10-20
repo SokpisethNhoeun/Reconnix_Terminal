@@ -9,7 +9,7 @@
 import type { AssistantInfo } from "@/components/assistant/types";
 import { deriveDashboard } from "@/components/dashboard/derive";
 import { deriveOverall } from "@/components/dashboard/derive-overall";
-import { overallReportCards, reportCards } from "@/components/dashboard/derive-report";
+import { overallReportCards, reportCards, runRow } from "@/components/dashboard/derive-report";
 import { overallScopeCards, scopeCards } from "@/components/dashboard/derive-scope";
 import { AssessmentsView } from "@/components/dashboard/assessments-view";
 import { EmptyView } from "@/components/dashboard/empty-view";
@@ -78,7 +78,7 @@ export default async function Home({ searchParams }: Props) {
           <EmptyView dir={dir} problems={library.problems} />
         )
       }
-      assessments={items.length ? <AssessmentsView items={items} /> : empty}
+      assessments={views.length ? <AssessmentsView rows={views.map(runRow)} /> : empty}
       findings={
         dash ? (
           <FindingsView key={dash.assessment.uid} findings={dash.findings} />

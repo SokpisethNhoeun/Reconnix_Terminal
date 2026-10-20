@@ -1,31 +1,71 @@
 "use client";
 
-/* The Assessments view: every saved run, newest first; a row opens that run's Overview. This is
-   the Phase 0 stub (docs/WEB_REDESIGN_V3_PLAN.md): the Assessments workstream replaces it with
-   search, status and template filters and ten rows a page (lib/paging.ts, ui/pagination.tsx). */
-import Link from "next/link";
+/* The Assessments view: every saved run, newest first, ten to a page. A search and the status and
+   template chips narrow the rows (assessments-filters.ts); the values and the page live in the
+   address (`?view=assessments&q=api&status=Completed&template=API&page=2`), so a reload or a link
+   lands on the same rows. A row opens that run's Overview. The page shows EmptyView instead when
+   nothing is saved; here the rows are never empty, only the match can be. */
+import { X } from "lucide-react";
+import { useRef } from "react";
 
-import { RunRow } from "@/components/dashboard/run-row";
-import type { LibraryItem } from "@/lib/data/view-types";
+import { AssessmentsFilters } from "@/components/dashboard/assessments-filters-bar";
+import { filterRuns, parseRunFilter, runFilterActive } from "@/components/dashboard/assessments-filters";
+import { AssessmentsRows } from "@/components/dashboard/assessments-rows";
+import { plural } from "@/components/dashboard/derive-shared";
+import type { ReportRunRow } from "@/components/dashboard/report-types";
+import { ViewHeader } from "@/components/dashboard/view-header";
+import { useQueryParams } from "@/components/dashboard/view-url";
+import { Pagination } from "@/components/ui/pagination";
+import { paginate, slicePage } from "@/lib/paging";
 
-export function AssessmentsView({ items }: { items: LibraryItem[] }) {
+const KEYS = ["q", "status", "template", "page"] as const;
+const CLEARED = { q: "", status: "", template: "", page: "" };
+
+export function AssessmentsView({ rows }: { rows: ReportRunRow[] }) {
+  const [p, update] = useQueryParams(KEYS);
+  const top = useRef<HTMLDivElement>(null);
+  const filter = parseRunFilter(p, rows);
+  const active = runFilterActive(filter);
+  const shown = filterRuns(rows, filter);
+  const paging = paginate(shown.length, p.page);
+  const page = slicePage(shown, paging);
+
+  // Turning a page from the bottom of a long list: bring the list's top back into view.
+  const turn = (n: number) => {
+    update({ page: n > 1 ? String(n) : "" });
+    const el = top.current;
+    if (!el) return;
+    const edge = el.closest("main")?.getBoundingClientRect().top ?? 0;
+    if (el.getBoundingClientRect().top < edge) el.scrollIntoView({ block: "start" });
+  };
+
   return (
-    <div className="dash-view dash-sheet">
-      <header>
-        <h1 className="text-[20px] font-medium text-foreground">Assessments</h1>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">
-          {items.length === 1 ? "1 saved run" : `${items.length} saved runs`} · open one to see its overview.
-        </p>
-      </header>
-      <ul aria-label="Saved assessments" className="grid gap-2 text-xs sm:grid-cols-2">
-        {items.map((item) => (
-          <li key={item.uid}>
-            <Link href={`/?uid=${encodeURIComponent(item.uid)}`} className="dash-finding-row flex items-center gap-2 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <RunRow item={item} />
-            </Link>
-          </li>
-        ))}
-      </ul>
+    <div className="dash-view dash-sheet" ref={top}>
+      <ViewHeader
+        title="Assessments"
+        tag={`All ${plural(rows.length, "run")}`}
+        about={
+          rows.length === 1
+            ? "The one run the TUI saved: open it for its overview, findings, scope and report."
+            : "Every run the TUI saved, newest first: search or filter them, and open one for its overview, findings, scope and report."
+        }
+      />
+
+      <AssessmentsFilters rows={rows} filter={filter} active={active} shown={shown.length} onChange={(patch) => update({ ...patch, page: "" })} />
+
+      {shown.length === 0 ? (
+        <div className="asm-empty" role="status">
+          <p>No saved run matches these filters.</p>
+          <button type="button" onClick={() => update(CLEARED)} className="asm-clear">
+            <X className="size-3" aria-hidden /> Clear filters
+          </button>
+        </div>
+      ) : (
+        <>
+          <AssessmentsRows rows={page} />
+          <Pagination paging={paging} onPage={turn} label="Assessment pages" />
+        </>
+      )}
     </div>
   );
 }
