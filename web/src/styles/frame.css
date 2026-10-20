@@ -1,7 +1,7 @@
 /* The dashboard's frame: the page, the app frame, where the sidebar, top bar, content and the
    AI Assistant's stage sit, and what scrolls. Owner: frame and scrolling.
 
-   Two modes, one breakpoint (keep it in step with `roomy()` in assistant-stage.tsx):
+   Two modes, one breakpoint (keep it in step with `roomy()` in components/assistant/motion-env.ts):
    - Fixed frame (≥1280×760): the frame is exactly the viewport minus the gutters, so the page
      never scrolls; `.dash-content` is the one vertical scroller.
    - Everywhere else the frame grows with its content and the WINDOW scrolls. `.dash-content`

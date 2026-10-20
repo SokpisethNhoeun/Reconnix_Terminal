@@ -422,3 +422,41 @@ The agents rely on the following and must not change it:
    - The terminal helper runs with `RECONIX_PYTHON=<repo>/.venv/bin/python`.
 7. **Docs.** README, CLAUDE.md and the in-app docs are the main agent's, at integration. Each
    agent lists its doc changes in its report.
+
+## Results (2026-10-20)
+
+Built by four subagents in their own worktrees (A motion, B assistant, C dashboard, D scrolling),
+each reviewed by `code-reviewer` (and B twice by `security-reviewer`), fixed, and merged into
+`redesign/v2` in the order D → C → B → A, with the full suite after each merge.
+
+- **Checks on the integrated branch:**
+  - tsc and lint clean; 371 unit tests; the build.
+  - **90 e2e**: access 11, pages 16, assistant 10, scroll 26, a11y 15, motion 12.
+  - TUI `pytest -q` 706.
+- **Browser pass, owner's 27 real runs and the local `llama3.2`:**
+  - The Audit Log is gone; the summary strip shows its 4 cards.
+  - Welcome: one WebGL globe at 0.18, drawing.
+  - A suggested question was answered in 17 s with a findings card from the server; the globe
+    then went to 0 and paused.
+  - Closing returns to `/` with the globe back at full quality.
+  - After reopening the browser, History lists the conversation and reopens both messages.
+  - At 1366×768 the wheel scrolls the Overview (78/78 px) and Findings.
+  - The phone welcome starts at its heading, with no sideways scroll; no console errors.
+- **Final motion values** (`MOTION`, seconds from the click):
+  - Open:
+    - top bar 0–0.85, summary strip 0.06–0.91, right 0.12–0.97, bottom 0.18–1.03 (power2.inOut);
+    - surface 0.15–1.45 (power4.inOut, not expo: expo packed the growth into about 0.3 s);
+    - globe 0.30–1.45 to 0.18;
+    - pieces 1.05–1.60, 70 ms apart.
+  - Close: 1.40 s.
+  - Crossfade: 0.3 s; reduced motion 0.22 s.
+  - Breathing: a 6 s cycle (icon 1→1.10, globe 0.98→1.02, panel 1→1.003 with glow 0.35→0.75).
+  - No `left` part, because the layout has no left group.
+- **Found and fixed during integration:**
+  - The Authorization and Cookie masking gap (Python and TypeScript, with shared vectors).
+  - A glide in flight overrode the reader's scroll-up.
+  - The phone welcome opened at its end.
+  - In the motion branch: the globe stayed frozen after a round trip to the docs, kept drawing
+    invisibly, drew over the phone's top bar, and was blurred by scaling.
+- §4 note: tool segments sit on one shared track under the step rows. The saved data doesn't
+  say which step a tool line belongs to.

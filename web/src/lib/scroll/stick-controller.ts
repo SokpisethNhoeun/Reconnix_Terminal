@@ -9,6 +9,8 @@
    - `scrollToBottom()` glides there (instantly under prefers-reduced-motion, or when asked with
      `{ instant: true }`, e.g. on opening a long saved conversation) and holds on; if more arrives
      during the glide, it re-aims at the new bottom.
+   - `scrollToTop()` shows the start and lets go (a welcome screen reads from the top: content
+     that grows or a box that opens later must not pull it to its end).
    - The reader's own move up (the wheel, PageUp / ArrowUp / Home / Shift+Space) stops a glide on
      the spot and lets go: a smooth scroll still on its way would otherwise carry on to the bottom
      and take them along (Chrome doesn't always cancel it for a wheel).
@@ -160,5 +162,11 @@ export function createStickToBottom<T extends HTMLElement>({ onPinned, reducedMo
     el.scrollTo({ top: m.scrollHeight - m.clientHeight, behavior: instant ? "instant" : "smooth" });
   };
 
-  return { ref, scrollToBottom, follow, state: () => state };
+  const scrollToTop = () => {
+    if (!el) return;
+    setState({ pinned: false, seeking: false, lastTop: 0 });
+    el.scrollTo({ top: 0, behavior: "instant" });
+  };
+
+  return { ref, scrollToBottom, scrollToTop, follow, state: () => state };
 }

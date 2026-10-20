@@ -95,6 +95,19 @@ function setup(reduced = false) {
 }
 
 describe("createStickToBottom", () => {
+  it("scrollToTop shows the start and stops following until asked again", () => {
+    const { stick, box, last } = setup();
+    stick.scrollToTop();
+    expect(box.scrollTop).toBe(0);
+    expect(last()).toBe(false);
+    box.scrollHeight = 1400; // the welcome grows, or its box opens
+    stick.follow();
+    expect(box.scrollTop).toBe(0); // still at the start
+    stick.scrollToBottom({ instant: true }); // a question was asked
+    expect(box.scrollTop).toBe(1100);
+    expect(last()).toBe(true);
+  });
+
   it("stops a glide on the spot when the reader moves up, and lets go", () => {
     const { stick, box, last } = setup();
     box.user(100); // read from near the top, then ask to go down

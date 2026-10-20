@@ -28,7 +28,7 @@ function Reason({ tone = "warning", id, children }: { tone?: "warning" | "info";
 
 export const AssistantView = forwardRef<HTMLTextAreaElement, { onMinimize: () => void }>(function AssistantView({ onMinimize }, composerRef) {
   const { info, canAsk, messages, busy, retry, conversation, opening, notice, newChat } = useAssistant();
-  const { ref: scroller, atBottom, scrollToBottom } = useStickToBottom<HTMLDivElement>();
+  const { ref: scroller, atBottom, scrollToBottom, scrollToTop } = useStickToBottom<HTMLDivElement>();
   const view = useRef<HTMLElement>(null);
   const { model } = info;
   // "New messages" goes away once used: carry on where the next question is typed
@@ -43,11 +43,12 @@ export const AssistantView = forwardRef<HTMLTextAreaElement, { onMinimize: () =>
   useEffect(() => {
     if (lastUser) scrollToBottom();
   }, [lastUser, conversation.id, scrollToBottom]);
-  // the welcome reads from the top (the scroller otherwise starts at its end)
+  // the welcome reads from the top, and stays there when the stage opens later (on phones it
+  // gets its height only then): stop following until a question is asked
   const welcome = messages.length === 0 && !opening;
   useEffect(() => {
-    if (welcome) scroller.current?.scrollTo({ top: 0 });
-  }, [welcome, scroller]);
+    if (welcome) scrollToTop();
+  }, [welcome, scrollToTop]);
 
   const reason = !info.operator
     ? "Asking the AI model needs the operator role. Open the dashboard with the sign-in link /web prints."
