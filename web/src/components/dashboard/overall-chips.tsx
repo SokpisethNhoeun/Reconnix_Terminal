@@ -36,7 +36,7 @@ function CountsChip({
   return (
     <Popover triggerClassName={CHIP} triggerAriaLabel={label} align={align} panelClassName="w-[260px] space-y-2.5 p-3 text-xs" triggerContent={<ChipTrigger label={label} value={value} />}>
       <p className="text-muted-foreground">{heading}</p>
-      <ul className="max-h-[220px] space-y-1 overflow-y-auto" data-lenis-prevent>
+      <ul className="max-h-[220px] space-y-1 overflow-y-auto">
         {rows.map((r) => (
           <li key={r.name} className="flex items-center justify-between gap-3">
             {statuses && r.name in RUN_STATUS ? (
@@ -67,11 +67,13 @@ export function OverallChips({ overall }: { overall: OverallChipsData }) {
   return (
     <>
       <CountsChip label="Target" value={many(overall.targets, "targets")} heading="Runs per target" rows={overall.targets} />
-      <CountsChip label="Template" value={many(overall.templates, "templates")} heading="Runs per template" rows={templates}>
+      <div className="hidden min-[1440px]:block">
+        <CountsChip label="Template" value={many(overall.templates, "templates")} heading="Runs per template" rows={templates}>
         <Link href="/docs/assessments/templates" className={`inline-block ${LINK}`}>
           About templates
         </Link>
       </CountsChip>
+      </div>
       <CountsChip
         label="Status"
         value={waiting ? `${waiting} waiting` : `${completed}/${runs} done`}

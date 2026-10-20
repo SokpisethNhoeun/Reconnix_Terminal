@@ -59,15 +59,16 @@ export function TopBar({
     <header className="dash-topbar relative z-30 flex min-w-0 items-center gap-2 border-b border-border px-3 sm:gap-3 sm:px-4">
       <LiveRefresh renderedAt={renderedAt} dir={dir} />
       {(dash || overall) && (
-        <div className="dash-reveal flex min-w-0 items-center gap-2 lg:ml-auto">
+        <div className="dash-reveal flex min-w-0 items-center gap-2 xl:ml-auto">
           <AssessmentSwitcher current={a} all={overall && allSummary(overall)} items={items} dir={dir} skipped={skipped} />
-          <div className="hidden min-w-0 items-center gap-2 lg:flex">
+          {/* the chips need ≥1280 px; the Template chip ≥1440 (run-chips / overall-chips) */}
+          <div className="hidden min-w-0 items-center gap-2 xl:flex">
             {dash ? <RunChips dash={runChips(dash)} /> : overall && <OverallChips overall={overallChips(overall)} />}
           </div>
         </div>
       )}
 
-      <div className="dash-reveal ml-auto flex shrink-0 items-center gap-2 lg:ml-3">
+      <div className="dash-reveal ml-auto flex shrink-0 items-center gap-2 xl:ml-3">
         <DocsSearch />
         <AttentionBell gate={dash?.gate ?? null} currentUid={a?.uid ?? null} items={items} terminal={terminal} />
         {operator && (

@@ -58,7 +58,8 @@ export function RunChips({ dash }: { dash: RunChipsData }) {
         )}
       </Popover>
 
-      <Popover triggerClassName={CHIP} triggerAriaLabel="Template" align="start" panelClassName="w-[220px] space-y-2 p-3 text-xs" triggerContent={<ChipTrigger label="Template" value={a.template} />}>
+      <div className="hidden min-[1440px]:block">
+        <Popover triggerClassName={CHIP} triggerAriaLabel="Template" align="start" panelClassName="w-[220px] space-y-2 p-3 text-xs" triggerContent={<ChipTrigger label="Template" value={a.template} />}>
         <ul className="space-y-1">
           {TEMPLATES.map((t) => {
             const on = t === a.template;
@@ -74,6 +75,7 @@ export function RunChips({ dash }: { dash: RunChipsData }) {
           About templates
         </Link>
       </Popover>
+      </div>
 
       <Popover triggerClassName={CHIP} triggerAriaLabel="Status" align="end" panelClassName="w-[300px] space-y-3 p-3 text-xs" triggerContent={<ChipTrigger label="Status" value={RUN_STATUS[a.status].label} />}>
         <StatusBadge meaning={RUN_STATUS[a.status]} />

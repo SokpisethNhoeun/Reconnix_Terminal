@@ -59,7 +59,7 @@ export function AttentionBell({
                 {others.length} {currentUid ? "other " : ""}
                 {others.length === 1 ? "run waits" : "runs wait"} on a decision
               </p>
-              <ul className="max-h-[200px] space-y-1 overflow-y-auto" data-lenis-prevent>
+              <ul className="max-h-[200px] space-y-1 overflow-y-auto">
                 {others.map((i) => (
                   <li key={i.uid}>
                     <Link

@@ -5,9 +5,6 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import type { LibraryItem } from "@/lib/data/view-types";
 import { RUN_STATUS } from "@/lib/status";
 
-export const runMatches = (item: LibraryItem, q: string) =>
-  !q || [item.id, item.template, item.target, item.status, item.when].some((t) => t.toLowerCase().includes(q));
-
 export function RunRow({ item, current = false }: { item: LibraryItem; current?: boolean }) {
   return (
     <>

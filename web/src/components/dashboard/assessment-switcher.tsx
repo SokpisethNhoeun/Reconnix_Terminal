@@ -11,7 +11,8 @@ import type { Dashboard } from "@/components/dashboard/derive";
 import type { Overall } from "@/components/dashboard/derive-overall";
 import { SearchField } from "@/components/dashboard/filter-bar";
 import { Popover } from "@/components/dashboard/popover";
-import { RunRow, runMatches } from "@/components/dashboard/run-row";
+import { runMatches } from "@/components/dashboard/filters";
+import { RunRow } from "@/components/dashboard/run-row";
 import { useRunHref } from "@/components/dashboard/view-url";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { LibraryItem, SkippedFile } from "@/lib/data/view-types";
@@ -26,7 +27,7 @@ export function ChipTrigger({ label, value }: { label: string; value: string }) 
   return (
     <>
       <span className="hidden text-muted-foreground sm:inline">{label}:</span>
-      <span className="max-w-[140px] truncate text-foreground">{value}</span>
+      <span className="max-w-[120px] truncate text-foreground min-[1440px]:max-w-[140px]">{value}</span>
       <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
     </>
   );
@@ -107,7 +108,7 @@ export function AssessmentSwitcher({
             </p>
             {items.length > 6 && <SearchField label="Search saved assessments" placeholder="ID, template, target, status…" value={query} onChange={setQuery} />}
           </div>
-          <ul className="max-h-[260px] overflow-y-auto" data-lenis-prevent>
+          <ul className="max-h-[260px] overflow-y-auto">
             {!q && (
               <li>
                 <Link href={href(null)} onClick={close} aria-current={current ? undefined : "true"} className={ROW}>
