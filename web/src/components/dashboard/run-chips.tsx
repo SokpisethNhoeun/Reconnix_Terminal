@@ -7,6 +7,8 @@ import { Check, X } from "lucide-react";
 import { CHIP, ChipTrigger, Row } from "@/components/dashboard/assessment-switcher";
 import { TEMPLATES, type Dashboard } from "@/components/dashboard/derive";
 import { Popover } from "@/components/dashboard/popover";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { RUN_STATUS, STEP_STATUS } from "@/lib/status";
 
 const LINK = "rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -64,7 +66,9 @@ export function RunChips({ dash }: { dash: Dashboard }) {
         </Link>
       </Popover>
 
-      <Popover triggerClassName={CHIP} triggerAriaLabel="Status" align="end" panelClassName="w-[260px] space-y-3 p-3 text-xs" triggerContent={<ChipTrigger label="Status" value={a.status} />}>
+      <Popover triggerClassName={CHIP} triggerAriaLabel="Status" align="end" panelClassName="w-[300px] space-y-3 p-3 text-xs" triggerContent={<ChipTrigger label="Status" value={RUN_STATUS[a.status].label} />}>
+        <StatusBadge meaning={RUN_STATUS[a.status]} />
+        <p className="text-muted-foreground">{RUN_STATUS[a.status].hint}</p>
         <div>
           <div className="mb-1 flex items-center justify-between">
             <span className="text-muted-foreground">Progress</span>
@@ -77,9 +81,10 @@ export function RunChips({ dash }: { dash: Dashboard }) {
         {dash.phases.length > 0 && (
           <ul className="space-y-1">
             {dash.phases.map((p) => (
-              <li key={p.key} className="flex items-center justify-between gap-3">
-                <span className={p.status === "pending" ? "truncate text-muted-foreground" : "truncate text-foreground"}>{p.label}</span>
-                <span className="tabnums shrink-0 text-muted-foreground">{p.pct}%</span>
+              <li key={p.key} className="flex items-center gap-2">
+                <span className={p.status === "pending" ? "min-w-0 flex-1 truncate text-muted-foreground" : "min-w-0 flex-1 truncate text-foreground"}>{p.label}</span>
+                <StatusBadge meaning={STEP_STATUS[p.status]} />
+                <span className="tabnums w-9 shrink-0 text-right text-muted-foreground">{p.pct}%</span>
               </li>
             ))}
           </ul>

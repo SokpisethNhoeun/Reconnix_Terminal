@@ -123,7 +123,8 @@ test("a waiting run shows its pending approval", async ({ page }) => {
   await expect(page.getByText("This run waits on you")).toBeVisible();
   await expect(page.getByText(/awaiting approval/).first()).toBeVisible();
   await page.click(view("Scope"));
-  await expect(page.getByText("PENDING", { exact: true })).toBeVisible();
+  const requests = page.getByRole("heading", { name: "Approval requests" }).locator("..");
+  await expect(requests.getByText("Waiting for approval", { exact: true })).toBeVisible();
 });
 
 test("the report links every export format and a download works", async ({ page }) => {
