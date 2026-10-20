@@ -75,11 +75,19 @@ export function AssistantStage({ view, shown, setShown }: { view: View; shown: V
   };
   const stageBox = () => ({ left: 0, top: 0, width: stage.current?.clientWidth ?? 0, height: stage.current?.clientHeight ?? 0 });
   /** Without the fixed-height frame the stage shares the content's grid row, so a view laid out
-      under it (while it fades) would stretch it; hold it at its own height meanwhile. */
+      under it (while it fades) would stretch it; hold it meanwhile at the height it has once
+      settled: the rest of the frame below its top, the frame being a screen tall while the stage
+      is on (frame.css), and never less than its own minimum. */
   const lockStage = (hold: boolean) => {
     const s = stage.current;
+    const f = frame();
     if (!s) return;
-    const h = hold && !roomy() ? parseFloat(getComputedStyle(s).minHeight) : 0;
+    let h = 0;
+    if (hold && !roomy()) {
+      const own = parseFloat(getComputedStyle(s).minHeight) || 0;
+      const screen = f ? (parseFloat(getComputedStyle(f).minHeight) || 0) - 2 * f.clientTop - s.offsetTop : 0;
+      h = Math.max(own, screen);
+    }
     if (h > 0) Object.assign(s.style, { height: `${h}px`, alignSelf: "start" });
     else {
       s.style.removeProperty("height");
