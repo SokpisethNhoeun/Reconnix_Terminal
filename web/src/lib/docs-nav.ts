@@ -1,14 +1,17 @@
 import {
-  BookMarked,
   BookOpen,
-  Network,
+  Bot,
+  FileText,
+  LifeBuoy,
   Rocket,
-  ScanSearch,
   ShieldCheck,
-  SlidersHorizontal,
   SquareTerminal,
+  Target,
+  TerminalSquare,
   type LucideIcon,
 } from "lucide-react";
+
+import commandsJson from "@/content/docs/commands.json";
 
 export type DocPage = { title: string; href: string; description: string };
 
@@ -16,29 +19,51 @@ export type DocGroup = {
   /** url segment under /docs (also the content key in src/content/docs) */
   id: string;
   title: string;
-  /** group landing page; for single-page groups (Overview, Architecture) it is the page itself */
+  /** group landing page; for single-page groups (Overview) it is the page itself */
   href: string;
   description: string;
   icon: LucideIcon;
   pages: DocPage[];
-  /**
-   * Single-page groups only: the page's DocSection titles, shown as #anchor links on the docs
-   * overview cards in place of sub-pages. Keep in step with the page's headings.
-   */
-  sections?: string[];
 };
+
+/** One slash command as `scripts/export_commands.py` wrote it (the TUI's `Command`). */
+export type CommandEntry = {
+  name: string;
+  aliases: string[];
+  description: string;
+  /** the argument is picked from a list */
+  takes_argument: boolean;
+  /** a missing argument opens that list as a menu (false: the list only suggests) */
+  ask: boolean;
+  question: string;
+  empty: string;
+};
+
+export type CommandGroup = { id: string; title: string; commands: CommandEntry[] };
+
+/**
+ * The generated command reference: every command of `reconix/commands/builtin.py`, grouped by
+ * area. Regenerate with `python scripts/export_commands.py`; `tests/test_export_commands.py`
+ * fails when the file is stale.
+ */
+export const COMMAND_GROUPS: CommandGroup[] = commandsJson.groups;
+
+export const COMMANDS: CommandEntry[] = COMMAND_GROUPS.flatMap((g) => g.commands);
+
+export const commandHref = (name: string) => `/docs/commands/${name}`;
 
 /**
  * The docs structure, single source of truth for the docs sidebar, the navbar "Docs" and
- * "Guardrails" dropdowns, breadcrumbs, prev/next links and the sitemap. Adding a page = add it
- * here and add its content to src/content/docs/<group>.tsx under the same slug.
+ * "Guardrails" dropdowns, breadcrumbs, prev/next links, search and the sitemap. Adding a page =
+ * add it here and add its content to src/content/docs/<group>.tsx under the same slug.
+ * The Commands group's pages come from the generated reference (one per command).
  */
 export const DOCS_NAV: DocGroup[] = [
   {
     id: "overview",
     title: "Overview",
     href: "/docs",
-    description: "What Reconix is, who it is for and the assessments it supports.",
+    description: "What the Reconix terminal is, what it does and where to start.",
     icon: BookOpen,
     pages: [],
   },
@@ -46,84 +71,108 @@ export const DOCS_NAV: DocGroup[] = [
     id: "getting-started",
     title: "Getting started",
     href: "/docs/getting-started",
-    description: "Install the services and the terminal, then run your first assessment.",
+    description: "Install the terminal, launch it and run a first assessment.",
     icon: Rocket,
     pages: [
-      { title: "Requirements", href: "/docs/getting-started/requirements", description: "What you need before installing." },
-      { title: "Installation", href: "/docs/getting-started/installation", description: "Start the services and install the terminal client." },
-      { title: "Configuration", href: "/docs/getting-started/configuration", description: "The main settings in .env." },
-      { title: "First assessment", href: "/docs/getting-started/first-assessment", description: "From request to report, step by step." },
+      { title: "Introduction", href: "/docs/getting-started/introduction", description: "What Reconix does, what is simulated and what is real." },
+      { title: "Requirements", href: "/docs/getting-started/requirements", description: "Python, a terminal, and the optional pieces for PDF, DOCX, the dashboard and a model." },
+      { title: "Installation", href: "/docs/getting-started/installation", description: "Clone, create a virtual environment, install." },
+      { title: "Launching", href: "/docs/getting-started/launching", description: "python -m reconix, the reconix command and run.py." },
+      { title: "First steps", href: "/docs/getting-started/first-steps", description: "A first assessment on the demo target, gate by gate." },
     ],
   },
   {
-    id: "assessments",
-    title: "Assessments",
-    href: "/docs/assessments",
-    description: "How an assessment runs and what each template covers.",
-    icon: ScanSearch,
-    pages: [
-      { title: "Assessment workflow", href: "/docs/assessments/workflow", description: "The seven steps and the approval gate." },
-      { title: "Assessment templates", href: "/docs/assessments/templates", description: "Network, API, Source Code and Web URL: inputs and results." },
-    ],
-  },
-  {
-    id: "interfaces",
-    title: "Interfaces",
-    href: "/docs/interfaces",
-    description: "The terminal you work in, the VS Code extension and the read-only viewer.",
+    id: "terminal-guide",
+    title: "Terminal guide",
+    href: "/docs/terminal-guide",
+    description: "The eight screens, the keys and the slash-command bar.",
     icon: SquareTerminal,
     pages: [
-      { title: "Terminal", href: "/docs/interfaces/terminal", description: "Start assessments, edit the scope and approve actions." },
-      { title: "VS Code extension", href: "/docs/interfaces/vscode-extension", description: "Work with Reconix from inside your editor." },
-      { title: "Local assessment viewer", href: "/docs/interfaces/local-viewer", description: "Browse findings, evidence, the audit log and reports." },
+      { title: "The screens", href: "/docs/terminal-guide/screens", description: "Start, Template, Plan, Approval, Execution, Findings, Finding Detail and Report." },
+      { title: "Keys", href: "/docs/terminal-guide/keys", description: "The keys that work everywhere and the ones each screen adds." },
+      { title: "The command bar", href: "/docs/terminal-guide/command-bar", description: "Slash commands, Tab completion, history and Ctrl+R." },
+      { title: "The prompt", href: "/docs/terminal-guide/prompt", description: "What a typed line does: a target, a question, a command or a path." },
     ],
   },
   {
-    id: "configuration",
-    title: "Configuration",
-    href: "/docs/configuration",
-    description: "The Scope Manifest and the risk policies.",
-    icon: SlidersHorizontal,
+    id: "ai-models",
+    title: "AI models",
+    href: "/docs/ai-models",
+    description: "Connect a model with /provider and /model, and what runs without one.",
+    icon: Bot,
     pages: [
-      { title: "Scope Manifest", href: "/docs/configuration/scope-manifest", description: "Targets, permitted actions, exclusions and limits." },
-      { title: "Policies", href: "/docs/configuration/policies", description: "The Risk Policy Table and execution limits." },
+      { title: "Providers", href: "/docs/ai-models/providers", description: "/provider: set, test, use a model, unset; the six-provider catalog." },
+      { title: "Models", href: "/docs/ai-models/models", description: "/model: pick the active model, switch mid-run, chat with it." },
+      { title: "Configuration", href: "/docs/ai-models/configuration", description: "The .env seed, the encrypted llm.db and the 0600 key file." },
+      { title: "Common errors", href: "/docs/ai-models/errors", description: "Every message the provider and model commands can show." },
+    ],
+  },
+  {
+    id: "commands",
+    title: "Commands",
+    href: "/docs/commands",
+    description: "Every slash command: purpose, syntax, an example, what happens and its errors.",
+    icon: TerminalSquare,
+    pages: COMMANDS.map((c) => ({ title: `/${c.name}`, href: commandHref(c.name), description: c.description })),
+  },
+  {
+    id: "assessment-guide",
+    title: "Security assessment guide",
+    href: "/docs/assessment-guide",
+    description: "From a typed request to findings: scope, plan, tools, policy checks, approval gates and execution.",
+    icon: Target,
+    pages: [
+      { title: "Request and template", href: "/docs/assessment-guide/request", description: "A target picks a template; four templates cover web, API, network and source code." },
+      { title: "Scope manifest", href: "/docs/assessment-guide/scope", description: "What a scope allows, how to edit it, what approving it locks." },
+      { title: "Plan and tools", href: "/docs/assessment-guide/plan", description: "The phases, the target login the tools need, and the gated steps." },
+      { title: "Policy checks", href: "/docs/assessment-guide/policy-checks", description: "Every request is checked against the approved scope before it runs." },
+      { title: "Approval gates", href: "/docs/assessment-guide/approval-gates", description: "MEDIUM: one decision. HIGH: a double check with a single-use token and the request hash." },
+      { title: "Execution", href: "/docs/assessment-guide/execution", description: "The live run, its pauses, and stopping it." },
+      { title: "Findings", href: "/docs/assessment-guide/findings", description: "How findings appear, and how the run ends." },
+      { title: "The AI agent", href: "/docs/assessment-guide/ai-agent", description: "/assess with a model: a real assessment through the same gates." },
+    ],
+  },
+  {
+    id: "reports",
+    title: "Reports",
+    href: "/docs/reports",
+    description: "Review the results, understand the findings, export from the terminal or the dashboard.",
+    icon: FileText,
+    pages: [
+      { title: "Reviewing results", href: "/docs/reports/reviewing", description: "The Report screen, the summary and the audit trail." },
+      { title: "Understanding findings", href: "/docs/reports/understanding-findings", description: "Severity, validation, CVSS, triage, filters and imports." },
+      { title: "Exporting", href: "/docs/reports/exporting", description: "Seven formats from the terminal, saved under ./reports/." },
+      { title: "The web dashboard", href: "/docs/reports/dashboard", description: "Single downloads, the preview, and the combined report of up to five runs." },
+    ],
+  },
+  {
+    id: "troubleshooting",
+    title: "Troubleshooting",
+    href: "/docs/troubleshooting",
+    description: "What each error means and what to do about it.",
+    icon: LifeBuoy,
+    pages: [
+      { title: "Model connection", href: "/docs/troubleshooting/model-connection", description: "Unreachable providers, bad keys, timeouts." },
+      { title: "Missing tools", href: "/docs/troubleshooting/missing-tools", description: "No Chrome for the PDF, no python-docx, no harness." },
+      { title: "Policy errors", href: "/docs/troubleshooting/policy-errors", description: "Blocked requests and refused edits." },
+      { title: "Unknown commands", href: "/docs/troubleshooting/unknown-commands", description: "Typos, the path rule, and commands that need a run." },
+      { title: "Report failures", href: "/docs/troubleshooting/report-failures", description: "When an export is refused or can't be written." },
+      { title: "The web dashboard", href: "/docs/troubleshooting/web-dashboard", description: "/web can't start: ports, Node and the log." },
     ],
   },
   {
     id: "guardrails",
     title: "Guardrails",
     href: "/docs/guardrails",
-    description: "The checks that keep an assessment safe, the model and its knowledge.",
+    description: "The rules that keep an assessment inside what you approved.",
     icon: ShieldCheck,
     pages: [
       { title: "Authorized use", href: "/docs/guardrails/authorized-use", description: "Only assess what you may test." },
-      { title: "Scope & safety", href: "/docs/guardrails/scope-and-safety", description: "Scope checks, command validation and limits." },
-      { title: "Approval model", href: "/docs/guardrails/approval-model", description: "Who approves what, and when." },
-      { title: "Credential handling", href: "/docs/guardrails/credential-handling", description: "How secrets are masked." },
-      { title: "LLM data handling", href: "/docs/guardrails/llm-data-handling", description: "What the model sees, and what it never does." },
-      { title: "Model switching", href: "/docs/guardrails/model-switching", description: "Use the local model or any OpenAI-compatible endpoint." },
-      { title: "Knowledge & RAG", href: "/docs/guardrails/knowledge-and-rag", description: "Answers grounded in public sources and your own documents." },
+      { title: "Scope & safety", href: "/docs/guardrails/scope-and-safety", description: "The scope check, canonical paths and untrusted data." },
+      { title: "Approval model", href: "/docs/guardrails/approval-model", description: "The scope once, every risky action, and the HIGH double check." },
+      { title: "Credential handling", href: "/docs/guardrails/credential-handling", description: "Logins in memory, codes never stored, secrets masked everywhere." },
+      { title: "LLM data handling", href: "/docs/guardrails/llm-data-handling", description: "What a model sees, what it never decides." },
       { title: "Limitations", href: "/docs/guardrails/limitations", description: "What Reconix does not do." },
-    ],
-  },
-  {
-    id: "architecture",
-    title: "Architecture",
-    href: "/docs/architecture",
-    description: "How the terminal, backend, AI service and tool service fit together.",
-    icon: Network,
-    pages: [],
-    sections: ["Request path", "Components", "Where the checks run", "Deployment"],
-  },
-  {
-    id: "reference",
-    title: "Reference",
-    href: "/docs/reference",
-    description: "The findings format and reports.",
-    icon: BookMarked,
-    pages: [
-      { title: "Findings", href: "/docs/reference/findings", description: "Severity, confidence and evidence." },
-      { title: "Reports", href: "/docs/reference/reports", description: "What a report contains and how to export it." },
     ],
   },
 ];

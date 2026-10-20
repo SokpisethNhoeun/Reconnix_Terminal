@@ -4,15 +4,18 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, Menu, X } from "lucide-react";
+import { DocsSearch } from "@/components/docs-search";
 import { DOCS_NAV, type DocGroup } from "@/lib/docs-nav";
+import type { DocsSearchEntry } from "@/lib/docs-search-index";
 import { cn } from "@/lib/utils";
 
 /**
- * Docs sidebar from DOCS_NAV: one collapsible section per group (single-page groups are a
- * plain link), the current page highlighted in teal and its group expanded. Below lg it
- * collapses behind a "Docs menu" button and closes again when a page is chosen.
+ * Docs sidebar: the search box, then one collapsible section per DOCS_NAV group (single-page
+ * groups are a plain link), the current page highlighted in teal and its group expanded.
+ * Sticky on desktop; below lg the tree collapses behind a "Docs menu" button and closes again
+ * when a page is chosen (the search stays visible at every size).
  */
-export function DocsSidebar() {
+export function DocsSidebar({ index }: { index: DocsSearchEntry[] }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   // groups the reader toggled by hand; the current page's group is always open
@@ -27,10 +30,12 @@ export function DocsSidebar() {
   const isOpen = (g: DocGroup) => toggled[g.id] ?? (pathname === g.href || g.pages.some((p) => p.href === pathname));
 
   return (
-    <aside className="lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto" data-lenis-prevent>
+    <aside className="docs-sidebar lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100vh-7rem)] lg:flex-col lg:self-start" data-lenis-prevent>
+      <DocsSearch index={index} />
+
       <button
         type="button"
-        className="flex w-full items-center justify-between rounded-lg border border-border bg-card/70 px-4 py-3 font-mono text-xs uppercase tracking-[0.16em] text-foreground lg:hidden"
+        className="mt-3 flex w-full items-center justify-between rounded-lg border border-border bg-card/70 px-4 py-3 font-mono text-xs uppercase tracking-[0.16em] text-foreground lg:hidden"
         aria-expanded={mobileOpen}
         aria-controls="docs-sidebar-nav"
         onClick={() => setMobileOpen((o) => !o)}
@@ -42,7 +47,10 @@ export function DocsSidebar() {
       <nav
         id="docs-sidebar-nav"
         aria-label="Documentation"
-        className={cn("mt-3 rounded-xl border border-border bg-card/70 p-3 lg:mt-0 lg:block lg:border-0 lg:bg-transparent lg:p-0", !mobileOpen && "hidden")}
+        className={cn(
+          "mt-3 rounded-xl border border-border bg-card/70 p-3 lg:mt-4 lg:block lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:border-0 lg:bg-transparent lg:p-0",
+          !mobileOpen && "hidden"
+        )}
       >
         <p className="mb-3 hidden px-2 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground lg:block">
           Documentation
@@ -70,7 +78,7 @@ export function DocsSidebar() {
             }
             const open = isOpen(g);
             return (
-              <li key={g.id}>
+              <li key={g.id} data-docs-group={g.id}>
                 <div className="flex items-center">
                   <Link
                     href={g.href}
