@@ -457,7 +457,8 @@ export const assessmentGuide: GroupContent = {
               <Mono>/assess &lt;target&gt;</Mono> (alias <Mono>/agent</Mono>), or simply a target typed at the prompt while a
               model is active, builds the run and its scope like the scripted flow and opens the Template screen. Text
               that is not a target is refused: &quot;That doesn&apos;t look like a scan target (URL, host or repo).&quot;
-              A running assessment is stopped (it stays listed under <Mono>/assessments</Mono>) and a fresh one starts.
+              A running assessment&apos;s playback pauses and it stays listed under <Mono>/assessments</Mono> (reopening it
+              resumes it); a fresh one starts.
             </li>
             <li>
               The scope manifest lists the agent&apos;s whole tool set (the harness&apos;s scanners: gobuster, httpprobe,
@@ -473,8 +474,9 @@ export const assessmentGuide: GroupContent = {
             <li>
               When the agent needs a decision it pops a dialog (&quot;AGENT NEEDS YOUR DECISION&quot;, Yes/No or its own
               options); when it needs a login it pops the secure-input form. A username and password are exchanged
-              host-side for a session, so the raw password never reaches the model; a <strong>token or cookie</strong>{" "}
-              you type is handed back to the agent as the tool&apos;s result, so it does reach the model and its provider.
+              host-side for a session, so the raw password never reaches the model, but the <strong>session it mints
+              (a header with a bearer token or cookie)</strong>, like a <strong>token or cookie you type</strong>, is handed
+              back to the agent as the tool&apos;s result, so it does reach the model and its provider.
             </li>
             <li>
               A line typed during the run continues the same agent (its history is kept). While a turn runs, chat waits:
@@ -490,11 +492,16 @@ export const assessmentGuide: GroupContent = {
             the API key is decrypted only for that call.
           </p>
         </DocSection>
-        <DocSection title="What stays the same">
-          <Callout variant="warning" title="Real tools, same guardrails">
-            The agent runs real tools against the target you named. Only assess what you are authorized to test. The
-            scope approval, the dialogs for decisions and logins, the redaction of evidence and the audit trail apply
-            as in the scripted flow; without a model or the harness, the scripted demo runs instead.
+        <DocSection title="What is and is not enforced">
+          <Callout variant="warning" title="Real tools, fewer guardrails">
+            The agent runs real tools against the target you named. Only assess what you are authorized to test. In
+            agent mode the approved scope <strong>authorizes the target and the tool set</strong>, and that is all it
+            does: the allowed methods, the excluded paths, the ports, the time limit and the per-action approval gates
+            (MEDIUM, and the HIGH double check) are <strong>not enforced on the agent</strong>. It is told the engagement
+            is approved and not to ask for confirmation, and nothing it sends passes the policy engine. What does apply:
+            the scope approval before anything starts, the dialogs it opens for decisions and logins, the redaction of
+            the evidence it records, and the audit trail. Without a model or the harness, the scripted demo runs
+            instead.
           </Callout>
         </DocSection>
       </>

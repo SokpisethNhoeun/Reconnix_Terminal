@@ -162,7 +162,10 @@ LLM_MODEL=your-model-id                  # the model id at that endpoint
 LLM_TIMEOUT=120                          # per-request timeout, seconds`}</Code>
           <p>
             The Reconix provider&apos;s API key is <strong>not</strong> in <Mono>.env</Mono>: enter it with{" "}
-            <Mono>/provider set reconix</Mono>. The other providers are added entirely in the terminal.
+            <Mono>/provider set reconix</Mono>. Saving copies the base URL and model into <Mono>llm.db</Mono>, and tests
+            and chat read that copy: after changing <Mono>LLM_BASE_URL</Mono> or <Mono>LLM_MODEL</Mono>, restart, run{" "}
+            <Mono>/provider set reconix</Mono> again (leave the key blank to keep it) and test again. The other
+            providers are added entirely in the terminal.
           </p>
         </DocSection>
         <DocSection title="Where keys are stored">
@@ -219,7 +222,7 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
               { key: "At least one model name is required.", value: "The model field is empty." },
               { key: "That model name is too long.", value: "Model names are limited to 200 characters." },
               { key: "<Provider> holds a single model.", value: "Ollama and the custom endpoint take exactly one model; frontier providers take a list." },
-              { key: "Reconix's base URL comes from .env and can't be changed.", value: "The Reconix provider's base URL and model are read-only; edit .env and restart." },
+              { key: "Reconix's base URL comes from .env and can't be changed.", value: "The Reconix provider's base URL and model are read-only: edit .env, restart, then /provider set reconix to re-save them (see Configuration)." },
               { key: "Reconix's model comes from .env and can't be changed.", value: "Same for the model." },
             ]}
           />

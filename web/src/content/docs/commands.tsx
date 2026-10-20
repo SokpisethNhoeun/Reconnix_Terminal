@@ -299,7 +299,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
         agent&apos;s whole tool set. Approving the scope hands the assessment to the agent, which runs on the Execution
         screen: its plan as task rows, its tool calls in the live output, its findings as <Mono>AI-NNN</Mono> findings.
         It asks for decisions and logins through dialogs; a chat line continues it; <Mono>/model</Mono> switches its model
-        mid-run. A running assessment is stopped and stays listed under <Mono>/assessments</Mono>. See{" "}
+        mid-run. A running assessment&apos;s playback pauses and it stays listed under <Mono>/assessments</Mono>. See{" "}
         <DocLink href="/docs/assessment-guide/ai-agent">The AI agent</DocLink>.
       </>
     ),
