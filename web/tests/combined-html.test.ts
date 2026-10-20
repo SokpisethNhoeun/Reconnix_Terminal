@@ -1,6 +1,7 @@
 /* The combined report's HTML (lib/report/combined/html.ts): its ten sections, the anchors,
-   every run and finding, escaping, no scripts — and that the single report, whose helpers it
-   now shares, is byte-identical to the copy saved before the refactor. */
+   every run and finding, escaping, no scripts, its own meta CSP — and that the single report,
+   whose helpers it shares, still matches its saved copy (regenerated once, deliberately, when the
+   meta CSP was added to it; otherwise byte-identical to the pre-refactor copy). */
 import { describe, expect, it } from "vitest";
 
 import { renderCombinedHtml } from "@/lib/report/combined/html";
@@ -38,6 +39,22 @@ describe("the combined HTML report", () => {
     }
     expect(html).toContain("Generated 2026-10-20");
     expect(html).toContain("break-before:page");
+    expect(html).toContain(`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">`);
+  });
+
+  it("claims approval only when every run's scope was approved", () => {
+    expect(html).toContain("Every run tested inside a scope the operator approved");
+    const draft = { ...picked[0], scope: { ...picked[0].scope!, status: "DRAFT" } };
+    const out = renderCombinedHtml(combineAssessments([draft, picked[1]], DEFAULT_COMBINE_OPTIONS));
+    expect(out).not.toContain("Every run tested inside a scope the operator approved");
+    expect(out).toContain("1 of the runs had no approved scope: see Limitations.");
+    expect(out).toContain("combined <b>2 assessments</b>");
+  });
+
+  it("says when a completed run recorded no findings", () => {
+    const out = renderCombinedHtml(combineAssessments([{ ...picked[0], findings: [] }], DEFAULT_COMBINE_OPTIONS));
+    expect(out).toContain("This run completed and recorded no findings.");
+    expect(out).toContain("Every run completed inside an approved scope; nothing was left out.");
   });
 
   it("names every run, its uid and every included finding", () => {
@@ -75,8 +92,18 @@ describe("the combined HTML report", () => {
 });
 
 describe("the single report", () => {
-  it("is unchanged by sharing its helpers (byte-identical to the saved copy)", async () => {
+  it("matches its saved copy, and carries the meta CSP", async () => {
     const a = all.find((x) => x.findings.length > 0 && x.scope)!;
-    await expect(renderReportHtml(a, new Date("2026-10-05T12:00:00Z"))).toMatchFileSnapshot("./__snapshots__/single-report.html");
+    const out = renderReportHtml(a, new Date("2026-10-05T12:00:00Z"));
+    expect(out).toContain(`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">`);
+    await expect(out).toMatchFileSnapshot("./__snapshots__/single-report.html");
+  });
+
+  it("never lets a triage status named like an Object built-in pick a class", () => {
+    const a = all.find((x) => x.findings.length > 0)!;
+    const out = renderReportHtml({ ...a, findings: [{ ...a.findings[0], status: "constructor", severity: "HIGH", validation: "toString" }] });
+    expect(out).toContain('<span class="st open">constructor</span>');
+    expect(out).toContain('<span class="val inconclusive">tostring</span>');
+    expect(out).not.toContain("function Object");
   });
 });

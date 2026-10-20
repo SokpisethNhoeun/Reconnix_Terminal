@@ -78,8 +78,13 @@ Figma changes before then. This plan answers the "Master implementation prompt" 
    - **Styles:** one stylesheet per area (`findings.css`, `assessments.css`, `reports.css`,
      `docs.css`), so no two agents edit one stylesheet.
    - **Tokens:** only the main agent changes `theme.py` / `lib/status.ts`.
-   - **Combined report API contract:** `GET /api/reports/combined?uids=a,b&format=pdf|html&opts=…`.
-     It needs `viewer`, accepts 1–5 valid uids (else 400), only reads, and writes nothing.
+   - **Combined report API contract:**
+     `GET /api/reports/combined?uids=a,b&format=pdf|html&evidence=1&low=1&appendix=1`.
+     It needs `viewer`, accepts 1–5 distinct valid uids (else 400), `format` defaults to `html`,
+     and each option is a flag (`1`/`true` on; absent, `0` or `false` off) — so a bare `?uids=a`
+     builds the report with every option off; the Report view's panel starts with all three on.
+     It only reads (one read of the folder per request) and writes nothing; 404 names a missing
+     run, 501 (no browser to print the PDF) carries the HTML link.
 4. One worktree per workstream: `reconix-wt3/<area>` on `redesign/v3-<area>`.
 
 ### Phase 1 — parallel workstreams (code, each in its own worktree)

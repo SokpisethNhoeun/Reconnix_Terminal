@@ -11,6 +11,7 @@
 import { type Assessment, type Finding, SEVERITIES, type Severity, type Status, STATUSES } from "@/lib/data/schema";
 import { effectiveSeverity, isConfirmed, isFalsePositive } from "@/lib/data/stats";
 
+import { sevRank } from "../html";
 import type { CombineOptions } from "./options";
 
 export const COMBINED_TITLE = "Combined security assessment report";
@@ -93,6 +94,7 @@ export interface RunSection extends RunRef {
   scope: ScopeSummary | null;
   plan: { done: number; total: number; steps: { label: string; status: "pending" | "active" | "done" }[] };
   findings: Occurrence[]; // the ones the report includes, worst first
+  finished: boolean; // Completed: an empty findings list means it recorded none
   approvals: { approved: number; rejected: number; pending: number; total: number };
   blocked: number; // requests the policy engine refused
   requests: number;
@@ -137,6 +139,7 @@ export interface CombinedReport {
     uniqueBySeverity: Record<Severity, number>;
     occurrencesBySeverity: Record<Severity, number>;
     confirmed: number; // unique findings confirmed in at least one run
+    scopesApproved: number; // runs whose Scope Manifest the operator approved
     worst: Severity | null;
     topRisks: UniqueFinding[]; // the first five priorities
     leftOut: { falsePositives: number; minor: number }; // findings not in this report
@@ -176,7 +179,6 @@ export const identityOf = (f: Pick<Finding, "title" | "cwe" | "references" | "af
 
 // --- helpers -----------------------------------------------------------------------------
 
-const sevRank = (s: Severity) => SEVERITIES.indexOf(s);
 const runId = (a: Assessment) => a.assessment_id || a.label || a.uid;
 const distinct = (items: string[]) => [...new Set(items.filter(Boolean))];
 const parse = (iso: string | null | undefined) => {
@@ -253,7 +255,7 @@ function runSection(a: Assessment, findings: Occurrence[]): RunSection {
   if (!a.scope) missing.push("scope");
   if (!a.plan.length) missing.push("plan");
   if (!a.run.started_at) missing.push("timing");
-  if (!a.findings.length) missing.push("findings");
+  if (!a.findings.length && a.status !== "Completed") missing.push("findings"); // a completed run may simply have found nothing
   const details: { label: string; value: string }[] = [
     { label: "Assessment", value: ref.id },
     { label: "Template", value: ref.template },
@@ -274,6 +276,7 @@ function runSection(a: Assessment, findings: Occurrence[]): RunSection {
     scope: scopeSummary(a),
     plan: { done, total: a.plan.length, steps: a.plan.map((p) => ({ label: p.label, status: p.status })) },
     findings: [...findings].sort(byWorst),
+    finished: a.status === "Completed",
     approvals: { approved: decided("APPROVED"), rejected: decided("REJECTED"), pending, total: a.approvals.length },
     blocked: a.verdicts.filter((v) => !v.allowed).length,
     requests: a.run.requests,
@@ -314,6 +317,9 @@ function uniqueFindings(occurrences: Occurrence[], identity: Map<string, string>
     );
 }
 
+/** "plan", "plan or timing", "plan, timing or findings". */
+const listWords = (items: string[]) => (items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`);
+
 const RUN_LIMITS: Partial<Record<Status, string>> = {
   Interrupted: "was interrupted before it finished: its findings and coverage may be incomplete",
   Stopped: "was stopped by the operator before it finished: its findings and coverage may be incomplete",
@@ -339,7 +345,7 @@ function limitations(list: Assessment[], sections: RunSection[], leftOut: { fals
       out.push({ kind: "plan", run: s.id, text: `${s.id} completed ${s.plan.done} of ${s.plan.total} plan steps.` });
     }
     const missing = s.missing.filter((m) => m !== "scope");
-    if (missing.length) out.push({ kind: "data", run: s.id, text: `${s.id} has no ${missing.join(", ")} saved.` });
+    if (missing.length) out.push({ kind: "data", run: s.id, text: `${s.id} has no ${listWords(missing)} saved.` });
   }
   if (leftOut.falsePositives) {
     const n = leftOut.falsePositives;
@@ -347,7 +353,8 @@ function limitations(list: Assessment[], sections: RunSection[], leftOut: { fals
   }
   if (!opts.low) {
     const n = leftOut.minor;
-    out.push({ kind: "left-out", run: null, text: `LOW and INFO findings were left out by the report's options (${n} in these runs).` });
+    const count = n ? ` (${n} in these runs)` : "";
+    out.push({ kind: "left-out", run: null, text: `LOW and INFO findings were left out by the report's options${count}.` });
   }
   if (!opts.evidence) out.push({ kind: "left-out", run: null, text: "Evidence lines were left out by the report's options." });
   if (!opts.appendix) out.push({ kind: "left-out", run: null, text: "The appendix (tools, references, run ids) was left out by the report's options." });
@@ -441,6 +448,7 @@ export function combineAssessments(list: Assessment[], opts: CombineOptions): Co
       uniqueBySeverity: bySeverity(unique),
       occurrencesBySeverity: bySeverity(occurrences),
       confirmed: unique.filter((u) => u.confirmed).length,
+      scopesApproved: runs.filter((a) => a.scope?.status === "APPROVED").length,
       worst: unique[0]?.severity ?? null,
       topRisks: unique.slice(0, 5),
       leftOut,

@@ -8,13 +8,20 @@
    exported for the combined report (combined/html.ts), which must look the same. */
 import type { Assessment, Finding } from "@/lib/data/schema";
 
-export const SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
-export const SEV_CLASS: Record<string, string> = { CRITICAL: "crit", HIGH: "high", MEDIUM: "med", LOW: "low", INFO: "info" };
+const SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
+const SEV_CLASS: Record<string, string> = { CRITICAL: "crit", HIGH: "high", MEDIUM: "med", LOW: "low", INFO: "info" };
 const VALIDATION_CLASS: Record<string, string> = { CONFIRMED: "confirmed", UNCONFIRMED: "unconfirmed", INCONCLUSIVE: "inconclusive" };
 const STATUS_CLASS: Record<string, string> = { open: "open", fixed: "fixed", accepted: "accepted", "false-positive": "falsepos" };
 const STATUS_LABEL: Record<string, string> = { open: "Open", fixed: "Fixed", accepted: "Accepted", "false-positive": "False+" };
 
 const escapeMap: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#x27;" };
+
+/** `map[key]`, but only the map's own entries (a status named "constructor" is not one). */
+const own = (map: Record<string, string>, key: string, fallback: string) => (Object.hasOwn(map, key) ? map[key] : fallback);
+
+/** The document's own policy, for the downloaded file and the printer's temp copy: no scripts,
+    no requests, only its inline styles and data: images. */
+export const META_CSP = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">`;
 
 /** Escape one line of text, collapsing runs of whitespace (for inline copy). */
 export function esc(value: unknown): string {
@@ -36,21 +43,23 @@ export const sevRank = (s: string) => {
   const i = (SEV_ORDER as readonly string[]).indexOf(s.toUpperCase());
   return i < 0 ? SEV_ORDER.length : i;
 };
+/** The CSS class of a severity ("crit", "high", …; unknown ones read as info). */
+export const sevClass = (severity: string) => own(SEV_CLASS, severity.toUpperCase(), "info");
 
-export function counts(findings: Pick<Finding, "severity">[]): Record<string, number> {
+function counts(findings: Pick<Finding, "severity">[]): Record<string, number> {
   const out: Record<string, number> = Object.fromEntries(SEV_ORDER.map((s) => [s, 0]));
-  for (const f of findings) if (f.severity in out) out[f.severity] += 1;
+  for (const f of findings) if (Object.hasOwn(out, f.severity)) out[f.severity] += 1;
   return out;
 }
 
-export const pill = (severity: string) => `<span class="sev ${SEV_CLASS[severity.toUpperCase()] ?? "info"}">${esc(title(severity))}</span>`;
+export const pill = (severity: string) => `<span class="sev ${sevClass(severity)}">${esc(title(severity))}</span>`;
 export const validation = (state: string) =>
-  `<span class="val ${VALIDATION_CLASS[state.toUpperCase()] ?? "inconclusive"}">${esc(title(state))}</span>`;
+  `<span class="val ${own(VALIDATION_CLASS, state.toUpperCase(), "inconclusive")}">${esc(title(state))}</span>`;
 export const status = (f: Pick<Finding, "status">) => {
   const s = f.status || "open";
-  return `<span class="st ${STATUS_CLASS[s] ?? "open"}">${esc(STATUS_LABEL[s] ?? s)}</span>`;
+  return `<span class="st ${own(STATUS_CLASS, s, "open")}">${esc(own(STATUS_LABEL, s, s))}</span>`;
 };
-export const cvss = (f: Finding) => (f.cvss_score ? f.cvss_score.toFixed(1) : "—");
+const cvss = (f: Finding) => (f.cvss_score ? f.cvss_score.toFixed(1) : "—");
 
 /* --- the fixed stylesheet (identical to the TUI's report) ----------------------------------- */
 export const CSS = `
@@ -262,8 +271,8 @@ function scopeBlock(a: Assessment): string {
   );
 }
 
-export function findingCard(f: Finding): string {
-  const cls = SEV_CLASS[f.severity.toUpperCase()] ?? "info";
+function findingCard(f: Finding): string {
+  const cls = sevClass(f.severity);
   const mapping = esc([...f.owasp, ...f.cwe, ...f.cve].join(", ") || "—");
   const badge = f.cvss_score ? `<span class="find-cvss">CVSS ${f.cvss_score.toFixed(1)}</span>` : "";
   const vector = f.cvss_vector ? `<div><dt>CVSS vector</dt><dd>${esc(f.cvss_vector)}</dd></div>` : "";
@@ -334,7 +343,7 @@ export function renderReportHtml(a: Assessment, now: Date = new Date()): string 
     `${governance(a)}</section><div class="pfoot"><span>Reconix — Confidential</span><span>${engagement} · End of report</span></div></section>` +
     `</main>`;
   return (
-    `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
+    `<!doctype html>\n<html lang="en"><head><meta charset="utf-8">${META_CSP}<meta name="viewport" content="width=device-width, initial-scale=1">` +
     `<title>Reconix Report — ${engagement}</title><style>${CSS}</style></head><body>${body}</body></html>\n`
   );
 }

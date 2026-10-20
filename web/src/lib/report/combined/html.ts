@@ -7,7 +7,7 @@
    masked before it was saved. */
 import type { Severity } from "@/lib/data/schema";
 
-import { CSS, chips, esc, escPre, pill, SEV_CLASS, severityBlock, shortDate, status, title, validation } from "../html";
+import { chips, CSS, esc, escPre, META_CSP, pill, sevClass, severityBlock, shortDate, status, title, validation } from "../html";
 import type { CombinedReport, Limitation, Occurrence, Priority, RunSection, UniqueFinding } from "./select";
 
 /* --- additions to the single report's stylesheet ------------------------------------------ */
@@ -108,12 +108,15 @@ function summary(r: CombinedReport): string {
   const top = s.topRisks[0];
   const lead = top ? `, led by <b>${esc(top.title)}</b> (seen in ${plural(top.runs.length, "run")})` : "";
   const targets = plural(r.cover.targets.length, "target");
+  const approval =
+    s.scopesApproved === s.runs
+      ? " Every run tested inside a scope the operator approved; intrusive actions ran only after explicit, single-use approval."
+      : ` ${s.runs - s.scopesApproved} of the runs had no approved scope: see Limitations.`;
   const narrative =
-    `<p class="summary">Reconix combined <b>${plural(s.runs, "authorized assessment")}</b> of ${targets}` +
+    `<p class="summary">Reconix combined <b>${plural(s.runs, "assessment")}</b> of ${targets}` +
     ` (${esc(r.cover.templates.join(", ") || "—")}). Together they recorded <b>${plural(s.occurrences, "finding occurrence")}</b>, which are` +
     ` <b>${plural(s.unique, "unique finding")}</b> — ${esc(breakdown)}. The highest severity is <b>${esc(title(s.worst ?? "none"))}</b>${lead}.` +
-    ` ${s.confirmed} of the unique findings ${s.confirmed === 1 ? "is" : "are"} confirmed with evidence in at least one run.` +
-    ` Intrusive actions ran only after explicit, single-use approval.</p>`;
+    ` ${s.confirmed} of the unique findings ${s.confirmed === 1 ? "is" : "are"} confirmed with evidence in at least one run.${approval}</p>`;
   const risks = s.topRisks.length
     ? `<div class="tw"><table><thead><tr><th>#</th><th>Top risk</th><th>Severity</th><th>CVSS</th><th>Runs</th></tr></thead><tbody>${s.topRisks
         .map((u, i) => `<tr><td class="id">${i + 1}</td><td>${esc(u.title)}</td><td>${pill(u.severity)}</td><td class="mono">${score(u.cvss)}</td><td>${runTags(u.runs)}</td></tr>`)
@@ -196,7 +199,7 @@ function runFindings(x: RunSection): string {
           `<tr><td class="id">${esc(o.id)}</td><td>${esc(o.title)}</td><td>${pill(o.severity)}</td><td class="mono">${score(o.cvss)}</td>` +
           `<td>${validation(o.validation)}</td><td>${status(o)}</td><td>${esc(o.tool || "—")}</td></tr>`,
       )
-      .join("") || `<tr><td colspan="7">No findings in this report for this run.</td></tr>`;
+      .join("") || `<tr><td colspan="7">${x.finished ? "This run completed and recorded no findings." : "No findings in this report for this run."}</td></tr>`;
   return (
     `<div class="sub-h">Findings · ${x.findings.length}</div><div class="tw"><table><thead><tr><th>ID</th><th>Finding</th><th>Severity</th>` +
     `<th>CVSS</th><th>Validation</th><th>Status</th><th>Tool</th></tr></thead><tbody>${rows}</tbody></table></div>`
@@ -227,7 +230,7 @@ function occurrenceCard(o: Occurrence, withEvidence: boolean): string {
   const vector = o.cvssVector ? `<div><dt>CVSS vector</dt><dd>${esc(o.cvssVector)}</dd></div>` : "";
   const note = o.note ? `<div class="fb"><span class="eyebrow">Analyst note</span><p>${esc(o.note)}</p></div>` : "";
   return (
-    `<div class="occ" id="occ-${esc(o.key)}"><div class="occ-head"><span class="run">${esc(o.runId)}</span><b>${esc(o.id)}</b>` +
+    `<div class="occ"><div class="occ-head"><span class="run">${esc(o.runId)}</span><b>${esc(o.id)}</b>` +
     `${pill(o.severity)}${validation(o.validation)}${status(o)}<span class="find-cvss">CVSS ${score(o.cvss)}</span></div>` +
     `<dl class="find-meta"><div><dt>Saved copy</dt><dd>${esc(o.uid)}</dd></div><div><dt>Location</dt><dd>${esc(o.location || "—")}</dd></div>` +
     `<div><dt>Detected by</dt><dd>${esc(o.tool || "—")}</dd></div><div><dt>Mapping</dt><dd>${esc(o.references.join(", ") || "—")}</dd></div>${vector}</dl>` +
@@ -237,9 +240,8 @@ function occurrenceCard(o: Occurrence, withEvidence: boolean): string {
 }
 
 function uniqueCard(u: UniqueFinding, withEvidence: boolean): string {
-  const cls = SEV_CLASS[u.severity] ?? "info";
   return (
-    `<div class="find s-${cls}" id="u-${esc(u.key)}"><div class="find-head"><h3>${esc(u.title)}</h3>${pill(u.severity)}` +
+    `<div class="find s-${sevClass(u.severity)}"><div class="find-head"><h3>${esc(u.title)}</h3>${pill(u.severity)}` +
     `${validation(u.confirmed ? "CONFIRMED" : "UNCONFIRMED")}<span class="find-cvss">CVSS ${score(u.cvss)}</span></div>` +
     `<div class="find-body"><dl class="find-meta"><div><dt>Target</dt><dd>${esc(u.target || "—")}</dd></div><div><dt>Weakness</dt><dd>${esc(u.cwe ?? "—")}</dd></div>` +
     `<div><dt>Category</dt><dd>${esc(u.category || "—")}</dd></div><div><dt>Seen in</dt><dd>${esc(u.runs.join(", "))}</dd></div></dl>` +
@@ -315,7 +317,7 @@ export function renderCombinedHtml(r: CombinedReport, now: Date = new Date()): s
   ].join("");
   const body = `<div class="toolbar"><span class="hint">&#8681; Press Ctrl+P / &#8984;P to save as PDF</span></div><main class="doc">${sheets}</main>`;
   return (
-    `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
+    `<!doctype html>\n<html lang="en"><head><meta charset="utf-8">${META_CSP}<meta name="viewport" content="width=device-width, initial-scale=1">` +
     `<title>Reconix Combined Report — ${plural(r.summary.runs, "run")}</title><style>${CSS}${EXTRA_CSS}</style></head><body>${body}</body></html>\n`
   );
 }

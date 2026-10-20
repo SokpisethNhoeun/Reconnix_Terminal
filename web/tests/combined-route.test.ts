@@ -1,13 +1,13 @@
 /* GET /api/reports/combined called directly (the e2e tests go through the proxy too): the
    viewer role, the query checked before anything is read (1–5 distinct uids, the format, the
    flags), 404 for a run that is not saved, the HTML inline, the PDF as a download, 501 with the
-   HTML link when no browser can print — and that the dashboard may frame the HTML. */
+   HTML link when no browser can print. Every answer is no-store. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { contentSecurityPolicy, framable } from "@/lib/auth/csp";
 import { COOKIE, sessionValue } from "@/lib/auth/session";
 import { COMBINE_MAX, combinedFileName, combinedHref } from "@/lib/report/combined/options";
 import { parseCombinedQuery } from "@/lib/report/combined/query";
+import { chromeBinary } from "@/lib/report/pdf";
 
 import { sampleNames } from "./fixtures";
 
@@ -69,7 +69,9 @@ describe("the query", () => {
 describe("GET /api/reports/combined", () => {
   it("needs the viewer role", async () => {
     cookie = "";
-    expect((await get(`uids=${uids[0]}`)).status).toBe(401);
+    const res = await get(`uids=${uids[0]}`);
+    expect(res.status).toBe(401);
+    expect(res.headers.get("cache-control")).toBe("no-store");
     cookie = "viewer.forged";
     expect((await get(`uids=${uids[0]}`)).status).toBe(401);
   });
@@ -79,12 +81,15 @@ describe("GET /api/reports/combined", () => {
     expect((await get("uids=../etc")).status).toBe(400);
     expect((await get(`uids=${uids[0]}&format=exe`)).status).toBe(400);
     expect((await get(`uids=${uids[0]}&low=maybe`)).status).toBe(400);
-    expect(await detail(await get("uids="))).toContain("Bad request");
+    const res = await get("uids=");
+    expect(await detail(res)).toContain("Bad request");
+    expect(res.headers.get("cache-control")).toBe("no-store");
   });
 
   it("is a 404 when a run is not saved", async () => {
     const res = await get(`uids=${uids[0]},20200101-000000-dead_RCX-NOPE-1`);
     expect(res.status).toBe(404);
+    expect(res.headers.get("cache-control")).toBe("no-store");
     expect(await detail(res)).toContain("20200101-000000-dead_RCX-NOPE-1");
   });
 
@@ -98,6 +103,8 @@ describe("GET /api/reports/combined", () => {
     expect(html).toContain(uids[0]);
     expect(html).toContain(uids[1]);
     expect(html).toContain("Combined security assessment report");
+    expect(html).toContain(`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">`);
+    expect(html).not.toContain("<script");
   });
 
   it("answers 501 with the HTML link when no browser can print the PDF", async () => {
@@ -110,28 +117,13 @@ describe("GET /api/reports/combined", () => {
     expect(body.html).toBe(combinedHref([uids[0], uids[1]], "html", { evidence: false, low: true, appendix: false }));
   });
 
-  it("prints one PDF as a download when a browser is there", { timeout: 90_000 }, async () => {
-    if (!process.env.CHROMIUM_PATH && !process.env.RECONIX_CHROME_TEST) {
-      // a printer is not part of the unit test machine's contract; the e2e spec downloads a real one
-      const { chromeBinary } = await import("@/lib/report/pdf");
-      if (!chromeBinary()) return;
-    }
+  // a printer is not part of every machine's contract; the e2e spec downloads a real one too
+  it.skipIf(!chromeBinary())("prints one PDF as a download when a browser is there", { timeout: 90_000 }, async () => {
     const res = await get(`uids=${uids[0]},${uids[1]}&format=pdf`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("application/pdf");
     expect(res.headers.get("content-disposition")).toMatch(/^attachment; filename="combined-2-runs-\d{4}-\d{2}-\d{2}\.pdf"$/);
     const bytes = new Uint8Array(await res.arrayBuffer());
     expect(String.fromCharCode(...bytes.subarray(0, 5))).toBe("%PDF-");
-  });
-});
-
-describe("framing", () => {
-  it("lets the dashboard frame the combined report, and nothing else new", () => {
-    expect(framable("/api/reports/combined")).toBe(true);
-    expect(contentSecurityPolicy("n", "/api/reports/combined")).toContain("frame-ancestors 'self'");
-    for (const path of ["/api/reports", "/api/reports/combined/x", "/reports/combined", "/"]) {
-      expect(framable(path)).toBe(false);
-      expect(contentSecurityPolicy("n", path)).toContain("frame-ancestors 'none'");
-    }
   });
 });

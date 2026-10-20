@@ -120,6 +120,17 @@ describe("the options", () => {
     expect(r.findings.every((u) => u.severity !== "LOW" && u.severity !== "INFO")).toBe(true);
     expect(r.summary.leftOut.minor).toBe(minor);
     expect(r.limitations.some((l) => l.kind === "left-out" && l.text.includes(`(${minor} in these runs)`))).toBe(true);
+    // the priorities and the top risks drop them too
+    expect(r.priorities.every((p) => p.severity !== "LOW" && p.severity !== "INFO")).toBe(true);
+    expect(r.summary.topRisks.every((u) => u.severity !== "LOW" && u.severity !== "INFO")).toBe(true);
+    expect(r.priorities.length).toBe(full.priorities.length - full.priorities.filter((p) => p.severity === "LOW" || p.severity === "INFO").length);
+  });
+
+  it("say nothing was dropped when no LOW or INFO finding existed", () => {
+    const high = { ...api1, findings: api1.findings.filter((f) => f.severity === "MEDIUM") };
+    const r = combineAssessments([high], { ...opts, low: false });
+    const line = r.limitations.find((l) => l.text.startsWith("LOW and INFO"))!;
+    expect(line.text).toBe("LOW and INFO findings were left out by the report's options.");
   });
 
   it("leave out the evidence lines and the appendix", () => {
@@ -153,7 +164,7 @@ describe("missing data", () => {
     const texts = r.limitations.map((l) => l.text);
     expect(texts).toContain("RCX-TEST-009 was interrupted before it finished: its findings and coverage may be incomplete (the terminal closed).");
     expect(texts).toContain("RCX-TEST-009 has no Scope Manifest saved: the boundary of its testing is not recorded.");
-    expect(texts).toContain("RCX-TEST-009 has no plan, timing saved.");
+    expect(texts).toContain("RCX-TEST-009 has no plan or timing saved.");
     expect(texts).toContain("1 finding marked as false positive was left out.");
     expect(r.summary.leftOut.falsePositives).toBe(1);
     expect(r.summary.byStatus).toEqual([
@@ -164,7 +175,41 @@ describe("missing data", () => {
 
   it("notes a scope that was never approved", () => {
     const draft = { ...api1, scope: { ...api1.scope!, status: "DRAFT" } };
-    const r = combineAssessments([draft], opts);
+    const r = combineAssessments([draft, api2], opts);
     expect(r.limitations.map((l) => l.text)).toContain("RCX-DEMO-001's scope was not approved (DRAFT): testing could not start inside an approved boundary.");
+    expect(r.summary.scopesApproved).toBe(1);
+    expect(combineAssessments([api1, api2], opts).summary.scopesApproved).toBe(2);
+  });
+
+  it("does not call a completed run with no findings incomplete", () => {
+    const clean = { ...api1, findings: [] };
+    const r = combineAssessments([clean], opts);
+    expect(r.runs[0].missing).toEqual([]);
+    expect(r.runs[0].finished).toBe(true);
+    expect(r.limitations).toEqual([]);
+    const unfinished = combineAssessments([{ ...clean, status: "Stopped" }], opts);
+    expect(unfinished.runs[0].missing).toEqual(["findings"]);
+    expect(unfinished.runs[0].finished).toBe(false);
+  });
+});
+
+describe("edge cases of the identity", () => {
+  it("folds two same-identity findings inside one run into one unique finding, counting the run once", () => {
+    const twice = { ...api1, findings: [api1.findings[0], { ...api1.findings[0], id: "001-dup", validation: "UNCONFIRMED" }] };
+    const r = combineAssessments([twice], opts);
+    expect(r.summary.unique).toBe(1);
+    expect(r.summary.occurrences).toBe(2);
+    expect(r.findings[0].occurrences.map((o) => o.id)).toEqual(["001", "001-dup"]);
+    expect(r.findings[0].runs).toEqual(["RCX-DEMO-001"]);
+    expect(r.findings[0].confirmed).toBe(true);
+  });
+
+  it("breaks ties by CVSS, then occurrences, then title", () => {
+    const base = { ...api1.findings[0], severity: "MEDIUM" as const, cwe: [], references: [], affected_url: "" };
+    const mk = (title: string, cvss: number, path: string) => ({ ...base, id: `${title}-${path}`, title, cvss_score: cvss, path });
+    const one = { ...api1, findings: [mk("Beta", 5, "/a"), mk("Alpha", 5, "/b"), mk("Gamma", 7, "/c"), mk("Seen twice", 5, "/d")] };
+    const two = { ...api2, findings: [mk("Seen twice", 5, "/d")] };
+    const r = combineAssessments([one, two], opts);
+    expect(r.findings.map((u) => u.title)).toEqual(["Gamma", "Seen twice", "Alpha", "Beta"]);
   });
 });

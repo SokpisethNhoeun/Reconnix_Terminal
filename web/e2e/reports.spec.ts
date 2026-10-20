@@ -1,12 +1,13 @@
 /* Combining saved runs into one report, in the Report view's all-runs mode: pick runs (the
    sixth is disabled with a reason, Clear empties the selection, the selection survives a
    search), Preview report frames the combined HTML with every chosen run in it, Generate PDF
-   downloads one real PDF, and the panel works at phone size. The 501 path (no browser to
-   print with) is unit-tested in tests/combined-route.test.ts. */
+   downloads one real PDF, the failure paths (a 500 on the preview offers Retry, a 501 on the PDF
+   offers the HTML), and the panel works at phone size. */
 import { readFileSync } from "node:fs";
 
 import { expect, type Page, test } from "@playwright/test";
 
+import { combinedHref } from "../src/lib/report/combined/options";
 import { sample, signIn } from "./support";
 
 const COMBINE_MAX = 5;
@@ -54,11 +55,16 @@ test("two runs preview as one combined report and generate one PDF", async ({ pa
   await expect(doc.getByRole("heading", { name: "Risk & remediation priorities" })).toBeVisible();
   await expect(doc.locator("script")).toHaveCount(0);
 
-  // the same HTML the PDF prints: what the frame shows is what the route serves
-  const res = await page.request.get((await page.locator('iframe[title="Combined report preview"]').getAttribute("src"))!);
+  // the same HTML the PDF prints: what the frame shows is what the route serves (fully sandboxed, no src)
+  const iframe = page.locator('iframe[title="Combined report preview"]');
+  await expect(iframe).toHaveAttribute("sandbox", "");
+  expect(await iframe.getAttribute("src")).toBeNull();
+  const res = await page.request.get(combinedHref(chosen.map((a) => a.uid).sort(), "html", { evidence: true, low: true, appendix: true }));
   expect(res.status()).toBe(200);
-  expect(res.headers()["content-security-policy"]).toContain("frame-ancestors 'self'");
-  expect(await res.text()).toContain("Combined security assessment report");
+  expect(res.headers()["cache-control"]).toBe("no-store");
+  const served = await res.text();
+  expect(served).toContain("Combined security assessment report");
+  expect(await iframe.getAttribute("srcdoc")).toBe(served);
 
   await expect(generate(page)).toBeEnabled();
   const [download] = await Promise.all([page.waitForEvent("download", { timeout: 90_000 }), generate(page).click()]);
@@ -73,6 +79,36 @@ test("two runs preview as one combined report and generate one PDF", async ({ pa
   await expect(page.getByRole("checkbox", { name: "Include the appendix" })).not.toBeChecked();
   await expect(generate(page)).toBeDisabled();
   await expect(page.getByText(/changed since this preview/)).toBeVisible();
+});
+
+test("a failed preview offers Retry, and a PDF without a printer offers the HTML", async ({ page }) => {
+  await openReports(page);
+  let previews = 0;
+  await page.route("**/api/reports/combined?*", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get("format") === "pdf") {
+      await route.fulfill({ status: 501, contentType: "application/json", body: JSON.stringify({ detail: "No browser to print with (stub).", html: `/api/reports/combined?${url.searchParams}`.replace("format=pdf", "format=html") }) });
+      return;
+    }
+    previews += 1;
+    if (previews === 1) await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "Stubbed failure." }) });
+    else await route.continue();
+  });
+  await tick(page, 0);
+  await preview(page).click();
+  const alert = page.getByRole("alert").filter({ hasText: "The preview could not be loaded" });
+  await expect(alert).toContainText("The preview could not be loaded: Stubbed failure.");
+  await expect(generate(page)).toBeDisabled();
+  await alert.getByRole("button", { name: "Retry" }).click();
+  await expect(frame(page).getByRole("heading", { name: "Combined security assessment report" })).toBeVisible({ timeout: 20_000 });
+  await expect(generate(page)).toBeEnabled();
+  await generate(page).click();
+  const status = page.locator(".rep-status");
+  await expect(status).toContainText("No browser to print with (stub).");
+  const html = status.getByRole("link", { name: "Download HTML" });
+  await expect(html).toBeVisible();
+  expect(await html.getAttribute("href")).toContain("format=html");
+  await expect(generate(page)).toBeEnabled(); // not stuck on "Generating…"
 });
 
 test("the sixth run is disabled with a reason, and Clear empties the selection", async ({ page }) => {
@@ -121,6 +157,7 @@ test.describe("at phone size", () => {
     await preview(page).tap();
     const iframe = page.locator('iframe[title="Combined report preview"]');
     await expect(iframe).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator(".rep-preview-card")).toBeFocused(); // the preview takes focus when it appears
     await expect(frame(page).getByRole("heading", { name: "Combined security assessment report" })).toBeVisible();
     const box = (await iframe.boundingBox())!;
     expect(box.width).toBeLessThanOrEqual(390);
