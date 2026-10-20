@@ -1,0 +1,41 @@
+/* ---- Terminal view (the Reconix TUI over xterm.js; from reconix-tui/web's globals.css) ---- */
+.term {
+  position: relative;
+  height: max(420px, calc(100dvh - 250px));
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--term-bg);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--primary) 22%, var(--border)),
+    0 30px 80px -32px color-mix(in oklab, var(--primary) 30%, transparent);
+  overflow: hidden;
+}
+/* Expand: the session card fills the browser window; the page behind it stays put */
+.dash-card.term-full {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  border-radius: 0;
+  padding: 14px 16px 16px;
+}
+.term-full .term { flex: 1; height: auto; min-height: 0; }
+:root:has(.term-full) { overflow: hidden; }
+/* "↓ Latest": over the terminal's bottom right, only while scrolled up */
+.term-latest {
+  position: absolute;
+  right: 16px;
+  bottom: 12px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: color-mix(in oklab, var(--term-text) 14%, var(--term-bg));
+  color: var(--term-text);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--term-text) 22%, transparent), 0 8px 20px -8px rgba(0, 0, 0, 0.6);
+}
+.term-latest:hover { background: color-mix(in oklab, var(--term-text) 22%, var(--term-bg)); }
+.term-latest:focus-visible { outline: 2px solid var(--term-cursor); outline-offset: 2px; }
+.term-latest svg { color: var(--term-cursor); }

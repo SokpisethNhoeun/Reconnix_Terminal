@@ -19,7 +19,7 @@ test("the overview totals every saved file by default", async ({ page }) => {
   await expect(stat(page, "Policy checks")).toHaveText(String(all.reduce((n, a) => n + a.verdicts.length, 0)));
   await page.click(view("Findings"));
   await expect(page.locator('[role="option"]')).toHaveCount(all.reduce((n, a) => n + a.findings.length, 0));
-  await page.click(view("Audit log"));
+  await page.click(view("Reports"));
   await expect(page.getByRole("list", { name: "Saved assessments" }).getByRole("link")).toHaveCount(all.length);
 });
 
@@ -36,7 +36,7 @@ test("one run's overview counts what its file holds", async ({ page }) => {
 
 test("the views switch in the page and keep their place in the address", async ({ page }) => {
   await signIn(page);
-  for (const [name, param] of [["Findings", "findings"], ["Audit log", "audit"], ["Reports", "reports"], ["Scope", "scope"]]) {
+  for (const [name, param] of [["Findings", "findings"], ["Reports", "reports"], ["Scope", "scope"]]) {
     await page.click(view(name));
     await expect(page).toHaveURL(new RegExp(`view=${param}`));
     await expect(page.locator(view(name))).toHaveAttribute("data-active", "true");
@@ -65,14 +65,6 @@ test("a waiting run shows its pending approval", async ({ page }) => {
   await expect(page.getByText(/awaiting approval/).first()).toBeVisible();
   await page.click(view("Scope"));
   await expect(page.getByText("PENDING", { exact: true })).toBeVisible();
-});
-
-test("the audit log lists every activity line", async ({ page }) => {
-  await signIn(page);
-  await page.goto(`/?uid=${newest().uid}`);
-  await page.click(view("Audit log"));
-  const lines = newest().timeline.filter((e) => e.type === "activity").length;
-  await expect(page.locator(".dash-log-row")).toHaveCount(lines);
 });
 
 test("the report links every export format and a download works", async ({ page }) => {
@@ -105,6 +97,13 @@ test("the terminal view runs a session and keeps it while you browse", async ({ 
   await page.click(view("Terminal"));
   await expect(page.getByText("Connected", { exact: true })).toBeVisible();
   await expect(page.locator(".xterm-rows")).toContainText("hello-reconix"); // the same session
+});
+
+test("the removed Audit log address opens the Overview", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/?view=audit");
+  await expect(page.getByRole("heading", { name: "Assessment Operations Center" })).toBeVisible();
+  await expect(page.locator('nav[aria-label="Views"] button[aria-label="Audit log"]')).toHaveCount(0);
 });
 
 test("an unknown assessment opens every run, and an unknown page is a 404", async ({ page }) => {
@@ -144,25 +143,6 @@ test("the overview drills into filtered views", async ({ page }) => {
   await expect(page).toHaveURL(/sev=MEDIUM/);
   await expect(page.locator('[role="option"]')).toHaveCount(medium);
 
-  await page.click(view("Overview"));
-  await page.getByRole("button", { name: "Show the blocked requests in the audit log" }).click();
-  await expect(page).toHaveURL(/view=audit/);
-  await expect(page).toHaveURL(/kind=policy/);
-  await expect(page.locator(".dash-log-row").first()).toContainText("Blocked");
-});
-
-test("the audit log filters by author and search", async ({ page }) => {
-  await signIn(page);
-  await page.goto(`/?uid=${newest().uid}`);
-  await page.click(view("Audit log"));
-  await page.getByRole("group", { name: "By" }).getByRole("button", { name: /^TOOL/ }).click();
-  await expect(page).toHaveURL(/who=TOOL/);
-  const rows = page.locator(".dash-log-row");
-  const n = await rows.count();
-  expect(n).toBe(newest().timeline.filter((e) => e.type === "activity" && e.who === "TOOL").length);
-  for (let i = 0; i < n; i++) await expect(rows.nth(i)).toContainText("TOOL");
-  await page.getByRole("searchbox", { name: "Search the audit log" }).fill("zzz-nothing");
-  await expect(page.getByText("No event matches these filters.")).toBeVisible();
 });
 
 test("the switcher searches every saved run, and the bell lists other waiting runs", async ({ page }) => {

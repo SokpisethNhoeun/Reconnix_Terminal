@@ -1,6 +1,6 @@
 "use client";
 
-/* The filter controls the Findings and Audit log views share: toggle chips with counts, a
+/* The Findings view's filter controls: toggle chips with counts, a
    search field, and a "Clear filters" button. Purely presentational: the views keep the
    values in the address (view-url.ts) and do the filtering. */
 import { Search, X } from "lucide-react";

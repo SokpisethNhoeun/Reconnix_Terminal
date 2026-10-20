@@ -5,7 +5,6 @@
    this browser may use it (lib/auth/guard.ts); the AI Assistant learns what it is about, whether
    this browser may ask (operator role) and which model answers (lib/assistant/config.ts). */
 import type { AssistantInfo } from "@/components/assistant/types";
-import { AuditView } from "@/components/dashboard/audit-view";
 import { deriveDashboard } from "@/components/dashboard/derive";
 import { deriveOverall } from "@/components/dashboard/derive-overall";
 import { EmptyView } from "@/components/dashboard/empty-view";
@@ -56,7 +55,7 @@ export default async function Home({ searchParams }: Props) {
     model: { configured: model.configured, name: model.model, local: model.local, reason: model.reason },
   };
   const empty = <EmptyView dir={dir} problems={library.problems} compact />;
-  // Audit log, Reports and Scope belong to one run: with every run shown, pick one first.
+  // Reports and Scope belong to one run: with every run shown, pick one first.
   const pick = (title: string, about: string) => (overall ? <RunPicker title={title} about={about} items={items} /> : empty);
 
   return (
@@ -90,7 +89,6 @@ export default async function Home({ searchParams }: Props) {
           empty
         )
       }
-      audit={dash ? <AuditView log={dash.log} /> : pick("Audit log", "Each assessment keeps its own audit log. Pick one to read it.")}
       reports={dash ? <ReportsView dash={dash} /> : pick("Report", "Reports are made per assessment. Pick one to see its summary and downloads.")}
       scope={dash ? <ScopeView dash={dash} /> : pick("Scope", "Each assessment has its own approved scope. Pick one to see it.")}
       terminal={<TerminalView access={access} />}

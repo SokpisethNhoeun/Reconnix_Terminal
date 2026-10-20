@@ -1,0 +1,159 @@
+/* Motion: the sidebar and its AI item, the assistant's surface / fill / panel (the open and
+   close animation and the breathing loop), and the AI orb. Owner: animation and navigation. */
+
+/* ---- Sidebar ---- */
+.dash-navbtn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  color: var(--muted-foreground);
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+.dash-navbtn:hover { color: var(--foreground); background: color-mix(in oklab, var(--foreground) 5%, transparent); }
+.dash-navbtn[data-active="true"] {
+  background: var(--surface);
+  border-color: color-mix(in oklab, var(--primary) 25%, transparent);
+  color: var(--primary);
+  box-shadow: 0 0 18px -4px color-mix(in oklab, var(--primary) 45%, transparent);
+}
+/* tooltip (right side) */
+.dash-tip {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  translate: 0 -50%;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 11px;
+  opacity: 0;
+  transform: translateX(-4px);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  z-index: 40;
+}
+.dash-navbtn:hover .dash-tip,
+.dash-navbtn:focus-visible .dash-tip { opacity: 1; transform: translateX(0); }
+
+/* ---- AI Assistant (components/assistant/*) --------------------------------------------
+   stage   — over the top bar and the content, beside the sidebar (never covers it)
+   surface — what the open/close animation moves and resizes (motion.ts)
+   fill    — the surface's background and glow (fades in as it grows)
+   panel   — the chat itself; it breathes once the assistant has settled
+   One 4 s breathing cycle is shared by the panel, the orb and the sidebar's AI icon. */
+.dash-assistant-surface { position: absolute; inset: 0; overflow: hidden; pointer-events: auto; }
+.dash-assistant-fill {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(55% 45% at 50% 0%, color-mix(in oklab, var(--globe-glow) 13%, transparent), transparent 70%),
+    radial-gradient(45% 45% at 100% 100%, color-mix(in oklab, var(--page-glow) 45%, transparent), transparent 70%),
+    var(--background);
+}
+.dash-assistant-panel {
+  position: absolute;
+  inset: 14px; /* room for the breathing scale and glow: nothing clips, nothing scrolls */
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  border: 1px solid color-mix(in oklab, var(--primary) 18%, var(--border));
+  background: linear-gradient(180deg, color-mix(in oklab, var(--card) 90%, transparent), color-mix(in oklab, var(--card-2) 94%, transparent));
+  box-shadow: 0 0 36px -22px color-mix(in oklab, var(--primary) 45%, transparent);
+  overflow: hidden;
+  transform-origin: 50% 50%;
+}
+.dash-assistant-panel.is-breathing { animation: dash-chat-breathe 4s ease-in-out infinite; }
+@keyframes dash-chat-breathe {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 36px -22px color-mix(in oklab, var(--primary) 45%, transparent); }
+  50% { transform: scale(1.003); box-shadow: 0 0 72px -14px color-mix(in oklab, var(--primary) 60%, transparent); }
+}
+/* The top bar sits under the open assistant (the sidebar stays). */
+@media (min-width: 768px) { .dash-frame[data-assistant-open] .dash-topbar { visibility: hidden; } }
+@media (max-width: 767.98px) {
+  .dash-assistant-panel { inset: 8px; }
+}
+
+/* The AI orb: the globe's colours as a small sphere with a dot texture and a halo. */
+.dash-orb {
+  position: relative;
+  display: inline-block;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%,
+    color-mix(in oklab, var(--primary-strong) 85%, var(--foreground)) 0%,
+    var(--primary) 24%,
+    color-mix(in oklab, var(--globe-glow) 70%, transparent) 50%,
+    color-mix(in oklab, var(--primary-dim) 55%, transparent) 69%,
+    transparent 71%);
+  animation: dash-orb-breathe 4s ease-in-out infinite;
+}
+.dash-orb-dots {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-image: radial-gradient(circle, color-mix(in oklab, var(--globe-dot) 80%, transparent) 0.6px, transparent 1.1px);
+  background-size: 4px 4px;
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, var(--foreground) 58%, transparent 70%);
+  mask-image: radial-gradient(circle at 50% 50%, var(--foreground) 58%, transparent 70%);
+  opacity: 0.6;
+}
+@keyframes dash-orb-breathe {
+  0%, 100% { transform: scale(0.96); filter: drop-shadow(0 0 3px color-mix(in oklab, var(--globe-glow) 45%, transparent)); }
+  50% { transform: scale(1.04); filter: drop-shadow(0 0 12px color-mix(in oklab, var(--globe-glow) 70%, transparent)); }
+}
+
+/* The sidebar's AI icon: it breathes (size and a soft halo), stronger while selected. Only the
+   icon scales; the button and its clickable area stay put. */
+.dash-ai-icon {
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  animation: dash-ai-breathe 4s ease-in-out infinite;
+}
+.dash-navbtn[data-active="true"] .dash-ai-icon { animation-name: dash-ai-breathe-on; }
+@keyframes dash-ai-breathe {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 0%, transparent); }
+  50% { transform: scale(1.12); box-shadow: 0 0 10px 2px color-mix(in oklab, var(--primary) 28%, transparent); }
+}
+@keyframes dash-ai-breathe-on {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 6px 1px color-mix(in oklab, var(--primary) 30%, transparent); }
+  50% { transform: scale(1.12); box-shadow: 0 0 16px 4px color-mix(in oklab, var(--primary) 50%, transparent); }
+}
+
+/* The active view's marker: a bar on the sidebar's edge that grows in (under the strip on phones). */
+.dash-navbtn::after {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  width: 3px;
+  height: 18px;
+  margin-top: -9px;
+  border-radius: 0 3px 3px 0;
+  background: var(--primary);
+  box-shadow: 0 0 10px color-mix(in oklab, var(--primary) 70%, transparent);
+  opacity: 0;
+  transform: scaleY(0);
+  transition: transform 0.35s var(--ease-out-expo), opacity 0.2s ease;
+}
+.dash-navbtn[data-active="true"]::after { opacity: 1; transform: scaleY(1); }
+@media (max-width: 767.98px) {
+  .dash-navbtn::after { left: 50%; top: auto; bottom: -6px; width: 18px; height: 3px; margin: 0 0 0 -9px; border-radius: 3px 3px 0 0; transform: scaleX(0); }
+  .dash-navbtn[data-active="true"]::after { transform: scaleX(1); }
+}
+
+/* Reduced motion: no breathing scale; a still halo marks the assistant instead. */
+@media (prefers-reduced-motion: reduce) {
+  .dash-assistant-panel.is-breathing, .dash-orb, .dash-ai-icon,
+  .dash-navbtn[data-active="true"] .dash-ai-icon { animation: none; }
+  .dash-orb { filter: drop-shadow(0 0 8px color-mix(in oklab, var(--globe-glow) 55%, transparent)); }
+  .dash-ai-icon { box-shadow: 0 0 10px 2px color-mix(in oklab, var(--primary) 30%, transparent); }
+  .dash-assistant-panel { box-shadow: 0 0 56px -16px color-mix(in oklab, var(--primary) 55%, transparent); }
+  .dash-navbtn::after { transition: none; }
+}

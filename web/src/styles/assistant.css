@@ -1,0 +1,22 @@
+/* The AI Assistant's own pieces: the composer and the "answering" dots. Owner: the assistant UI. */
+
+.dash-composer {
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  transition: border-color 0.2s ease;
+}
+.dash-composer:focus-within { border-color: color-mix(in oklab, var(--primary) 45%, var(--border)); }
+
+/* "answering…" dots while the first words are on their way */
+.dash-typing {
+  display: inline-block;
+  width: 30px;
+  height: 10px;
+  background: radial-gradient(circle, var(--muted-foreground) 2px, transparent 2.6px) 0 50% / 10px 10px repeat-x;
+  animation: dash-breathe 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-typing { animation: none; }
+}

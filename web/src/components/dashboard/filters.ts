@@ -1,8 +1,7 @@
-/* What the Findings and Audit log filters keep. Pure functions over the derived data (no I/O,
+/* What the Findings filters keep. Pure functions over the derived data (no I/O,
    no React), so the views and the unit tests share them. Filter values come from the address
    (`?sev=HIGH,LOW&val=review&q=sql`), so anything unknown is ignored rather than trusted. */
 import type { FindingRow } from "@/components/dashboard/derive";
-import type { LogLine } from "@/lib/data/view-types";
 
 export const SEVERITY_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
 
@@ -39,18 +38,6 @@ export function sortFindings(findings: FindingRow[]): FindingRow[] {
   return [...findings].sort((a, b) => rank(a.severity) - rank(b.severity) || (b.score ?? 0) - (a.score ?? 0));
 }
 
-export interface LogFilter {
-  kinds: string[];
-  whos: string[];
-  q: string;
-}
-
-export function logMatches(l: LogLine, { kinds, whos, q }: LogFilter): boolean {
-  if (kinds.length && !kinds.includes(l.kind)) return false;
-  if (whos.length && !whos.includes(l.who)) return false;
-  const needle = q.trim().toLowerCase();
-  return !needle || has(l.text, needle) || has(l.t, needle);
-}
 
 /** How many items fall in each bucket, in the order the buckets are listed. */
 export function countBy<T>(items: T[], key: (item: T) => string, order: readonly string[]): { value: string; count: number }[] {

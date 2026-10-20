@@ -1,6 +1,6 @@
 "use client";
 
-/* Shown by the views that belong to one run (Audit log, Reports, Scope) while the Overview
+/* Shown by the views that belong to one run (Reports, Scope) while the Overview
    totals every saved run: pick a run to open the view for it (the view stays open). */
 import { useState } from "react";
 import Link from "next/link";

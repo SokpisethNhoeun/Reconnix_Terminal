@@ -6,10 +6,11 @@ import { defineConfig, devices } from "@playwright/test";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-export const PORT = 3199;
+// E2E_PORT moves the three test ports together, so several checkouts can test at once.
+export const PORT = Number(process.env.E2E_PORT || 3199);
 export const TOKEN = "e2e-token-0123456789abcdef";
-export const TERM_PORT = 3198;
-export const LLM_PORT = 3195; // e2e/llm-stub.mjs, the AI Assistant's stand-in model
+export const TERM_PORT = PORT - 1;
+export const LLM_PORT = PORT - 4; // e2e/llm-stub.mjs, the AI Assistant's stand-in model
 
 export default defineConfig({
   testDir: "e2e",

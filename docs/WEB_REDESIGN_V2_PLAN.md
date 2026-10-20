@@ -372,3 +372,53 @@ database or new service.**
 | **Tests** | Store: permissions, atomic write, refusing symlinks and large files, retention, limits, masking. Routes: viewer 403, other origin 403, bad id 400. e2e: a conversation survives closing the browser; delete works. Then the security reviewer. |
 
 Owner: subagent B (the assistant), with the `security-reviewer` before the merge.
+
+## Phase 0 contracts (done by the main agent on `redesign/v2`)
+
+What phase 0 did:
+- Committed the base (`bdb41d9` on `New_redesignV1`).
+- Split `globals.css` into one file per area.
+- Added the meaning and severity tokens, `lib/status.ts` and `StatusBadge` / `SeverityBadge`.
+- Removed the Audit Log view and the microphone.
+- Made the test ports configurable.
+- Added the shared scrolling hook.
+
+The agents rely on the following and must not change it:
+
+1. **File ownership.**
+   - `src/styles/frame.css` belongs to D, `dashboard.css` to C, `motion.css` to A and
+     `assistant.css` to B.
+   - `globals.css`, `tokens.css`, `terminal.css` and `site.css` belong to nobody: no edits.
+   - `src/lib/status.ts`, `components/ui/status-badge.tsx` and `components/dashboard/view-url.ts`
+     are frozen. A meaning that's missing is defined locally and reported.
+2. **How the transition finds the dashboard.** C puts `data-motion` on the Overview's groups:
+   - `top`: the summary strip.
+   - `right`: the Findings by Severity column.
+   - `bottom`: the timelines row.
+   - `hero`: the globe plus Ask bar box that the chat grows from.
+   - `fade`: hero text that only fades (the title and the Ask bar contents).
+   - optional `left`.
+
+   A uses only these attributes, never class names. `<Globe />` (A's) stays inside the hero.
+3. **Assistant view and motion.**
+   - B keeps `data-assistant-piece` on the header, the conversation and the composer.
+   - In the welcome state, B renders one `<div data-globe-slot />`: the box the globe sits
+     behind. It is gone once the conversation has messages.
+   - `useAssistant()` keeps `messages` (the open conversation); A uses `messages.length === 0`
+     for the welcome state.
+   - `AssistantView` stays `forwardRef<HTMLTextAreaElement, { onMinimize }>`, and A's stage
+     renders it.
+4. **Scrolling.**
+   - `useStickToBottom()` returns `{ ref, atBottom, scrollToBottom }`.
+   - `<ScrollToBottom show onClick className />`.
+   - D owns both and may improve the inside, but not the shape. B uses them.
+5. **Shared entry points.** A owns `viewer.tsx`; B owns `app/page.tsx` (`AssistantInfo`). C
+   doesn't edit `page.tsx`: the dashboard data reaches it through `OverviewCards`, and anything
+   more goes in C's report.
+6. **Test ports.**
+   - Each worktree sets `E2E_PORT`: A 3210, B 3220, C 3230, D 3240. The suite also uses
+     `E2E_PORT − 1` and `E2E_PORT − 4`.
+   - Servers started by hand use `E2E_PORT + 5`.
+   - The terminal helper runs with `RECONIX_PYTHON=<repo>/.venv/bin/python`.
+7. **Docs.** README, CLAUDE.md and the in-app docs are the main agent's, at integration. Each
+   agent lists its doc changes in its report.

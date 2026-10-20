@@ -1,0 +1,89 @@
+/* The dashboard's frame: the page, the app frame, where the sidebar, top bar, content and the
+   AI Assistant's stage sit, and the content area that scrolls. Owner: frame and scrolling. */
+
+/* ======================================================================================
+   SOC DASHBOARD (the / route). Frame + grid in §4, cards in §3. Numbers come from
+   components/dashboard/derive.ts; colours are tokens only.
+   ====================================================================================== */
+
+/* Outer page: --page with two soft --page-glow washes (top-right, bottom-left), like the ref. */
+.dash-page {
+  position: relative;
+  min-height: 100dvh;
+  padding: 16px;
+  background:
+    radial-gradient(45% 45% at 100% 0%, color-mix(in oklab, var(--page-glow) 55%, transparent), transparent 70%),
+    radial-gradient(45% 45% at 0% 100%, color-mix(in oklab, var(--page-glow) 45%, transparent), transparent 70%),
+    var(--page);
+}
+@media (max-width: 767.98px) { .dash-page { padding: 12px; } }
+
+/* App frame */
+.dash-frame {
+  position: relative;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-rows: 64px minmax(0, 1fr);
+  border-radius: 22px;
+  border: 1px solid color-mix(in oklab, var(--foreground) 8%, transparent);
+  background: var(--background);
+  box-shadow: 0 40px 120px -40px color-mix(in oklab, var(--globe-glow) 25%, transparent);
+  overflow: clip;
+}
+/* On a roomy desktop the frame is exactly the viewport minus the 16px gutters: no page scroll. */
+@media (min-width: 1280px) and (min-height: 760px) {
+  .dash-frame { height: calc(100dvh - 32px); }
+}
+
+/* Frame children placement (≥768). Sidebar rail left, top bar + content on the right. */
+.dash-sidebar { grid-column: 1; grid-row: 1 / span 2; flex-direction: column; border-right: 1px solid var(--border); }
+.dash-topbar { grid-column: 2; grid-row: 1; }
+/* Content area = the scroll container for whichever view is active. */
+.dash-content { grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+
+/* Phone (<768): the sidebar becomes a horizontal strip under the top bar. */
+@media (max-width: 767.98px) {
+  .dash-frame { grid-template-columns: 1fr; grid-template-rows: 64px auto minmax(0, 1fr); height: auto; }
+  .dash-topbar { grid-column: 1; grid-row: 1; }
+  .dash-sidebar {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: row;
+    width: 100%;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 2px;
+    padding-inline: 8px;
+  }
+  .dash-sidebar::-webkit-scrollbar { display: none; }
+  .dash-sidebar > a { height: auto; width: auto; padding: 0 6px; }
+  .dash-sidebar nav { flex: 1; flex-direction: row; padding: 6px 0; }
+  .dash-sidebar > div { flex-direction: row; padding: 0; }
+  .dash-content { grid-column: 1; grid-row: 3; }
+}
+
+/* The AI Assistant's stage: over the top bar and the content, beside the sidebar. */
+.dash-assistant-stage {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  position: relative;
+  z-index: 35;
+  min-width: 0;
+  min-height: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+.dash-assistant-stage[data-on] { visibility: visible; }
+/* Off the fixed-height desktop frame the frame grows with its content: give the assistant a
+   screen's height, so the composer is always in reach. */
+@media (max-width: 1279.98px), (max-height: 759.98px) {
+  .dash-assistant-stage[data-on] { min-height: calc(100dvh - 34px); }
+}
+/* Phones: the sidebar strip and the top bar stay above the assistant. */
+@media (max-width: 767.98px) {
+  .dash-assistant-stage { grid-column: 1; grid-row: 3; }
+  .dash-assistant-stage[data-on] { min-height: max(420px, calc(100dvh - 150px)); }
+}

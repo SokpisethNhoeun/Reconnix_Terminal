@@ -75,6 +75,11 @@ WEB_TOKENS: Dict[str, Dict[str, str]] = {
         "primary": "#46E0D4", "primary-strong": "#7AF0EC", "primary-dim": "#2C7F7C",
         "primary-foreground": "#032A27", "accent": "#E7C183", "success": "#5EE6A8",
         "danger": "#F87171", "ring": "#46E0D4", "globe-dot": "#3CC8D2", "globe-glow": CYAN,
+        # meanings (web/src/lib/status.ts): amber `warning` = waiting / needs review, slate
+        # `info` = informational; the severity scale is the TUI's own (SEVERITY below)
+        "warning": "#E7C183", "info": INFO,
+        "sev-critical": CRITICAL, "sev-high": HIGH, "sev-medium": MEDIUM, "sev-low": LOW,
+        "sev-info": INFO,
         **TERMINAL_WEB_TOKENS,
     },
 }

@@ -1,16 +1,15 @@
 "use client";
 
 /* The assistant's message box: the shared draft (the Overview's Ask bar edits the same one),
-   Enter to send and Shift+Enter for a new line, Stop while a reply streams. The microphone is
-   shown as on the Ask bar but voice input isn't available, so it only says so. */
-import { forwardRef, useState } from "react";
-import { Mic, Send, Square } from "lucide-react";
+   Enter to send and Shift+Enter for a new line, Stop while a reply streams. No microphone: the
+   app has no voice input. */
+import { forwardRef } from "react";
+import { Send, Square } from "lucide-react";
 import { MAX_QUESTION } from "@/lib/assistant/request";
 import { useAssistant } from "./assistant-provider";
 
 export const Composer = forwardRef<HTMLTextAreaElement, { label: string }>(function Composer({ label }, ref) {
   const { draft, setDraft, ask, busy, stop, canAsk } = useAssistant();
-  const [micNote, setMicNote] = useState(false);
   const send = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!busy) ask();
@@ -30,23 +29,6 @@ export const Composer = forwardRef<HTMLTextAreaElement, { label: string }>(funct
         placeholder={canAsk ? "Ask about the findings, the scope, what waits on you…" : "Write your question (asking needs the setup below)"}
         className="max-h-[132px] min-h-[40px] flex-1 resize-none bg-transparent px-2 py-2.5 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none [field-sizing:content]"
       />
-      <div className="relative">
-        <button
-          type="button"
-          aria-disabled="true"
-          aria-label="Voice input (not available)"
-          onClick={() => setMicNote((v) => !v)}
-          onBlur={() => setMicNote(false)}
-          className="grid size-[38px] place-items-center rounded-lg text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <Mic className="size-[18px]" strokeWidth={1.6} aria-hidden />
-        </button>
-        {micNote && (
-          <span role="status" className="dash-pop absolute bottom-[calc(100%+6px)] right-0 w-max max-w-[220px] px-2.5 py-1.5 text-[11px] text-muted-foreground">
-            Voice input isn&apos;t available yet. Type your question.
-          </span>
-        )}
-      </div>
       {busy ? (
         <button
           type="button"

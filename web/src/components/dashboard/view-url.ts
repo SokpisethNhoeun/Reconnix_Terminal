@@ -5,13 +5,13 @@
 import { useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 
-export const VIEWS = ["overview", "findings", "audit", "reports", "scope", "terminal", "assistant"] as const;
+// (no "audit": the Audit log view was removed; old ?view=audit links open the Overview)
+export const VIEWS = ["overview", "findings", "reports", "scope", "terminal", "assistant"] as const;
 export type View = (typeof VIEWS)[number];
 
 /** Each view's own filter parameters (cleared when a link opens that view with new ones). */
 export const VIEW_FILTERS: Partial<Record<View, readonly string[]>> = {
   findings: ["sev", "val", "q", "finding"],
-  audit: ["kind", "who", "aq"],
 };
 
 export type ViewParams = Record<string, string | undefined>;

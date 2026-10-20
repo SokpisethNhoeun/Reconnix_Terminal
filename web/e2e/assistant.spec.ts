@@ -5,7 +5,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 import { sessionValue } from "../src/lib/auth/session";
-import { TOKEN } from "../playwright.config";
+import { PORT, TOKEN } from "../playwright.config";
 import { sample, signIn } from "./support";
 
 const tab = (page: Page) => page.locator('nav[aria-label="Views"] button[aria-label="AI Assistant"]');
@@ -97,7 +97,7 @@ test("a viewer sees the assistant but cannot ask the model", async ({ page, cont
   await assistantShown(page);
   await expect(page.getByText(/needs the operator role/)).toBeVisible();
   const res = await page.request.post("/api/assistant", {
-    headers: { Origin: "http://127.0.0.1:3199" },
+    headers: { Origin: `http://127.0.0.1:${PORT}` },
     data: { uid: null, messages: [{ role: "user", content: "hi" }] },
   });
   expect(res.status()).toBe(403);
@@ -107,7 +107,7 @@ test("the route wants a signed-in operator, the page's origin and a valid reques
   const body = { uid: null, messages: [{ role: "user", content: "hi" }] };
   expect((await request.post("/api/assistant", { data: body })).status()).toBe(401); // no session
   await signIn(page);
-  const post = (data: unknown, origin = "http://127.0.0.1:3199") => page.request.post("/api/assistant", { headers: { Origin: origin }, data });
+  const post = (data: unknown, origin = `http://127.0.0.1:${PORT}`) => page.request.post("/api/assistant", { headers: { Origin: origin }, data });
   expect((await post(body, "http://evil.example")).status()).toBe(403);
   expect((await post({ ...body, messages: [] })).status()).toBe(400);
   expect((await post({ ...body, extra: "context of my own" })).status()).toBe(400);

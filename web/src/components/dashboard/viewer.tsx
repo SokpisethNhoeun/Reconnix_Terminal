@@ -14,7 +14,7 @@ export type { View };
 
 /**
  * Local Assessment Viewer shell: sidebar + top bar around a content area that switches between
- * the Overview dashboard, Findings (list + evidence), Audit log, Reports, Scope and Terminal, plus
+ * the Overview dashboard, Findings (list + evidence), Reports, Scope and Terminal, plus
  * the AI Assistant, which opens over the top bar and content (AssistantStage). The views are
  * server-rendered and passed in as props; all stay mounted and are toggled with `hidden` so the
  * globe keeps its WebGL context (it pauses itself when the overview is hidden) and the intro's
@@ -28,7 +28,6 @@ export function Viewer({
   topBar,
   overview,
   findings,
-  audit,
   reports,
   scope,
   terminal,
@@ -38,7 +37,6 @@ export function Viewer({
   topBar: React.ReactNode;
   overview: React.ReactNode;
   findings: React.ReactNode;
-  audit: React.ReactNode;
   reports: React.ReactNode;
   scope: React.ReactNode;
   terminal: React.ReactNode;
@@ -72,7 +70,6 @@ export function Viewer({
               {overview}
             </div>
             <div hidden={shown !== "findings"}>{findings}</div>
-            <div hidden={shown !== "audit"}>{audit}</div>
             <div hidden={shown !== "reports"}>{reports}</div>
             <div hidden={shown !== "scope"}>{scope}</div>
             <div hidden={shown !== "terminal"}>{terminalOpened && terminal}</div>

@@ -1,0 +1,225 @@
+/* The dashboard's content: the Overview grid, cards, chips, popovers, the hero and its globe
+   placement, the viewer views and their rows, the intro's hidden-before-animate state.
+   Owner: the dashboard. */
+
+/* Overview view: the dashboard grid (hero + bottom on the left, right column on the right). */
+.dash-overview {
+  padding: 0 16px 16px 4px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto;
+}
+.dash-hero { position: relative; overflow: visible; min-height: 420px; }
+.dash-bottom { min-width: 0; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.dash-right { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+@media (min-width: 1280px) {
+  .dash-overview {
+    height: 100%;
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 22vw, 330px);
+    grid-template-rows: minmax(0, 1fr) clamp(190px, 27vh, 230px);
+  }
+  .dash-hero { grid-column: 1; grid-row: 1; }
+  .dash-bottom { grid-column: 1; grid-row: 2; }
+  .dash-right { grid-column: 2; grid-row: 1 / span 2; }
+}
+
+/* Tablet (768–1279): single column; the right column becomes a row of three. */
+@media (min-width: 768px) and (max-width: 1279.98px) {
+  .dash-hero { min-height: 560px; }
+  .dash-right { flex-direction: row; }
+  .dash-right > * { flex: 1; min-width: 0; }
+}
+/* Bottom row (stats | execution timeline) splits side-by-side at ≥1024, stacks below. */
+@media (min-width: 1024px) {
+  .dash-bottom { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.5fr); }
+}
+/* Phone (<768): everything stacks. */
+@media (max-width: 767.98px) {
+  .dash-overview { padding: 12px 16px 16px; }
+  .dash-hero { min-height: 440px; }
+}
+
+/* ---- Shared card ---- */
+.dash-card {
+  position: relative;
+  isolation: isolate;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--card), var(--card-2));
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--foreground) 4%, transparent);
+  padding: 14px;
+  overflow: clip;
+  transition: border-color 0.3s var(--ease-out-quart);
+}
+@media (min-width: 1536px) { .dash-card { padding: 16px; } }
+/* cursor-following soft light (--mx/--my set by pointermove in dash-card.tsx) */
+.dash-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0;
+  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklab, var(--primary) 7%, transparent), transparent 70%);
+  transition: opacity 0.3s var(--ease-out-quart);
+}
+.dash-card:hover { border-color: color-mix(in oklab, var(--primary) 22%, var(--border)); }
+.dash-card:hover::before { opacity: 1; }
+
+/* Glass variant: cards that sit over the globe (Activity Timeline, Ask bar). */
+.dash-glass {
+  background: color-mix(in oklab, var(--card) 72%, transparent);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+}
+
+/* Card header: title left, "open in docs" icon right. */
+.dash-card-open { color: var(--muted-foreground); transition: color 0.2s ease; }
+.dash-card-open:hover { color: var(--primary); }
+
+/* Inner surface tile (findings 2×2, icon wells). */
+.dash-tile { background: var(--surface); border-radius: 10px; }
+
+/* ---- Chips / small bits reused across cards ---- */
+.dash-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 7px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.tabnums { font-variant-numeric: tabular-nums; }
+
+/* The "Running" status dot (ambient pulse added in Phase 6). */
+.dash-livedot { background: var(--primary); box-shadow: 0 0 8px color-mix(in oklab, var(--primary) 70%, transparent); }
+
+/* Popovers / search dropdowns */
+.dash-pop {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.6), inset 0 1px 0 color-mix(in oklab, var(--foreground) 4%, transparent);
+  transform-origin: top;
+  animation: dash-pop-in 0.18s var(--ease-out-expo);
+}
+@keyframes dash-pop-in { from { opacity: 0; transform: translateY(-4px) scale(0.96); } }
+
+/* Ask-bar inline note (appears on submit) */
+.dash-note { animation: dash-note-in 0.2s var(--ease-out-expo); }
+@keyframes dash-note-in { from { opacity: 0; transform: translateY(4px); } }
+
+/* ---- Intro reveal: hide the animated pieces before GSAP runs, but only when scripting is on
+   (no inline script needed, so nothing bypasses the CSP). No-JS users see the full page; a
+   browser without the `scripting` media feature shows it too, and GSAP still animates it in.
+   GSAP sets the pieces visible itself. ---- */
+@media (scripting: enabled) {
+  .dash-overview .dash-card,
+  .dash-navbtn,
+  .dash-reveal { visibility: hidden; }
+}
+
+/* ---- Ambient loops (§7.2) ---- */
+@keyframes dash-ping {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 55%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 6px transparent; }
+}
+.dash-livedot { animation: dash-ping 1.6s ease-out infinite; }
+.dash-bell-dot { animation: dash-ping 1.6s ease-out 0.7s infinite; box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 55%, transparent); }
+.dash-bell-dot { animation-name: dash-ping-amber; }
+@keyframes dash-ping-amber {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 55%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 6px transparent; }
+}
+@keyframes dash-gate { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.dash-gate-pulse { animation: dash-gate 1.4s ease-in-out infinite; }
+@keyframes dash-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.dash-breathe { animation: dash-breathe 2s ease-in-out infinite; }
+@keyframes dash-marker { 0%, 100% { filter: drop-shadow(0 0 1px color-mix(in oklab, var(--primary) 50%, transparent)); } 50% { filter: drop-shadow(0 0 4px color-mix(in oklab, var(--primary-strong) 80%, transparent)); } }
+.dash-marker-breathe { animation: dash-marker 2.4s ease-in-out infinite; }
+
+/* ---- Hero (globe + overlaid glass cards) ---- */
+.dash-globe-wrap { position: absolute; inset: 0; z-index: 0; }
+.dash-globe-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 46%, color-mix(in oklab, var(--globe-glow) 22%, transparent), transparent 55%);
+  transition: opacity 0.6s ease;
+}
+.dash-globe-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; transition: opacity 0.8s ease; }
+.dash-hero-title { position: relative; z-index: 2; padding: 24px 0 0 24px; }
+/* Phones: the globe sits right behind the title, so the title gets a shadow of the background
+   to stay readable over its glow. */
+@media (max-width: 767.98px) {
+  .dash-hero-title { padding: 16px 0 0 16px; }
+  .dash-hero-title > * { text-shadow: 0 0 2px var(--background), 0 2px 18px var(--background); }
+}
+.dash-preview-label {
+  position: absolute;
+  top: 24px;
+  right: 0;
+  z-index: 2;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+/* Below desktop the title wraps, so the preview label flows under it instead of overlapping. */
+@media (max-width: 1279.98px) {
+  .dash-preview-label { position: static; display: block; margin: 8px 0 0 24px; }
+}
+
+.dash-timeline-card { position: relative; z-index: 2; margin-top: 16px; display: flex; }
+.dash-timeline-card > * { flex: 1; min-width: 0; min-height: 0; }
+.dash-askbar { position: relative; z-index: 2; margin-top: 12px; }
+
+@media (min-width: 768px) {
+  .dash-globe-wrap { inset: -24px -12px -40px -12px; }
+  .dash-timeline-card {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: clamp(220px, 22%, 270px);
+    height: 62%;
+    margin: 0;
+  }
+  .dash-askbar {
+    position: absolute;
+    left: calc(clamp(220px, 22%, 270px) + 12px);
+    right: 0;
+    bottom: 0;
+    margin: 0;
+  }
+}
+
+/* ---- Viewer views (Findings / Audit / Reports / Scope) ---- */
+.dash-view { padding: 20px 16px 28px 8px; }
+
+/* Findings view rows and the log rows */
+.dash-findings { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1024px) { .dash-findings { grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); } }
+.dash-finding-row {
+  width: 100%;
+  text-align: left;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--card), var(--card-2));
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.dash-finding-row:hover { border-color: color-mix(in oklab, var(--primary) 30%, var(--border)); }
+.dash-finding-row[aria-current="true"] {
+  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+  background: color-mix(in oklab, var(--primary) 6%, var(--card));
+}
+.dash-log-row { transition: background-color 0.2s ease; }
+.dash-log-row:hover { background: color-mix(in oklab, var(--foreground) 3%, transparent); }
+
+/* ---- Reduced motion: the dashboard's loops and enter animations off, nothing hidden ---- */
+@media (prefers-reduced-motion: reduce) {
+  /* dashboard: all ambient loops + enter animations off, nothing hidden */
+  .dash-livedot, .dash-bell-dot, .dash-gate-pulse, .dash-breathe, .dash-marker-breathe,
+  .dash-pop, .dash-note { animation: none; }
+  .dash-overview .dash-card, .dash-navbtn, .dash-reveal { visibility: visible; }
+}

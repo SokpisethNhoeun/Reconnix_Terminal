@@ -21,6 +21,13 @@
   --ring: #46E0D4;
   --globe-dot: #3CC8D2;
   --globe-glow: #22D3EE;
+  --warning: #E7C183;
+  --info: #94A3B8;
+  --sev-critical: #F2495C;
+  --sev-high: #F97316;
+  --sev-medium: #FBBF24;
+  --sev-low: #38BDF8;
+  --sev-info: #94A3B8;
   --term-bg: #0B0F12;
   --term-text: #E6EDF0;
   --term-cursor: #22D3EE;

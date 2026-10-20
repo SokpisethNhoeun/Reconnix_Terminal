@@ -59,7 +59,7 @@ export type FindingRow = FindingView & { tone: Tone; icon: FindingIcon; key: str
 export type SeverityCount = { level: Severity; count: number; share: number; tone: Tone };
 export type TopFinding = { key: string; id: string; title: string; severity: Severity; score: number; icon: FindingIcon; run: string | null };
 /** A drill-down: which view a number opens, with which filters (see view-url.ts). */
-export type DrillDown = { view: "findings" | "audit"; filters: Record<string, string>; label: string };
+export type DrillDown = { view: "findings"; filters: Record<string, string>; label: string };
 export type StatCard = { label: string; value: string; chip: string; tone: Tone; isDuration?: boolean; link?: DrillDown };
 
 /** What the Overview's cards draw, for one run or for every saved run. */
@@ -295,14 +295,12 @@ export function deriveDashboard(v: AssessmentView): Dashboard {
       value: String(v.checks.total),
       chip: `${v.checks.allowed} allowed`,
       tone: "primary",
-      link: { view: "audit", filters: { who: "POLICY" }, label: "Show the policy engine's lines in the audit log" },
     },
     {
       label: "Blocked by policy",
       value: String(v.checks.blocked),
       chip: "not executed",
       tone: "accent",
-      link: { view: "audit", filters: { kind: "policy" }, label: "Show the blocked requests in the audit log" },
     },
     { label: "Duration", value: durationText, chip: windowLimit ? `of ${windowLimit}` : "no time limit", tone: "primary", isDuration: true },
   ];

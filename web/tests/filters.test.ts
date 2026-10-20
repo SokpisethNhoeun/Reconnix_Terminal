@@ -2,14 +2,13 @@
 import { describe, expect, it } from "vitest";
 
 import { deriveDashboard } from "@/components/dashboard/derive";
-import { countBy, findingMatches, list, logMatches, sortFindings, validationOf } from "@/components/dashboard/filters";
+import { countBy, findingMatches, list, sortFindings, validationOf } from "@/components/dashboard/filters";
 import { assessmentView } from "@/lib/data/adapt";
 
 import { sampleAssessments } from "./fixtures";
 
 const dashes = sampleAssessments().map((a) => deriveDashboard(assessmentView(a)));
 const findings = dashes.flatMap((d) => d.findings);
-const log = dashes.flatMap((d) => d.log);
 const none = { sev: [], val: "", q: "" };
 
 describe("findingMatches", () => {
@@ -47,17 +46,6 @@ describe("sortFindings", () => {
       const d = order.indexOf(a.severity) - order.indexOf(b.severity);
       expect(d < 0 || (d === 0 && (a.score ?? 0) >= (b.score ?? 0))).toBe(true);
     }
-  });
-});
-
-describe("logMatches", () => {
-  it("filters by kind and author, and searches text and time", () => {
-    const blocked = log.filter((l) => logMatches(l, { kinds: ["policy"], whos: [], q: "" }));
-    expect(blocked.length).toBeGreaterThan(0);
-    expect(blocked.every((l) => l.kind === "policy")).toBe(true);
-    expect(log.filter((l) => logMatches(l, { kinds: [], whos: ["TOOL"], q: "" })).every((l) => l.who === "TOOL")).toBe(true);
-    const line = log.find((l) => l.t !== "—")!;
-    expect(log.filter((l) => logMatches(l, { kinds: [], whos: [], q: line.t }))).toContain(line);
   });
 });
 
