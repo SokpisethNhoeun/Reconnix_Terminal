@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { CLUSTER_GAP, cluster, countTicks, MAX_SEGMENTS, mergeNarrow, type Segment, ticksAt } from "@/components/dashboard/axis";
 import { deriveDashboard } from "@/components/dashboard/derive";
 import { deriveOverall, LATEST_RUNS } from "@/components/dashboard/derive-overall";
-import { eventBadge, LANE_ORDER, toolsNamed } from "@/components/dashboard/event-kinds";
+import { EVENT_KIND, eventBadge, LANE_ORDER, toolsNamed } from "@/components/dashboard/event-kinds";
 import type { ActivityCard, ExecutionCard } from "@/components/dashboard/overview-types";
 import { tabStop } from "@/components/dashboard/use-mark-nav";
 import { MASK } from "@/lib/assistant/redact";
@@ -111,16 +111,27 @@ describe("axis helpers", () => {
 });
 
 describe("event badges", () => {
-  const at = { pendingGate: false, liveTool: false, severityOf: (id: string) => (id === "F-001" ? ("HIGH" as const) : undefined) };
+  const at = { who: "USER", pendingGate: false, liveTool: false, severityOf: (id: string) => (id === "F-001" ? ("HIGH" as const) : undefined) };
+  const policy = { ...at, who: "POLICY" };
+  const badge = (who: string, tone: string, text: string, extra: Partial<typeof at> = {}) =>
+    eventBadge(kindOf({ who, tone, text }), text, { ...at, who, ...extra });
   it("reads the status a line records", () => {
-    expect(eventBadge("policy", "Blocked: Path excluded", at)).toEqual({ type: "status", meaning: POLICY_DECISION.blocked });
-    expect(eventBadge("gate", "Risk: HIGH · needs a double check", { ...at, pendingGate: true })).toEqual({ type: "status", meaning: APPROVAL_STATE.PENDING });
-    expect(eventBadge("user", "Approved: secret_validation (double-checked)", at)).toEqual({ type: "status", meaning: APPROVAL_STATE.APPROVED });
-    expect(eventBadge("user", "Rejected: limited_validation", at)).toEqual({ type: "status", meaning: APPROVAL_STATE.REJECTED });
-    expect(eventBadge("scope", "Scope check: passed", at)).toEqual({ type: "status", meaning: POLICY_DECISION.allowed });
-    expect(eventBadge("scope", "Scope Manifest drafted · pending approval", at).type).toBe("status");
-    expect(eventBadge("tool", "Executing baseline request", { ...at, liveTool: true })).toEqual({ type: "status", meaning: STEP_STATUS.active });
-    expect(eventBadge("finding", "Candidate F-001 · hardcoded secret", at)).toEqual({ type: "severity", level: "HIGH" });
+    expect(eventBadge("policy", "Blocked: Path excluded", policy)).toEqual({ type: "status", meaning: POLICY_DECISION.blocked });
+    expect(eventBadge("gate", "Risk: HIGH · needs a double check", { ...policy, pendingGate: true })).toEqual({ type: "status", meaning: APPROVAL_STATE.PENDING });
+    expect(badge("USER", "ok", "Approved: secret_validation (double-checked)")).toEqual({ type: "status", meaning: APPROVAL_STATE.APPROVED });
+    expect(badge("USER", "ok", "Scope approved")).toEqual({ type: "status", meaning: APPROVAL_STATE.APPROVED });
+    expect(badge("USER", "block", "Rejected: limited_validation")).toEqual({ type: "status", meaning: APPROVAL_STATE.REJECTED });
+    expect(badge("POLICY", "ok", "Scope check: passed")).toEqual({ type: "status", meaning: POLICY_DECISION.allowed });
+    expect(eventBadge("scope", "Scope Manifest drafted · pending approval", { ...at, who: "AI" })).toEqual({ type: "status", meaning: EVENT_KIND.scope });
+    expect(eventBadge("tool", "Executing baseline request", { ...at, who: "TOOL", liveTool: true })).toEqual({ type: "status", meaning: STEP_STATUS.active });
+    expect(eventBadge("finding", "Candidate F-001 · hardcoded secret", { ...at, who: "AI" })).toEqual({ type: "severity", level: "HIGH" });
+  });
+  it("gives approved and rejected only to the operator's own lines", () => {
+    // a line from the sample runs: the policy continuing inside the approved scope is no approval
+    const line = samples.flatMap((a) => a.timeline).find((e) => e.text === "Continuing within approved scope")!;
+    expect(line.who).toBe("POLICY");
+    expect(badge(line.who, line.tone, line.text)).toEqual({ type: "status", meaning: EVENT_KIND.scope });
+    expect(badge("AI", "default", "Scope approved by the policy engine")).not.toEqual({ type: "status", meaning: APPROVAL_STATE.APPROVED });
   });
   it("names only approved tools as tools used", () => {
     expect(toolsNamed(["Executing permitted scan · Semgrep", "Semgrep: checks", "Executing baseline request"], ["Semgrep", "gitleaks"])).toEqual(["Semgrep"]);

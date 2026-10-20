@@ -76,13 +76,15 @@ export function eventLabel(kind: LogKind, text: string, tools: string[]): string
   return cut(text.split(" · ")[0].split(":")[0].trim() || text);
 }
 
-/** The status a line records, from its kind and its own words (nothing is guessed beyond
-    them): blocked, allowed, approved, rejected, waiting (the gate a waiting run stopped at),
-    running (the last tool step of a run that is running now), or the finding's severity. */
+/** The status a line records, from who wrote it, its kind and its own words (nothing is guessed
+    beyond them): blocked (a policy block), allowed (a scope check the policy passed), approved
+    or rejected (only the operator's own USER lines: "Continuing within approved scope" is the
+    policy talking, not an approval), waiting (the gate a waiting run stopped at), running (the
+    last tool step of a run that is running now), or the severity of the finding it names. */
 export function eventBadge(
   kind: LogKind,
   text: string,
-  at: { pendingGate: boolean; liveTool: boolean; severityOf: (id: string) => Severity | undefined },
+  at: { who: string; pendingGate: boolean; liveTool: boolean; severityOf: (id: string) => Severity | undefined },
 ): EventBadge {
   const status = (meaning: Meaning): EventBadge => ({ type: "status", meaning });
   switch (kind) {
@@ -98,9 +100,9 @@ export function eventBadge(
     }
     case "scope":
     case "user":
-      if (/\brejected\b/i.test(text)) return status(APPROVAL_STATE.REJECTED);
-      if (/\bapproved\b/i.test(text) && !/pending/i.test(text)) return status(APPROVAL_STATE.APPROVED);
-      if (/\bpassed\b/i.test(text)) return status(POLICY_DECISION.allowed);
+      if (at.who === "USER" && /\brejected\b/i.test(text)) return status(APPROVAL_STATE.REJECTED);
+      if (at.who === "USER" && /\bapproved\b/i.test(text)) return status(APPROVAL_STATE.APPROVED);
+      if (at.who === "POLICY" && /\bpassed\b/i.test(text)) return status(POLICY_DECISION.allowed);
       return status(EVENT_KIND[kind]);
     default:
       return status(EVENT_KIND[kind]);

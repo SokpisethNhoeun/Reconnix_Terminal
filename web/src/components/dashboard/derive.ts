@@ -186,6 +186,7 @@ function activityCard(v: AssessmentView, pos: (sec: number) => number, labelAt: 
       kind: l.kind,
       label: redact(eventLabel(l.kind, l.text, tools)),
       badge: eventBadge(l.kind, l.text, {
+        who: l.who,
         pendingGate: v.gate !== null && l === lastGate,
         liveTool: v.status === "Running" && l === lastTool,
         severityOf,
