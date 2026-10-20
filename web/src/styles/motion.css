@@ -151,7 +151,9 @@
   opacity: 0.7;
 }
 .dash-assistant-front { position: absolute; inset: 0; pointer-events: auto; }
-.dash-assistant-panel { display: flex; flex-direction: column; overflow: hidden; }
+/* The panel doesn't clip: the card layer under it draws the rounded frame, the conversation scrolls
+   (and clips) inside itself, and the History menu can drop below the header in full. */
+.dash-assistant-panel { display: flex; flex-direction: column; }
 @media (max-width: 767.98px) {
   .dash-assistant-card, .dash-assistant-panel { inset: 8px; }
 }
