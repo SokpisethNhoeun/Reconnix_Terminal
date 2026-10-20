@@ -11,7 +11,7 @@ export function ExecutionTimeline({ data }: { data: ExecutionCard }) {
     <DashCard
       id="execution-timeline"
       title="Execution Timeline"
-      docsHref="/docs/assessments/workflow"
+      docsHref="/docs/assessment-guide"
       meta={data.caption}
       className="dash-panel"
       bodyClassName="flex flex-col gap-2.5"

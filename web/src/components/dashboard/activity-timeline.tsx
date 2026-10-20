@@ -11,7 +11,7 @@ export function ActivityTimeline({ data }: { data: ActivityCard }) {
     <DashCard
       id="activity-timeline"
       title="Activity Timeline"
-      docsHref="/docs/assessments/workflow"
+      docsHref="/docs/assessment-guide"
       meta={data.window}
       className="dash-panel"
       bodyClassName="flex flex-col gap-2"

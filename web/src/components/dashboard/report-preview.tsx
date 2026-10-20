@@ -28,7 +28,7 @@ export function ReportPreview({ state, runs, stale, onRetry }: { state: Exclude<
   const loading = state.kind === "loading";
   return (
     <div ref={card} tabIndex={-1} className="is-wide rep-preview-card">
-      <DashCard id="report-preview" title="Preview" docsHref="/docs/reference/reports" meta={`${runs} ${runs === 1 ? "run" : "runs"} · the same HTML the PDF prints`}>
+      <DashCard id="report-preview" title="Preview" docsHref="/docs/reports/exporting" meta={`${runs} ${runs === 1 ? "run" : "runs"} · the same HTML the PDF prints`}>
         {state.kind === "failed" ? (
           <div role="alert" className="rep-error">
             <TriangleAlert className="size-4 shrink-0" aria-hidden />

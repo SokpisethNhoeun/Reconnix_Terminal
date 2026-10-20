@@ -69,7 +69,7 @@ export function OverallChips({ overall }: { overall: OverallChipsData }) {
       <CountsChip label="Target" value={many(overall.targets, "targets")} heading="Runs per target" rows={overall.targets} />
       <div className="hidden min-[1440px]:block">
         <CountsChip label="Template" value={many(overall.templates, "templates")} heading="Runs per template" rows={templates}>
-        <Link href="/docs/assessments/templates" className={`inline-block ${LINK}`}>
+        <Link href="/docs/assessment-guide/request" className={`inline-block ${LINK}`}>
           About templates
         </Link>
       </CountsChip>

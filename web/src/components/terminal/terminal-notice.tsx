@@ -27,7 +27,7 @@ export function TerminalNotice({ access }: { access: Exclude<TerminalAccess, "op
           to run the TUI here.
         </p>
       )}
-      <Link href="/docs/interfaces/terminal" className="w-fit rounded-sm text-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <Link href="/docs/terminal-guide/screens" className="w-fit rounded-sm text-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         Terminal docs
       </Link>
     </section>

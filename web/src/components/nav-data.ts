@@ -30,18 +30,18 @@ export const NAV_MENUS: NavMenu[] = [
     items: [
       { label: "Purpose", href: "/", description: "AI-planned security assessments inside an approved scope.", icon: Target },
       { label: "Key features", href: "/docs", description: "Scope, policy, tools, analysis, knowledge and reports.", icon: Sparkles },
-      { label: "Integrations", href: "/docs/architecture", description: "The approved tools and the stack you run yourself.", icon: Puzzle },
-      { label: "Assessment categories", href: "/docs/assessments/templates", description: "Network, API, Source Code and Web URL.", icon: LayoutGrid },
+      { label: "Integrations", href: "/docs/assessment-guide/plan", description: "The approved tools and the stack you run yourself.", icon: Puzzle },
+      { label: "Assessment categories", href: "/docs/assessment-guide/request", description: "Network, API, Source Code and Web URL.", icon: LayoutGrid },
     ],
   },
   {
     id: "how",
     label: "How it works",
-    href: "/docs/assessments/workflow",
+    href: "/docs/assessment-guide",
     columns: 1,
     items: [
-      { label: "Assessment flow", href: "/docs/assessments/workflow", description: "Seven steps, one approval gate you can't skip.", icon: Route },
-      { label: "Architecture", href: "/docs/architecture", description: "Terminal, backend, AI service and tool service.", icon: Network },
+      { label: "Assessment flow", href: "/docs/assessment-guide", description: "Seven steps, one approval gate you can't skip.", icon: Route },
+      { label: "Architecture", href: "/docs/getting-started/introduction", description: "Terminal, backend, AI service and tool service.", icon: Network },
     ],
   },
   {

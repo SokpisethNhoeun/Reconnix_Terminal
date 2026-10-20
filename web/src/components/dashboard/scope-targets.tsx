@@ -18,7 +18,7 @@ function reach(t: TargetRow): string {
 
 export function ScopeTargets({ data }: { data: Extract<Boundary, { mode: "all" }> }) {
   return (
-    <DashCard id="scope-targets" title="Targets" docsHref="/docs/configuration/scope-manifest" meta={data.summary} className="dash-panel">
+    <DashCard id="scope-targets" title="Targets" docsHref="/docs/assessment-guide/scope" meta={data.summary} className="dash-panel">
       <div className="dash-table-scroll">
         <table aria-label="Targets tested" className="dash-table">
           <thead>

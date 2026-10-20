@@ -14,7 +14,7 @@ import { DocsLink, ViewHeader } from "@/components/dashboard/view-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TIME_LIMIT } from "@/lib/status";
 
-const MANIFEST_DOCS = "/docs/configuration/scope-manifest";
+const MANIFEST_DOCS = "/docs/assessment-guide/scope";
 
 export function ScopeView({ data }: { data: ScopeCards }) {
   const { usage } = data.limits;
@@ -47,7 +47,7 @@ export function ScopeView({ data }: { data: ScopeCards }) {
             <ChipPanel
               id="scope-limits"
               title="Limits"
-              docsHref="/docs/configuration/policies"
+              docsHref="/docs/assessment-guide/policy-checks"
               meta={data.mode === "all" ? "in how many runs" : undefined}
               groups={data.limits.rows.map((r) => ({ ...r, empty: r.label === "Window" ? "No time limit." : "None listed." }))}
             >

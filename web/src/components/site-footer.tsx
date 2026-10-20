@@ -14,9 +14,9 @@ const item = (id: string, href: string) => menu(id).items.find((i) => i.href ===
 // Every column is derived from the navbar data (NAV_MENUS), the docs structure (DOCS_NAV) or site.ts.
 const PRODUCT: FooterLink[] = [
   { label: menu("features").label, href: menu("features").href },
-  { label: item("features", "/docs/architecture").label, href: "/docs/architecture" },
+  { label: item("features", "/docs/getting-started/introduction").label, href: "/docs/getting-started/introduction" },
   { label: menu("how").label, href: menu("how").href },
-  { label: item("features", "/docs/assessments/templates").label, href: "/docs/assessments/templates" },
+  { label: item("features", "/docs/assessment-guide/request").label, href: "/docs/assessment-guide/request" },
 ];
 const DOCS: FooterLink[] = DOCS_NAV.filter((g) => g.id !== "guardrails").map((g) => ({ label: g.title, href: g.href }));
 const GUARDRAILS: FooterLink[] = menu("guardrails").items.map((i) => ({ label: i.label, href: i.href }));

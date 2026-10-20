@@ -18,7 +18,7 @@ export function ReportsView({ data }: { data: ReportCards }) {
     <div className="dash-view dash-sheet" data-mode={data.mode}>
       <ViewHeader title="Report" tag={data.tag} about={data.about}>
         {data.mode === "run" && <ReportDownloads uid={data.uid} />}
-        <DocsLink href="/docs/reference/reports">Report format</DocsLink>
+        <DocsLink href="/docs/reports/exporting">Report format</DocsLink>
       </ViewHeader>
       <StatStrip stats={data.stats} label="Report summary" />
       {data.mode === "run" ? (

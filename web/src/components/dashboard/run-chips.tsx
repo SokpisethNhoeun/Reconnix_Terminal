@@ -71,7 +71,7 @@ export function RunChips({ dash }: { dash: RunChipsData }) {
             );
           })}
         </ul>
-        <Link href="/docs/assessments/templates" className={`inline-block ${LINK}`}>
+        <Link href="/docs/assessment-guide/request" className={`inline-block ${LINK}`}>
           About templates
         </Link>
       </Popover>

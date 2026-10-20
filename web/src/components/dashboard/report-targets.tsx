@@ -9,7 +9,7 @@ const count = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
 
 export function ReportTargets({ targets }: { targets: ReportTargetRow[] }) {
   return (
-    <DashCard id="report-targets" title="Targets" docsHref="/docs/reference/reports" meta={count(targets.length, "target")} className="dash-panel">
+    <DashCard id="report-targets" title="Targets" docsHref="/docs/reports/exporting" meta={count(targets.length, "target")} className="dash-panel">
       <ul aria-label="Targets" className="flex flex-col gap-px">
         {targets.map((t) => (
           <li key={t.target}>

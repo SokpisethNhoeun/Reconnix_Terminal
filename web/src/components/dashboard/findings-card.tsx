@@ -19,7 +19,7 @@ export function FindingsCard({ data, id = "findings-card" }: { data: FindingsSli
     <DashCard
       id={id}
       title="Findings by Severity"
-      docsHref="/docs/reference/findings"
+      docsHref="/docs/reports/understanding-findings"
       meta={`${data.total} ${findingsWord(data.total)}`}
       className="dash-panel h-full"
       bodyClassName="flex flex-col gap-3"

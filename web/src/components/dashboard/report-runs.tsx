@@ -41,7 +41,7 @@ export function ReportRuns({ runs, selection }: { runs: ReportRunRow[]; selectio
     <DashCard
       id="report-runs"
       title="Runs"
-      docsHref="/docs/reference/reports"
+      docsHref="/docs/reports/exporting"
       meta={shown.length === runs.length ? `${runs.length} saved` : `${shown.length} of ${runs.length}`}
       className="is-wide"
       bodyClassName="flex flex-col gap-3"

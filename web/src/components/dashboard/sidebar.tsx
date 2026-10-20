@@ -32,7 +32,7 @@ const VIEWS: NavItem[] = [
 const TERMINAL_HINT = { operator: "Terminal", viewer: "Terminal · operator role needed", off: "Terminal · off" } as const;
 const DOCS: DocItem[] = [
   { icon: BookOpen, label: "Documentation", href: "/docs" },
-  { icon: Settings, label: "Configuration", href: "/docs/getting-started/configuration" },
+  { icon: Settings, label: "Configuration", href: "/docs/ai-models/configuration" },
 ];
 
 // Logo: a 3×3 grid of rounded teal squares, 4 of the 9 dimmed (like the reference mark).
