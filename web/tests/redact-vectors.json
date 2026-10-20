@@ -1,12 +1,18 @@
 [
   ["open https://admin:hunter2@app.example.com/login", "open https://••••@app.example.com/login"],
-  ["Cookie: session=abc123; theme=dark", "Cookie: ••••; theme=dark"],
-  ["Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2lnbmF0dXJlLXZhbHVl", "Authorization: •••• •••• (JWT)"],
+  ["Cookie: session=abc123; theme=dark", "Cookie: ••••"],
+  ["Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2lnbmF0dXJlLXZhbHVl", "Authorization: Bearer ••••"],
   ["curl -H 'X: y' --data password=Sup3r$ecret&user=bob", "curl -H 'X: y' --data password=••••&user=bob"],
   ["api_key: \"sk-live-123456\"", "api_key: ••••"],
   ["use bearer abcdefghijklmnop please", "use Bearer •••• please"],
   ["token in text eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2lnbmF0dXJlLXZhbHVl here", "token in text •••• (JWT) here"],
   ["aws AKIAABCDEFGHIJKLMNOP key", "aws AKIA•••• key"],
   ["-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAK\n-----END RSA PRIVATE KEY----- done", "•••• (private key) done"],
-  ["Which runs found high-risk issues?", "Which runs found high-risk issues?"]
+  ["Which runs found high-risk issues?", "Which runs found high-risk issues?"],
+  ["Authorization: Bearer 3f9a1c7e2b8d4f60a1b2c3d4e5f6a7b8", "Authorization: Bearer ••••"],
+  ["Proxy-Authorization: Basic dXNlcjpodW50ZXIy", "Proxy-Authorization: Basic ••••"],
+  ["authorization=Bearer sk_live_51Habcdefghij", "authorization=Bearer ••••"],
+  ["Authorization: 3f9a1c7e2b8d4f60a1b2c3d4", "Authorization: ••••"],
+  ["Cookie: theme=dark; sid=S3CRET-value", "Cookie: ••••"],
+  ["set-cookie: sid=abc; Path=/; HttpOnly", "set-cookie: ••••"]
 ]

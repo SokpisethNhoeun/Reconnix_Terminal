@@ -12,12 +12,21 @@ from typing import Any
 
 MASK = "••••"
 
+# Authorization schemes kept readable in front of the masked credential. A fixed list: a general
+# "word, then a space" would read a bare key as its scheme and leave the key visible.
+_SCHEMES = r"bearer|basic|digest|token|negotiate|ntlm|dpop|apikey|aws4-hmac-sha256"
+
 _PATTERNS = (
     # https://user:password@host → https://••••@host
     (re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/\s@:]+:[^/\s@]*@"), rf"\g<1>{MASK}@"),
-    # Cookie: …, Authorization: …, password=…, api_key: "…" → keep the name, mask the value
+    # Authorization: Bearer … → keep the header and the scheme, mask the credential
+    (re.compile(r"(?i)\b((?:proxy-)?authorization)\b(\s*[:=]\s*)((?:" + _SCHEMES + r")\s+)?"
+                r"(\"[^\"]*\"|'[^']*'|[^\s,;&]+)"), rf"\g<1>\g<2>\g<3>{MASK}"),
+    # Cookie: a=1; sid=2 → every cookie on the header line, not just the first
+    (re.compile(r"(?i)\b((?:set-)?cookie)(\s*:\s*)[^\r\n]+"), rf"\g<1>\g<2>{MASK}"),
+    # cookie=…, password=…, api_key: "…" → keep the name, mask the value
     (re.compile(
-        r"(?i)\b((?:set-)?cookie|(?:proxy-)?authorization|password|passwd|pwd|secret|"
+        r"(?i)\b((?:set-)?cookie|password|passwd|pwd|secret|"
         r"client[_-]?secret|token|access[_-]?token|refresh[_-]?token|api[_-]?key|"
         r"access[_-]?key|session[_-]?id|sessionid)\b(\s*[:=]\s*)(\"[^\"]*\"|'[^']*'|[^\s,;&]+)"),
      rf"\g<1>\g<2>{MASK}"),

@@ -51,19 +51,23 @@ class Box {
   children: Element[] = [];
   behaviors: string[] = [];
   target = -1; // where a glide was aimed
-  private onScroll: (() => void) | null = null;
+  private handlers = new Map<string, (event?: unknown) => void>();
   constructor(scrollHeight: number, clientHeight = 300) {
     this.scrollHeight = scrollHeight;
     this.clientHeight = clientHeight;
   }
-  addEventListener(_type: string, fn: () => void) {
-    this.onScroll = fn;
+  addEventListener(type: string, fn: (event?: unknown) => void) {
+    this.handlers.set(type, fn);
   }
-  removeEventListener() {
-    this.onScroll = null;
+  removeEventListener(type: string) {
+    this.handlers.delete(type);
   }
   get listening() {
-    return this.onScroll !== null;
+    return this.handlers.has("scroll");
+  }
+  /** A wheel or key event reaching the box. */
+  fire(type: "wheel" | "keydown", event: Partial<WheelEvent & KeyboardEvent>) {
+    this.handlers.get(type)?.(event);
   }
   /** Programmatic scrolls land at once here (a glide's steps are sent with `user`). */
   scrollTo({ top, behavior }: { top: number; behavior: string }) {
@@ -78,7 +82,7 @@ class Box {
     const next = Math.max(0, Math.min(top, this.scrollHeight - this.clientHeight));
     if (next === this.scrollTop) return;
     this.scrollTop = next;
-    this.onScroll?.();
+    this.handlers.get("scroll")?.();
   }
 }
 
@@ -91,6 +95,37 @@ function setup(reduced = false) {
 }
 
 describe("createStickToBottom", () => {
+  it("stops a glide on the spot when the reader moves up, and lets go", () => {
+    const { stick, box, last } = setup();
+    box.user(100); // read from near the top, then ask to go down
+    stick.scrollToBottom(); // a glide: the stand-in lands at once, so start it again mid-way
+    box.user(400); // a glide step on its way down
+    box.fire("wheel", { deltaY: -120 }); // the reader's wheel, up
+    expect(last()).toBe(false);
+    expect(box.behaviors.at(-1)).toBe("instant"); // the glide was halted where it was
+    expect(box.scrollTop).toBe(400);
+    box.scrollHeight = 1400;
+    stick.follow();
+    expect(box.scrollTop).toBe(400); // and nothing pulls them down any more
+  });
+
+  it("lets go on PageUp, ArrowUp, Home and Shift+Space, but not at the very top or on a wheel down", () => {
+    for (const key of [{ key: "PageUp" }, { key: "ArrowUp" }, { key: "Home" }, { key: " ", shiftKey: true }]) {
+      const { box, last } = setup();
+      box.fire("keydown", key);
+      expect(last()).toBe(false);
+    }
+    const down = setup();
+    down.box.fire("wheel", { deltaY: 120 });
+    expect(down.last()).toBe(true);
+    const top = setup();
+    top.box.user(0);
+    top.stick.scrollToBottom({ instant: true });
+    top.box.scrollTop = 0; // nothing above
+    top.box.fire("wheel", { deltaY: -120 });
+    expect(top.box.behaviors.at(-1)).toBe("instant");
+  });
+
   it("opens on the newest content and follows growth at once", () => {
     const { stick, box, last } = setup();
     expect(box.scrollTop).toBe(700);

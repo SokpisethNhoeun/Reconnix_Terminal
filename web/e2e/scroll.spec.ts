@@ -387,12 +387,11 @@ for (const size of [{ width: 1366, height: 768 }, { width: 390, height: 844 }]) 
   });
 }
 
-/* Needs the assistant view to use useStickToBottom + ScrollToBottom (the assistant UI's branch).
-   Turn it on (drop `.fixme`) once that branch is merged. */
+/* The conversation's way back down: useStickToBottom with the assistant's view. */
 test.describe("the assistant's way back down", () => {
   test.use({ viewport: { width: 1366, height: 768 } });
 
-  test.fixme("New messages appears after scrolling up, follows nothing until clicked, then glides back and follows again", async ({ page }) => {
+  test("New messages appears after scrolling up, follows nothing until clicked, then glides back and follows again", async ({ page }) => {
     await signIn(page);
     await page.goto("/?view=assistant");
     await ask(page, 1);

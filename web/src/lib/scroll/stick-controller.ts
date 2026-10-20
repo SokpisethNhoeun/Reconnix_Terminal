@@ -9,6 +9,9 @@
    - `scrollToBottom()` glides there (instantly under prefers-reduced-motion, or when asked with
      `{ instant: true }`, e.g. on opening a long saved conversation) and holds on; if more arrives
      during the glide, it re-aims at the new bottom.
+   - The reader's own move up (the wheel, PageUp / ArrowUp / Home / Shift+Space) stops a glide on
+     the spot and lets go: a smooth scroll still on its way would otherwise carry on to the bottom
+     and take them along (Chrome doesn't always cancel it for a wheel).
    - Nothing can hide behind a sticky element at the bottom: following goes to the end of the
      scroll area, where an in-flow sticky footer sits after the last message, not over it.
    - `ref` is a callback ref that also carries `current`, so the box may be swapped (the welcome
@@ -31,6 +34,8 @@ type Options = {
   /** Whether to jump instead of gliding (defaults to prefers-reduced-motion). */
   reducedMotion?: () => boolean;
 };
+
+const UP_KEYS: ReadonlySet<string> = new Set(["ArrowUp", "PageUp", "Home"]);
 
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -58,6 +63,19 @@ export function createStickToBottom<T extends HTMLElement>({ onPinned, reducedMo
   const attach = (box: T) => {
     const onScroll = () => setState(nextStick(state, metrics(box)));
     box.addEventListener("scroll", onScroll, { passive: true });
+    const readerUp = () => {
+      if (box.scrollTop <= EPSILON) return; // already at the top: nothing changes
+      setState({ pinned: false, seeking: false, lastTop: box.scrollTop });
+      box.scrollTo({ top: box.scrollTop, behavior: "instant" }); // halts a glide in flight
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY < 0) readerUp();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (UP_KEYS.has(e.key) || (e.key === " " && e.shiftKey)) readerUp();
+    };
+    box.addEventListener("wheel", onWheel, { passive: true });
+    box.addEventListener("keydown", onKey);
 
     let frame = 0;
     const later = () => {
@@ -105,6 +123,8 @@ export function createStickToBottom<T extends HTMLElement>({ onPinned, reducedMo
 
     return () => {
       box.removeEventListener("scroll", onScroll);
+      box.removeEventListener("wheel", onWheel);
+      box.removeEventListener("keydown", onKey);
       sizes?.disconnect();
       nodes?.disconnect();
       if (frame && typeof cancelAnimationFrame === "function") cancelAnimationFrame(frame);

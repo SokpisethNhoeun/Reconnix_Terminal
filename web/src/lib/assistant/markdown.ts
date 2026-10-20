@@ -96,7 +96,7 @@ export function parseBlocks(text: string): Block[] {
     const heading = HEADING.exec(line);
     if (heading) {
       flush();
-      blocks.push({ kind: "h", level: heading[1].length <= 2 ? 3 : 4, text: line.replace(HEADING, "").replace(/\s+#+\s*$/, "") });
+      blocks.push({ kind: "h", level: heading[1].length <= 2 ? 3 : 4, text: line.replace(HEADING, "").trimEnd().replace(/\s#+$/, "").trimEnd() }); // linear: no backtracking on long lines
       continue;
     }
     if (QUOTE.test(line)) {
