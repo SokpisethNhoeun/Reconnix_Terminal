@@ -13,9 +13,6 @@
 
 /* ---- The column ---- */
 .dash-findings { display: flex; flex-direction: column; min-height: 0; }
-/* until the view has hydrated (data-ready) its buttons take no pointer events (the handlers
-   ignore the keyboard themselves until then): see findings-view.tsx */
-.dash-findings:not([data-ready]) button { pointer-events: none; }
 .dash-findings > * { flex: none; }
 .dash-findings > .ui-split { flex: 1 1 auto; min-height: 0; }
 

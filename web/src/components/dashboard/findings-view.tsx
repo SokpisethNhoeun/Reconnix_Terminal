@@ -23,7 +23,7 @@ import {
   sortFindings,
   validationOf,
 } from "@/components/dashboard/filters";
-import { FINDINGS_KEYS, useQueryParams } from "@/components/dashboard/view-url";
+import { FINDINGS_KEYS, useQueryParams, writeQuery } from "@/components/dashboard/view-url";
 import { ListDetail } from "@/components/ui/list-detail";
 import type { Severity } from "@/lib/data/view-types";
 import { FINDING_REVIEW, SEVERITY_META, toneColor } from "@/lib/status";
@@ -50,10 +50,11 @@ function writeFinding(key: string, mode: "push" | "replace"): void {
   const params = new URLSearchParams(window.location.search);
   params.set("finding", key);
   const state: FindingState = { rxFinding: mode === "push" || pushedHere() };
-  window.history[mode === "push" ? "pushState" : "replaceState"](state, "", `?${params.toString()}`);
+  writeQuery(params, mode, state);
 }
 
-// Hydrated or not, without an effect: the server snapshot says no, the browser's says yes.
+// Hydrated or not, without an effect: the server snapshot says no, the browser's says yes. Only
+// the e2e specs read it (`data-ready`); the address writers gate themselves (view-url.ts).
 const subscribeNever = () => () => {};
 const useHydrated = () => useSyncExternalStore(subscribeNever, () => true, () => false);
 
@@ -69,11 +70,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
   const [p, update] = useQueryParams(FINDINGS_KEYS);
   const root = useRef<HTMLDivElement>(null);
   const detail = useRef<HTMLElement>(null);
-  // The controls act once the view has hydrated: a click replayed from before that would change
-  // the address before the router listens for it, and the view would not follow. Until then
-  // the buttons also take no pointer events (findings.css), so a tester's click waits.
   const ready = useHydrated();
-  const guard = <A extends unknown[]>(fn: (...args: A) => void) => (...args: A) => { if (ready) fn(...args); };
   // The row a phone opened last: highlighted and focused again when Back returns to the list.
   const [lastOpened, setLastOpened] = useState<string | null>(null);
 
@@ -86,19 +83,19 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
   const highlight = !page.explicit && lastOpened && page.rows.some((f) => f.key === lastOpened) ? lastOpened : page.current?.key ?? null;
 
   // A row: on a phone or tablet the detail pane replaces the list, as a history entry.
-  const open = guard((key: string) => {
+  const open = (key: string) => {
     if (!narrow()) return update({ finding: key });
     setLastOpened(key);
     writeFinding(key, "push");
-  });
-  const select = guard((key: string) => {
+  };
+  const select = (key: string) => {
     if (narrow() && page.explicit) return writeFinding(key, "replace"); // the pane stays, and so does its mark
     update({ finding: key, page: "" });
-  });
-  const back = guard(() => {
+  };
+  const back = () => {
     if (pushedHere()) return window.history.back();
     update({ finding: "" }); // a link or a reload opened the detail: nothing to go back to
-  });
+  };
 
   // The phone's panes and the keyboard: the detail pane takes focus and starts at its top (the
   // list may have been scrolled far down); back on the list, the row opened last takes focus
@@ -125,10 +122,10 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
     }
   }, [pane, page.current?.key, lastOpened]);
 
-  const setFilter = guard((patch: Partial<Record<"sev" | "val" | "q", string>>) => {
+  const setFilter = (patch: Partial<Record<"sev" | "val" | "q", string>>) => {
     const nextFilter = parseFindingFilter({ ...p, ...patch });
     update({ ...patch, ...filterPatch(findings, nextFilter, p.finding) });
-  });
+  };
   const clearFilters = () => setFilter({ sev: "", val: "", q: "" });
 
   const sevChips = countBy(findings, (f) => f.severity, SEVERITY_ORDER)
@@ -192,11 +189,11 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
             )}
           </span>
           {page.missing === "filtered" && (
-            <button type="button" onClick={guard(() => update({ sev: "", val: "", q: "", page: "" }))} className={NOTICE_BTN}>
+            <button type="button" onClick={() => update({ sev: "", val: "", q: "", page: "" })} className={NOTICE_BTN}>
               Show it
             </button>
           )}
-          <button type="button" onClick={guard(() => update({ finding: "" }))} className={NOTICE_BTN}>
+          <button type="button" onClick={() => update({ finding: "" })} className={NOTICE_BTN}>
             Dismiss
           </button>
         </p>
@@ -208,7 +205,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
           onBack={back}
           backLabel="Back to the findings"
           listLabel="Findings list"
-          list={<FindingsList rows={page.rows} currentKey={highlight} paging={page.paging} onOpen={open} onPage={guard((n: number) => update(pagePatch(sorted, n, p.finding)))} />}
+          list={<FindingsList rows={page.rows} currentKey={highlight} paging={page.paging} onOpen={open} onPage={(n) => update(pagePatch(sorted, n, p.finding))} />}
           detail={<FindingDetail ref={detail} finding={page.current} position={{ index: page.index, total: sorted.length }} prev={prev} next={next} onSelect={select} />}
         />
       )}

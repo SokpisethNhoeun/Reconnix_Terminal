@@ -26,10 +26,20 @@ export type ViewParams = Record<string, string | undefined>;
 export const parseView = (value: string | null | undefined): View =>
   (VIEWS as readonly string[]).includes(value ?? "") ? (value as View) : "overview";
 
-function write(params: URLSearchParams): void {
+/** Whether the page is interactive: viewer.tsx marks `html[data-hydrated]` once React has taken
+    over. A click React replays from before that would change the address before the router
+    listens for it, and the view would not follow; so the one writer below waits for the mark. */
+const routerReady = (): boolean => document.documentElement.hasAttribute("data-hydrated");
+
+/** Put `params` in the address: in place (`replace`, the default) or as a new history entry
+    carrying `state` (`push`). The only place the dashboard writes its address. */
+export function writeQuery(params: URLSearchParams, mode: "push" | "replace" = "replace", state: unknown = null): void {
+  if (!routerReady()) return;
   const query = params.toString();
-  window.history.replaceState(null, "", query ? `?${query}` : window.location.pathname);
+  window.history[mode === "push" ? "pushState" : "replaceState"](state, "", query ? `?${query}` : window.location.pathname);
 }
+
+const write = (params: URLSearchParams): void => writeQuery(params);
 
 /** The address after opening `view` from the one `search` holds (pure; showView's rule). The
     chosen assessment stays. Changing view drops the view left behind's own filters (and the
