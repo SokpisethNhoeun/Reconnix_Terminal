@@ -310,10 +310,13 @@ test("a viewer sees the assistant but can't ask or read conversations", async ({
   expect((await page.request.get("/api/assistant/conversations/0b0e2d55-1c5a-4b1e-9b8c-2f1d3c4b5a69")).status()).toBe(403);
 });
 
-test("the routes want a signed-in operator, the page's origin and a valid request", async ({ page, request }) => {
+test("the routes want a signed-in operator, the page's origin and a valid request", async ({ page, playwright }) => {
   const body = { uid: null, question: "hi" };
-  expect((await request.post("/api/assistant", { data: body })).status()).toBe(401); // no session
-  expect((await request.get("/api/assistant/conversations")).status()).toBe(401);
+  // no session: a context that starts with no cookies (the default one is signed in)
+  const anonymous = await playwright.request.newContext({ baseURL: ORIGIN, storageState: { cookies: [], origins: [] } });
+  expect((await anonymous.post("/api/assistant", { data: body })).status()).toBe(401);
+  expect((await anonymous.get("/api/assistant/conversations")).status()).toBe(401);
+  await anonymous.dispose();
   await signIn(page);
   const post = (data: unknown, origin = ORIGIN) => page.request.post("/api/assistant", { headers: { Origin: origin }, data });
   expect((await post(body, "http://evil.example")).status()).toBe(403);
