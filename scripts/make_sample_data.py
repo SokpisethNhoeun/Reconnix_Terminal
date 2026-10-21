@@ -17,6 +17,7 @@ import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Callable, Optional
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -38,6 +39,38 @@ NUCLEI = "\n".join(json.dumps(row) for row in [
     {"template-id": "missing-hsts", "matched-at": "https://{host}/",
      "info": {"name": "HSTS header missing", "severity": "low"}},
 ])
+
+# A run with every severity the scale has, a title that must stay text, and a login in a URL
+# (the store masks the login in what it keeps).
+NUCLEI_EDGE = "\n".join(json.dumps(row) for row in [
+    {"template-id": "admin-console-open", "matched-at": "https://ops:hunter2@{host}/console",
+     "info": {"name": "Admin console reachable without authentication", "severity": "critical",
+              "description": "The management console answers without a login."}},
+    {"template-id": "title-markup", "matched-at": "https://{host}/status",
+     "info": {"name": "<b>Status page</b> leaks build details", "severity": "high",
+              "description": "The page prints the <i>build number</i> and the host name."}},
+    {"template-id": "tech-detect", "matched-at": "https://{host}/",
+     "info": {"name": "Technology detected: nginx", "severity": "info"}},
+    {"template-id": "robots-txt", "matched-at": "https://{host}/robots.txt",
+     "info": {"name": "robots.txt lists internal paths", "severity": "low"},
+     "extracted-results": ["Disallow: /internal/"]},
+    {"template-id": "old-cert", "matched-at": "https://{host}/",
+     "info": {"name": "Certificate expires within 30 days", "severity": "medium"}},
+])
+
+# Nine more rows: with the template's own findings one run lists more than ten.
+NUCLEI_MANY = "\n".join(json.dumps(row) for row in [
+    {"template-id": f"exposed-{name}", "matched-at": f"https://{{host}}/{name}",
+     "info": {"name": f"Exposed {name} endpoint", "severity": severity}}
+    for name, severity in [("backup", "high"), ("metrics", "medium"), ("debug", "medium"),
+                           ("swagger", "low"), ("health", "info"), ("version", "info"),
+                           ("status", "low"), ("config", "medium"), ("trace", "low")]
+])
+
+
+def triage_false_positive() -> None:
+    store.triage_finding("IMP-003", status="false-positive",
+                         note="Banner is a test fixture; the scanner matched a stale cache.")
 
 
 # --- a clock that moves a few seconds per reading ----------------------------------------------
@@ -88,17 +121,38 @@ def decide(gate: str, *, high: str) -> bool:
     return True
 
 
-def play(text: str, *, high: str = "approve", fmt: str = "", imports: str = "") -> None:
+def play(text: str, *, high: str = "approve", fmt: str = "", imports: str = "",
+         stop_at: str = "", running_steps: int = 0, no_findings: bool = False,
+         after: Optional[Callable[[], None]] = None) -> None:
+    """Play one run from `text`.
+
+    `stop_at`: "scope" stops the run at the template/scope gate (nothing approved);
+    `running_steps`: leave the run Running after that many played steps once the plan runs;
+    `no_findings`: drop every finding (a completed run that found nothing);
+    `after`: a callable run last (triage a finding, for instance).
+    """
     if store.get_run().started:
         store.new_assessment()
     store.start_run(text)
+    played = 0
     while True:
         step = store.advance()
         if step is None:
             break
         if step.kind == "gate" and store.waiting_gate() == step.name:
+            if stop_at == "scope" and step.name in ("template", "scope"):
+                store.stop_run()
+                break
             if not decide(step.name, high=high):
                 break
+        elif running_steps and store.get_run().plan_started:
+            played += 1
+            if played >= running_steps:
+                break
+    if no_findings:
+        run = store.get_assessment().run
+        store.get_assessment().findings.clear()
+        run.revealed.clear()
     if fmt and store.is_completed():
         store.generate_report(fmt)
     if imports:
@@ -107,6 +161,8 @@ def play(text: str, *, high: str = "approve", fmt: str = "", imports: str = "") 
         path.write_text(imports.replace("{host}", host), encoding="utf-8")
         store.import_findings(str(path))
         path.unlink()
+    if after:
+        after()
 
 
 def session(moment: datetime, runs, closed: bool = True) -> list:
@@ -159,6 +215,27 @@ def main() -> None:
              imports=NUCLEI.split("\n")[0]),
         dict(text="Review the source repository git@git.example.com:shop/storefront.git "
                   "for security issues.", high="wait", gap=6),
+    ], closed=False)
+
+    # Runs for the edge cases (appended last: the sessions above keep their stamps).
+    snapshots += session(datetime(2026, 9, 29, 11, 20, tzinfo=utc), [
+        dict(text="Assess https://ops:hunter2@portal.example.com for web security issues.",
+             imports=NUCLEI_EDGE, after=triage_false_positive),
+        dict(text="Test the REST API at https://api.example.org/v2 for security issues.",
+             imports=NUCLEI_MANY, gap=9),
+    ])
+    snapshots += session(datetime(2026, 10, 1, 8, 30, tzinfo=utc), [
+        dict(text="Assess https://quiet.example.com for web security issues.", no_findings=True),
+        dict(text="Assess https://calm.example.com for web security issues.", no_findings=True,
+             gap=7),
+        dict(text="Check portal.example.net", stop_at="scope", gap=5),
+    ])
+    snapshots += session(datetime(2026, 10, 2, 13, 40, tzinfo=utc), [
+        dict(text="Review the source repository git@git.example.com:shop/checkout.git "
+                  "for security issues.", fmt="json"),
+    ])
+    snapshots += session(datetime(2026, 10, 4, 15, 0, tzinfo=utc), [
+        dict(text="Assess https://live.example.com for web security issues.", running_steps=12),
     ], closed=False)
 
     for data in snapshots:
