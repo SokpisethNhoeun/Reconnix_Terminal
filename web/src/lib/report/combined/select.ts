@@ -7,7 +7,12 @@
    (the first `cwe`, else the first `CWE-…` reference) and the target. Each run it appears in is
    an **occurrence**, kept whole (its own severity, CVSS, validation and masked evidence) so every
    line traces back to a uid. False positives are left out and counted; LOW and INFO findings are
-   left out when the `low` option is off, and counted too. */
+   left out when the `low` option is off, and counted too.
+
+   Free text taken from the files (targets, paths, descriptions, notes, evidence, the reason a
+   run stopped) is masked again here (lib/assistant/redact.ts), as the dashboard's derive
+   modules do, on top of what the TUI masked before it saved. */
+import { redact } from "@/lib/assistant/redact";
 import { type Assessment, type Finding, SEVERITIES, type Severity, type Status, STATUSES } from "@/lib/data/schema";
 import { effectiveSeverity, isConfirmed, isFalsePositive } from "@/lib/data/stats";
 
@@ -173,6 +178,9 @@ export function cweOf(f: Pick<Finding, "cwe" | "references">): string | null {
 
 const targetOf = (f: Pick<Finding, "affected_url" | "path">) => (f.affected_url || f.path || "").trim();
 
+/** Saved free text as the report shows it: masked again. */
+const masked = (value: string | null | undefined) => redact(value ?? "");
+
 /** What makes two findings of different runs the same finding. */
 export const identityOf = (f: Pick<Finding, "title" | "cwe" | "references" | "affected_url" | "path">) =>
   `${normaliseTitle(f.title)}|${cweOf(f) ?? ""}|${targetOf(f).toLowerCase()}`;
@@ -191,7 +199,7 @@ function runRef(a: Assessment): RunRef {
     uid: a.uid,
     id: runId(a),
     template: a.template.name || "—",
-    target: a.target_url || a.target || "—",
+    target: masked(a.target_url || a.target || "—"),
     status: a.status,
     operator: a.operator || "—",
     client: a.client,
@@ -206,7 +214,7 @@ function occurrence(a: Assessment, f: Finding, opts: CombineOptions): Occurrence
     uid: a.uid,
     runId: runId(a),
     id: f.id,
-    title: f.title,
+    title: masked(f.title),
     severity: effectiveSeverity(f),
     cvss: f.cvss_score > 0 ? f.cvss_score : null,
     cvssVector: f.cvss_vector,
@@ -214,16 +222,16 @@ function occurrence(a: Assessment, f: Finding, opts: CombineOptions): Occurrence
     confirmed: isConfirmed(f),
     status: f.status || "open",
     tool: f.tool,
-    target: targetOf(f),
-    location: f.path,
+    target: masked(targetOf(f)),
+    location: masked(f.path),
     category: f.category,
     cwe: cweOf(f),
     references: distinct([...f.references, ...f.owasp, ...f.cve, ...f.cwe]),
-    description: f.description,
-    impact: f.impact,
-    remediation: f.remediation,
-    evidence: opts.evidence ? [...f.evidence] : [],
-    note: f.triage_note,
+    description: masked(f.description),
+    impact: masked(f.impact),
+    remediation: masked(f.remediation),
+    evidence: opts.evidence ? f.evidence.map(masked) : [],
+    note: masked(f.triage_note),
   };
 }
 
@@ -236,10 +244,10 @@ function scopeSummary(a: Assessment): ScopeSummary | null {
   return {
     status: s.status,
     approved: s.status === "APPROVED",
-    target: s.target_url || a.target,
+    target: masked(s.target_url || a.target),
     actions: [...s.allowed_actions],
     methods: [...s.allowed_methods],
-    excluded: [...s.excluded_paths],
+    excluded: s.excluded_paths.map(masked),
     ports: [...s.allowed_ports],
     tools: [...s.tools],
     timeLimitMinutes: s.time_limit_minutes,
@@ -334,7 +342,7 @@ function limitations(list: Assessment[], sections: RunSection[], leftOut: { fals
     const s = sections[i];
     const limit = RUN_LIMITS[a.status];
     if (limit) {
-      const why = a.stopped_reason ? ` (${a.stopped_reason})` : "";
+      const why = a.stopped_reason ? ` (${masked(a.stopped_reason)})` : "";
       out.push({ kind: "run", run: s.id, text: `${s.id} ${limit}${why}.` });
     }
     if (!a.scope) out.push({ kind: "scope", run: s.id, text: `${s.id} has no Scope Manifest saved: the boundary of its testing is not recorded.` });

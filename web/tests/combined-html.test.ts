@@ -4,12 +4,14 @@
    meta CSP was added to it; otherwise byte-identical to the pre-refactor copy). */
 import { describe, expect, it } from "vitest";
 
+import type { Assessment } from "@/lib/data/schema";
 import { renderCombinedHtml } from "@/lib/report/combined/html";
 import { DEFAULT_COMBINE_OPTIONS } from "@/lib/report/combined/options";
 import { combineAssessments } from "@/lib/report/combined/select";
-import { esc, renderReportHtml } from "@/lib/report/html";
+import { esc, escPre, renderReportHtml } from "@/lib/report/html";
 
 import { sampleAssessments } from "./fixtures";
+import vectors from "./redact-vectors.json";
 
 const all = sampleAssessments();
 const picked = all.slice(0, 3);
@@ -88,6 +90,80 @@ describe("the combined HTML report", () => {
     const out = renderCombinedHtml(combineAssessments(picked, { ...DEFAULT_COMBINE_OPTIONS, appendix: false }));
     expect(out).toContain("The appendix was left out");
     expect(out).not.toContain("Saved copies");
+  });
+});
+
+// --- masking parity: the TUI's secret vectors through every free-text field of both reports ----
+// A saved file is already masked, but the dashboard masks every saved text again (derive*.ts);
+// the two report builders must too, field by field, so a secret in any one of them never prints.
+
+type Field = { name: string; put: (a: Assessment, raw: string) => Assessment };
+
+const withFinding = (a: Assessment, patch: Partial<Assessment["findings"][number]>): Assessment => ({
+  ...a,
+  findings: [{ ...a.findings[0], ...patch }, ...a.findings.slice(1)],
+});
+
+const FIELDS: Field[] = [
+  { name: "target_url", put: (a, raw) => ({ ...a, target_url: raw }) },
+  { name: "stopped_reason", put: (a, raw) => ({ ...a, status: "Stopped", stopped_reason: raw }) },
+  { name: "scope.excluded_paths", put: (a, raw) => ({ ...a, scope: { ...a.scope!, excluded_paths: [raw] } }) },
+  { name: "finding.title", put: (a, raw) => withFinding(a, { title: raw }) },
+  { name: "finding.description", put: (a, raw) => withFinding(a, { description: raw }) },
+  { name: "finding.impact", put: (a, raw) => withFinding(a, { impact: raw }) },
+  { name: "finding.remediation", put: (a, raw) => withFinding(a, { remediation: raw }) },
+  { name: "finding.triage_note", put: (a, raw) => withFinding(a, { triage_note: raw }) },
+  { name: "finding.evidence", put: (a, raw) => withFinding(a, { evidence: [raw] }) },
+  { name: "finding.affected_url", put: (a, raw) => withFinding(a, { affected_url: raw }) },
+  { name: "finding.path", put: (a, raw) => withFinding(a, { path: raw }) },
+];
+
+const SINGLE_ONLY: Field[] = [
+  { name: "verdict.reason", put: (a, raw) => ({ ...a, verdicts: [{ method: "GET", path: "/x", allowed: false, reason: raw, at: null }] }) },
+  { name: "verdict.path", put: (a, raw) => ({ ...a, verdicts: [{ method: "GET", path: raw, allowed: false, reason: "out of scope", at: null }] }) },
+  {
+    name: "approval.target",
+    put: (a, raw) => ({
+      ...a,
+      approvals: [{ ...a.approvals[0], request_id: "r-1", target: raw }],
+      decisions: [{ ...a.decisions[0], request_id: "r-1" }],
+    }),
+  },
+];
+
+describe("masking parity with the dashboard", () => {
+  const base = all.find((a) => a.findings.length > 0 && a.scope && a.approvals.length && a.decisions.length)!;
+  const secret = (vectors as [string, string][]).filter(([raw, masked]) => raw !== masked);
+
+  const expectMasked = (out: string, raw: string, masked: string, where: string) => {
+    expect(out, `${where}: the raw text printed`).not.toContain(esc(raw));
+    expect(out, `${where}: the raw text printed in a <pre>`).not.toContain(escPre(raw));
+    expect(out.includes(esc(masked)) || out.includes(escPre(masked)), `${where}: the masked text is missing`).toBe(true);
+  };
+
+  it("masks every secret vector in every free-text field of the combined report", () => {
+    for (const [raw, masked] of secret) {
+      for (const field of FIELDS) {
+        const out = renderCombinedHtml(combineAssessments([field.put(base, raw), picked[1]], DEFAULT_COMBINE_OPTIONS));
+        expectMasked(out, raw, masked, `combined ${field.name} ← ${raw.slice(0, 30)}`);
+      }
+    }
+  });
+
+  it("masks every secret vector in every free-text field of the single report", () => {
+    for (const [raw, masked] of secret) {
+      // (the single report has no Limitations section, so it never prints stopped_reason)
+      for (const field of [...FIELDS.filter((f) => f.name !== "stopped_reason"), ...SINGLE_ONLY]) {
+        const out = renderReportHtml(field.put(base, raw));
+        expectMasked(out, raw, masked, `single ${field.name} ← ${raw.slice(0, 30)}`);
+      }
+    }
+  });
+
+  it("leaves a plain question alone", () => {
+    const [plain] = (vectors as [string, string][]).filter(([raw, masked]) => raw === masked);
+    const out = renderReportHtml(withFinding(base, { description: plain[0] }));
+    expect(out).toContain(esc(plain[0]));
   });
 });
 
