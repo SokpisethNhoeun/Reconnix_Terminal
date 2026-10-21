@@ -26,6 +26,7 @@ import {
 import { FINDINGS_KEYS, useQueryParams, writeQuery } from "@/components/dashboard/view-url";
 import { ListDetail } from "@/components/ui/list-detail";
 import type { Severity } from "@/lib/data/view-types";
+import { revealCentred, revealTop } from "@/lib/scroll";
 import { FINDING_REVIEW, SEVERITY_META, toneColor } from "@/lib/status";
 
 const NARROW = "(max-width: 1023.98px)"; // one pane at a time (components/ui/list-detail.tsx)
@@ -99,8 +100,8 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
 
   // The phone's panes and the keyboard: the detail pane takes focus and starts at its top (the
   // list may have been scrolled far down); back on the list, the row opened last takes focus
-  // again, which brings it into view. The window is scrolled by hand, never with scrollIntoView
-  // (that would also move where the keyboard's Tab starts from).
+  // again, which brings it into view (lib/scroll.ts: by hand, never scrollIntoView, at the
+  // content area's scroll padding).
   const wasPane = useRef(pane);
   useEffect(() => {
     const was = wasPane.current;
@@ -110,15 +111,12 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
       const el = detail.current;
       if (!el) return;
       el.focus({ preventScroll: true });
-      const top = el.getBoundingClientRect().top;
-      const margin = 12; // the content area's scroll padding
-      if (top < 0 || top > margin) window.scrollTo({ top: Math.max(0, window.scrollY + top - margin), behavior: "instant" });
+      revealTop(el);
     } else if (was === "detail" && lastOpened) {
       const el = root.current?.querySelector<HTMLElement>(`[data-finding-key="${CSS.escape(lastOpened)}"]`);
       if (!el) return;
       el.focus({ preventScroll: true });
-      const r = el.getBoundingClientRect();
-      if (r.top < 0 || r.bottom > window.innerHeight) window.scrollTo({ top: Math.max(0, window.scrollY + r.top - (window.innerHeight - r.height) / 2), behavior: "instant" });
+      revealCentred(el);
     }
   }, [pane, page.current?.key, lastOpened]);
 

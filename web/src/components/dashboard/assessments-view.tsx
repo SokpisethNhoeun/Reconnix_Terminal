@@ -27,14 +27,7 @@ export function AssessmentsView({ rows }: { rows: ReportRunRow[] }) {
   const paging = paginate(shown.length, p.page);
   const page = slicePage(shown, paging);
 
-  // Turning a page from the bottom of a long list: bring the list's top back into view.
-  const turn = (n: number) => {
-    update({ page: n > 1 ? String(n) : "" });
-    const el = top.current;
-    if (!el) return;
-    const edge = el.closest("main")?.getBoundingClientRect().top ?? 0;
-    if (el.getBoundingClientRect().top < edge) el.scrollIntoView({ block: "start" });
-  };
+  const turn = (n: number) => update({ page: n > 1 ? String(n) : "" });
 
   return (
     <div className="dash-view dash-sheet" ref={top}>
@@ -57,7 +50,7 @@ export function AssessmentsView({ rows }: { rows: ReportRunRow[] }) {
       ) : (
         <>
           <AssessmentsRows rows={page} />
-          <Pagination paging={paging} onPage={turn} label="Assessment pages" />
+          <Pagination paging={paging} onPage={turn} label="Assessment pages" scrollTarget={top} />
         </>
       )}
     </div>

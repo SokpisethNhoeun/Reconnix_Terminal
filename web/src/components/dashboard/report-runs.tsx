@@ -139,7 +139,7 @@ export function ReportRuns({ runs, selection }: { runs: ReportRunRow[]; selectio
         </table>
       </div>
       {shown.length === 0 && <p className="text-sm text-muted-foreground">No saved assessment matches.</p>}
-      {paging.pages > 1 && <Pagination paging={paging} onPage={setPage} label="Saved assessment pages" />}
+      <Pagination paging={paging} onPage={setPage} label="Saved assessment pages" />
     </DashCard>
   );
 }

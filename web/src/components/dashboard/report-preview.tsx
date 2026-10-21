@@ -10,6 +10,7 @@ import { useEffect, useRef } from "react";
 import { RefreshCw, TriangleAlert } from "lucide-react";
 
 import { DashCard } from "@/components/dashboard/dash-card";
+import { revealTop } from "@/lib/scroll";
 
 export type PreviewState =
   | { kind: "idle" }
@@ -23,7 +24,7 @@ export function ReportPreview({ state, runs, stale, onRetry }: { state: Exclude<
     const el = card.current;
     if (!el) return;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
+    revealTop(el, { when: "always", behavior: reduced ? "instant" : "smooth" });
     el.focus({ preventScroll: true });
   }, []);
   const loading = state.kind === "loading";

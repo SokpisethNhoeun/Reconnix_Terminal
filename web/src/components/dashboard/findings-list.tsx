@@ -1,16 +1,19 @@
 "use client";
 
-/* The Findings view's list pane: one page of rows (ten at most) and the pager under them. On
-   the fixed desktop frame the rows scroll on their own under the filters, with the pager kept in
-   reach (styles/findings.css); elsewhere they grow with the window. The view owns the page and
-   the selection (both in the address) and hands them down. */
+/* The Findings view's list pane: one page of rows (ten at most) and the pager under them
+   (shown only with more than one page). On the fixed desktop frame the rows scroll on their own
+   under the filters, with the pager kept in reach (styles/findings.css); elsewhere they grow with
+   the window. The view owns the page and the selection (both in the address) and hands them
+   down; the view turns the chosen page into an address change (filters.ts pagePatch keeps the
+   selection when its row is on that page). */
 import { useEffect, useRef } from "react";
 
 import type { FindingRow } from "@/components/dashboard/derive";
 import { FINDING_ICON } from "@/components/dashboard/finding-icon";
-import { FindingsPager } from "@/components/dashboard/findings-pager";
+import { Pagination } from "@/components/ui/pagination";
 import { SeverityBadge } from "@/components/ui/status-badge";
 import type { Paging } from "@/lib/paging";
+import { isScroller, revealWithin } from "@/lib/scroll";
 
 export function FindingsList({
   rows,
@@ -28,16 +31,12 @@ export function FindingsList({
   const list = useRef<HTMLUListElement>(null);
 
   // When the rows scroll on their own (the fixed frame), keep the selected one in view: Previous /
-  // Next finding and deep links change it without a click on the row. Scrolled by hand rather
-  // than scrollIntoView, which would also move where the keyboard's Tab starts from.
+  // Next finding and deep links change it without a click on the row (lib/scroll.ts: by hand,
+  // never scrollIntoView).
   useEffect(() => {
     const ul = list.current;
     const row = ul?.querySelector('[aria-current="true"]');
-    if (!ul || !row || getComputedStyle(ul).overflowY !== "auto") return;
-    const r = row.getBoundingClientRect();
-    const u = ul.getBoundingClientRect();
-    if (r.top < u.top) ul.scrollTop += r.top - u.top;
-    else if (r.bottom > u.bottom) ul.scrollTop += r.bottom - u.bottom;
+    if (ul && row && isScroller(ul)) revealWithin(row, ul);
   }, [currentKey]);
 
   return (
@@ -74,7 +73,7 @@ export function FindingsList({
           );
         })}
       </ul>
-      <FindingsPager paging={paging} onPage={onPage} />
+      <Pagination paging={paging} onPage={onPage} label="Finding pages" className="dash-findings-pager" />
     </div>
   );
 }
