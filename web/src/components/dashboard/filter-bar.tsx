@@ -8,6 +8,7 @@ import { Search, X } from "lucide-react";
 
 import { plural } from "@/components/dashboard/derive-shared";
 import type { ChipOption } from "@/components/dashboard/filters";
+import { toneColor } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
 export type { ChipOption };
@@ -38,7 +39,7 @@ export function FilterChips({
       <span className="mr-0.5 text-[11px] text-muted-foreground">{label}</span>
       {options.map((o) => {
         const on = selected.includes(o.value);
-        const color = o.color ?? "var(--primary)";
+        const color = o.color ?? toneColor("primary"); // a chip without a meaning of its own (a template)
         return (
           <button
             key={o.value}
