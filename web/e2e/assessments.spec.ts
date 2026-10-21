@@ -45,6 +45,15 @@ test("lists every saved run newest first, at most ten a page, with the pager", a
   await expect(page).not.toHaveURL(/page=/);
 });
 
+test("a filter that fits one page shows no pager at all", async ({ page }) => {
+  await open(page, "&status=Stopped");
+  const stopped = all.filter((x) => x.status === "Stopped").length;
+  expect(stopped).toBeGreaterThan(0);
+  expect(stopped).toBeLessThanOrEqual(PER_PAGE);
+  await expect(rows(page)).toHaveCount(stopped);
+  await expect(pager(page)).toHaveCount(0); // nothing to turn: not a disabled pair of buttons
+});
+
 test("each row shows the run's status, findings count, worst severity and plan steps", async ({ page }) => {
   await open(page);
   const a = newest();
