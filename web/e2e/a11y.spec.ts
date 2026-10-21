@@ -18,10 +18,6 @@ const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 /* Known violations by page and axe rule (none today). Each entry is expected to be found, and the
    test fails with "remove it from KNOWN" once it is gone, so a stale entry can't hide a new one. */
 const KNOWN: Record<string, string[]> = {
-  // found by the CRITICAL finding the sample data now has: a CRITICAL row's badge reads under 4.5:1
-  // (the token check below passes: the badge sits on a different ground than the cards)
-  findings: ["color-contrast"],
-  "phone findings list": ["color-contrast"],
   // the documentation pages (the docs workstream's): muted text, links told apart by colour only,
   // buttons nested in the search's options, a code block that scrolls without a tab stop
   "docs index": ["color-contrast", "link-in-text-block"],
@@ -336,7 +332,7 @@ const tint = (c: number[], under: number[], share = 0.13) => c.map((v, i) => sha
 
 test("the meaning colours read at 4.5:1 on the cards, the page and inside their own badges", () => {
   const colours = ["primary", "success", "warning", "danger", "info", "sev-critical", "sev-high", "sev-medium", "sev-low", "sev-info"];
-  const grounds = ["card", "card-2", "background"]; // a card's gradient runs --card → --card-2
+  const grounds = ["card", "card-2", "background", "surface"]; // a card's gradient runs --card → --card-2; a row's tile is --surface
   const low: string[] = [];
   for (const name of colours) {
     expect(TOKENS[name], `--${name} is a token`).toMatch(/^#/);
