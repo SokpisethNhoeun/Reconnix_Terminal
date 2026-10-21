@@ -17,14 +17,7 @@ const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 /* Known violations by page and axe rule (none today). Each entry is expected to be found, and the
    test fails with "remove it from KNOWN" once it is gone, so a stale entry can't hide a new one. */
-const KNOWN: Record<string, string[]> = {
-  // the documentation pages (the docs workstream's): muted text, links told apart by colour only,
-  // buttons nested in the search's options, a code block that scrolls without a tab stop
-  "docs index": ["color-contrast", "link-in-text-block"],
-  "command page": ["color-contrast", "link-in-text-block"],
-  "docs search open": ["color-contrast", "link-in-text-block", "nested-interactive"],
-  "phone docs menu": ["color-contrast", "link-in-text-block", "scrollable-region-focusable"],
-};
+const KNOWN: Record<string, string[]> = {};
 
 async function axe(page: Page, name: string) {
   const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();

@@ -163,7 +163,7 @@ Plan, approve, execute, analyze, and report with confidence.
               </ul>
             </nav>
           </div>
-          <p className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground/80">
+          <p className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
             <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-accent" />
             For authorized testing only. Approve the scope before anything runs.
           </p>

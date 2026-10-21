@@ -102,21 +102,25 @@ export function DocsSearch({ index }: { index: DocsSearchEntry[] }) {
         hidden={!shown}
         className="docs-search-list absolute left-0 right-0 top-[calc(100%+6px)] z-40 max-h-80 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-lg"
       >
+        {/* each option is itself the thing to click (no control inside it: the box keeps the
+            keyboard, aria-activedescendant names the active one); its fill is the selected
+            row's (ui.css .ui-row[aria-current]), light enough for its muted line to read */}
         {hits.map((h, i) => (
-          <li key={h.href} id={`${listId}-${i}`} role="option" aria-selected={i === active}>
-            <button
-              type="button"
-              onMouseEnter={() => setActive(i)}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => go(h.href)}
-              className={cn("flex w-full flex-col gap-0.5 rounded-md px-2.5 py-1.5 text-left", i === active && "bg-primary/10")}
-            >
-              <span className="text-sm text-foreground">{h.entry.title}</span>
-              <span className="truncate text-[11px] text-muted-foreground">
-                {h.entry.group}
-                {h.heading ? ` · ${h.heading}` : ""}
-              </span>
-            </button>
+          <li
+            key={h.href}
+            id={`${listId}-${i}`}
+            role="option"
+            aria-selected={i === active}
+            onMouseEnter={() => setActive(i)}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => go(h.href)}
+            className={cn("flex cursor-pointer flex-col gap-0.5 rounded-md px-2.5 py-1.5 text-left", i === active && "bg-primary/6")}
+          >
+            <span className="text-sm text-foreground">{h.entry.title}</span>
+            <span className="truncate text-[11px] text-muted-foreground">
+              {h.entry.group}
+              {h.heading ? ` · ${h.heading}` : ""}
+            </span>
           </li>
         ))}
       </ul>

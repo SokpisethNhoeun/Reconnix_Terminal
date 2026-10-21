@@ -181,4 +181,21 @@ test.describe("on a phone", () => {
     expect(widths.length).toBeGreaterThan(0);
     for (const w of widths) expect(w).toBeGreaterThanOrEqual(300);
   });
+
+  test("a code block that scrolls sideways is a tab stop named Code, and one that fits is not", async ({ page }) => {
+    await page.goto("/docs/commands/export");
+    await expect(page.locator('.docs-code pre[tabindex="0"]').first()).toBeVisible(); // hydrated and measured
+    const blocks = await page.locator(".docs-code pre").evaluateAll((els) =>
+      els.map((el) => ({
+        scrolls: el.scrollWidth > el.clientWidth,
+        stop: el.getAttribute("tabindex") === "0" && el.getAttribute("role") === "region" && el.getAttribute("aria-label") === "Code",
+      })),
+    );
+    expect(blocks.some((b) => b.scrolls), "a block that scrolls at phone width").toBe(true);
+    for (const b of blocks) expect(b.stop, "a tab stop exactly when it scrolls").toBe(b.scrolls);
+    const stop = page.locator('.docs-code pre[tabindex="0"]').first();
+    await stop.focus();
+    await expect(stop).toBeFocused();
+    await expect(stop).toHaveCSS("outline-style", "solid"); // the focus mark (.ui-scroll-region)
+  });
 });
