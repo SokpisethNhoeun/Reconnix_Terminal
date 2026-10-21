@@ -80,9 +80,6 @@ test.describe("at 1440×900 with motion on", () => {
 
   for (const mode of MODES.slice(0, 2)) {
     test(`the Overview for ${mode.name} fits once the intro has settled`, async ({ page }) => {
-      // A real fault, found here: with motion on, the settled Overview at 1440×900 leaves the content
-      // area 8 px to scroll (reduced motion fits). test.fail() fails this test once it is fixed.
-      test.fail(true, "the Overview scrolls 8 px with motion on at 1440×900");
       await page.goto(`/?view=${mode.view}`);
       await expect(page.locator(".dash-overview")).toBeVisible();
       await settled(page);
