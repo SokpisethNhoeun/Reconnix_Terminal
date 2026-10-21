@@ -26,8 +26,8 @@ htmlcov/
 .env.*
 !.env.example
 
-# generated reports
-reports/
+# generated reports (the TUI's exports at the repo root; not web/src/app/api/reports)
+/reports/
 
 # local runtime data (encrypted keys, databases, logs)
 .reconix/
@@ -37,5 +37,3 @@ reports/
 # working / reference docs (not part of the branch)
 /Copy of Reconix*.md
 
-# The dashboard's combined-report route lives under web/src/app/api/reports (not a reports folder)
-!web/src/app/api/reports/

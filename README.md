@@ -8,8 +8,9 @@ approvals and findings, and a policy engine checks every request against the sco
 approved.
 
 Flow: **Start → Template → Plan → Approval → Execution → Findings → Finding Detail →
-Report**. A **web dashboard** (`web/`) shows the saved assessments, and its **Terminal**
-page runs this same TUI in the browser.
+Report**. A **web dashboard** (`web/`) shows the saved assessments (Overview, Assessments,
+Findings, Reports, Scope and an AI Assistant, with the documentation under `/docs`), and its
+**Terminal** view runs this same TUI in the browser.
 
 ## Run it
 
@@ -44,9 +45,9 @@ pip install -r requirements-dev.txt     # + python-docx for the DOCX export
 pytest -q
 ```
 
-## Model integration — quick start (`feature/model-integration`)
+## Model integration — quick start
 
-This branch adds **real, AI-driven assessments**: configure LLM providers, switch model
+Reconix also runs **real, AI-driven assessments**: configure LLM providers, switch model
 mid-run with preserved context, and have an agent run real Kali tools through an MCP server.
 Without a model configured, the scripted demo above still runs.
 
@@ -244,17 +245,19 @@ password never reaches the model. Configure the Kali MCP server and point the `L
 at your model in `.env` (see `.env.example`); `backend/` must be installed
 (`pip install -e backend`). Without a model or the harness, the scripted demo runs instead.
 
-**What is enforced on the agent:** approving the scope authorizes the target (Reconix registers
+**What is enforced (agent mode).** Approving the scope authorizes the target (Reconix registers
 it, not the model), and every tool call the agent makes is checked against that scope before it
 runs: the target host, the tool set, the time limit, allowed methods and excluded paths (web
 scopes) and ports (network scopes; a source-code scope refuses every network tool). A refused
-call is not executed; it shows as a POLICY line, raises the blocked count and is audited. The
-per-action MEDIUM/HIGH approval gates are **not** applied to the agent. The tool set limits it
-only if you edit the tools down (the manifest lists every scanner), a scanner's own traffic
-inside an allowed target is not checked request by request, and a bare-host scan on a network
-scope is judged by host only. Login requests never follow redirects. `/assess`, `/new`,
-opening another assessment and quitting cancel a running turn; the run you leave is marked
-stopped.
+call is not executed; the refusal goes back to the model, shows as a POLICY line in the activity
+log, raises the blocked count and is audited. What is **not** enforced: the scripted flow's
+per-action approval gates (MEDIUM: one decision; HIGH: the double check bound to the request
+hash) do not apply to the agent's actions — it asks its own yes/no confirmations in the chat
+instead, so read them. The tool set limits it only if you edit the tools down (the manifest
+lists every scanner), a scanner's own traffic inside an allowed target is not checked request by
+request, and a bare-host scan on a network scope is judged by host only. Login requests never
+follow redirects. `/assess`, `/new`, opening another assessment and quitting cancel a running
+turn; the run you leave is marked stopped.
 
 With no active model (or if a call fails) the built-in reply is used, so the demo runs
 offline.
@@ -267,8 +270,10 @@ to the exact request (`store.approve()` checks the command hash); HIGH risk also
 double check, the single-use token from `store.request_confirmation()`. Editing an
 action (`store.edit_approval()`) is policy-checked, rebuilds the request and its hash,
 and voids any open confirmation, so you approve exactly what is shown. The policy
-engine checks every request against the approved scope and blocks the rest. Target
-logins live in memory for the session only; one-time codes are never stored; evidence
+engine checks every request against the approved scope and blocks the rest (agent mode:
+each of the AI agent's tool calls too — target, tool set, methods, excluded paths, ports and
+the time limit; the per-action approval gates above do not cover the agent, see Agent
+mode). Target logins live in memory for the session only; one-time codes are never stored; evidence
 is masked; saved copies for the web dashboard (`~/.reconix/assessments`, 0600) never
 contain a secret. The browser terminal only opens for the dashboard's own page with a
 single-use ticket that only an operator gets, on 127.0.0.1; the helper proves itself before
@@ -280,9 +285,12 @@ the page sends a keystroke, never logs what is typed, and takes its TUIs down wi
 reconix-tui/
 ├── run.py                  # launcher
 ├── requirements*.txt, pyproject.toml
-├── docs/                   # plans: CLASSIC_UI_PLAN (this branch), LLM integration, web …
-├── scripts/                # export_tokens.py (web colors), make_sample_data.py
-├── web/                    # Next.js dashboard (read-only pages + the Terminal page)
+├── docs/                   # plans: CLASSIC_UI_PLAN (the classic-ui branch), LLM integration,
+│                           #   the web dashboard (WEB_REDESIGN_V3_PLAN is the current one) …
+├── scripts/                # export_tokens.py (web colors), export_commands.py (the docs'
+│                           #   command reference), make_sample_data.py (web/sample-data)
+├── web/                    # Next.js dashboard: read-only views, the AI Assistant, single and
+│                           #   combined report exports, the docs, the Terminal page
 ├── tests/                  # pytest + Textual Pilot
 └── reconix/
     ├── app.py              # ReconixApp: bindings and the command runner

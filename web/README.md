@@ -2,12 +2,14 @@
 
 A local dashboard for what the Reconix terminal app did, opened from the TUI with `/web`. It
 reads the assessments the TUI saves to `~/.reconix/assessments/` and shows them as the
-**Assessment Operations Center** (the globe UI from the reconix-web-ui site), with Findings,
-Reports, Scope, Terminal and AI Assistant views, all switched in-page (`?view=`). By default
-the Overview totals **every saved run** (`derive-overall.ts`) and Findings lists them all, each
-naming its run; the Assessment switcher in the top bar opens one run instead (`?uid=`) and
-searches every saved run. Reports and Scope belong to one run, so with every run shown they ask
-you to pick one. The page re-reads the files every 10 s.
+**Assessment Operations Center** (the globe UI from the reconix-web-ui site), with Assessments,
+Findings, Reports, Scope, Terminal and AI Assistant views, all switched in-page (`?view=`;
+each view's own address keys and every run link live in `components/dashboard/view-url.ts`).
+By default the Overview totals **every saved run** (`derive-overall.ts`) and Findings lists
+them all, each naming its run; the Assessment switcher in the top bar opens one run instead
+(`?uid=`) and searches every saved run. Scope belongs to one run, so with every run shown it
+asks you to pick one; Reports then lists every run and combines them. The page re-reads the
+files every 10 s (`RECONIX_LIVE_REFRESH_MS`; `0` turns it off).
 
 - **Overview:** a summary strip (Findings with the worst severity, Assessment progress with its
   state, Tool execution, Duration against the time limit) over the globe hero with the Ask bar;
@@ -19,19 +21,32 @@ you to pick one. The page re-reads the files every 10 s.
 - **Meanings:** every status, step, approval, policy decision and severity is a badge with an
   icon, a label and a tooltip from `lib/status.ts` (`components/ui/status-badge.tsx`); severity
   uses the TUI's own scale. Colour is never the only signal; every chart has a legend.
-- **Findings** filter by severity and validation and search title, ID, CWE and target; the
-  filters and the open finding live in the address (`?sev=HIGH,LOW&val=review&q=sql&finding=F-001`).
+- **Assessments:** every saved run, newest first, ten a page, with a search and status and
+  template chips (`?view=assessments&q=api&status=Completed&template=API&page=2`); a row opens
+  that run's Overview.
+- **Findings** filter by severity and validation and search title, ID, CWE and target, ten
+  rows a page with Previous / Next; the filters, the page and the open finding live in the
+  address (`?sev=HIGH,LOW&val=review&q=sql&page=2&finding=F-001`), so a link opens on its
+  finding's page. The finding's evidence and remediation sit beside the list; on the fixed
+  desktop frame the list scrolls on its own under the filters, and on a phone the list and the
+  detail take turns (Back returns to the list). Ten rows a page is `lib/paging.ts`, shared with
+  Assessments and the Report view's runs.
 - **Drill-down:** the Findings card opens every finding, a severity row opens Findings filtered
   to it, a top finding opens itself.
 - **The bell** lists what the open run waits on and every other saved run that waits on a
   decision; the switcher says when a saved file was skipped and why. Those views never change
   anything. The **Terminal** view runs the TUI itself in the browser, so every gate and
-  decision still goes through the TUI's store. `/docs` holds the project's documentation.
+  decision still goes through the TUI's store. `/docs` holds the project's documentation
+  (`lib/docs-nav.ts` over `content/docs/`: getting started, the terminal guide, AI models, one
+  page per command, the assessment guide, reports, troubleshooting, guardrails; a search; the
+  addresses of the previous structure redirect, 308, through `lib/docs-redirects.ts`).
   (The Audit log view was removed; the audit data stays in the saved files and the TUI.)
 
 Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind v4 · GSAP · Lenis ·
 three.js · zod · lucide-react. Dark only. See `../docs/WEB_GLOBE_UI_PLAN.md` for how it
-replaced the earlier pages.
+replaced the earlier pages, `../docs/WEB_REDESIGN_V2_PLAN.md` for the v2 redesign and
+`../docs/WEB_REDESIGN_V3_PLAN.md` for v3 (Assessments, paging, the combined report, the docs;
+§5 holds its status).
 
 ## Run
 
@@ -48,6 +63,8 @@ npm start -- --no-terminal         # no Terminal page; the sign-in grants viewer
 |---|---|---|
 | `RECONIX_DATA_DIR` | `~/.reconix/assessments` | the folder the TUI saves to |
 | `RECONIX_STALE_AFTER_HOURS` | `12` | an unfinished run whose file has not changed for this long reads as Interrupted (its TUI was killed before it could say so); `0` turns this off, e.g. for the old sample data |
+| `RECONIX_LIVE_REFRESH_MS` | `10000` | how often the page re-reads the saved files; `0` turns the live refresh off (the e2e server does) |
+| `RECONIX_CHROME` | the usual names on PATH, then the common install paths | the Chrome/Chromium that prints the PDF exports; without one the PDF routes answer 501 |
 | `RECONIX_WEB_PORT` | `3100` | port on 127.0.0.1 |
 | `RECONIX_TERM_PORT` | `3101` | the terminal helper's port on 127.0.0.1 |
 | `RECONIX_PYTHON` | repo `.venv`, else `python3` (`python` on Windows) | the Python that runs the terminal helper and the TUI |
@@ -97,8 +114,9 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   conversation has messages it fades out and stops drawing (also when hidden, or on low-power
   devices, where it holds a still frame).
 - **Breathing** (`breath.ts`, `styles/motion.css`): one 6 s cycle shared by the sidebar's AI
-  icon, the globe/orb and the whole chat panel (scale 1 → 1.003 and its glow), started once the
-  open has settled, on its own layer; reduced motion shows a still halo instead.
+  icon and the globe/orb, started once the open has settled, on its own layer. Nothing that
+  holds text breathes: the chat panel and its card are static once messages exist (scaled text
+  vibrates while reading); reduced motion shows a still halo instead.
 
 - **Model:** any OpenAI-compatible endpoint, as the product docs' "Model switching": set
   `LLM_BASE_URL` and `LLM_MODEL` in the environment `/web` starts from or in `web/.env.local`
@@ -128,13 +146,15 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   (operators; changes need the page's origin). Kept 30 days after last use
   (`RECONIX_ASSISTANT_RETENTION_DAYS`, `0` keeps them), at most 100 conversations and 200
   messages each. The tab keeps only the open conversation's id and the masked unsent draft.
-  Plans: `docs/WEB_AI_ASSISTANT_PLAN.md`, `docs/WEB_REDESIGN_V2_PLAN.md`.
+  Plans: `docs/WEB_AI_ASSISTANT_PLAN.md`, `docs/WEB_REDESIGN_V2_PLAN.md` (the transition and
+  the breathing), `docs/WEB_REDESIGN_V3_PLAN.md` (the v3 polish and its status).
 
 ## Develop
 
 ```bash
 npm run dev          # hot reload, same sign-in flow
-npm test             # vitest: data reader, schema, stats, session, dashboard numbers
+npm test             # vitest: data reader, schema, stats, session, dashboard numbers, filters
+                     #   and paging, the docs structure and redirects, the combined report
 npm run check:data   # print everything derive.ts computes from a saved file (default: the
                      #   newest in sample-data/, or pass a path)
 npm run globe:points # rebuild public/globe/land.bin (dev only; the build doesn't run it)
@@ -144,15 +164,24 @@ npm run build && npm run e2e        # Playwright on sample-data (npx playwright 
                                     #   ports (default 3199, plus 3198 and 3195)
 ```
 
-The e2e specs: `access` (roles, origin), `pages` (views, switcher, filters, drill-downs),
-`assistant` (with the stand-in model `e2e/llm-stub.mjs`; `[stub:markdown]`, `[stub:long]` and
-`[stub:fail]` pick its answers), `motion` (directions, timing, the globe, history), `scroll`
-(the wheel and keys at six sizes, no sideways scroll) and `a11y` (axe via
-`@axe-core/playwright`, focus order). Known faults are listed in the specs as expected
-failures that fail with "remove this entry" once fixed.
+The e2e specs: `access` (roles, origin, headers), `pages` (views, switcher, downloads, the docs,
+the Terminal view with a stand-in program), `assessments` (ten a page, the pager, chips, search,
+the address), `findings` (paging, deep links, Previous / Next across a page end, the notice for
+a hidden finding, the list scroller, the phone's list → detail → Back), `reports` (combining
+runs: the selection, the preview frame, one real PDF, the 500 / 501 paths), `docs` (groups,
+command pages, Copy, search, redirects, the phone menu), `dashboard-fit` (the Overview fits the
+fixed frame with nothing to scroll), `assistant` (with the stand-in model `e2e/llm-stub.mjs`;
+`[stub:markdown]`, `[stub:long]` and `[stub:fail]` pick its answers), `motion` (directions,
+timing, the globe, history), `scroll` (the wheel and keys at six sizes, no sideways scroll) and
+`a11y` (axe via `@axe-core/playwright`, focus order). Known faults are listed in the specs as
+expected failures that fail with "remove this entry" once fixed. The specs wait for
+`html[data-hydrated]` (set by `components/dashboard/viewer.tsx`), never for network idle.
 
 `sample-data/` is generated by `python scripts/make_sample_data.py` (repo root), which plays
-the four templates through the real TUI store, so it always matches the saved format.
+at least a dozen runs across the four templates through the real TUI store (every severity,
+runs with no findings, a run stopped before its scope was approved, one still running, one
+with more than a page of findings), so it always matches the saved format; the specs read their
+counts from it (`e2e/support.ts`), never from literals.
 
 ## Layout
 
@@ -167,11 +196,14 @@ src/
 │   ├── assistant/           # /assistant → /?view=assistant
 │   ├── login/               # sign-in (token from the link's #fragment) → the Overview
 │   └── api/                 # session (sign-in), assessments/[uid] (JSON), assessments/[uid]/export,
-│                            #   terminal/ticket, assistant and assistant/conversations (operators)
+│                            #   reports/combined (1–5 runs as one HTML / PDF; viewer), terminal/ticket,
+│                            #   assistant and assistant/conversations (operators)
 ├── lib/
 │   ├── data/                # schema.ts (zod), store.ts (server-only reader), stats.ts (pure), export.ts,
 │   │                        #   adapt.ts (a saved run → the viewer's terms), view-types.ts, format.ts
-│   ├── report/              # formats.ts (the export registry), html.ts (report), pdf.ts (Chrome), render.ts
+│   ├── report/              # formats.ts (the export registry), html.ts (report), pdf.ts (Chrome), render.ts,
+│   │                        #   combined/ (query.ts validates ?uids=&format=&evidence=&low=&appendix=,
+│   │                        #   select.ts merges the runs, html.ts renders, options.ts names the file)
 │   ├── auth/                # session.ts (launch token, signed cookie, roles, hosts), csp.ts, guard.ts
 │   │                        #   (+ terminalAccess), origin.ts (same-origin check), ticket.ts (terminal tickets)
 │   ├── terminal/            # config.ts (on/off, helper port), paths.ts, protocol.ts (frames, close codes),
@@ -182,25 +214,39 @@ src/
 │   │                        #   prompts from saved data), history-store.ts + history-schema.ts (saved
 │   │                        #   conversations), redact.ts, markdown.ts, rate.ts, access.ts, client.ts
 │   ├── scroll/              # stick-rules.ts + stick-controller.ts (the conversation follows its end)
+│   ├── scroll.ts            # scrolling a row into view by hand (never scrollIntoView, which moves the page)
+│   ├── paging.ts            # ten rows a page: the page clamped from the address, the label
 │   ├── status.ts            # what every status, step, approval, policy decision and severity means
-│   └── globe*.ts (three.js globe: scene, post, holds), docs-nav.ts, site.ts, templates.ts, utils.ts
+│   ├── docs-nav.ts          # DOCS_NAV / DOCS_ROUTES / the DOCS link map, and the commands from commands.json
+│   ├── docs-redirects.ts    # the old docs addresses → the new pages (308, loaded by next.config.ts)
+│   ├── docs-search-index.ts # what the docs search looks through (titles, headings, aliases)
+│   └── globe*.ts (three.js globe: scene, post, holds), site.ts, templates.ts, utils.ts
 ├── components/
 │   ├── dashboard/           # Viewer, Sidebar, TopBar, the views, the summary strip and the three panels;
 │   │                        #   derive*.ts hold every number they show (overview-types.ts); axis.ts,
 │   │                        #   event-kinds.ts, legend.tsx, hint.tsx, chart-tooltip.tsx, mark-details.tsx;
-│   │                        #   view-url.ts (?view=), live-refresh.tsx, intro.tsx (GSAP, by data-motion)
+│   │                        #   view-url.ts (?view=, each view's keys, run links), live-refresh.tsx,
+│   │                        #   intro.tsx (GSAP, by data-motion); the Assessments view (assessments-*.ts(x)),
+│   │                        #   Findings (findings-view/-list.tsx, finding-detail.tsx, filters.ts, filter-bar.tsx),
+│   │                        #   Reports (reports-view.tsx, report-selection/-runs/-preview.tsx, derive-report.ts),
+│   │                        #   run-cells.tsx (the one run row of Assessments and Reports), view-header.tsx,
+│   │                        #   view-link.tsx and run-link.tsx (drill-downs), docs-search.tsx
 │   ├── assistant/           # AssistantProvider (+ use-* hooks: open, asking, history, tab memory),
 │   │                        #   AssistantStage + motion*.ts + use-globe*.ts (the transition and the globe),
 │   │                        #   AssistantView, header, welcome, prompt cards, messages, cards/, composer,
 │   │                        #   conversation menu, breath.ts, use-stick-to-bottom.ts + scroll-to-bottom.tsx
 │   ├── terminal/            # TerminalView, TerminalPanel, TerminalToolbar, RestartButton, TerminalNotice,
 │   │                        #   ScrollToLatest, useXterm, useTerminalSession, useTerminalView, useLeaveWarning
-│   ├── ui/                  # Button, Card, Badge, StatusChip, IconButton (cva + cn)
+│   ├── ui/                  # Button, Badge, StatusBadge / SeverityBadge, IconButton, Checkbox, CopyButton,
+│   │                        #   Pagination, ListDetail, EmptyNote (cva + cn; styles/ui.css)
 │   └── docs-*.tsx, site-nav.tsx, site-footer.tsx, nav-*.ts(x)   # the docs' chrome
-├── content/docs/            # the documentation pages
+├── content/docs/            # the documentation pages, one file per group; commands.json is GENERATED from
+│                            #   reconix/commands/builtin.py by scripts/export_commands.py (never edit it:
+│                            #   tests/test_export_commands.py and tests/docs-nav.test.ts check it)
 └── styles/                  # tokens.css (GENERATED from reconix/theme.py by scripts/export_tokens.py), then one
-                             #   file per area: frame (page and scrolling), dashboard, motion, assistant,
-                             #   terminal, site (imported in that order from app/globals.css)
+                             #   file per area, imported in this order from app/globals.css: frame (page and
+                             #   scrolling), dashboard, motion, terminal, site, assistant, ui (shared controls),
+                             #   findings, assessments, reports, docs
 public/globe/land.bin        # the globe's land dots (scripts/build-globe-points.mjs)
 ```
 
@@ -225,7 +271,8 @@ once, with each run as an occurrence; what a run lacks is listed under Limitatio
   ticket route only hands out a ticket; the helper starts the session), and the AI Assistant
   writes **its own conversation files** in `~/.reconix/assistant` (and nothing else). The
   assistant's route is also the one place saved data leaves the machine, and only to the model
-  the operator configured.
+  the operator configured. The PDF exports (single and combined) start a headless Chrome on a
+  temp file the server wrote (`lib/report/pdf.ts`), never on anything the request said.
 - **One data source.** Pages read through `lib/data/store.ts` only; it accepts regular files
   named `<YYYYMMDD-HHMMSS-xxxx>_<id>.json` up to 5 MB that pass `AssessmentSchema`.
   Change `schema.ts` together with `reconix/store/snapshot.py`.
@@ -253,7 +300,8 @@ once, with each run as an occurrence; what a run lacks is listed under Limitatio
   assistant view keeps `data-assistant-piece` on its header, conversation and composer, and
   the welcome's `data-globe-slot`.
 - **Filters are client-side** over data the page already has (`components/dashboard/filters.ts`,
-  unit-tested); they never add a route or a request.
+  `assessments-filters.ts`, `lib/paging.ts`; unit-tested, and anything unknown in the address
+  is ignored or clamped); they never add a route or a request.
 - **No inline scripts.** The intro's hide-before-animate state is CSS
   (`@media (scripting: enabled)`), so the nonce CSP needs no exceptions.
 - **Reusable components** in `components/dashboard` (DashCard, Popover, …) and `components/ui`
