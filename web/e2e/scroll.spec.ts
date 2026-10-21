@@ -190,6 +190,7 @@ for (const size of SIZES) {
     test.use({ viewport: size, reducedMotion: "reduce" });
 
     test("every view reaches its bottom, nothing overflows sideways, the composer is in view", async ({ page }) => {
+      test.setTimeout(120_000); // eight views, the assistant and a docs page, three browsers at a time
       await signIn(page);
       for (const view of VIEWS) {
         await open(page, view);

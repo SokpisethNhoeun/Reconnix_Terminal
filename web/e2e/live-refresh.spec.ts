@@ -7,12 +7,14 @@ import { expect, test } from "@playwright/test";
 import { LIVE_PORT, PORT } from "../playwright.config";
 import { hydrated } from "./support";
 
+/** The router.refresh() call: a Flight request for the page itself, not a link's prefetch. */
+const isRefresh = (r: import("@playwright/test").Request) => !!r.headers()["rsc"] && !r.headers()["next-router-prefetch"];
 const pill = (page: import("@playwright/test").Page) => page.locator("[data-live-refresh]");
 
 test("the e2e server has live refresh off: a static pill, no polling", async ({ page }) => {
   let refreshes = 0;
   page.on("request", (r) => {
-    if (r.url().includes("_rsc=") && r.headers()["rsc"]) refreshes += 1;
+    if (isRefresh(r)) refreshes += 1;
   });
   await page.goto(`http://127.0.0.1:${PORT}/`);
   await hydrated(page);
@@ -42,7 +44,7 @@ test.describe("with live refresh on (every second)", () => {
     const paused = (await pill(page).textContent())!;
     let asked = 0;
     page.on("request", (r) => {
-      if (r.url().includes("_rsc=")) asked += 1;
+      if (isRefresh(r)) asked += 1;
     });
     await page.waitForTimeout(2200);
     expect(asked, "no refresh while paused").toBe(0);

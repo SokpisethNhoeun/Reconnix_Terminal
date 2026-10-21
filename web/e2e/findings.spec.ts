@@ -140,8 +140,9 @@ test("a run with no findings says so: no list, no filters, no pager", async ({ p
   expect(run.status).toBe("Completed");
   await go(page, `/?uid=${NO_FINDINGS}&view=findings`);
   await expect(page.getByRole("heading", { name: "Findings", level: 1 })).toBeVisible();
-  await expect(page.getByText("No findings in this assessment yet.")).toBeVisible();
-  await expect(page.getByText("Findings appear here once this assessment's run records some.")).toBeVisible();
+  const view = page.locator("main > :not([hidden])"); // the Report view (hidden) says it too
+  await expect(view.getByText("No findings in this assessment yet.")).toBeVisible();
+  await expect(view.getByText("Findings appear here once this assessment's run records some.")).toBeVisible();
   await expect(list(page)).toHaveCount(0);
   await expect(page.getByRole("searchbox", { name: "Search findings" })).toHaveCount(0);
   await expect(pager(page)).toHaveCount(0);
@@ -180,10 +181,14 @@ test("a critical finding, an info finding and a false positive show their own ba
   await expect(markup).toHaveCount(1);
   await expect(page.locator("b", { hasText: "Status page" })).toHaveCount(0);
   // the false positive is listed, marked closed, and its triage note shows in its detail
-  const fp = rows(page).filter({ hasText: "Technology detected: nginx" });
-  await expect(fp).toContainText("False positive");
-  await fp.locator("button").click();
-  await expect(detail(page)).toContainText("Banner is a test fixture; the scanner matched a stale cache.");
+  await rows(page).filter({ hasText: "Technology detected: nginx" }).locator("button").click();
+  await expect(detail(page)).toContainText("False positive");
+  // the analyst's note is part of the report, and the markup in a title is escaped there too
+  const html = await (await page.request.get(`/api/assessments/${uid}/export?format=html`)).text();
+  expect(html).toContain("Analyst note");
+  expect(html).toContain("Banner is a test fixture; the scanner matched a stale cache.");
+  expect(html).toContain("&lt;b&gt;Status page&lt;/b&gt; leaks build details");
+  expect(html).not.toContain("<b>Status page</b>");
 });
 
 test.describe("on the fixed frame (1366×768)", () => {

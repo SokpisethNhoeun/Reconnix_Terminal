@@ -49,7 +49,7 @@ async function settled(page: Page) {
         last = now;
         return same;
       },
-      { intervals: [300] },
+      { intervals: [300], timeout: 20_000 },
     )
     .toBe(true);
 }

@@ -168,7 +168,7 @@ test("a finding two runs share counts once, with an occurrence in each run", asy
   const doc = frame(page);
   await expect(doc.getByRole("heading", { name: "Combined security assessment report" })).toBeVisible({ timeout: 20_000 });
   const text = await doc.locator("body").innerText();
-  const [, unique, occurrences] = text.match(/Unique findings\s*(\d+) \((\d+) occurrences?\)/)!.map(Number);
+  const [, unique, occurrences] = text.match(/Unique findings\s*(\d+) \((\d+) occurrences?\)/i)!.map(Number);
   expect(occurrences, "a shared finding is one unique finding with two occurrences").toBeGreaterThan(unique);
   // 3 + 4 findings recorded; the BOLA finding is in both
   expect(occurrences).toBe(7);
@@ -187,7 +187,7 @@ test("with evidence and LOW off the preview drops the evidence blocks and the LO
   const doc = frame(page);
   await expect(doc.getByRole("heading", { name: "Combined security assessment report" })).toBeVisible({ timeout: 20_000 });
   await expect(doc.locator("pre.evidence")).toHaveCount(0);
-  await expect(doc.getByText("Evidence lines were left out by the report's options.")).toBeVisible();
+  await expect(doc.locator("#evidence").getByText("Evidence lines were left out by the report's options.")).toBeVisible();
   await expect(doc.getByText("Broken object-level authorization").first()).toBeVisible(); // MEDIUM stays
   await expect(doc.getByText("No rate limiting on login")).toHaveCount(0); // LOW: gone
   await expect(doc.getByText("HSTS header missing")).toHaveCount(0);

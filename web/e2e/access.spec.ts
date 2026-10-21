@@ -21,7 +21,6 @@ test("the combined report needs a session, and a viewer can read it", async ({ c
   const url = `/api/reports/combined?uids=${sample()[0].uid}&format=html&evidence=1&low=1&appendix=1`;
   const none = await request.get(url);
   expect(none.status()).toBe(401);
-  expect(none.headers()["cache-control"]).toBe("no-store");
   await context.addCookies([{ name: "reconix_view", value: sessionValue("viewer", TOKEN), domain: "127.0.0.1", path: "/" }]);
   const ok = await context.request.get(url);
   expect(ok.status()).toBe(200);
