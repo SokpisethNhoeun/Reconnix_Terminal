@@ -272,3 +272,90 @@ async def test_repeat_guard_stops_loop(tmp_path):
     # update_plan ran exactly once despite being issued twice.
     assert len([e for e in events if e.get("type") == "plan"]) == 1
     assert not any("should-not-reach" in e.get("text", "") for e in events)
+
+
+async def test_refusing_guard_never_builds_the_mcp_client(tmp_path, monkeypatch):
+    from harness import agent as agent_mod
+    from harness.models import Target, TargetType
+
+    built = []
+
+    class _NoMCP:
+        def __init__(self, *a, **kw):
+            built.append(1)
+
+    monkeypatch.setattr(agent_mod, "KaliMCP", _NoMCP)
+    agent = Agent(_settings(tmp_path), guard=lambda name, args: "outside the test scope")
+    agent.db.add_target(
+        Target(name="shop", type=TargetType.WEB, value="http://10.0.0.5:8081", authorized=True))
+    _script(agent, [
+        {"role": "assistant", "content": "",
+         "tool_calls": [_tool_call("c1", "run_scan", {"target": "shop", "tools": ["nmap"]})]},
+        {"role": "assistant", "content": "ok"},
+    ])
+    events = await _collect(agent, "scan it")
+
+    assert built == []                                  # refused before any tool ran
+    policy = [e for e in events if e["type"] == "policy"]
+    assert policy and policy[0]["reason"] == "outside the test scope"
+    ends = [e for e in events if e["type"] == "tool_end"]
+    assert ends[0]["result"] == {"error": "blocked by Reconix scope: outside the test scope"}
+
+
+async def test_a_guard_that_raises_refuses(tmp_path):
+    def broken(name, args):
+        raise RuntimeError("boom")
+
+    agent = Agent(_settings(tmp_path), guard=broken)
+    res = await agent._dispatch("list_targets", {})
+    assert "blocked by Reconix scope" in res["error"]
+
+
+async def test_no_guard_changes_nothing(tmp_path):
+    agent = Agent(_settings(tmp_path))
+    assert await agent._dispatch("list_targets", {}) == []
+
+
+async def test_login_never_follows_redirects(tmp_path, monkeypatch):
+    import httpx
+
+    seen = {}
+
+    class _Redirect:
+        status_code = 307
+        headers = {"location": "https://elsewhere.example/steal"}
+        cookies: dict = {}
+
+        def json(self):
+            raise ValueError
+
+    class _Client:
+        def __init__(self, **kw):
+            seen.update(kw)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, **kw):
+            return _Redirect()
+
+    monkeypatch.setattr(httpx, "AsyncClient", _Client)
+    agent = Agent(_settings(tmp_path))
+    out = await agent._login({"url": "http://10.0.0.5/login", "username": "u", "password": "p"})
+    assert seen["follow_redirects"] is False
+    assert "HTTP 307" in out["error"] and "not followed" in out["error"]
+
+
+def test_register_authorized_target_is_idempotent(tmp_path):
+    from harness.models import Target, TargetType
+
+    agent = Agent(_settings(tmp_path))
+    agent.db.add_target(Target(name="a", type=TargetType.WEB, value="http://a.example"))
+    agent.register_authorized_target("http://a.example", TargetType.WEB)
+    agent.register_authorized_target("http://b.example", TargetType.WEB)
+    agent.register_authorized_target("http://b.example", TargetType.WEB)
+    got = sorted((t.value, t.authorized) for t in agent.db.list_targets())
+    assert got == [("http://a.example", True), ("http://b.example", True)]

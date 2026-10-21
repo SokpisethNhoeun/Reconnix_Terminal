@@ -53,8 +53,10 @@ def confirming_agent(monkeypatch):
     got = {}
 
     async def fake_run(text, on_event, on_ask=None):
-        got["answer"] = await on_ask(
-            {"type": "confirm", "question": "Proceed with an intrusive sqlmap scan?", "options": []})
+        got["answer"] = await on_ask({
+            "type": "confirm", "question": "Proceed with an intrusive sqlmap scan?",
+            "options": [],
+        })
 
     monkeypatch.setattr(agent_run, "run", fake_run)
     return got

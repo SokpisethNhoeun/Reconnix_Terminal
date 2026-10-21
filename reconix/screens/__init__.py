@@ -1,3 +1,5 @@
+"""The flow screens (one file per frame) and the overlays they share."""
+
 from .start import StartScreen
 from .template import TemplateScreen
 from .plan import PlanScreen

@@ -100,7 +100,8 @@ class HelpScreen(ModalScreen):
 
     @staticmethod
     def _row(keys: str, desc: str) -> Static:
-        return Static(Text.assemble((f"{keys:<10}", f"bold {theme.CYAN}"), " ", (desc, theme.MUTED)))
+        return Static(
+            Text.assemble((f"{keys:<10}", f"bold {theme.CYAN}"), " ", (desc, theme.MUTED)))
 
     def action_close(self) -> None:
         self.app.pop_screen()

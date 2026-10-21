@@ -15,7 +15,8 @@ from .support import play_until_gate, run_to
 @pytest.mark.parametrize("text, secret", [
     ("Assess https://admin:Hunter2pw@staging.example.com now", "Hunter2pw"),
     ("Cookie: session=abc123def456", "abc123def456"),
-    ("Authorization: Bearer eyJhbGciOiJIUzI1.eyJzdWIiOiIxMjM0.c2lnbmF0dXJlX2hlcmU", "eyJzdWIiOiIxMjM0"),
+    ("Authorization: Bearer eyJhbGciOiJIUzI1.eyJzdWIiOiIxMjM0.c2lnbmF0dXJlX2hlcmU",
+     "eyJzdWIiOiIxMjM0"),
     ("password=correct-horse-battery", "correct-horse-battery"),
     ('api_key: "sk_live_1234567890abcdef"', "sk_live_1234567890abcdef"),
     ("found AKIAIOSFODNN7EXAMPLE in config", "IOSFODNN7EXAMPLE"),

@@ -199,6 +199,7 @@ class ActionsMixin:
     # --- assessments ----------------------------------------------------------------------------
     def new_assessment(self, target: Optional[str] = None) -> None:
         """Start over on a fresh assessment (earlier ones stay listed); optionally on `target`."""
+        self.cancel_agent()                 # stop a running agent turn on the run we leave
         self.controller.stop()
         store.new_assessment()
         self.agent_mode = False
@@ -211,6 +212,7 @@ class ActionsMixin:
 
     def switch_assessment(self, index: int) -> None:
         """Reopen another assessment where it stands; a run that was playing plays on."""
+        self.cancel_agent()                 # stop a running agent turn on the run we leave
         self.controller.stop()
         try:
             store.switch_assessment(index)

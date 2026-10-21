@@ -1,7 +1,7 @@
 # Plan — Redesign V3: Figma workflow, prototype and design system, plus the remaining web work
 
-Status: **planning only, waiting for the owner's `START`** (2026-10-20). Nothing in code or
-Figma changes before then. This plan answers the "Master implementation prompt" of 2026-10-20.
+Status: **built and merged** into `redesign/v3` (2026-10-20), see §5 for what was checked and
+what is left. This plan answers the "Master implementation prompt" of 2026-10-20.
 
 ## 1. What is there today (inspected)
 
