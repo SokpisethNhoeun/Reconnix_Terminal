@@ -50,6 +50,7 @@ export function DocsSearch({ index }: { index: DocsSearchEntry[] }) {
 
   const hits = searchDocs(index, q);
   const shown = open && hits.length > 0;
+  const current = Math.min(active, Math.max(hits.length - 1, 0)); // the hits may have shrunk under the arrows
 
   const go = (href: string) => {
     setOpen(false);
@@ -68,7 +69,7 @@ export function DocsSearch({ index }: { index: DocsSearchEntry[] }) {
       setActive((a) => Math.max(a - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      go(hits[Math.min(active, hits.length - 1)].href);
+      go(hits[current].href);
     }
   };
 
@@ -91,7 +92,7 @@ export function DocsSearch({ index }: { index: DocsSearchEntry[] }) {
         aria-expanded={shown}
         aria-controls={listId}
         aria-autocomplete="list"
-        aria-activedescendant={shown ? `${listId}-${active}` : undefined}
+        aria-activedescendant={shown ? `${listId}-${current}` : undefined}
         className="h-10 w-full rounded-[10px] border border-border bg-card pl-3 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
       <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
@@ -102,21 +103,25 @@ export function DocsSearch({ index }: { index: DocsSearchEntry[] }) {
         hidden={!shown}
         className="docs-search-list absolute left-0 right-0 top-[calc(100%+6px)] z-40 max-h-80 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-lg"
       >
+        {/* each option is itself the thing to click (no control inside it: the box keeps the
+            keyboard, aria-activedescendant names the active one); the active one's fill is 6 %
+            of the primary, light enough for its muted line to read at 4.5:1 */}
         {hits.map((h, i) => (
-          <li key={h.href} id={`${listId}-${i}`} role="option" aria-selected={i === active}>
-            <button
-              type="button"
-              onMouseEnter={() => setActive(i)}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => go(h.href)}
-              className={cn("flex w-full flex-col gap-0.5 rounded-md px-2.5 py-1.5 text-left", i === active && "bg-primary/10")}
-            >
-              <span className="text-sm text-foreground">{h.entry.title}</span>
-              <span className="truncate text-[11px] text-muted-foreground">
-                {h.entry.group}
-                {h.heading ? ` · ${h.heading}` : ""}
-              </span>
-            </button>
+          <li
+            key={h.href}
+            id={`${listId}-${i}`}
+            role="option"
+            aria-selected={i === current}
+            onMouseEnter={() => setActive(i)}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => go(h.href)}
+            className={cn("flex cursor-pointer flex-col gap-0.5 rounded-md px-2.5 py-1.5 text-left", i === current && "bg-primary/6")}
+          >
+            <span className="text-sm text-foreground">{h.entry.title}</span>
+            <span className="truncate text-[11px] text-muted-foreground">
+              {h.entry.group}
+              {h.heading ? ` · ${h.heading}` : ""}
+            </span>
           </li>
         ))}
       </ul>

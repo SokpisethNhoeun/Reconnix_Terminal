@@ -30,6 +30,9 @@ HIGH        = "#F97316"
 MEDIUM      = "#FBBF24"
 LOW         = "#38BDF8"
 INFO        = "#94A3B8"
+# The web's CRITICAL: the same red, lifted a little so a badge's text (the colour at 13 % over a
+# row's surface, status-badge.tsx) reads at 4.5:1 there too; the scale and its meaning stay.
+CRITICAL_WEB = "#F56A7A"
 
 # Syntax / accents
 VIOLET      = "#A78BFA"
@@ -78,7 +81,7 @@ WEB_TOKENS: Dict[str, Dict[str, str]] = {
         # meanings (web/src/lib/status.ts): amber `warning` = waiting / needs review, slate
         # `info` = informational; the severity scale is the TUI's own (SEVERITY below)
         "warning": "#E7C183", "info": INFO,
-        "sev-critical": CRITICAL, "sev-high": HIGH, "sev-medium": MEDIUM, "sev-low": LOW,
+        "sev-critical": CRITICAL_WEB, "sev-high": HIGH, "sev-medium": MEDIUM, "sev-low": LOW,
         "sev-info": INFO,
         **TERMINAL_WEB_TOKENS,
     },

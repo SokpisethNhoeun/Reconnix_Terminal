@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Info, TriangleAlert } from "lucide-react";
 import { CopyButton } from "@/components/ui/copy-button";
+import { ScrollRegion } from "@/components/ui/scroll-region";
 import { cn } from "@/lib/utils";
 
 /**
@@ -30,13 +31,18 @@ export function DocSection({ title, children }: { title: string; children: React
   );
 }
 
-/** A code block with a Copy button (the button copies exactly the text shown). */
+/** A code block with a Copy button (the button copies exactly the text shown). A long line
+    scrolls sideways inside the block, which is then a tab stop named "Code" (ScrollRegion). */
 export function Code({ children, label = "Copy code" }: { children: string; label?: string }) {
   return (
     <div className="docs-code group relative">
-      <pre className="overflow-x-auto rounded-lg border border-border bg-card p-4 pr-24 font-mono text-[13px] leading-relaxed text-foreground">
+      <ScrollRegion
+        as="pre"
+        label="Code"
+        className="overflow-x-auto rounded-lg border border-border bg-card p-4 pr-24 font-mono text-[13px] leading-relaxed text-foreground"
+      >
         <code>{children}</code>
-      </pre>
+      </ScrollRegion>
       <CopyButton text={children} label={label} className="docs-copy absolute right-2 top-2" />
     </div>
   );
@@ -85,10 +91,11 @@ export function Callout({
   );
 }
 
-/** A link inside docs content. */
+/** A link inside docs content: underlined, like the dashboard's links (.ui-link), so it is told
+    apart from the text around it by more than its colour. */
 export function DocLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="text-primary underline-offset-4 hover:underline">
+    <Link href={href} className="ui-link">
       {children}
     </Link>
   );
@@ -107,7 +114,7 @@ export type TableRow = { key: React.ReactNode; value: React.ReactNode };
  */
 export function DocTable({ head, rows, caption }: { head: [string, string]; rows: TableRow[]; caption: string }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <ScrollRegion label={caption} className="overflow-x-auto rounded-lg border border-border">
       <table className="docs-table w-full text-left text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead className="bg-card font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -131,7 +138,7 @@ export function DocTable({ head, rows, caption }: { head: [string, string]; rows
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }
 

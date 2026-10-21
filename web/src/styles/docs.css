@@ -11,11 +11,10 @@
 /* numbered steps (Steps) keep their counter even inside a bulleted context */
 .docs-steps > li { list-style: decimal; }
 
-/* ---- Code blocks: the Copy button sits in the corner and is always reachable (never hover-only,
-   for keyboard and touch readers); it only fades a little when the block is not in use ---- */
-.docs-code .docs-copy { opacity: 0.7; transition: opacity 0.15s ease; }
-.docs-code:hover .docs-copy, .docs-code:focus-within .docs-copy { opacity: 1; }
-/* long lines stay inside the block on a phone: the block scrolls, the page never does */
+/* ---- Code blocks: the Copy button sits in the corner, always reachable and at full strength
+   (never hover-only or faded: keyboard and touch readers, and its label must read at 4.5:1).
+   Long lines stay inside the block on a phone: the block scrolls (a tab stop while it does, see
+   components/ui/scroll-region.tsx), the page never does ---- */
 .docs-code pre { max-width: 100%; }
 
 /* ---- Two-column tables (DocTable): below sm the key sits above its meaning, each row a block,
@@ -73,5 +72,5 @@
 @media (max-width: 480px) { .docs-command-row { grid-template-columns: 1fr; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .docs-card, .docs-card::before, .docs-card::after, .docs-code .docs-copy { transition: none; }
+  .docs-card, .docs-card::before, .docs-card::after { transition: none; }
 }

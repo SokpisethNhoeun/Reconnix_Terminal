@@ -217,7 +217,15 @@ def main() -> None:
                   "for security issues.", high="wait", gap=6),
     ], closed=False)
 
-    # Runs for the edge cases (appended last: the sessions above keep their stamps).
+    # Runs for the edge cases (appended last: the sessions above keep their stamps):
+    #   2026-09-29  a login in the target URL (masked wherever it is kept), one finding of
+    #               every severity, a title with markup that must stay text, and a finding
+    #               triaged as a false positive; then a run with more than ten findings
+    #               (the Findings view's second page)
+    #   2026-10-01  two completed runs that found nothing, and one stopped at the scope gate
+    #               (no Scope Manifest, no plan, no findings: the Limitations of a report)
+    #   2026-10-02  a second repository review, its report in JSON (a finding two runs share)
+    #   2026-10-04  a run still Running in a session left open (the TUI is on it now)
     snapshots += session(datetime(2026, 9, 29, 11, 20, tzinfo=utc), [
         dict(text="Assess https://ops:hunter2@portal.example.com for web security issues.",
              imports=NUCLEI_EDGE, after=triage_false_positive),

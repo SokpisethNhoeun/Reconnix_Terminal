@@ -7,6 +7,8 @@
 .ui-link { border-radius: 4px; color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
 .ui-link:hover { color: var(--primary-strong); }
 .ui-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+/* a box that scrolls inside itself (components/ui/scroll-region.tsx): a tab stop while it does */
+.ui-scroll-region:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
 /* ---- An empty list (empty-note.tsx) ---- */
 .ui-empty {
