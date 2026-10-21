@@ -7,9 +7,9 @@
    to review; --danger errors and blocked; --info informational; --sev-* the TUI's severity
    scale; --term-* is the browser terminal (the TUI's own colours). */
 @import "../styles/tokens.css";
-/* The app's styles, one file per area (and per owner while the redesign runs in parallel):
-   frame (page and scrolling), dashboard, motion (sidebar, transition, breathing), terminal,
-   site (docs chrome) and assistant. Order matters for the cascade. */
+/* The app's styles, one file per area: frame (page and scrolling), dashboard, motion (sidebar,
+   transition, breathing), terminal, site (docs chrome), assistant, ui (shared controls and the
+   shared row), findings, assessments, reports and docs. Order matters for the cascade. */
 @import "../styles/frame.css";
 @import "../styles/dashboard.css";
 @import "../styles/motion.css";

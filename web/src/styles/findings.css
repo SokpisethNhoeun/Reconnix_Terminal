@@ -1,5 +1,5 @@
-/* The findings view. Owner: the findings workstream (docs/WEB_REDESIGN_V3_PLAN.md). Colours only from the
-   tokens (tokens.css); meanings from lib/status.ts.
+/* The Findings view (findings-view.tsx, findings-list.tsx, finding-detail.tsx). Colours only
+   from the tokens (tokens.css); meanings from lib/status.ts.
 
    The view is a column: the header, the filters, a notice, then the list / detail split
    (components/ui/list-detail.tsx, styles/ui.css .ui-split) and the footnote. The list pane holds
