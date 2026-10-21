@@ -6,7 +6,7 @@
 import { redact } from "@/lib/assistant/redact";
 import type { Assessment } from "@/lib/data/schema";
 
-const isStrings = (value: unknown[]): value is string[] => value.every((v) => typeof v === "string");
+const isStrings = (value: unknown[]): value is string[] => value.length > 0 && value.every((v) => typeof v === "string"); // [] stays []
 
 /** `value` with every string inside it masked (arrays and plain objects are walked). */
 export function maskDeep<T>(value: T): T {

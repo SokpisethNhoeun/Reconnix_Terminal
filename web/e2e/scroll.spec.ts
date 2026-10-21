@@ -6,9 +6,11 @@
    because the old bug (Lenis taking the wheel on the dashboard) only existed with motion on.
    The long view they scroll is the every-run Report: on the fixed frame the Findings view
    scrolls its list pane, not the content area (e2e/findings.spec.ts). */
-import { type CDPSession, expect, type Page, test } from "@playwright/test";
+import { type CDPSession, type Page } from "@playwright/test";
 
-import { newest, signIn } from "./support";
+import { expect, test } from "./fixtures";
+
+import { clickMoving, frames, newest, signIn } from "./support";
 
 const SIZES = [
   { width: 1920, height: 1080 },
@@ -16,14 +18,18 @@ const SIZES = [
   { width: 1366, height: 768 },
   { width: 1280, height: 720 },
   { width: 1024, height: 768 },
+  { width: 768, height: 1024 }, // a tablet held upright
   { width: 844, height: 390 }, // a phone held sideways: wide enough for the rail, too short for it to stick
   { width: 390, height: 844 },
 ];
 const label = (s: { width: number; height: number }) => `${s.width}×${s.height}`;
 const fixedFrame = (s: { width: number; height: number }) => s.width >= 1280 && s.height >= 760;
 const RUN = newest().uid; // Reports and Scope for one run, as well as for every run
-const VIEWS = ["overview", "findings", "reports", "scope", `reports&uid=${RUN}`, `scope&uid=${RUN}`];
+const VIEWS = ["overview", "findings", "assessments", "reports", "scope", `reports&uid=${RUN}`, `scope&uid=${RUN}`];
 const viewName = (v: string) => (v.includes("&uid=") ? `${v.split("&")[0]} (one run)` : v);
+
+// the wheel and touch tests run with motion on (the project's default is reduced, for speed)
+test.use({ reducedMotion: "no-preference" });
 
 /* Known faults by size and view (none today): the check for that pair is expected to FAIL, and
    fails with "remove this entry" once the fault is gone, so a stale entry can't hide a new one. */
@@ -89,7 +95,7 @@ async function overhang(page: Page) {
     main.scrollTop = main.scrollHeight;
     window.scrollTo(0, document.scrollingElement!.scrollHeight);
   });
-  await page.waitForTimeout(150);
+  await frames(page, 3); // layout and the scroll position have settled
   return page.evaluate(() => {
     const main = document.querySelector("main")!;
     const frame = main.closest<HTMLElement>(".dash-frame")!;
@@ -186,6 +192,7 @@ for (const size of SIZES) {
     test.use({ viewport: size, reducedMotion: "reduce" });
 
     test("every view reaches its bottom, nothing overflows sideways, the composer is in view", async ({ page }) => {
+      test.setTimeout(120_000); // eight views, the assistant and a docs page, three browsers at a time
       await signIn(page);
       for (const view of VIEWS) {
         await open(page, view);
@@ -214,6 +221,15 @@ for (const size of SIZES) {
       expect(b.y).toBeGreaterThanOrEqual(0);
       expect(b.y + b.height, "the composer is below the fold").toBeLessThanOrEqual(size.height);
       expect((await sideways(page)).page).toBe(0);
+
+      // a docs page: the window scrolls to its foot and nothing hangs out sideways
+      await page.goto("/docs/commands/import");
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await page.evaluate(() => window.scrollTo(0, document.scrollingElement!.scrollHeight));
+      await expect
+        .poll(() => page.evaluate(() => Math.round(document.scrollingElement!.scrollHeight - scrollY - innerHeight)), { message: "the docs page reaches its foot" })
+        .toBeLessThanOrEqual(1);
+      expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - document.scrollingElement!.clientWidth), "the docs page scrolls sideways").toBeLessThanOrEqual(0);
     });
   });
 
@@ -288,7 +304,6 @@ test.describe("the docs", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   test("glide with the wheel, follow their own hash links, and hand back a natively scrolling dashboard", async ({ page }) => {
-    await signIn(page);
     await page.goto("/docs/architecture");
     await expect(page.locator("html.lenis")).toHaveCount(1);
     await page.mouse.move(720, 500);
@@ -342,7 +357,6 @@ for (const size of [{ width: 1366, height: 768 }, { width: 390, height: 844 }]) 
     test.use({ viewport: size, reducedMotion: "reduce" });
 
     test("the conversation scrolls with the wheel, keeps a reader who scrolled up, and the composer stays in view", async ({ page }) => {
-      await signIn(page);
       await page.goto("/?view=assistant");
       const composer = page.getByRole("textbox", { name: /^Ask about/ }).last();
       await expect(composer).toBeVisible();
@@ -376,7 +390,7 @@ for (const size of [{ width: 1366, height: 768 }, { width: 390, height: 844 }]) 
         more.textContent = "more content";
         el.appendChild(more);
       });
-      await page.waitForTimeout(300);
+      await frames(page, 4); // the new content is laid out and the stick-to-bottom has had its say
       expect(Math.abs((await logState(page)).top - reading)).toBeLessThanOrEqual(1);
 
       await page.mouse.wheel(0, 5000);
@@ -392,7 +406,6 @@ test.describe("the assistant's way back down", () => {
   test.use({ viewport: { width: 1366, height: 768 } });
 
   test("New messages appears after scrolling up, follows nothing until clicked, then glides back and follows again", async ({ page }) => {
-    await signIn(page);
     await page.goto("/?view=assistant");
     await ask(page, 1);
     await ask(page, 2);
@@ -402,7 +415,7 @@ test.describe("the assistant's way back down", () => {
     await page.mouse.wheel(0, -600);
     const back = page.getByRole("button", { name: "New messages" });
     await expect(back).toBeVisible();
-    await back.click({ force: true }); // the panel breathes, so it is never "stable"
+    await clickMoving(page, back); // the panel breathes, so it is never "stable"
     await expect.poll(async () => { const s = await logState(page); return s.range - s.top; }).toBeLessThanOrEqual(1);
     await expect(back).toBeHidden();
     await log.evaluate((el) => {

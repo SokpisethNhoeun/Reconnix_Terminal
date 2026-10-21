@@ -33,4 +33,5 @@ reconix = ["reconix.tcss"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+addopts = "--durations=10"
 pythonpath = ["."]

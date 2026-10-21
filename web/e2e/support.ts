@@ -2,13 +2,57 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+
+import { expect } from "./fixtures";
 
 import { TOKEN } from "../playwright.config";
 
-export async function signIn(page: Page, token = TOKEN) {
+/** Sign in through the sign-in link (the page's own flow). Specs start signed in through
+    `storageState` (e2e/global-setup.ts); only the ones that test the sign-in itself call this. */
+export async function signInFresh(page: Page, token = TOKEN) {
   await page.goto(`/login#token=${token}`);
   await page.waitForURL((url) => url.pathname === "/");
+}
+
+/** `<html data-hydrated>`: the dashboard is interactive (a click before it can be replayed or lost).
+    The attribute sits on <html>, which Playwright never counts as "visible": wait for it attached. */
+export const hydrated = (page: Page) => page.locator("html[data-hydrated]").waitFor({ state: "attached" });
+
+/** Wait for `n` painted frames (layout, observers and effects triggered by a change have run). */
+export const frames = (page: Page, n = 2) =>
+  page.evaluate(
+    (count) =>
+      new Promise<void>((resolve) => {
+        const step = (left: number) => (left <= 0 ? resolve() : requestAnimationFrame(() => step(left - 1)));
+        step(count);
+      }),
+    n,
+  );
+
+/** Click an element that never holds still (the breathing panel and icons): the same checks as a
+    click (it is visible, enabled, and the click lands on it, not on something over it), minus the
+    wait for two identical frames that a looping animation never gives. No `force: true`. */
+export async function clickMoving(page: Page, target: Locator) {
+  await expect(target).toBeVisible();
+  await expect(target).toBeEnabled();
+  const box = (await target.boundingBox())!;
+  const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+  const lands = await target.evaluate((el, [px, py]) => {
+    const hit = document.elementFromPoint(px, py);
+    return !!hit && el.contains(hit);
+  }, [x, y]);
+  expect(lands, "the click would land on something else").toBe(true);
+  await page.mouse.click(x, y);
+}
+
+/** Runs the dashboard counts a finding for (assistant cards say "N across M runs"). */
+export const runsWithFindings = () => sample().filter((a) => counted(a).length > 0);
+
+/** Open the dashboard signed in (the saved state) and wait until it is interactive. */
+export async function signIn(page: Page) {
+  await page.goto("/");
+  await hydrated(page);
 }
 
 interface SampleAssessment {

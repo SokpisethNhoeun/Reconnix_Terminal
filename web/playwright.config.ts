@@ -11,17 +11,55 @@ export const PORT = Number(process.env.E2E_PORT || 3199);
 export const TOKEN = "e2e-token-0123456789abcdef";
 export const TERM_PORT = PORT - 1;
 export const LLM_PORT = PORT - 4; // e2e/llm-stub.mjs, the AI Assistant's stand-in model
+export const LIVE_PORT = PORT - 2; // a second dashboard with live refresh on (e2e/live-refresh.spec.ts)
+/** The signed-in state every spec starts from (e2e/global-setup.ts writes it once per run). */
+export const STATE_FILE = path.join(tmpdir(), `reconix-e2e-state-${PORT}.json`);
+
+const DESKTOP = { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } };
 
 export default defineConfig({
   testDir: "e2e",
-  workers: 1,
+  forbidOnly: !!process.env.CI,
+  workers: 3,
   reporter: "list",
+  globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     launchOptions: process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
+    storageState: STATE_FILE,
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } }],
+  /* `parallel`: the specs that share nothing, three at a time, with motion reduced (they test
+     content, not the transition). Then the specs that share the assistant's conversation folder
+     or need the whole CPU for frame timing run one after the other: each is its own project
+     chained by `dependencies`, so no two of them (nor any parallel spec) run at once. */
+  projects: [
+    {
+      name: "parallel",
+      testMatch: /(access|assessments|findings|docs|dashboard-fit|scroll|a11y|pages|reports|live-refresh)\.spec\.ts/,
+      fullyParallel: true,
+      use: { ...DESKTOP, reducedMotion: "reduce" },
+    },
+    { name: "serial-assistant", testMatch: /assistant\.spec\.ts/, dependencies: ["parallel"], use: { ...DESKTOP, reducedMotion: "reduce" } },
+    { name: "serial-motion", testMatch: /motion\.spec\.ts/, dependencies: ["serial-assistant"], use: DESKTOP },
+  ],
   webServer: [
+    {
+      // the same built dashboard with live refresh on every second: only the live-refresh spec uses it
+      command: "node scripts/serve.mjs start --no-open --no-terminal",
+      url: `http://127.0.0.1:${LIVE_PORT}/login`,
+      env: {
+        RECONIX_WEB_PORT: String(LIVE_PORT),
+        RECONIX_WEB_TOKEN: TOKEN,
+        RECONIX_DATA_DIR: "sample-data",
+        RECONIX_STALE_AFTER_HOURS: "0",
+        RECONIX_LIVE_REFRESH_MS: "1000",
+        RECONIX_WEB_URL_FILE: path.join(tmpdir(), `reconix-e2e-live-${PORT}.url`),
+      },
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
     {
       command: "node e2e/llm-stub.mjs",
       url: `http://127.0.0.1:${LLM_PORT}/`,

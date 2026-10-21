@@ -1,9 +1,12 @@
 /* Access control: sign-in, the roles on every page and route, Host checks, headers. */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 import { sessionValue } from "../src/lib/auth/session";
 import { PORT, TOKEN } from "../playwright.config";
-import { sample, signIn } from "./support";
+import { sample, signInFresh } from "./support";
+
+// every test here starts with no cookies at all (the others start signed in)
+test.use({ storageState: { cookies: [], origins: [] } });
 
 test("pages and routes need a session", async ({ page, request }) => {
   await page.goto("/docs");
@@ -12,6 +15,21 @@ test("pages and routes need a session", async ({ page, request }) => {
 
   const api = await request.get(`/api/assessments/${sample()[0].uid}`);
   expect(api.status()).toBe(401);
+});
+
+test("the combined report needs a session, and a viewer can read it", async ({ context, request }) => {
+  const url = `/api/reports/combined?uids=${sample()[0].uid}&format=html&evidence=1&low=1&appendix=1`;
+  const none = await request.get(url);
+  expect(none.status()).toBe(401);
+  await context.addCookies([{ name: "reconix_view", value: sessionValue("viewer", TOKEN), domain: "127.0.0.1", path: "/" }]);
+  const ok = await context.request.get(url);
+  expect(ok.status()).toBe(200);
+  expect(ok.headers()["content-type"]).toContain("text/html");
+  expect(await ok.text()).toContain("Combined security assessment report");
+  // the query is validated before anything is read: more than five runs, and unknown runs, are refused
+  const six = sample().slice(0, 6).map((a) => a.uid).join(",");
+  expect((await context.request.get(`/api/reports/combined?uids=${six}&format=html`)).status()).toBe(400);
+  expect((await context.request.get("/api/reports/combined?uids=20200101-000000-dead_NOPE-1&format=html")).status()).toBe(404);
 });
 
 test("the terminal needs a session too", async ({ page, request }) => {
@@ -49,7 +67,7 @@ test("a wrong token does not sign in", async ({ page }) => {
 });
 
 test("the token is removed from the address bar after sign-in", async ({ page }) => {
-  await signIn(page);
+  await signInFresh(page);
   expect(page.url()).not.toContain("token");
   const cookie = (await page.context().cookies()).find((c) => c.name === "reconix_view");
   expect(cookie?.httpOnly).toBe(true);
@@ -85,7 +103,7 @@ test("sign-in only accepts requests from the dashboard's own origin", async ({ r
 });
 
 test("pages send a nonce-based CSP and hardening headers", async ({ page }) => {
-  await signIn(page);
+  await signInFresh(page);
   const res = await page.goto("/");
   const headers = res!.headers();
   expect(headers["content-security-policy"]).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
@@ -96,7 +114,7 @@ test("pages send a nonce-based CSP and hardening headers", async ({ page }) => {
 });
 
 test("a signed-in user can download an assessment as JSON", async ({ page }) => {
-  await signIn(page);
+  await signInFresh(page);
   const uid = sample()[0].uid;
   const res = await page.request.get(`/api/assessments/${uid}`);
   expect(res.status()).toBe(200);

@@ -34,7 +34,11 @@ import { AssessmentSchema, type TimelineEntry } from "@/lib/data/schema";
 
 import { SAMPLE_DIR, sampleAssessments } from "./fixtures";
 
-const list = sampleAssessments();
+/* The sample data holds one false positive (the triage tests below add their own), and these counts
+   check the arithmetic over untriaged findings: that finding is read as open here, and the real file
+   is checked in "the sample's false positive" below. */
+const saved = sampleAssessments();
+const list = saved.map((a) => ({ ...a, findings: a.findings.map((f) => (f.status === "false-positive" ? { ...f, status: "open" } : f)) }));
 const findings = list.flatMap((a) => a.findings);
 
 describe("overview", () => {
@@ -120,14 +124,14 @@ describe("time", () => {
     expect(filterAssessments(list, { q: "", template: "all", status: "all", range: "all" }, now)).toHaveLength(list.length);
     expect(filterAssessments(list, { q: "staging", template: "", status: "", range: "all" }, now).every((a) => a.target.includes("staging"))).toBe(true);
     expect(filterAssessments(list, { q: "", template: "API", status: "", range: "all" }, now).every((a) => a.template.name === "API")).toBe(true);
-    expect(filterAssessments(list, { q: "", template: "", status: "Stopped", range: "all" }, now)).toHaveLength(1);
+    expect(filterAssessments(list, { q: "", template: "", status: "Stopped", range: "all" }, now)).toHaveLength(list.filter((a) => a.status === "Stopped").length);
     const week = filterAssessments(list, { q: "", template: "", status: "", range: "7" }, now);
     expect(week.every((a) => now - Date.parse(a.created_at) <= 7 * 86_400_000)).toBe(true);
   });
 
   it("filters to the runs that need attention", () => {
     const shown = filterAssessments(list, { q: "", template: "", status: ATTENTION, range: "all" });
-    expect(shown.map((a) => a.status).sort()).toEqual(["Awaiting input", "Stopped"]);
+    expect(shown.map((a) => a.status).sort()).toEqual(list.map((a) => a.status).filter((x) => x === "Awaiting input" || x === "Stopped").sort());
   });
 });
 
@@ -241,8 +245,10 @@ describe("analyst triage", () => {
   it("sorts and counts by the analyst's severity", () => {
     const low = findings.find((x) => x.severity === "LOW")!;
     const raised = list.map((a) => ({ ...a, findings: a.findings.map((f) => (f === low ? { ...f, effective_severity: "CRITICAL" } : f)) }));
-    expect(allFindings(raised)[0].id).toBe(low.id);
-    expect(severityCounts(raised.flatMap((a) => a.findings)).CRITICAL).toBe(severityCounts(findings).CRITICAL + 1);
+    const criticals = severityCounts(findings).CRITICAL + 1;
+    expect(allFindings(raised).slice(0, criticals).map((f) => f.id)).toContain(low.id); // among the critical ones first
+    expect(allFindings(raised)[criticals].severity).not.toBe("CRITICAL");
+    expect(severityCounts(raised.flatMap((a) => a.findings)).CRITICAL).toBe(criticals);
   });
 
   it("counts triage statuses; unknown ones count as open", () => {
@@ -321,5 +327,16 @@ describe("average testing time", () => {
     const done = list.filter((a) => a.status === "Completed").map(durationMs) as number[];
     expect(averageTestingMs(list)).toBe(done.reduce((a, b) => a + b, 0) / done.length);
     expect(averageTestingMs(list.filter((a) => a.status !== "Completed"))).toBeNull();
+  });
+});
+
+describe("the sample's false positive", () => {
+  it("is in the file with its note, and left out of every count", () => {
+    const all = saved.flatMap((a) => a.findings);
+    const fps = all.filter((f) => f.status === "false-positive");
+    expect(fps).toHaveLength(1);
+    expect(fps[0].triage_note).not.toBe("");
+    expect(overview(saved).findings).toBe(all.length - 1);
+    expect(triageCounts(all).falsePositive).toBe(1);
   });
 });

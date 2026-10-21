@@ -7,7 +7,7 @@ from reconix.flow import RunController
 from reconix.screens import ChoiceScreen, StartScreen, TemplateScreen
 from reconix.widgets import PromptBox
 
-from .support import ASK_REQUEST, SIZE, settle
+from .support import ASK_REQUEST, SIZE, settle, wait_until
 
 
 class FakeHost:
@@ -76,15 +76,16 @@ async def test_a_gate_that_arrives_under_another_dialog_opens_after_it(app, monk
         app.show_audit()                               # … then look at the audit trail
         await settle(pilot)
         assert store.waiting_gate() == ""              # the gate hasn't arrived yet
-        await pilot.pause(2.5)
+        await wait_until(pilot, lambda: store.waiting_gate() == "template", 6,
+                         "the template gate to arrive")
         assert isinstance(app.screen, ChoiceScreen)    # still on top: nothing pulled away
-        assert store.waiting_gate() == "template"
         await pilot.press("escape")
         await settle(pilot)
         assert isinstance(app.screen, TemplateScreen)
         assert app.screen.state() == "choose"
         await pilot.press("enter")                     # the suggestion (Web URL)
-        await pilot.pause(2.5)
+        await wait_until(pilot, lambda: store.waiting_gate() == "scope", 6,
+                         "the scope gate after the template")
         await settle(pilot)
         # The decided gate never comes back; the next one shows.
         assert isinstance(app.screen, TemplateScreen)

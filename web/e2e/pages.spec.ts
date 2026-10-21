@@ -1,10 +1,12 @@
 /* The globe dashboard on the sample data: every view, the assessment switcher, the report
    downloads, the docs, and the Terminal view (with the stand-in program from
    playwright.config.ts instead of the TUI). */
-import { expect, type Page, test } from "@playwright/test";
+import { type Page } from "@playwright/test";
+
+import { expect, test } from "./fixtures";
 
 import { PER_PAGE } from "../src/lib/paging";
-import { counted, newest, sample, signIn, toolSteps } from "./support";
+import { counted, hydrated, newest, sample, signIn, toolSteps } from "./support";
 
 const view = (name: string) => `nav[aria-label="Views"] button[aria-label^="${name}"]`;
 
@@ -33,7 +35,10 @@ test("the overview totals every saved file by default", async ({ page }) => {
   await expect(findingRows(page)).toHaveCount(Math.min(PER_PAGE, all.reduce((n, a) => n + a.findings.length, 0))); // ten a page
   // Report and Scope sum up every run too (no run picker): a row per run, a row per target
   await page.click(view("Reports"));
-  await expect(page.getByRole("table", { name: "Saved assessments" }).getByRole("link", { name: /^Open the report of/ })).toHaveCount(all.length);
+  // every run is a row, ten to a page
+  expect(all.length).toBeGreaterThan(PER_PAGE);
+  await expect(page.getByRole("table", { name: "Saved assessments" }).getByRole("link", { name: /^Open the report of/ })).toHaveCount(PER_PAGE);
+  await expect(page.getByRole("navigation", { name: "Saved assessment pages" })).toContainText(`${all.length} results`);
   await expect(page.getByRole("group", { name: "Report summary" }).locator("section")).toHaveCount(4);
   await page.click(view("Scope"));
   await expect(page.getByRole("table", { name: "Targets tested" }).getByRole("row")).toHaveCount(new Set(all.map((a) => a.target)).size + 1);
@@ -43,7 +48,7 @@ test("every run's Scope and Report open a run in the same view", async ({ page }
   await signIn(page);
   const a = newest();
   await page.goto("/?view=scope");
-  await page.waitForLoadState("networkidle"); // hydrated: the links are client-side navigations
+  await hydrated(page); // the links are client-side navigations
   const approvals = sample().reduce((n, x) => n + x.approvals.length, 0);
   await expect(page.getByRole("group", { name: "Scope summary" }).getByRole("region", { name: "Approvals" })).toContainText(String(approvals));
   // the waiting request comes first
@@ -56,7 +61,7 @@ test("every run's Scope and Report open a run in the same view", async ({ page }
   await expect(page.getByRole("region", { name: "Boundary" })).toBeVisible();
 
   await page.goto("/?view=reports");
-  await page.waitForLoadState("networkidle");
+  await hydrated(page);
   await page.getByRole("link", { name: new RegExp(`^Open the report of ${a.label}`) }).first().click();
   await expect(page).toHaveURL(new RegExp(`uid=${a.uid}`));
   await expect(page).toHaveURL(/view=reports/);
@@ -130,7 +135,8 @@ test("with every run shown, a day lists its runs and a run row opens that run", 
   await page.keyboard.press("Escape");
   await expect(page.locator(".dash-tooltip")).toHaveCount(0);
   const rows = page.getByRole("list", { name: /^The \d+ newest runs?/ }).getByRole("link");
-  await expect(rows).toHaveCount(Math.min(8, all.length));
+  expect(all.length, "the sample data has at least eight runs").toBeGreaterThanOrEqual(8);
+  await expect(rows).toHaveCount(8);
   const target = [...all].sort((x, y) => y.created_at.localeCompare(x.created_at))[1];
   await rows.nth(1).click();
   await expect(page).toHaveURL(new RegExp(`uid=${target.uid}`));
@@ -173,15 +179,26 @@ test("a waiting run shows its pending approval", async ({ page }) => {
   await expect(requests.getByText("Waiting for approval", { exact: true })).toBeVisible();
 });
 
-test("the report links every export format and a download works", async ({ page }) => {
-  await signIn(page);
-  await page.goto(`/?uid=${newest().uid}`);
+test("the report links every export format and each one downloads the newest run", async ({ page }) => {
+  test.setTimeout(90_000); // the PDF is printed by a headless browser on this machine
+  const run = newest();
+  await page.goto(`/?uid=${run.uid}`);
   await page.click(view("Reports"));
   const links = page.getByRole("navigation", { name: "Download the report" }).getByRole("link");
   await expect(links).toHaveText(["PDF", "HTML", "JSON", "CSV", "SARIF"]);
-  const res = await page.request.get((await links.nth(2).getAttribute("href"))!);
-  expect(res.status()).toBe(200);
-  expect((await res.json()).uid ?? (await res.text())).toBeTruthy();
+  const media = { pdf: "application/pdf", html: "text/html", json: "application/json", csv: "text/csv", sarif: "application/sarif+json" };
+  for (const [i, format] of (["pdf", "html", "json", "csv", "sarif"] as const).entries()) {
+    const href = (await links.nth(i).getAttribute("href"))!;
+    const url = new URL(href, page.url());
+    expect(url.pathname, format).toBe(`/api/assessments/${run.uid}/export`);
+    expect(url.searchParams.get("format"), format).toBe(format);
+    const res = await page.request.get(href);
+    expect(res.status(), format).toBe(200);
+    expect(res.headers()["content-type"], format).toContain(media[format]);
+    const body = await res.body();
+    expect(body.length, `${format} is not empty`).toBeGreaterThan(100);
+    if (format === "json") expect((JSON.parse(body.toString()) as { uid: string }).uid).toBe(run.uid);
+  }
 });
 
 test("a card opens its documentation", async ({ page }) => {
@@ -208,14 +225,12 @@ test("the terminal view runs a session and keeps it while you browse", async ({ 
 });
 
 test("the removed Audit log address opens the Overview", async ({ page }) => {
-  await signIn(page);
   await page.goto("/?view=audit");
   await expect(page.getByRole("heading", { name: "Assessment Operations Center" })).toBeVisible();
   await expect(page.locator('nav[aria-label="Views"] button[aria-label="Audit log"]')).toHaveCount(0);
 });
 
 test("an unknown assessment opens every run, and an unknown page is a 404", async ({ page }) => {
-  await signIn(page);
   await page.goto("/?uid=20200101-000000-dead_NOPE-1");
   await expect(page.getByRole("button", { name: "Choose an assessment" })).toContainText(`All (${sample().length})`);
   const res = await page.goto("/no-such-page");
