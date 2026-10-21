@@ -16,7 +16,7 @@ const EXTRA_CSS = `
 .toc li{display:flex; gap:10px; align-items:baseline; border-bottom:1px dotted var(--line); padding:4px 0}
 .toc .no{font-family:"IBM Plex Mono"; color:var(--accent); font-weight:600; font-size:12px; width:18px}
 .toc a{color:var(--ink)}
-.run{font-family:"IBM Plex Mono"; font-size:10.5px; color:var(--accent); background:#eaf1fb; border-radius:6px; padding:1px 7px; white-space:nowrap}
+.run{font-family:"IBM Plex Mono"; font-size:10.5px; color:var(--accent); background:var(--chip-wash); border-radius:6px; padding:1px 7px; white-space:nowrap}
 .runs{display:flex; flex-wrap:wrap; gap:4px}
 td .run{white-space:normal}
 .nw{white-space:nowrap}

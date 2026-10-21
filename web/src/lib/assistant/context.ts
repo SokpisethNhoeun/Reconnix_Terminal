@@ -6,7 +6,7 @@
    fence), cut to a field's length. */
 import { assessmentView } from "../data/adapt";
 import { hourMinute, shortDay } from "../data/format";
-import type { Assessment } from "../data/schema";
+import { type Assessment, SEVERITIES as SEVERITY_ORDER } from "../data/schema";
 import type { AssessmentView, FindingView } from "../data/view-types";
 
 export const CONTEXT_LIMIT = 14_000;
@@ -15,7 +15,6 @@ const SHORT = 80; // ids, statuses, names
 const ALL_RUNS = 40; // runs listed in the every-run context
 const ALL_FINDINGS = 40;
 const RECENT_LINES = 25;
-const SEVERITY_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
 
 /** A saved value made safe for the prompt (see the file comment). */
 export function clean(value: unknown, max = FIELD): string {

@@ -9,7 +9,7 @@
 import type { AssistantInfo } from "@/components/assistant/types";
 import { deriveDashboard } from "@/components/dashboard/derive";
 import { deriveOverall } from "@/components/dashboard/derive-overall";
-import { overallReportCards, reportCards, runRow } from "@/components/dashboard/derive-report";
+import { assessmentsCards, overallReportCards, reportCards, runRow } from "@/components/dashboard/derive-report";
 import { overallScopeCards, scopeCards } from "@/components/dashboard/derive-scope";
 import { AssessmentsView } from "@/components/dashboard/assessments-view";
 import { EmptyView } from "@/components/dashboard/empty-view";
@@ -53,8 +53,9 @@ export default async function Home({ searchParams }: Props) {
     model: { configured: model.configured, name: model.model, local: model.local, reason: model.reason },
   };
   const empty = <EmptyView dir={dir} problems={library.problems} compact />;
+  const runs = views.map(runRow); // once: the Assessments view and the all-runs Report share it
   const scope = chosen ? scopeCards(chosen) : overall ? overallScopeCards(views) : null;
-  const report = chosen && dash ? reportCards(chosen, dash.findings, dash.cards.findings) : overall ? overallReportCards(views, overall.cards.findings) : null;
+  const report = chosen && dash ? reportCards(chosen, dash.findings, dash.cards.findings) : overall ? overallReportCards(views, overall.cards.findings, runs) : null;
 
   return (
     <Viewer
@@ -78,7 +79,7 @@ export default async function Home({ searchParams }: Props) {
           <EmptyView dir={dir} problems={library.problems} />
         )
       }
-      assessments={views.length ? <AssessmentsView rows={views.map(runRow)} /> : empty}
+      assessments={runs.length ? <AssessmentsView data={assessmentsCards(runs)} /> : empty}
       findings={
         dash ? (
           <FindingsView key={dash.assessment.uid} findings={dash.findings} />

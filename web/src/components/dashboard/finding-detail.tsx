@@ -19,7 +19,6 @@ import { cn } from "@/lib/utils";
 import { runFindingHref } from "@/components/dashboard/view-url";
 
 const WRAP = "[overflow-wrap:anywhere]"; // saved text may hold long unbroken tokens (URLs, payloads)
-const LINK = "rounded-sm font-mono text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 // at the ends the buttons stay focusable (aria-disabled), so focus is never dropped
 const NAV_BTN = "size-7 aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent aria-disabled:hover:text-muted-foreground";
@@ -74,7 +73,7 @@ export const FindingDetail = forwardRef<HTMLElement, FindingDetailProps>(functio
         {f.run && (
           <p className="text-xs text-muted-foreground">
             From{" "}
-            <Link href={f.run ? runFindingHref(f.run.uid, f.id) : ""} className={LINK}>
+            <Link href={runFindingHref(f.run.uid, f.id)} className="ui-link font-mono">
               {f.run.label}
             </Link>
           </p>

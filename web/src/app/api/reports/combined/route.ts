@@ -11,6 +11,7 @@ import { COOKIE, hasRole, launchToken, readRole } from "@/lib/auth/session";
 import { loadLibrary } from "@/lib/data/store";
 import { renderCombinedHtml } from "@/lib/report/combined/html";
 import { combinedFileName, combinedHref } from "@/lib/report/combined/options";
+import { NO_PRINTER } from "@/lib/report/formats";
 import { parseCombinedQuery } from "@/lib/report/combined/query";
 import { combineAssessments } from "@/lib/report/combined/select";
 import { renderPdf } from "@/lib/report/pdf";
@@ -42,9 +43,7 @@ export async function GET(request: Request) {
     if (!pdf) {
       return NextResponse.json(
         {
-          detail:
-            "PDF export needs a Chrome/Chromium browser on the dashboard machine (set RECONIX_CHROME). " +
-            "Download the HTML report instead and print it to PDF.",
+          detail: NO_PRINTER,
           html: combinedHref(uids, "html", options),
         },
         { status: 501, headers: NO_STORE },

@@ -8,9 +8,6 @@ import { FilterChips, FilterSummary, SearchField } from "@/components/dashboard/
 import { FindingDetail } from "@/components/dashboard/finding-detail";
 import { FindingsList } from "@/components/dashboard/findings-list";
 import {
-  SEVERITY_ORDER,
-  VALIDATION,
-  countBy,
   filterActive,
   filterPatch,
   findingMatches,
@@ -20,18 +17,18 @@ import {
   parseFindingFilter,
   resolveFindingsPage,
   safeFindingKey,
+  severityChips,
   sortFindings,
-  validationOf,
+  validationChips,
 } from "@/components/dashboard/filters";
+import { ViewHeader } from "@/components/dashboard/view-header";
 import { FINDINGS_KEYS, useQueryParams, writeQuery } from "@/components/dashboard/view-url";
+import { EmptyNote } from "@/components/ui/empty-note";
 import { ListDetail } from "@/components/ui/list-detail";
-import type { Severity } from "@/lib/data/view-types";
+import { DOCS } from "@/lib/docs-nav";
 import { revealCentred, revealTop } from "@/lib/scroll";
-import { FINDING_REVIEW, SEVERITY_META, toneColor } from "@/lib/status";
 
 const NARROW = "(max-width: 1023.98px)"; // one pane at a time (components/ui/list-detail.tsx)
-const LINK = "rounded-sm text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-const NOTICE_BTN = "rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 const narrow = () => window.matchMedia(NARROW).matches;
 
@@ -126,22 +123,16 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
   };
   const clearFilters = () => setFilter({ sev: "", val: "", q: "" });
 
-  const sevChips = countBy(findings, (f) => f.severity, SEVERITY_ORDER)
-    .filter((c) => c.count > 0 || filter.sev.includes(c.value))
-    .map((c) => ({ ...c, label: c.value.toLowerCase(), color: SEVERITY_META[c.value as Severity]?.color }));
-  const valChips = countBy(findings, validationOf, VALIDATION).map((c) => {
-    const meaning = FINDING_REVIEW[c.value as keyof typeof FINDING_REVIEW];
-    return { ...c, label: meaning?.label ?? c.value, color: meaning ? toneColor(meaning.tone) : undefined, hint: meaning?.hint };
-  });
+  const sevChips = severityChips(findings, filter.sev);
+  const valChips = validationChips(findings);
   // the address's finding is repeated only when it looks like a key (it is untrusted input)
   const named = safeFindingKey(p.finding) ? <span className="font-mono text-foreground">{p.finding}</span> : null;
 
   return (
     <div ref={root} className="dash-view dash-findings" data-pane={pane} data-ready={ready ? "" : undefined}>
-      <header className="mb-3">
-        <h1 className="text-[20px] font-medium text-foreground">Findings</h1>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">{findingsHeadline(findings.length, across)}</p>
-      </header>
+      <div className="mb-3">
+        <ViewHeader title="Findings" about={findingsHeadline(findings.length, across)} />
+      </div>
 
       {findings.length > 0 && (
         <div className="dash-findings-filters mb-4 flex flex-col gap-2.5">
@@ -157,21 +148,19 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
               onChange={([next]) => setFilter({ val: next === p.val ? "" : next })}
             />
           </div>
-          <FilterSummary shown={sorted.length} total={findings.length} noun="findings" active={active} onClear={clearFilters} />
+          <FilterSummary shown={sorted.length} total={findings.length} noun="finding" active={active} onClear={clearFilters} />
         </div>
       )}
 
       {findings.length === 0 && (
-        <p className="dash-findings-empty rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+        <EmptyNote className="dash-findings-empty">
           {across !== null
             ? "Findings appear here once a saved assessment records some."
             : "Findings appear here once this assessment's run records some. The Overview shows how far the run has come."}
-        </p>
+        </EmptyNote>
       )}
 
-      {findings.length > 0 && sorted.length === 0 && (
-        <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">No finding matches these filters.</p>
-      )}
+      {findings.length > 0 && sorted.length === 0 && <EmptyNote>No finding matches these filters.</EmptyNote>}
 
       {page.missing && (
         <p role="status" className="dash-findings-notice mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
@@ -187,11 +176,11 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
             )}
           </span>
           {page.missing === "filtered" && (
-            <button type="button" onClick={() => update({ sev: "", val: "", q: "", page: "" })} className={NOTICE_BTN}>
+            <button type="button" onClick={() => update({ sev: "", val: "", q: "", page: "" })} className="ui-link">
               Show it
             </button>
           )}
-          <button type="button" onClick={() => update({ finding: "" })} className={NOTICE_BTN}>
+          <button type="button" onClick={() => update({ finding: "" })} className="ui-link">
             Dismiss
           </button>
         </p>
@@ -210,7 +199,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
 
       <p className="dash-findings-foot mt-4 text-xs text-muted-foreground">
         See{" "}
-        <Link href="/docs/reports/understanding-findings" className={LINK}>
+        <Link href={DOCS.findings} className="ui-link">
           the findings format
         </Link>{" "}
         for how severity, validation and evidence are recorded.

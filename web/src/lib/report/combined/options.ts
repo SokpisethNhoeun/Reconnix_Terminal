@@ -15,6 +15,13 @@ export interface CombineOptions {
 
 export const DEFAULT_COMBINE_OPTIONS: CombineOptions = { evidence: true, low: true, appendix: true };
 
+/** The options as the Report view's selection panel offers them: a label and what it means. */
+export const COMBINE_OPTION_META: { key: keyof CombineOptions; label: string; hint: string }[] = [
+  { key: "evidence", label: "Include masked evidence", hint: "each occurrence's evidence lines, as masked when they were saved" },
+  { key: "low", label: "Include LOW and INFO findings", hint: "off: only CRITICAL, HIGH and MEDIUM" },
+  { key: "appendix", label: "Include the appendix", hint: "tools, references and the saved copies' ids" },
+];
+
 /** How many runs one report may combine (the route refuses more). */
 export const COMBINE_MAX = 5;
 

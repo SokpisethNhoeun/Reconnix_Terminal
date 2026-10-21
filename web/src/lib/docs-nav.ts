@@ -202,6 +202,8 @@ export const DOCS = {
   plan: "/docs/assessment-guide/plan",
   policyChecks: "/docs/assessment-guide/policy-checks",
   approvalGates: "/docs/assessment-guide/approval-gates",
+  approvalModel: "/docs/guardrails/approval-model",
+  llmData: "/docs/guardrails/llm-data-handling",
   screens: "/docs/terminal-guide/screens",
   configuration: "/docs/ai-models/configuration",
   findings: "/docs/reports/understanding-findings",

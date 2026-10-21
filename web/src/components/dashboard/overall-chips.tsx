@@ -10,8 +10,8 @@ import { Popover } from "@/components/dashboard/popover";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { Status } from "@/lib/data/view-types";
 import { RUN_STATUS } from "@/lib/status";
+import { DOCS } from "@/lib/docs-nav";
 
-const LINK = "rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 const many = (rows: CountRow[], noun: string) => (rows.length === 1 ? rows[0].name : `${rows.length} ${noun}`);
 
@@ -69,7 +69,7 @@ export function OverallChips({ overall }: { overall: OverallChipsData }) {
       <CountsChip label="Target" value={many(overall.targets, "targets")} heading="Runs per target" rows={overall.targets} />
       <div className="hidden min-[1440px]:block">
         <CountsChip label="Template" value={many(overall.templates, "templates")} heading="Runs per template" rows={templates}>
-        <Link href="/docs/assessment-guide/request" className={`inline-block ${LINK}`}>
+        <Link href={DOCS.request} className="ui-link inline-block">
           About templates
         </Link>
       </CountsChip>

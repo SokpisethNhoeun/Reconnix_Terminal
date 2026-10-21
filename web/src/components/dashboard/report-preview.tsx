@@ -10,6 +10,9 @@ import { useEffect, useRef } from "react";
 import { RefreshCw, TriangleAlert } from "lucide-react";
 
 import { DashCard } from "@/components/dashboard/dash-card";
+import { plural } from "@/components/dashboard/derive-shared";
+import { Button } from "@/components/ui/button";
+import { DOCS } from "@/lib/docs-nav";
 import { revealTop } from "@/lib/scroll";
 
 export type PreviewState =
@@ -34,17 +37,17 @@ export function ReportPreview({ state, runs, stale, onRetry }: { state: Exclude<
       tabIndex={-1}
       id="report-preview"
       title="Preview"
-      docsHref="/docs/reports/exporting"
-      meta={`${runs} ${runs === 1 ? "run" : "runs"} · the same HTML the PDF prints`}
+      docsHref={DOCS.exporting}
+      meta={`${plural(runs, "run")} · the same HTML the PDF prints`}
       className="is-wide rep-preview-card"
     >
         {state.kind === "failed" ? (
           <div role="alert" className="rep-error">
             <TriangleAlert className="size-4 shrink-0" aria-hidden />
             <span>The preview could not be loaded: {state.message}</span>
-            <button type="button" onClick={onRetry} className="rep-btn rep-btn-small">
+            <Button variant="outline" size="xs" onClick={onRetry}>
               <RefreshCw className="size-3.5" aria-hidden /> Retry
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="rep-frame-wrap" aria-busy={loading}>

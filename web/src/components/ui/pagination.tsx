@@ -8,6 +8,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { RefObject } from "react";
 
+import { Button } from "@/components/ui/button";
 import type { Paging } from "@/lib/paging";
 import { revealTop } from "@/lib/scroll";
 import { cn } from "@/lib/utils";
@@ -35,20 +36,13 @@ export function Pagination({
   };
   return (
     <nav aria-label={label} className={cn("ui-pager", className)}>
-      <button
-        type="button"
-        onClick={() => turn(page - 1)}
-        disabled={first}
-        aria-label="Previous page"
-        title={first ? "This is the first page" : "Previous page"}
-        className="ui-pager-btn"
-      >
+      <Button variant="outline" size="xs" onClick={() => turn(page - 1)} disabled={first} aria-label="Previous page" title={first ? "This is the first page" : "Previous page"}>
         <ChevronLeft className="size-3.5" aria-hidden /> Previous
-      </button>
+      </Button>
       <span className="ui-pager-label tabnums">{paging.label}</span>
-      <button type="button" onClick={() => turn(page + 1)} disabled={last} aria-label="Next page" title={last ? "This is the last page" : "Next page"} className="ui-pager-btn">
+      <Button variant="outline" size="xs" onClick={() => turn(page + 1)} disabled={last} aria-label="Next page" title={last ? "This is the last page" : "Next page"}>
         Next <ChevronRight className="size-3.5" aria-hidden />
-      </button>
+      </Button>
     </nav>
   );
 }

@@ -9,9 +9,8 @@
    derive modules do. The helpers and the stylesheet are exported for the combined report
    (combined/html.ts), which must look the same. */
 import { redact } from "@/lib/assistant/redact";
-import type { Assessment, Finding } from "@/lib/data/schema";
+import { type Assessment, type Finding, SEVERITIES as SEV_ORDER } from "@/lib/data/schema";
 
-const SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
 const SEV_CLASS: Record<string, string> = { CRITICAL: "crit", HIGH: "high", MEDIUM: "med", LOW: "low", INFO: "info" };
 const VALIDATION_CLASS: Record<string, string> = { CONFIRMED: "confirmed", UNCONFIRMED: "unconfirmed", INCONCLUSIVE: "inconclusive" };
 const STATUS_CLASS: Record<string, string> = { open: "open", fixed: "fixed", accepted: "accepted", "false-positive": "falsepos" };
@@ -77,7 +76,7 @@ export const CSS = `
   --rule:#2f6fd0; --accent:#1f5fc0; --ok:#1c8650;
   --crit:#911a3c; --high:#d9492a; --med:#c7920f; --low:#2a9657; --info:#596573;
   --crit-wash:#f8e3ea; --high-wash:#fbe6de; --med-wash:#f8efd5;
-  --low-wash:#e3f3ea; --info-wash:#eceff2; --ok-wash:#e1f2e9;
+  --low-wash:#e3f3ea; --info-wash:#eceff2; --ok-wash:#e1f2e9; --chip-wash:#eaf1fb;
 }
 html,body{margin:0}
 body{background:#eceef2; color:var(--ink); font-size:12.5px; line-height:1.5;
@@ -140,7 +139,7 @@ td.id{font-family:"IBM Plex Mono"; font-weight:600; color:var(--accent); white-s
 .kv{display:grid; grid-template-columns:150px 1fr; gap:8px 18px; font-size:12px}
 .kv dt{color:var(--muted)} .kv dd{margin:0; color:var(--ink-soft)}
 .chips{display:flex; flex-wrap:wrap; gap:6px}
-.chip{font-family:"IBM Plex Mono"; font-size:11px; padding:2px 9px; border-radius:7px; background:#eaf1fb; color:var(--accent)}
+.chip{font-family:"IBM Plex Mono"; font-size:11px; padding:2px 9px; border-radius:7px; background:var(--chip-wash); color:var(--accent)}
 .chip.block{background:var(--crit-wash); color:var(--crit)} .chip.plain{background:var(--info-wash); color:var(--ink-soft)}
 .disclaimer{color:var(--ink-soft); font-size:11.5px; background:var(--zebra); border:1px solid var(--line); border-radius:9px; padding:12px 14px}
 .find{border:1px solid var(--line); border-radius:11px; overflow:hidden; break-inside:avoid}

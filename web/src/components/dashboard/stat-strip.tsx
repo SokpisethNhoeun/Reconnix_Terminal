@@ -50,7 +50,7 @@ export function StatStrip({ stats, label }: { stats: Stat[]; label: string }) {
               </span>
             )}
           </div>
-          {s.meter && <StatMeter frac={s.meter.frac} color={s.meter.over ? "var(--danger)" : "var(--primary)"} label={s.meter.label} />}
+          {s.meter && <StatMeter frac={s.meter.frac} over={s.meter.over} label={s.meter.label} />}
           <p className="dash-stat-note [overflow-wrap:anywhere]">{s.note}</p>
           {s.link && (
             <ViewLink view={s.link.view} filters={s.link.filters} label={s.link.label} className="absolute inset-0 z-[1] rounded-[14px]">

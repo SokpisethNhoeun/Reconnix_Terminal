@@ -73,6 +73,10 @@ export const EXPORT_FORMATS: readonly ExportSpec[] = [
   },
 ];
 
+/** The 501 the PDF routes answer, and the Report view repeats, when no browser can print. */
+export const NO_PRINTER =
+  "PDF export needs a Chrome/Chromium browser on the dashboard machine (set RECONIX_CHROME). Download the HTML report instead and print it to PDF.";
+
 export const DEFAULT_EXPORT: ExportFormat = "pdf";
 
 export const isExportFormat = (value: string): value is ExportFormat =>

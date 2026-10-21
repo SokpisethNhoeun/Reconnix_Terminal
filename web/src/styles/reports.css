@@ -1,7 +1,7 @@
 /* The Report view: combining saved runs (report-selection.tsx), the runs table's checkboxes
-   (report-runs.tsx) and the preview frame (report-preview.tsx). Owner: the reports workstream
-   (docs/WEB_REDESIGN_V3_PLAN.md). Colours only from the tokens (tokens.css); meanings from
-   lib/status.ts. */
+   (report-runs.tsx) and the preview frame (report-preview.tsx). Its buttons are the shared
+   Button (components/ui/button.tsx) and its links .ui-link (ui.css). Colours only from the
+   tokens (tokens.css); meanings from lib/status.ts. */
 
 /* ---- Selection panel ---- */
 .rep-select { display: grid; gap: 12px; }
@@ -14,40 +14,8 @@
 .rep-reason { font-size: 12px; color: var(--muted-foreground); }
 .rep-reason:empty { display: none; }
 
-.rep-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  font-size: 12.5px;
-  color: var(--foreground);
-  white-space: nowrap;
-  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
-}
-.rep-btn:hover:not(:disabled):not([aria-disabled="true"]) { border-color: color-mix(in oklab, var(--primary) 40%, var(--border)); color: var(--primary); }
-.rep-btn:disabled, .rep-btn[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
-.rep-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.rep-btn-primary { border-color: transparent; background: var(--primary); color: var(--primary-foreground); }
-.rep-btn-primary:hover:not(:disabled):not([aria-disabled="true"]) { color: var(--primary-foreground); background: var(--primary-strong); border-color: transparent; }
-.rep-btn-quiet { border-color: transparent; color: var(--muted-foreground); }
-.rep-btn-small { height: 28px; padding: 0 10px; border-radius: 8px; font-size: 12px; }
-
 .rep-status { font-size: 12.5px; color: var(--muted-foreground); } /* sr-only while idle: in the DOM, out of sight */
 .rep-status.is-error { color: var(--danger); }
-.rep-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--primary);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  border-radius: 4px;
-}
-.rep-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
 /* ---- The runs table's checkbox ---- */
 .rep-pick { display: inline-flex; vertical-align: middle; }
@@ -72,5 +40,5 @@
 .rep-note { margin-top: 8px; font-size: 12px; color: var(--warning); }
 @media (max-width: 640px) {
   .rep-frame { height: clamp(320px, 60vh, 600px); }
-  .rep-actions > .rep-btn { flex: 1 1 auto; }
+  .rep-actions > button { flex: 1 1 auto; }
 }

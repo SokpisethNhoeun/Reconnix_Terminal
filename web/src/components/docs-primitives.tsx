@@ -58,10 +58,11 @@ export function Kbd({ children }: { children: React.ReactNode }) {
 
 const CALLOUTS = {
   note: { icon: Info, box: "border-primary/30 bg-primary/5", tone: "text-primary" },
-  warning: { icon: TriangleAlert, box: "border-accent/40 bg-accent/5", tone: "text-accent" },
+  warning: { icon: TriangleAlert, box: "border-warning/40 bg-warning/5", tone: "text-warning" },
 } as const;
 
-/** Note (teal) or warning (amber, approval gates and risks). */
+/** Note (teal: information) or warning (amber: waiting or to review, lib/status.ts tones), for
+    approval gates and risks. */
 export function Callout({
   variant = "note",
   title,

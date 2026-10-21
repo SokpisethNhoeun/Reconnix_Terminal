@@ -18,7 +18,7 @@ import { plural, runLink, statusBadge } from "./derive-shared";
 import { toolsNamed } from "./event-kinds";
 import { reviewLabel, sortFindings, validationOf } from "./filters";
 import type { EventBadge, FindingsSlice } from "./overview-types";
-import type { ReportCards, ReportFindingRow, ReportRunRow, ReportTargetRow } from "./report-types";
+import type { AssessmentsCards, ReportCards, ReportFindingRow, ReportRunRow, ReportTargetRow } from "./report-types";
 import type { Stat } from "./stat-types";
 
 const masked = (v: AssessmentView) => v.log.filter((l) => l.kind === "mask").length;
@@ -164,8 +164,21 @@ export function runRow(v: AssessmentView): ReportRunRow {
   };
 }
 
-/** `views` is the library (newest first); it must not be empty. */
-export function overallReportCards(views: AssessmentView[], slice: FindingsSlice): ReportCards {
+/** The Assessments view over `rows` (every saved run, newest first; not empty). */
+export function assessmentsCards(rows: ReportRunRow[]): AssessmentsCards {
+  return {
+    tag: `All ${plural(rows.length, "run")}`,
+    about:
+      rows.length === 1
+        ? "The one run the TUI saved: open it for its overview, findings, scope and report."
+        : "Every run the TUI saved, newest first: search or filter them, and open one for its overview, findings, scope and report.",
+    rows,
+  };
+}
+
+/** `views` is the library (newest first); it must not be empty. `runs` are its rows (runRow),
+    made once by the page for this view and the Assessments view. */
+export function overallReportCards(views: AssessmentView[], slice: FindingsSlice, runs: ReportRunRow[] = views.map(runRow)): ReportCards {
   const n = views.length;
   const completed = views.filter((v) => v.status === "Completed").length;
   const waiting = views.filter((v) => v.status === "Awaiting input").length;
@@ -209,6 +222,6 @@ export function overallReportCards(views: AssessmentView[], slice: FindingsSlice
     ],
     findings: slice,
     targets,
-    runs: views.map(runRow),
+    runs,
   };
 }

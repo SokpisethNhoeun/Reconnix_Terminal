@@ -5,7 +5,8 @@
    screen readers) and the state is the one live region, so a press is announced once. */
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+
+import { Button } from "@/components/ui/button";
 
 export function CopyButton({ text, label, className }: { text: string | (() => string); label: string; className?: string }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
@@ -26,10 +27,10 @@ export function CopyButton({ text, label, className }: { text: string | (() => s
   const Icon = state === "copied" ? Check : state === "failed" ? X : Copy;
   const shown = state === "copied" ? "Copied" : state === "failed" ? "Couldn't copy" : "Copy";
   return (
-    <button type="button" onClick={copy} title={label} className={cn("ai-btn ai-btn-small", className)}>
+    <Button variant="quiet" size="xs" onClick={copy} title={label} className={className}>
       <Icon className="size-3.5" aria-hidden />
       <span className="sr-only">{label} </span>
       <span role="status">{shown}</span>
-    </button>
+    </Button>
   );
 }

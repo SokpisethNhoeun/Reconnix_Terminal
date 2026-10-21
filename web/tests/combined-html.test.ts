@@ -1,7 +1,8 @@
 /* The combined report's HTML (lib/report/combined/html.ts): its ten sections, the anchors,
    every run and finding, escaping, no scripts, its own meta CSP — and that the single report,
-   whose helpers it shares, still matches its saved copy (regenerated once, deliberately, when the
-   meta CSP was added to it; otherwise byte-identical to the pre-refactor copy). */
+   whose helpers it shares, still matches its saved copy (regenerated deliberately twice: when the
+   meta CSP was added to it, and when the chip wash became a --chip-wash variable; otherwise
+   byte-identical to the pre-refactor copy). */
 import { describe, expect, it } from "vitest";
 
 import type { Assessment } from "@/lib/data/schema";

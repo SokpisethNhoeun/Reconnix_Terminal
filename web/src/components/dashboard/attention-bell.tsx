@@ -9,8 +9,8 @@ import { Bell } from "lucide-react";
 import { Popover } from "@/components/dashboard/popover";
 import { useRunHref } from "@/components/dashboard/view-url";
 import type { LibraryItem } from "@/lib/data/view-types";
+import { DOCS } from "@/lib/docs-nav";
 
-const LINK = "rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function AttentionBell({
   gate,
@@ -80,7 +80,7 @@ export function AttentionBell({
           <p className="text-muted-foreground">
             Decide in the TUI that runs it
             {terminal ? " (a run started in the Terminal view is decided there)" : ""}.{" "}
-            <Link href="/docs/guardrails/approval-model" className={LINK}>
+            <Link href={DOCS.approvalModel} className="ui-link">
               Approval model
             </Link>
           </p>

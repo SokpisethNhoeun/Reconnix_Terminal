@@ -12,20 +12,19 @@ import { StatMeter } from "@/components/dashboard/stat-card";
 import { StatStrip } from "@/components/dashboard/stat-strip";
 import { DocsLink, ViewHeader } from "@/components/dashboard/view-header";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { DOCS } from "@/lib/docs-nav";
 import { TIME_LIMIT } from "@/lib/status";
-
-const MANIFEST_DOCS = "/docs/assessment-guide/scope";
 
 export function ScopeView({ data }: { data: ScopeCards }) {
   const { usage } = data.limits;
   return (
     <div className="dash-view dash-sheet" data-mode={data.mode}>
       <ViewHeader title="Scope" tag={data.tag} about={data.about}>
-        <DocsLink href={MANIFEST_DOCS}>Scope Manifest</DocsLink>
+        <DocsLink href={DOCS.scope}>Scope Manifest</DocsLink>
       </ViewHeader>
 
       {data.empty ? (
-        <DashCard id="scope-empty" title="No Scope Manifest" docsHref={MANIFEST_DOCS}>
+        <DashCard id="scope-empty" title="No Scope Manifest" docsHref={DOCS.scope}>
           <p className="text-sm text-muted-foreground">{data.empty}</p>
         </DashCard>
       ) : (
@@ -37,7 +36,7 @@ export function ScopeView({ data }: { data: ScopeCards }) {
             <ChipPanel
               id="scope-permitted"
               title="Permitted actions"
-              docsHref={MANIFEST_DOCS}
+              docsHref={DOCS.scope}
               meta={data.mode === "all" ? "in how many runs" : undefined}
               groups={[
                 { label: "Actions", chips: data.permitted.actions, empty: "No action listed." },
@@ -47,14 +46,14 @@ export function ScopeView({ data }: { data: ScopeCards }) {
             <ChipPanel
               id="scope-limits"
               title="Limits"
-              docsHref="/docs/assessment-guide/policy-checks"
+              docsHref={DOCS.policyChecks}
               meta={data.mode === "all" ? "in how many runs" : undefined}
               groups={data.limits.rows.map((r) => ({ ...r, empty: r.label === "Window" ? "No time limit." : "None listed." }))}
             >
               {usage && (
                 <div className="mt-auto flex flex-col gap-1.5">
                   <h3 className="dash-subhead">Time used</h3>
-                  <StatMeter frac={usage.frac} color={usage.over ? "var(--danger)" : "var(--primary)"} label="Time used of the window" />
+                  <StatMeter frac={usage.frac} over={usage.over} label="Time used of the window" />
                   <p className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
                     {usage.caption}
                     {usage.over && <StatusBadge meaning={TIME_LIMIT.over} />}

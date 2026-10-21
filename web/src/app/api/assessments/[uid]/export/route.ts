@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
 
 import { COOKIE, hasRole, launchToken, readRole } from "@/lib/auth/session";
 import { loadAssessment } from "@/lib/data/store";
-import { downloadHref, exportFileName, exportSpec, isExportFormat } from "@/lib/report/formats";
+import { downloadHref, exportFileName, exportSpec, isExportFormat, NO_PRINTER } from "@/lib/report/formats";
 import { renderReportHtml } from "@/lib/report/html";
 import { renderPdf } from "@/lib/report/pdf";
 import { renderText } from "@/lib/report/render";
@@ -40,9 +40,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ uid: string
     if (!pdf) {
       return NextResponse.json(
         {
-          detail:
-            "PDF export needs a Chrome/Chromium browser on the dashboard machine (set RECONIX_CHROME). " +
-            "Open the HTML report instead and print it to PDF.",
+          detail: NO_PRINTER,
           html: downloadHref(assessment.uid, "html"),
         },
         { status: 501 },

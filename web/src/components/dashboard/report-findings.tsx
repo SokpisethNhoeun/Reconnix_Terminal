@@ -5,14 +5,16 @@ import { DashCard } from "@/components/dashboard/dash-card";
 import type { ReportFindingRow } from "@/components/dashboard/report-types";
 import { ViewLink } from "@/components/dashboard/view-link";
 import { SeverityBadge, StatusBadge } from "@/components/ui/status-badge";
+import { DOCS } from "@/lib/docs-nav";
+import { plural } from "@/components/dashboard/derive-shared";
 
 export function ReportFindings({ rows }: { rows: ReportFindingRow[] }) {
   return (
     <DashCard
       id="report-findings"
       title="Findings"
-      docsHref="/docs/reports/understanding-findings"
-      meta={rows.length === 1 ? "1 finding" : `${rows.length} findings`}
+      docsHref={DOCS.findings}
+      meta={plural(rows.length, "finding")}
       className="is-wide"
     >
       {rows.length ? (

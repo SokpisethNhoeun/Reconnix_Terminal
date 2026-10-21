@@ -1,6 +1,25 @@
-/* Shared controls (components/ui) and the shared row: the pager, the checkbox, the list/detail
-   split and .ui-row (a finding in the Findings list, a run on the Assessments view). Colours
-   only from the tokens. */
+/* Shared controls (components/ui) and the shared row: the text link, the empty note, the pager,
+   the checkbox, the list/detail split and .ui-row (a finding in the Findings list, a run on the
+   Assessments view). Buttons are components/ui/button.tsx (Tailwind). Colours only from the
+   tokens. */
+
+/* ---- A text link, in prose or as a button that reads like one ---- */
+.ui-link { border-radius: 4px; color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
+.ui-link:hover { color: var(--primary-strong); }
+.ui-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* ---- An empty list (empty-note.tsx) ---- */
+.ui-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
 
 /* ---- A row in a list: a card-like, selectable surface (findings-list.tsx, assessments-rows.tsx) ---- */
 .ui-row {
@@ -17,23 +36,8 @@
   background: color-mix(in oklab, var(--primary) 6%, var(--card));
 }
 
-/* ---- Pager (pagination.tsx) ---- */
+/* ---- Pager (pagination.tsx; its buttons are the outline xs Button) ---- */
 .ui-pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.ui-pager-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--foreground);
-  transition: border-color 0.2s ease, color 0.2s ease;
-}
-.ui-pager-btn:hover:not(:disabled) { border-color: color-mix(in oklab, var(--primary) 40%, var(--border)); color: var(--primary); }
-.ui-pager-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.ui-pager-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .ui-pager-label { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); text-align: center; }
 
 /* ---- Checkbox (checkbox.tsx) ---- */

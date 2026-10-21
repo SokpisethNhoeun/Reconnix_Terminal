@@ -15,7 +15,9 @@ import type { ReportRunRow } from "@/components/dashboard/report-types";
 import { RUN_COLUMNS, RUN_SEARCH, RunCells, type RunCellProps, runTitle } from "@/components/dashboard/run-cells";
 import { RunLinkTo } from "@/components/dashboard/run-link";
 import { Checkbox } from "@/components/ui/checkbox";
+import { EmptyNote } from "@/components/ui/empty-note";
 import { Pagination } from "@/components/ui/pagination";
+import { DOCS } from "@/lib/docs-nav";
 import { paginate, slicePage } from "@/lib/paging";
 import { downloadHref, exportSpec } from "@/lib/report/formats";
 
@@ -51,7 +53,7 @@ export function ReportRuns({ runs, selection }: { runs: ReportRunRow[]; selectio
     <DashCard
       id="report-runs"
       title="Runs"
-      docsHref="/docs/reports/exporting"
+      docsHref={DOCS.exporting}
       meta={shown.length === runs.length ? `${runs.length} saved` : `${shown.length} of ${runs.length}`}
       className="is-wide"
       bodyClassName="flex flex-col gap-3"
@@ -138,7 +140,7 @@ export function ReportRuns({ runs, selection }: { runs: ReportRunRow[]; selectio
           </tbody>
         </table>
       </div>
-      {shown.length === 0 && <p className="text-sm text-muted-foreground">No saved assessment matches.</p>}
+      {shown.length === 0 && <EmptyNote>No saved assessment matches.</EmptyNote>}
       <Pagination paging={paging} onPage={setPage} label="Saved assessment pages" />
     </DashCard>
   );

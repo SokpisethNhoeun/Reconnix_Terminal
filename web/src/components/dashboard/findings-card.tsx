@@ -5,12 +5,12 @@
    accessible name still count every level. Severity uses the TUI's scale (lib/status.ts
    SEVERITY_META). */
 import { DashCard } from "@/components/dashboard/dash-card";
+import { plural } from "@/components/dashboard/derive-shared";
 import type { FindingsSlice } from "@/components/dashboard/overview-types";
 import { ViewLink } from "@/components/dashboard/view-link";
 import { SeverityBadge, StatusBadge } from "@/components/ui/status-badge";
+import { DOCS } from "@/lib/docs-nav";
 import { FINDING_REVIEW, SEVERITY_META } from "@/lib/status";
-
-const findingsWord = (n: number) => (n === 1 ? "finding" : "findings");
 
 /** `id` names the card's heading; it must differ per view, since every view stays mounted. */
 export function FindingsCard({ data, id = "findings-card" }: { data: FindingsSlice; id?: string }) {
@@ -19,8 +19,8 @@ export function FindingsCard({ data, id = "findings-card" }: { data: FindingsSli
     <DashCard
       id={id}
       title="Findings by Severity"
-      docsHref="/docs/reports/understanding-findings"
-      meta={`${data.total} ${findingsWord(data.total)}`}
+      docsHref={DOCS.findings}
+      meta={plural(data.total, "finding")}
       className="dash-panel h-full"
       bodyClassName="flex flex-col gap-3"
     >
@@ -57,7 +57,7 @@ export function FindingsCard({ data, id = "findings-card" }: { data: FindingsSli
               <ViewLink
                 view="findings"
                 filters={{ sev: s.level }}
-                label={`Show the ${s.count} ${s.level.toLowerCase()} ${findingsWord(s.count)}`}
+                label={`Show the ${plural(s.count, `${s.level.toLowerCase()} finding`)}`}
                 className="absolute inset-0 rounded-md"
               >
                 <span className="sr-only">{s.level.toLowerCase()}</span>
