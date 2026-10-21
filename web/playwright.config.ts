@@ -37,6 +37,8 @@ export default defineConfig({
         RECONIX_DATA_DIR: "sample-data",
         // the sample files are old: keep their waiting run waiting instead of reading it as stale
         RECONIX_STALE_AFTER_HOURS: "0",
+        // no 10 s self-refresh under a test (a spec that wants it sets its own server)
+        RECONIX_LIVE_REFRESH_MS: "0",
         RECONIX_TERM_PORT: String(TERM_PORT),
         RECONIX_TERM_TEST: "1",
         RECONIX_TERM_COMMAND: "sh -c 'echo READY; exec cat'",

@@ -23,12 +23,11 @@ import {
   sortFindings,
   validationOf,
 } from "@/components/dashboard/filters";
-import { useQueryParams } from "@/components/dashboard/view-url";
+import { FINDINGS_KEYS, useQueryParams } from "@/components/dashboard/view-url";
 import { ListDetail } from "@/components/ui/list-detail";
 import type { Severity } from "@/lib/data/view-types";
 import { FINDING_REVIEW, SEVERITY_META, toneColor } from "@/lib/status";
 
-const KEYS = ["sev", "val", "q", "finding", "page"] as const;
 const NARROW = "(max-width: 1023.98px)"; // one pane at a time (components/ui/list-detail.tsx)
 const LINK = "rounded-sm text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const NOTICE_BTN = "rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -67,7 +66,7 @@ const useHydrated = () => useSyncExternalStore(subscribeNever, () => true, () =>
  * row's key (`<uid>~F-001`). The rules (which page, which row) are pure, in filters.ts.
  */
 export function FindingsView({ findings, across = null }: { findings: FindingRow[]; across?: number | null }) {
-  const [p, update] = useQueryParams(KEYS);
+  const [p, update] = useQueryParams(FINDINGS_KEYS);
   const root = useRef<HTMLDivElement>(null);
   const detail = useRef<HTMLElement>(null);
   // The controls act once the view has hydrated: a click replayed from before that would change

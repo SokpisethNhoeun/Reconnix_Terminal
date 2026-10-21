@@ -8,7 +8,7 @@ import { AttentionBell } from "@/components/dashboard/attention-bell";
 import type { Dashboard } from "@/components/dashboard/derive";
 import type { Overall } from "@/components/dashboard/derive-overall";
 import { DocsSearch } from "@/components/dashboard/docs-search";
-import { LiveRefresh } from "@/components/dashboard/live-refresh";
+import { LiveRefresh, liveRefreshMs } from "@/components/dashboard/live-refresh";
 import { OverallChips, type OverallChipsData } from "@/components/dashboard/overall-chips";
 import { RunChips, type RunChipsData } from "@/components/dashboard/run-chips";
 import type { LibraryItem, SkippedFile } from "@/lib/data/view-types";
@@ -57,7 +57,7 @@ export function TopBar({
       : null;
   return (
     <header className="dash-topbar relative z-30 flex min-w-0 items-center gap-2 border-b border-border px-3 sm:gap-3 sm:px-4">
-      <LiveRefresh renderedAt={renderedAt} dir={dir} />
+      <LiveRefresh renderedAt={renderedAt} dir={dir} everyMs={liveRefreshMs()} />
       {(dash || overall) && (
         <div className="dash-reveal flex min-w-0 items-center gap-2 xl:ml-auto">
           <AssessmentSwitcher current={a} all={overall && allSummary(overall)} items={items} dir={dir} skipped={skipped} />

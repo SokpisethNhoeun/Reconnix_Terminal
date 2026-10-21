@@ -9,10 +9,16 @@ import { useCallback } from "react";
 export const VIEWS = ["overview", "assessments", "findings", "reports", "scope", "terminal", "assistant"] as const;
 export type View = (typeof VIEWS)[number];
 
-/** Each view's own filter parameters (cleared when a link opens that view with new ones). */
+/** The Assessments view's own address parameters (its filters, its page). */
+export const ASSESSMENT_KEYS = ["q", "status", "template", "page"] as const;
+/** The Findings view's own address parameters (its filters, the selected finding, its page). */
+export const FINDINGS_KEYS = ["sev", "val", "q", "finding", "page"] as const;
+
+/** Each view's own filter parameters (cleared when a link opens that view with new ones). The
+    one list per view: the views read their parameters from these same constants. */
 export const VIEW_FILTERS: Partial<Record<View, readonly string[]>> = {
-  assessments: ["q", "status", "template", "page"],
-  findings: ["sev", "val", "q", "finding", "page"],
+  assessments: ASSESSMENT_KEYS,
+  findings: FINDINGS_KEYS,
 };
 
 export type ViewParams = Record<string, string | undefined>;
@@ -84,6 +90,13 @@ export function useRunHref(): (uid: string | null) => string {
   const search = useSearchParams();
   return (uid) => runHref(search.toString(), uid);
 }
+
+/** The Overview of one saved run, from anywhere (no filters carried). */
+export const runOverviewHref = (uid: string): string => `/?uid=${encodeURIComponent(uid)}`;
+
+/** One finding opened in its own run's Findings view. */
+export const runFindingHref = (uid: string, findingId: string): string =>
+  `/?uid=${encodeURIComponent(uid)}&view=findings&finding=${encodeURIComponent(findingId)}`;
 
 // --- the AI Assistant's history entry ----------------------------------------------------
 // Opening the assistant pushes one entry (Back returns to where you were); opening it while it

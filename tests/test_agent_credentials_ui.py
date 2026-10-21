@@ -6,19 +6,10 @@
 import pytest
 from textual.widgets import Input
 
-from reconix import store
 from reconix.screens.forms import CredentialForm
 from reconix.store import agent_run
 
 from .support import SIZE, settle
-
-
-@pytest.fixture
-def model_active(monkeypatch):
-    monkeypatch.setattr("reconix.llm.client.ping", lambda *a, **k: (True, "reachable"))
-    store.set_provider("openai", api_key="sk-x-1234", models=["gpt-4o-mini"])
-    store.test_provider("openai")
-    store.activate("openai", "gpt-4o-mini")
 
 
 @pytest.fixture

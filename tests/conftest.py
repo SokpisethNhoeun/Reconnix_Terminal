@@ -42,6 +42,28 @@ def llm_paths(monkeypatch, tmp_path):
     agent_run.reset()
 
 
+@pytest.fixture
+def reports_dir(tmp_path):
+    """Where instant_ui sends the reports this test writes."""
+    return tmp_path / "reports"
+
+
+@pytest.fixture
+def reachable(monkeypatch):
+    """Every provider reachability test passes without touching the network."""
+    from reconix.llm import client
+
+    monkeypatch.setattr(client, "ping", lambda pid, model, **kw: (True, "reachable"))
+
+
+@pytest.fixture
+def model_active(reachable):
+    """A configured, tested and active model, so /assess takes the agent path."""
+    store.set_provider("openai", api_key="sk-x-1234", models=["gpt-4o-mini"])
+    store.test_provider("openai")
+    store.activate("openai", "gpt-4o-mini")
+
+
 @pytest.fixture(autouse=True)
 def opened(monkeypatch) -> List[str]:
     """Nothing a test does may launch a real browser: record what would have opened."""

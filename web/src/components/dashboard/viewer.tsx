@@ -55,6 +55,13 @@ export function Viewer({
   const backdrop = shown === "assistant"; // the Overview under the open assistant
 
   useEffect(() => watchHistory(), []);
+  // The page is interactive: the e2e specs wait for this instead of guessing from network idle.
+  useEffect(() => {
+    document.documentElement.dataset.hydrated = "";
+    return () => {
+      delete document.documentElement.dataset.hydrated;
+    };
+  }, []);
 
   // The sidebar: the assistant gets its own history entry; leaving it goes back that entry. It
   // reads the address, not this render's `view`, which can lag a quick click behind.
@@ -84,11 +91,11 @@ export function Viewer({
             >
               {overview}
             </div>
-            <div hidden={shown !== "assessments"}>{assessments}</div>
-            <div hidden={shown !== "findings"}>{findings}</div>
-            <div hidden={shown !== "reports"}>{reports}</div>
-            <div hidden={shown !== "scope"}>{scope}</div>
-            <div hidden={shown !== "terminal"}>{terminalOpened && terminal}</div>
+            <div data-view-pane="assessments" hidden={shown !== "assessments"}>{assessments}</div>
+            <div data-view-pane="findings" hidden={shown !== "findings"}>{findings}</div>
+            <div data-view-pane="reports" hidden={shown !== "reports"}>{reports}</div>
+            <div data-view-pane="scope" hidden={shown !== "scope"}>{scope}</div>
+            <div data-view-pane="terminal" hidden={shown !== "terminal"}>{terminalOpened && terminal}</div>
           </main>
           <AssistantStage view={view} shown={shown} setShown={setShown} />
         </div>

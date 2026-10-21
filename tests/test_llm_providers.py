@@ -8,12 +8,6 @@ from reconix.llm import client
 SECRET_KEY = "sk-live-SECRET-0ff9a"   # must never land in the DB, a hint, chat or a snapshot
 
 
-@pytest.fixture
-def reachable(monkeypatch):
-    """Make every reachability test pass without touching the network."""
-    monkeypatch.setattr(client, "ping", lambda pid, model, **kw: (True, "reachable"))
-
-
 # --- set / update / unset ---------------------------------------------------------
 
 def test_set_provider_saves_one_row():

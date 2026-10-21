@@ -187,6 +187,29 @@ export const DOCS_ENTRIES: DocEntry[] = DOCS_NAV.flatMap((g) => [
 
 export const DOCS_ROUTES = DOCS_ENTRIES.map((e) => e.href);
 
+/**
+ * The docs pages the dashboard and the site link to, by meaning. Components link through this
+ * map, never through a string literal, so the docs can move again by changing one place; the
+ * test checks that every address here is a live page (DOCS_ROUTES).
+ */
+export const DOCS = {
+  home: "/docs",
+  gettingStarted: "/docs/getting-started",
+  introduction: "/docs/getting-started/introduction",
+  assessmentGuide: "/docs/assessment-guide",
+  request: "/docs/assessment-guide/request",
+  scope: "/docs/assessment-guide/scope",
+  plan: "/docs/assessment-guide/plan",
+  policyChecks: "/docs/assessment-guide/policy-checks",
+  approvalGates: "/docs/assessment-guide/approval-gates",
+  screens: "/docs/terminal-guide/screens",
+  configuration: "/docs/ai-models/configuration",
+  findings: "/docs/reports/understanding-findings",
+  exporting: "/docs/reports/exporting",
+  dashboard: "/docs/reports/dashboard",
+} as const;
+export type DocsLink = (typeof DOCS)[keyof typeof DOCS];
+
 export function findDoc(href: string): DocEntry | undefined {
   return DOCS_ENTRIES.find((e) => e.href === href);
 }

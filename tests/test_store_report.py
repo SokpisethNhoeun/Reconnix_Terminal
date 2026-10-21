@@ -11,12 +11,6 @@ from reconix.store import report
 from .support import TEST_PASSWORD, play_until_gate, run_to, run_to_end
 
 
-@pytest.fixture(autouse=True)
-def reports_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(report, "REPORTS_DIR", tmp_path / "reports")
-    return tmp_path / "reports"
-
-
 def test_no_report_before_the_assessment_is_complete():
     run_to("approval:approval-001")
     with pytest.raises(store.StoreValidationError):

@@ -7,11 +7,11 @@ import Link from "next/link";
 import type { ReportRunRow } from "@/components/dashboard/report-types";
 import { SeverityBadge, StatusBadge } from "@/components/ui/status-badge";
 import { RUN_STATUS } from "@/lib/status";
+import { runOverviewHref } from "@/components/dashboard/view-url";
 
 const COLUMNS = ["Run", "Target", "Status", "Findings", "Plan"] as const;
 
 /** The Overview of one run: its address, with no view and none of this view's filters. */
-export const runOverviewHref = (uid: string) => `/?uid=${encodeURIComponent(uid)}`;
 
 export function AssessmentsRows({ rows }: { rows: ReportRunRow[] }) {
   return (

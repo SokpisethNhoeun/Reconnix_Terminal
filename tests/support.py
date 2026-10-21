@@ -1,7 +1,8 @@
 """Helpers shared by the tests: driving the store's run, and driving the UI."""
 
 import io
-from typing import List, Optional
+import time
+from typing import Callable, List, Optional
 
 from reconix import store
 
@@ -101,6 +102,17 @@ async def settle(pilot, rounds: int = 4) -> None:
     """Let screen switches, dialogs (pushed on the app's next turn) and redraws land."""
     for _ in range(rounds):
         await pilot.pause()
+
+
+async def wait_until(pilot, cond: Callable[[], bool], timeout: float = 5.0,
+                     what: str = "condition") -> None:
+    """Pause the app until `cond()` holds (a worker finished, a gate opened, a line showed up),
+    or fail after `timeout` seconds. Replaces fixed `settle(rounds=N)` waits on background work."""
+    deadline = time.monotonic() + timeout
+    while not cond():
+        if time.monotonic() > deadline:
+            raise AssertionError(f"timed out after {timeout}s waiting for {what}")
+        await pilot.pause(0.05)
 
 
 async def show(app, pilot, name: str) -> None:

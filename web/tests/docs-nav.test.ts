@@ -7,7 +7,7 @@ import { searchDocs } from "@/components/docs-search";
 import { DOCS_CONTENT } from "@/content/docs";
 import { COMMAND_DOCS, STALE_COMMAND_DOCS, UNDOCUMENTED_COMMANDS } from "@/content/docs/commands";
 import commandsJson from "@/content/docs/commands.json";
-import { COMMANDS, COMMAND_GROUPS, DOCS_ENTRIES, DOCS_NAV, DOCS_ROUTES, docNeighbours, findDoc } from "@/lib/docs-nav";
+import { COMMANDS, COMMAND_GROUPS, DOCS, DOCS_ENTRIES, DOCS_NAV, DOCS_ROUTES, docNeighbours, findDoc } from "@/lib/docs-nav";
 import { DOCS_REDIRECTS, OLD_DOCS_ROUTES } from "@/lib/docs-redirects";
 import { docsSearchIndex } from "@/lib/docs-search-index";
 
@@ -136,5 +136,13 @@ describe("the docs search", () => {
     expect(hit?.href).toBe("/docs/assessment-guide/approval-gates#high-risk-the-double-check");
     expect(searchDocs(index, "")).toEqual([]);
     expect(searchDocs(index, "zzz-no-such-thing")).toEqual([]);
+  });
+});
+
+describe("the DOCS link map", () => {
+  it("names only live pages", () => {
+    for (const [key, href] of Object.entries(DOCS)) {
+      expect(DOCS_ROUTES, `DOCS.${key}`).toContain(href);
+    }
   });
 });

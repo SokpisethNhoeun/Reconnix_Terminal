@@ -1,20 +1,13 @@
 """Flexible LLM: the /provider menu, the provider form and the status bar (Pilot)."""
 
-import pytest
 from textual.widgets import Input
 
 from reconix import store
-from reconix.llm import client
 from reconix.screens import ChoiceScreen
 from reconix.screens.forms import ProviderForm
 from reconix.widgets.chrome import SessionBar
 
 from .support import SIZE, settle
-
-
-@pytest.fixture
-def reachable(monkeypatch):
-    monkeypatch.setattr(client, "ping", lambda pid, model, **kw: (True, "reachable"))
 
 
 def _bar_text(app) -> str:

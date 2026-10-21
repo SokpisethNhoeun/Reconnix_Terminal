@@ -4,8 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { ASSESSMENT_KEYS, filterRuns, parseRunFilter, RUN_STATUS_ORDER, runFilterActive, runFilterMatches, statusCounts, templateCounts } from "@/components/dashboard/assessments-filters";
 import { runRow } from "@/components/dashboard/derive-report";
-import { runOverviewHref } from "@/components/dashboard/assessments-rows";
-import { VIEW_FILTERS } from "@/components/dashboard/view-url";
+import { runOverviewHref, VIEW_FILTERS } from "@/components/dashboard/view-url";
 import { assessmentView } from "@/lib/data/adapt";
 import { paginate, PER_PAGE, slicePage } from "@/lib/paging";
 import { RUN_STATUS } from "@/lib/status";

@@ -7,7 +7,7 @@ import pytest
 
 from reconix import store
 from reconix.models import Secret
-from reconix.store import lists, report
+from reconix.store import lists
 from reconix.store.report_markdown import md
 
 from .support import ASK_REQUEST, TEST_PASSWORD, run_to
@@ -72,12 +72,6 @@ def test_a_template_is_chosen_once():
 
 
 # --- reports --------------------------------------------------------------------------------------
-@pytest.fixture
-def reports_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(report, "REPORTS_DIR", tmp_path / "reports")
-    return tmp_path / "reports"
-
-
 @pytest.mark.parametrize("bad_id", ["../../escape", "a/b", ".hidden", "", "x" * 80])
 def test_reports_never_leave_the_reports_folder(reports_dir, bad_id):
     run_to(None)

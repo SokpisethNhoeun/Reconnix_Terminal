@@ -14,14 +14,6 @@ from .support import SIZE, settle
 
 
 @pytest.fixture
-def model_active(monkeypatch):
-    monkeypatch.setattr("reconix.llm.client.ping", lambda *a, **k: (True, "reachable"))
-    store.set_provider("openai", api_key="sk-x-1234", models=["gpt-4o-mini"])
-    store.test_provider("openai")
-    store.activate("openai", "gpt-4o-mini")
-
-
-@pytest.fixture
 def fake_agent(monkeypatch):
     """Replace the bridge's run with a fake that streams a plan + a scan + a reply."""
     calls = []

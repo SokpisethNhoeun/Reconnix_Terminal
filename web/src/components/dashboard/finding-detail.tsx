@@ -16,6 +16,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { SeverityBadge, StatusBadge } from "@/components/ui/status-badge";
 import { FINDING_REVIEW } from "@/lib/status";
 import { cn } from "@/lib/utils";
+import { runFindingHref } from "@/components/dashboard/view-url";
 
 const WRAP = "[overflow-wrap:anywhere]"; // saved text may hold long unbroken tokens (URLs, payloads)
 const LINK = "rounded-sm font-mono text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -38,7 +39,6 @@ export interface FindingDetailProps {
 }
 
 /** A link back to the run a finding came from (the list spans several runs). */
-const runHref = (f: FindingRow) => (f.run ? `/?uid=${encodeURIComponent(f.run.uid)}&view=findings&finding=${encodeURIComponent(f.id)}` : "");
 
 export const FindingDetail = forwardRef<HTMLElement, FindingDetailProps>(function FindingDetail({ finding: f, position, prev, next, onSelect }, ref) {
   return (
@@ -73,7 +73,7 @@ export const FindingDetail = forwardRef<HTMLElement, FindingDetailProps>(functio
         {f.run && (
           <p className="text-xs text-muted-foreground">
             From{" "}
-            <Link href={runHref(f)} className={LINK}>
+            <Link href={f.run ? runFindingHref(f.run.uid, f.id) : ""} className={LINK}>
               {f.run.label}
             </Link>
           </p>
