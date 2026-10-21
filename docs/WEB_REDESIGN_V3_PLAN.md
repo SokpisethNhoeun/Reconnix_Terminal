@@ -212,3 +212,42 @@ covered by the e2e suite rather than a separate report. **Known, not fixed:** `/
 agent turn is in flight does not cancel the old worker (`reconix/shell/agent.py`, found by the
 docs review); the scope's methods / paths / ports / time limit are not enforced on the AI agent
 (documented honestly in the Assessment guide).
+
+### 5.1 Follow-up round (2026-10-21)
+
+Three read-only audits (dashboard code against the Rules, docs/TUI/repo hygiene, tests) led to
+five reviewed workstreams, merged into `redesign/v3` in this order:
+
+- **A · agent mode** — every AI-agent tool call is checked against the approved scope
+  (`reconix/store/agent_guard.py`, one rule set in `policy.request_reason` shared with the
+  scripted run): target host, tool set, time limit, methods and excluded paths (web), ports
+  (network), source scopes refuse network tools; refusals go back to the model, show as POLICY
+  lines, raise the blocked count and are audited. The per-action MEDIUM/HIGH gates still do not
+  apply to the agent. `/assess`, `/new`, switching and quitting cancel a running turn
+  (generation counter; the run left behind reads Stopped). Tool arguments and results are
+  masked before they reach the activity log; logins never follow redirects; plan labels are
+  masked before they are cut.
+- **D · docs and hygiene** — `CLAUDE.md`, `README.md`, `web/README.md` describe v3;
+  `scripts/export_commands.py --check`; `/reports/` anchored in `.gitignore`; ruff at 0.
+- **B · dashboard quality** — one address writer (`writeQuery`, queued until hydration), report
+  masking at the route boundary (`lib/report/mask.ts`), one run row (`run-cells.tsx`), one
+  pager (hidden on a single page), `lib/scroll.ts`, live regions and keyboard fixes, the `DOCS`
+  link map with a test, dead code removed, no Turbopack warning.
+- **C · tests** — 13-run sample data (all five severities, a false positive, a run stopped
+  before scope, zero-finding runs, a running run, a masked login), every skip turned into a
+  check, Playwright split into parallel and serial projects with one sign-in, flake fixes.
+- **G · accessibility** — axe clean on every page the suite visits (a web-only `sev-critical`
+  token at 4.93:1 on its badge, underlined docs links, single-interactive search options,
+  `ui/scroll-region.tsx` for sideways scrollers), motion floors derived from `MOTION`.
+
+**Checks on the merged branch:** `pytest` 798, backend 28, ruff 0, typecheck and lint clean,
+vitest 553, `next build` without warnings, Playwright **196 passed** (0 skipped, 0 flaky).
+**Real data** (27 runs): the Overview hides 0 px at 1920×1080, 1440×900 and 1366×768; no
+view scrolls sideways at any of the six sizes; no error screen or page error; the combined
+report of five runs previews in a sandboxed `srcdoc` frame and downloads one PDF (800 KB).
+
+**Figma:** the badge defect (bound colour variables drop paint opacity on assignment and on
+every instance) is fixed in the builder (`rx.setTint`); every screen was rebuilt and reviewed
+against the running dashboard; the FigJam board gained workflows 8–10 (Overview, Scope,
+Terminal). The prototype is being wired against a click map of the real dashboard
+(50 states, 2,541 interactive elements) with a parity table in the builder.
