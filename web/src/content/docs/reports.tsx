@@ -208,7 +208,7 @@ export const reports: GroupContent = {
             caption="The dashboard's export formats for one run"
             head={["Format", "What it is"]}
             rows={[
-              { key: "PDF", value: "The styled report printed to PDF on this computer by a headless Chrome; page 1 is the one-page executive summary. Without Chrome the route answers 501 with a JSON hint and a link to the HTML export." },
+              { key: "PDF", value: "The styled report printed to PDF on this computer by a headless Chrome; page 1 is the one-page executive summary. Without one the route answers 501 with a link to the HTML export and the hint \"PDF export needs a Chrome/Chromium browser on the dashboard machine (set RECONIX_CHROME). Download the HTML report instead and print it to PDF.\"" },
               { key: "HTML", value: "The same report as one self-contained page." },
               { key: "JSON", value: "The complete saved assessment, exactly as the terminal wrote it (evidence already masked)." },
               { key: "CSV", value: "One row per finding: id, severity, CVSS, status, category, location, CWE/OWASP, remediation." },

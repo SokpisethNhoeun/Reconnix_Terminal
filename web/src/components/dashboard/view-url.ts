@@ -31,15 +31,48 @@ export const parseView = (value: string | null | undefined): View =>
     listens for it, and the view would not follow; so the one writer below waits for the mark. */
 const routerReady = (): boolean => document.documentElement.hasAttribute("data-hydrated");
 
-/** Put `params` in the address: in place (`replace`, the default) or as a new history entry
-    carrying `state` (`push`). The only place the dashboard writes its address. */
-export function writeQuery(params: URLSearchParams, mode: "push" | "replace" = "replace", state: unknown = null): void {
-  if (!routerReady()) return;
-  const query = params.toString();
-  window.history[mode === "push" ? "pushState" : "replaceState"](state, "", query ? `?${query}` : window.location.pathname);
+let pending: (() => void) | null = null; // the last write asked for before hydration (last wins)
+let watching = false;
+
+/** Apply the pending write once html[data-hydrated] appears. */
+function flushWhenReady(): void {
+  if (watching) return;
+  watching = true;
+  const observer = new MutationObserver(() => {
+    if (!routerReady()) return;
+    observer.disconnect();
+    watching = false;
+    const write = pending;
+    pending = null;
+    write?.();
+  });
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-hydrated"] });
 }
 
-const write = (params: URLSearchParams): void => writeQuery(params);
+/**
+ * Put `params` in the address: in place (`replace`, the default) or as a new history entry
+ * carrying `state` (`push`), then call `done`. The only place the dashboard writes its address.
+ * Before hydration the write is queued (the last one asked for wins) and applied once the page
+ * is interactive; the return says whether it was written now.
+ */
+export function writeQuery(params: URLSearchParams, mode: "push" | "replace" = "replace", state: unknown = null, done?: () => void): boolean {
+  const query = params.toString();
+  const write = () => {
+    window.history[mode === "push" ? "pushState" : "replaceState"](state, "", query ? `?${query}` : window.location.pathname);
+    done?.();
+  };
+  if (routerReady()) {
+    write();
+    return true;
+  }
+  pending = write;
+  flushWhenReady();
+  return false;
+}
+
+const write = (params: URLSearchParams): void => {
+  writeQuery(params);
+};
 
 /** The address after opening `view` from the one `search` holds (pure; showView's rule). The
     chosen assessment stays. Changing view drops the view left behind's own filters (and the
@@ -123,9 +156,11 @@ export function openAssistant(): void {
   if (viewNow() === "assistant") return;
   const params = new URLSearchParams(window.location.search);
   params.set("view", "assistant");
-  window.history.pushState(null, "", `?${params.toString()}`);
-  assistantPushed = true;
-  ownEntryLength = window.history.length;
+  // the bookkeeping follows the push itself (which may wait for hydration)
+  writeQuery(params, "push", null, () => {
+    assistantPushed = true;
+    ownEntryLength = window.history.length;
+  });
 }
 
 /** Leave the assistant for `target`, or (no target) for wherever it was opened from. */

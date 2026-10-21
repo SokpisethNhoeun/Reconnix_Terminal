@@ -1,5 +1,5 @@
 /* One report that combines 1–5 saved runs (viewer role), built in memory from the saved,
-   already-redacted files and streamed back: `?uids=a,b&format=html|pdf&evidence=1&low=1&appendix=1`.
+   already-redacted files, masked once more at this boundary (lib/report/mask.ts), and streamed back: `?uids=a,b&format=html|pdf&evidence=1&low=1&appendix=1`.
    The HTML is served inline (the Report view's preview fetches it), the PDF as a download printed
    by the same headless Chrome the single export uses (501 with the HTML link without one).
    Nothing is written, started or shelled out with anything the request said: the query is
@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { COOKIE, hasRole, launchToken, readRole } from "@/lib/auth/session";
 import { loadLibrary } from "@/lib/data/store";
 import { renderCombinedHtml } from "@/lib/report/combined/html";
+import { maskAssessment } from "@/lib/report/mask";
 import { combinedFileName, combinedHref } from "@/lib/report/combined/options";
 import { NO_PRINTER } from "@/lib/report/formats";
 import { parseCombinedQuery } from "@/lib/report/combined/query";
@@ -35,7 +36,8 @@ export async function GET(request: Request) {
   if (absent !== undefined) return refuse(`No such assessment: ${absent}.`, 404);
 
   const now = new Date();
-  const html = renderCombinedHtml(combineAssessments(assessments.filter((a) => typeof a !== "string"), options), now);
+  const picked = assessments.filter((a) => typeof a !== "string").map(maskAssessment);
+  const html = renderCombinedHtml(combineAssessments(picked, options), now);
   const name = combinedFileName(uids.length, format, now);
 
   if (format === "pdf") {

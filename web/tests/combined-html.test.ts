@@ -10,6 +10,7 @@ import { renderCombinedHtml } from "@/lib/report/combined/html";
 import { DEFAULT_COMBINE_OPTIONS } from "@/lib/report/combined/options";
 import { combineAssessments } from "@/lib/report/combined/select";
 import { esc, escPre, renderReportHtml } from "@/lib/report/html";
+import { maskAssessment } from "@/lib/report/mask";
 
 import { sampleAssessments } from "./fixtures";
 import vectors from "./redact-vectors.json";
@@ -94,76 +95,75 @@ describe("the combined HTML report", () => {
   });
 });
 
-// --- masking parity: the TUI's secret vectors through every free-text field of both reports ----
-// A saved file is already masked, but the dashboard masks every saved text again (derive*.ts);
-// the two report builders must too, field by field, so a secret in any one of them never prints.
-
-type Field = { name: string; put: (a: Assessment, raw: string) => Assessment };
+// --- masking at the boundary: every string leaf of a saved run carries its own secret -------------
+// The routes mask an assessment once more (lib/report/mask.ts) before a report is built from it.
+// The probe marks every string leaf of a fixture with a distinct secret the TUI's patterns catch
+// (`token=LEAF<n>SECRET`), except the leaves a report uses as keys (uids, enums, timestamps,
+// request ids), renders both reports from the masked copy and looks for any marker that survived,
+// case-insensitively (some fields go through title()).
 
 const withFinding = (a: Assessment, patch: Partial<Assessment["findings"][number]>): Assessment => ({
   ...a,
   findings: [{ ...a.findings[0], ...patch }, ...a.findings.slice(1)],
 });
 
-const FIELDS: Field[] = [
-  { name: "target_url", put: (a, raw) => ({ ...a, target_url: raw }) },
-  { name: "stopped_reason", put: (a, raw) => ({ ...a, status: "Stopped", stopped_reason: raw }) },
-  { name: "scope.excluded_paths", put: (a, raw) => ({ ...a, scope: { ...a.scope!, excluded_paths: [raw] } }) },
-  { name: "finding.title", put: (a, raw) => withFinding(a, { title: raw }) },
-  { name: "finding.description", put: (a, raw) => withFinding(a, { description: raw }) },
-  { name: "finding.impact", put: (a, raw) => withFinding(a, { impact: raw }) },
-  { name: "finding.remediation", put: (a, raw) => withFinding(a, { remediation: raw }) },
-  { name: "finding.triage_note", put: (a, raw) => withFinding(a, { triage_note: raw }) },
-  { name: "finding.evidence", put: (a, raw) => withFinding(a, { evidence: [raw] }) },
-  { name: "finding.affected_url", put: (a, raw) => withFinding(a, { affected_url: raw }) },
-  { name: "finding.path", put: (a, raw) => withFinding(a, { path: raw }) },
-];
+const KEYS = new Set(["uid", "status", "severity", "type", "decision", "request_id", "created_at", "saved_at", "started_at", "finished_at", "at"]);
+const MARK = /leaf\d+secret/i;
 
-const SINGLE_ONLY: Field[] = [
-  { name: "verdict.reason", put: (a, raw) => ({ ...a, verdicts: [{ method: "GET", path: "/x", allowed: false, reason: raw, at: null }] }) },
-  { name: "verdict.path", put: (a, raw) => ({ ...a, verdicts: [{ method: "GET", path: raw, allowed: false, reason: "out of scope", at: null }] }) },
-  {
-    name: "approval.target",
-    put: (a, raw) => ({
-      ...a,
-      approvals: [{ ...a.approvals[0], request_id: "r-1", target: raw }],
-      decisions: [{ ...a.decisions[0], request_id: "r-1" }],
-    }),
-  },
-];
+function markLeaves(value: unknown, count: { n: number }, key = ""): unknown {
+  if (typeof value === "string") {
+    if (KEYS.has(key)) return value;
+    count.n += 1;
+    return `token=LEAF${count.n}SECRET`;
+  }
+  if (Array.isArray(value)) return value.map((v) => markLeaves(v, count, key));
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, markLeaves(v, count, k)]));
+  return value;
+}
 
-describe("masking parity with the dashboard", () => {
+describe("masking at the report boundary", () => {
   const base = all.find((a) => a.findings.length > 0 && a.scope && a.approvals.length && a.decisions.length)!;
-  const secret = (vectors as [string, string][]).filter(([raw, masked]) => raw !== masked);
+  const count = { n: 0 };
+  // Stopped, so the combined report prints the run's stopped_reason under Limitations
+  const probe = { ...(markLeaves(base, count) as Assessment), status: "Stopped" as const };
+  const other = markLeaves(picked[1], count) as Assessment;
 
-  const expectMasked = (out: string, raw: string, masked: string, where: string) => {
-    expect(out, `${where}: the raw text printed`).not.toContain(esc(raw));
-    expect(out, `${where}: the raw text printed in a <pre>`).not.toContain(escPre(raw));
-    expect(out.includes(esc(masked)) || out.includes(escPre(masked)), `${where}: the masked text is missing`).toBe(true);
-  };
+  it("marks every free-text leaf, and the unmasked reports would print them", () => {
+    expect(count.n).toBeGreaterThan(50);
+    expect(renderReportHtml(probe)).toMatch(MARK);
+    expect(renderCombinedHtml(combineAssessments([probe, other], DEFAULT_COMBINE_OPTIONS))).toMatch(MARK);
+  });
 
-  it("masks every secret vector in every free-text field of the combined report", () => {
-    for (const [raw, masked] of secret) {
-      for (const field of FIELDS) {
-        const out = renderCombinedHtml(combineAssessments([field.put(base, raw), picked[1]], DEFAULT_COMBINE_OPTIONS));
-        expectMasked(out, raw, masked, `combined ${field.name} ← ${raw.slice(0, 30)}`);
-      }
+  it("lets no marker through the single report", () => {
+    expect(renderReportHtml(maskAssessment(probe))).not.toMatch(MARK);
+  });
+
+  it("lets no marker through the combined report", () => {
+    const out = renderCombinedHtml(combineAssessments([maskAssessment(probe), maskAssessment(other)], DEFAULT_COMBINE_OPTIONS));
+    expect(out).not.toMatch(MARK);
+  });
+
+  it("masks every vector of redact-vectors.json wherever it lands", () => {
+    for (const [raw, masked] of vectors as [string, string][]) {
+      if (raw === masked) continue;
+      const a = maskAssessment(withFinding(base, { description: raw, evidence: [raw], affected_url: raw, triage_note: raw }));
+      const out = renderReportHtml(a);
+      expect(out, raw).not.toContain(esc(raw));
+      expect(out, raw).not.toContain(escPre(raw));
+      expect(out.includes(esc(masked)) || out.includes(escPre(masked)), `${raw.slice(0, 30)}: the masked text is missing`).toBe(true);
     }
   });
 
-  it("masks every secret vector in every free-text field of the single report", () => {
-    for (const [raw, masked] of secret) {
-      // (the single report has no Limitations section, so it never prints stopped_reason)
-      for (const field of [...FIELDS.filter((f) => f.name !== "stopped_reason"), ...SINGLE_ONLY]) {
-        const out = renderReportHtml(field.put(base, raw));
-        expectMasked(out, raw, masked, `single ${field.name} ← ${raw.slice(0, 30)}`);
-      }
-    }
+  it("catches a private key spread over several evidence lines", () => {
+    const spread = ["-----BEGIN RSA PRIVATE KEY-----", "MIIBOgIBAAJBAKleafkeysecret", "-----END RSA PRIVATE KEY-----"];
+    const a = maskAssessment(withFinding(base, { evidence: spread }));
+    expect(a.findings[0].evidence.join("\n")).not.toContain("leafkeysecret");
+    expect(renderReportHtml(a).toLowerCase()).not.toContain("leafkeysecret");
   });
 
   it("leaves a plain question alone", () => {
     const [plain] = (vectors as [string, string][]).filter(([raw, masked]) => raw === masked);
-    const out = renderReportHtml(withFinding(base, { description: plain[0] }));
+    const out = renderReportHtml(maskAssessment(withFinding(base, { description: plain[0] })));
     expect(out).toContain(esc(plain[0]));
   });
 });

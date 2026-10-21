@@ -2,13 +2,11 @@
    A port of reconix/store/report_html.py, so the dashboard's PDF matches the TUI's: page 1 is
    the one-page executive summary, then detailed findings and the audit trail.
 
-   Every value is HTML-escaped (tool output and operator text read as text, never markup),
-   the document carries no scripts (the dashboard's CSP would block them anyway), and the free
-   text it shows (targets, paths, descriptions, notes, evidence) is masked again
-   (lib/assistant/redact.ts) on top of what the TUI masked before it saved, as the dashboard's
-   derive modules do. The helpers and the stylesheet are exported for the combined report
+   Every value is HTML-escaped (tool output and operator text read as text, never markup) and
+   the document carries no scripts (the dashboard's CSP would block them anyway). The route
+   masks the assessment once more before it gets here (lib/report/mask.ts); this renderer prints
+   text as given. The helpers and the stylesheet are exported for the combined report
    (combined/html.ts), which must look the same. */
-import { redact } from "@/lib/assistant/redact";
 import { type Assessment, type Finding, SEVERITIES as SEV_ORDER } from "@/lib/data/schema";
 
 const SEV_CLASS: Record<string, string> = { CRITICAL: "crit", HIGH: "high", MEDIUM: "med", LOW: "low", INFO: "info" };
@@ -38,9 +36,6 @@ export function esc(value: unknown): string {
 export function escPre(value: unknown): string {
   return String(value ?? "").replace(/[&<>"']/g, (c) => escapeMap[c]);
 }
-
-/** Saved free text as the report shows it: masked again. */
-const masked = (value: string | null | undefined) => redact(value ?? "");
 
 export const shortDate = (iso: string | null | undefined) => (iso ? iso.split("T")[0] : "—");
 export const title = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
@@ -203,7 +198,7 @@ function masthead(a: Assessment, generated: string): string {
   return (
     `<header class="mast"><div class="eye">RECONIX</div><h1>Security Assessment Report</h1>` +
     `<div class="sub">AI-Assisted Authorized Penetration Test — ${esc(template)}</div>` +
-    `<div class="tgt mono">${esc(masked(a.target_url || a.target || "—"))}</div><dl>${items}</dl>` +
+    `<div class="tgt mono">${esc(a.target_url || a.target || "—")}</div><dl>${items}</dl>` +
     `<div class="conf">&#128274; CONFIDENTIAL — AUTHORIZED RECIPIENTS ONLY</div></header>`
   );
 }
@@ -234,9 +229,9 @@ function narrative(a: Assessment, findings: Finding[], blocked: number, approval
   const c = counts(findings);
   const highest = SEV_ORDER.find((s) => c[s]) ?? "INFO";
   const breakdown = SEV_ORDER.filter((s) => c[s]).map((s) => `${c[s]} ${title(s)}`).join(", ") || "no findings";
-  const lead = findings.length ? `, led by <b>${esc(masked(findings[0].title))}</b>` : "";
+  const lead = findings.length ? `, led by <b>${esc(findings[0].title)}</b>` : "";
   return (
-    `<p class="summary">Reconix performed an authorized assessment of <b>${esc(masked(a.target_url || a.target || "the target"))}</b>` +
+    `<p class="summary">Reconix performed an authorized assessment of <b>${esc(a.target_url || a.target || "the target")}</b>` +
     ` (${esc(a.template.name || "assessment")}). It recorded <b>${findings.length} finding(s)</b> — ${esc(breakdown)}.` +
     ` The highest severity is <b>${esc(title(highest))}</b>${lead}. ${blocked} out-of-scope request(s) were blocked by` +
     ` policy and ${approvals} gated action(s) were approved by a human. Intrusive actions ran only after explicit,` +
@@ -249,7 +244,7 @@ function findingsTable(findings: Finding[]): string {
     findings
       .map(
         (f) =>
-          `<tr><td class="id">${esc(f.id)}</td><td>${esc(masked(f.title))}</td><td>${pill(f.severity)}</td>` +
+          `<tr><td class="id">${esc(f.id)}</td><td>${esc(f.title)}</td><td>${pill(f.severity)}</td>` +
           `<td class="mono">${cvss(f)}</td><td>${status(f)}</td><td>${esc(f.category || "—")}</td></tr>`,
       )
       .join("") || `<tr><td colspan="6">No findings were recorded.</td></tr>`;
@@ -270,7 +265,7 @@ function scopeBlock(a: Assessment): string {
     `<dl class="kv"><dt>Approval status</dt><dd>${approved}</dd><dt>Standards</dt><dd>${standards}</dd>` +
     `<dt>Allowed actions</dt><dd><div class="chips">${chips(s?.allowed_actions ?? [])}</div></dd>` +
     `<dt>Allowed methods</dt><dd><div class="chips">${chips(s?.allowed_methods ?? [])}</div></dd>` +
-    `<dt>Excluded paths</dt><dd><div class="chips">${chips((s?.excluded_paths ?? []).map(masked), " block") || '<span class="note">none</span>'}</div></dd>` +
+    `<dt>Excluded paths</dt><dd><div class="chips">${chips(s?.excluded_paths ?? [], " block") || '<span class="note">none</span>'}</div></dd>` +
     `<dt>Time limit</dt><dd>${esc(s?.time_limit_minutes ?? 0)} minutes</dd>` +
     `<dt>Tools</dt><dd><div class="chips">${chips(s?.tools ?? [], " plain")}</div></dd></dl>`
   );
@@ -281,33 +276,33 @@ function findingCard(f: Finding): string {
   const mapping = esc([...f.owasp, ...f.cwe, ...f.cve].join(", ") || "—");
   const badge = f.cvss_score ? `<span class="find-cvss">CVSS ${f.cvss_score.toFixed(1)}</span>` : "";
   const vector = f.cvss_vector ? `<div><dt>CVSS vector</dt><dd>${esc(f.cvss_vector)}</dd></div>` : "";
-  const evidence = f.evidence.map((line) => escPre(masked(line))).join("\n") || "—";
-  const note = f.triage_note ? `<div class="fb"><span class="eyebrow">Analyst note</span><p>${esc(masked(f.triage_note))}</p></div>` : "";
+  const evidence = f.evidence.map(escPre).join("\n") || "—";
+  const note = f.triage_note ? `<div class="fb"><span class="eyebrow">Analyst note</span><p>${esc(f.triage_note)}</p></div>` : "";
   return (
-    `<div class="find s-${cls}"><div class="find-head"><span class="find-id">${esc(f.id)}</span><h3>${esc(masked(f.title))}</h3>` +
+    `<div class="find s-${cls}"><div class="find-head"><span class="find-id">${esc(f.id)}</span><h3>${esc(f.title)}</h3>` +
     `${pill(f.severity)}${validation(f.validation)}${status(f)}${badge}</div><div class="find-body"><dl class="find-meta">` +
-    `<div><dt>Affected asset</dt><dd>${esc(masked(f.affected_url) || "—")}</dd></div><div><dt>Location</dt><dd>${esc(masked(f.path) || "—")}</dd></div>` +
+    `<div><dt>Affected asset</dt><dd>${esc(f.affected_url || "—")}</dd></div><div><dt>Location</dt><dd>${esc(f.path || "—")}</dd></div>` +
     `<div><dt>Category</dt><dd>${esc(f.category || "—")}</dd></div><div><dt>Detected by</dt><dd>${esc(f.tool || "—")}</dd></div>` +
     `<div><dt>Mapping</dt><dd>${mapping}</dd></div>${vector}</dl>` +
-    `<div class="fb"><span class="eyebrow">Description</span><p>${esc(masked(f.description))}</p></div>` +
+    `<div class="fb"><span class="eyebrow">Description</span><p>${esc(f.description)}</p></div>` +
     `<div class="fb"><span class="eyebrow">Evidence &amp; validation (masked)</span><pre class="evidence">${evidence}</pre></div>` +
-    `<div class="fb"><span class="eyebrow">Impact</span><p>${esc(masked(f.impact))}</p></div>` +
-    `<div class="remediate"><span class="eyebrow">Remediation</span><p>${esc(masked(f.remediation))}</p></div>${note}</div></div>`
+    `<div class="fb"><span class="eyebrow">Impact</span><p>${esc(f.impact)}</p></div>` +
+    `<div class="remediate"><span class="eyebrow">Remediation</span><p>${esc(f.remediation)}</p></div>${note}</div></div>`
   );
 }
 
 function governance(a: Assessment): string {
   const blocked = a.verdicts.filter((v) => !v.allowed);
   const blockedRows =
-    blocked.map((v) => `<tr><td class="mono">${esc(masked(`${v.method} ${v.path}`))}</td><td>${esc(masked(v.reason))}</td></tr>`).join("") ||
+    blocked.map((v) => `<tr><td class="mono">${esc(`${v.method} ${v.path}`)}</td><td>${esc(v.reason)}</td></tr>`).join("") ||
     `<tr><td colspan="2">No requests were blocked.</td></tr>`;
   const decisionRows =
     a.decisions
       .map((d) => {
         const req = a.approvals.find((p) => p.request_id === d.request_id);
         return (
-          `<tr><td>${pill(req?.risk ?? "INFO")}</td><td>${esc(masked(req?.action ?? d.request_id))}</td>` +
-          `<td class="mono">${esc(masked(req?.target))}</td><td>${validation(d.decision)}</td><td>${esc(d.operator || "—")}</td></tr>`
+          `<tr><td>${pill(req?.risk ?? "INFO")}</td><td>${esc(req?.action ?? d.request_id)}</td>` +
+          `<td class="mono">${esc(req?.target ?? "")}</td><td>${validation(d.decision)}</td><td>${esc(d.operator || "—")}</td></tr>`
         );
       })
       .join("") || `<tr><td colspan="5">No gated actions were required.</td></tr>`;

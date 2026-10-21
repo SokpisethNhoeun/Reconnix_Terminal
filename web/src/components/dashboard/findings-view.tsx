@@ -43,12 +43,13 @@ interface FindingState {
 
 const pushedHere = (): boolean => (window.history.state as FindingState | null)?.rxFinding === true;
 
-/** Names `key` in the address: as a new history entry (`push`), or in place keeping the mark. */
-function writeFinding(key: string, mode: "push" | "replace"): void {
+/** Names `key` in the address: as a new history entry (`push`), or in place keeping the mark;
+    `done` runs once it is written (view-url.ts: now, or after hydration). */
+function writeFinding(key: string, mode: "push" | "replace", done?: () => void): boolean {
   const params = new URLSearchParams(window.location.search);
   params.set("finding", key);
   const state: FindingState = { rxFinding: mode === "push" || pushedHere() };
-  writeQuery(params, mode, state);
+  return writeQuery(params, mode, state, done);
 }
 
 // Hydrated or not, without an effect: the server snapshot says no, the browser's says yes. Only
@@ -83,8 +84,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
   // A row: on a phone or tablet the detail pane replaces the list, as a history entry.
   const open = (key: string) => {
     if (!narrow()) return update({ finding: key });
-    setLastOpened(key);
-    writeFinding(key, "push");
+    writeFinding(key, "push", () => setLastOpened(key)); // the row to return to, once the pane is open
   };
   const select = (key: string) => {
     if (narrow() && page.explicit) return writeFinding(key, "replace"); // the pane stays, and so does its mark
