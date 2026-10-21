@@ -1,20 +1,14 @@
 "use client";
 
 /* Re-reads the saved assessments every `everyMs` (10 s by default; the server reads
-   RECONIX_LIVE_REFRESH_MS, 0 turns it off, as the e2e server does) while the tab is visible, so
+   RECONIX_LIVE_REFRESH_MS through lib/live-refresh.ts, 0 turns it off, as the e2e server does) while the tab is visible, so
    a run going on in the TUI (or in the Terminal view) shows up without a reload. Click to pause.
    The refresh re-renders the server views and keeps client state, so an open terminal session
    and the chosen view survive it. */
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-export const DEFAULT_REFRESH_MS = 10_000;
-
-/** The interval the server configured: RECONIX_LIVE_REFRESH_MS, else the default; 0 = off. */
-export function liveRefreshMs(env: string | undefined = process.env.RECONIX_LIVE_REFRESH_MS): number {
-  const n = Number(env);
-  return env !== undefined && env !== "" && Number.isFinite(n) && n >= 0 ? Math.floor(n) : DEFAULT_REFRESH_MS;
-}
+import { DEFAULT_REFRESH_MS } from "@/lib/live-refresh";
 
 export function LiveRefresh({ renderedAt, dir, everyMs = DEFAULT_REFRESH_MS }: { renderedAt: string; dir: string; everyMs?: number }) {
   const router = useRouter();
