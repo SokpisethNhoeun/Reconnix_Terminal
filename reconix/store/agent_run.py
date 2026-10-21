@@ -12,9 +12,10 @@ a worker and renders the streamed events into the chat/activity log.
 import json
 from typing import Any, Awaitable, Callable, Dict, Optional
 
-from ..models import PlanTask
+from ..models import PlanTask, PolicyVerdict
 from ..models.base import utc_now
-from . import lists, providers
+from . import agent_guard, lists, providers
+from .activity import log_event
 from .assessment import get_assessment
 from .errors import StoreValidationError
 from .snapshot import uid_for
@@ -55,18 +56,35 @@ def _llm_settings():
                        model=params["model"], timeout=float(params["timeout"]))
 
 
-def _agent():
-    """The cached harness `Agent` for the current assessment (created on first use)."""
+def _agent(uid: Optional[str] = None):
+    """The cached harness `Agent` for an assessment (created on first use), with the scope
+    guard installed: every tool call is checked against the approved scope (`agent_guard`)."""
     from harness.agent import Agent
     from harness.config import load_settings
 
-    uid = uid_for(get_assessment())
+    uid = uid or uid_for(get_assessment())
     agent = _agents.get(uid)
     if agent is None:
         settings = load_settings()      # Kali MCP + DB from env; the LLM is set per turn
         agent = Agent(settings)
+        agent.guard = agent_guard.make_guard(
+            uid, lambda ref: _lookup_target(agent, ref), lambda a, kind: _tools_for(agent, a, kind))
         _agents[uid] = agent
     return agent
+
+
+def _lookup_target(agent, ref: str) -> Optional[tuple]:
+    """(value, type) of the harness target a tool call names, or None."""
+    target = agent._resolve_target(ref)
+    return (target.value, target.type.value) if target is not None else None
+
+
+def _tools_for(agent, args: Dict[str, Any], kind: str) -> list:
+    """The tools `run_scan` would actually run (the harness's own fallbacks, mirrored)."""
+    tools = args.get("tools") or agent.settings.profile(str(args.get("profile", "") or ""))
+    if not tools:
+        tools = ["whatweb", "nuclei", "nikto"] if kind in ("web", "api") else ["nmap"]
+    return [str(t) for t in tools] if isinstance(tools, (list, tuple)) else [str(tools)]
 
 
 def switch_model() -> bool:
@@ -87,14 +105,55 @@ async def run(text: str, on_event: OnEvent, on_ask: Optional[OnAsk] = None) -> N
     settings = _llm_settings()
     if settings is None:
         raise StoreValidationError("No LLM model is active. Use /model to pick one.")
-    agent = _agent()
+    uid = uid_for(get_assessment())    # bound now: a later switch can't redirect this turn
+    agent = _agent(uid)
     agent.set_llm(settings)            # always the current /provider selection
+    _authorize_approved_target(agent, uid)
     await agent.chat(text, on_event, on_ask)
+
+
+def _authorize_approved_target(agent, uid: str) -> None:
+    """Register the scope's own target as authorized, so the model never has to (or can)
+    decide authorization. Only the approved scope's target; CIDR bases are left to the model's
+    per-host `add_target`, which the guard checks."""
+    snap = agent_guard.snapshot(uid)
+    if snap is None or snap.scope.status != "APPROVED":
+        return
+    scope = snap.scope
+    if scope.kind not in ("web_url", "api", "network"):
+        return
+    if scope.kind == "network" and "/" in scope.target_url:
+        return
+    from urllib.parse import urlsplit
+
+    from harness.models import Target, TargetType
+
+    value = scope.target_url.strip()
+    if scope.kind == "network" and "://" in value:
+        value = urlsplit(value).netloc
+    for target in agent.db.list_targets():
+        if target.value == value:
+            agent._authorize(str(target.id))
+            return
+    kind = {"web_url": TargetType.WEB, "api": TargetType.API}.get(scope.kind, TargetType.NETWORK)
+    target = Target(name=value, type=kind, value=value, authorized=True)
+    target.id = agent.db.add_target(target)
 
 
 def reset() -> None:
     """Drop cached agents (new session / assessment, and between tests)."""
     _agents.clear()
+    agent_guard.clear()
+
+
+def revoke_current() -> None:
+    """`revoke` for the assessment that is current now."""
+    revoke(uid_for(get_assessment()))
+
+
+def revoke(uid: str) -> None:
+    """Withdraw an assessment's scope so a still-running or late tool call is refused."""
+    agent_guard.install(uid, None, None)
 
 
 # --- driving the shared run model so the static Execution screen renders the agent --------
@@ -141,6 +200,8 @@ def begin_execution() -> None:
     run.phase = "testing"
     if run.started_at is None:
         run.started_at = utc_now()
+    # The guard decides on this copy (it runs off the app thread); see store/agent_guard.py.
+    agent_guard.install(uid_for(get_assessment()), lists.current().scope, run.started_at)
 
 
 def set_plan(steps) -> None:
@@ -198,6 +259,8 @@ def record_event(ev: Dict[str, Any]) -> None:
         set_plan(steps)             # drives the Execution task rows + spinner
         labels = "; ".join(str(s.get("text", "")) for s in steps)
         add_activity("AI", f"plan: {labels}"[:300])
+    elif kind == "policy":
+        _record_policy(ev)
     elif kind == "tool_start":
         add_activity("TOOL", f"{ev.get('name')}({_short(ev.get('args'))})")
     elif kind == "tool_progress":
@@ -206,6 +269,22 @@ def record_event(ev: Dict[str, Any]) -> None:
         add_activity("TOOL", f"{ev.get('name')}: {_short(ev.get('result'))}")
         if ev.get("name") in ("run_scan", "http_poc"):   # scanners and ad-hoc PoC proofs
             ingest_scan_findings(ev.get("result"))
+
+
+def _record_policy(ev: Dict[str, Any]) -> None:
+    """A tool call the scope guard refused: audit it like a blocked request (app thread)."""
+    from .redact import redact
+
+    tool = str(ev.get("tool") or "tool")
+    args = ev.get("args") or {}
+    method = (str(args.get("method", "GET")).upper() if tool == "http_poc"
+              else "POST" if tool == "login" else tool.upper())
+    target = redact(str(args.get("url") or args.get("login_url") or args.get("target")
+                        or args.get("value") or tool))[:200]
+    reason = str(ev.get("reason") or "Outside approved scope")
+    lists.current().verdicts.append(PolicyVerdict(method, target, False, reason))
+    add_activity("POLICY", f"Blocked: {reason} · {tool} {target}"[:300], tone="block")
+    log_event("policy.blocked", f"{method} {target} · {reason}")
 
 
 _SEV = {"critical": "CRITICAL", "high": "HIGH", "medium": "MEDIUM",
