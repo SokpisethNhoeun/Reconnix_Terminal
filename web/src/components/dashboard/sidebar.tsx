@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { View } from "@/components/dashboard/view-url";
+import { DOCS } from "@/lib/docs-nav";
 
 type NavItem = { icon: LucideIcon; label: string; view: View };
 type DocItem = { icon: LucideIcon; label: string; href: string };
@@ -30,9 +31,9 @@ const VIEWS: NavItem[] = [
 // The Terminal item always opens its view; when this browser can't use the terminal, the
 // view says why (no dead ends), and the tooltip says so up front.
 const TERMINAL_HINT = { operator: "Terminal", viewer: "Terminal · operator role needed", off: "Terminal · off" } as const;
-const DOCS: DocItem[] = [
-  { icon: BookOpen, label: "Documentation", href: "/docs" },
-  { icon: Settings, label: "Configuration", href: "/docs/ai-models/configuration" },
+const DOC_ITEMS: DocItem[] = [
+  { icon: BookOpen, label: "Documentation", href: DOCS.home },
+  { icon: Settings, label: "Configuration", href: DOCS.configuration },
 ];
 
 // Logo: a 3×3 grid of rounded teal squares, 4 of the 9 dimmed (like the reference mark).
@@ -97,7 +98,7 @@ export function Sidebar({
         })}
       </nav>
       <div className="flex flex-col items-center gap-2 pb-3">
-        {DOCS.map((item) => {
+        {DOC_ITEMS.map((item) => {
           const Icon = item.icon;
           return (
             <Link

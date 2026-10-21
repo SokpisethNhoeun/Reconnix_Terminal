@@ -1,5 +1,5 @@
-/* The assessments view. Owner: the assessments workstream (docs/WEB_REDESIGN_V3_PLAN.md). Colours only from the
-   tokens (tokens.css); meanings from lib/status.ts.
+/* The Assessments view (assessments-view.tsx, assessments-rows.tsx). Colours only from the
+   tokens (tokens.css); meanings from lib/status.ts; a row is the shared .ui-row (ui.css).
 
    Layout: a card a run on phones (one column), two to a row from 640 px, and from 1024 px one
    table-like row a run under a header row (the cells' own labels are then read by screen
@@ -9,21 +9,7 @@
 .asm-controls { display: flex; flex-direction: column; gap: 10px; }
 .asm-controls-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
 
-/* ---- No match ---- */
-.asm-empty {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 14px;
-  padding: 16px;
-  border: 1px dashed var(--border);
-  border-radius: 10px;
-  font-size: 13px;
-  color: var(--muted-foreground);
-}
-.asm-clear { display: inline-flex; align-items: center; gap: 4px; border-radius: 4px; font-size: 12px; color: var(--primary); }
-.asm-clear:hover { text-decoration: underline; }
-.asm-clear:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+/* (no match: the shared .ui-empty, ui.css) */
 
 /* ---- The rows ---- */
 .asm-table { display: flex; flex-direction: column; min-width: 0; }

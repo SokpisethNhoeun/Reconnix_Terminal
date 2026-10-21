@@ -53,7 +53,7 @@ export function PhaseRows({ data }: { data: Phases }) {
       {data.ticks.length > 0 && (
         <div className="dash-chart-scroll">
           <div ref={group} role="group" aria-label={data.summary} aria-describedby={hint} className="dash-track" onKeyDown={nav.onKeyDown}>
-            <span className="dash-lane-label" style={{ "--c": "var(--primary)" } as React.CSSProperties}>
+            <span className="dash-lane-label" style={{ "--c": toneColor("primary") } as React.CSSProperties}>
               <Wrench className="size-3 shrink-0" aria-hidden /> Tools
             </span>
             <div className="dash-lane-track">

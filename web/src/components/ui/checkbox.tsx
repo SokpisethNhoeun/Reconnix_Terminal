@@ -11,12 +11,14 @@ export interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputE
   className?: string;
 }
 
-export function Checkbox({ label, reason, className, disabled, ...props }: CheckboxProps) {
+export function Checkbox({ label, reason, className, disabled, "aria-describedby": describedBy, ...props }: CheckboxProps) {
   const id = useId();
   const hint = reason && disabled ? `${id}-reason` : undefined;
+  // the caller's description and the reason it is disabled are both read, never one over the other
+  const described = [describedBy, hint].filter(Boolean).join(" ") || undefined;
   return (
     <label htmlFor={id} className={cn("ui-check", disabled && "is-disabled", className)} title={disabled ? reason : undefined}>
-      <input id={id} type="checkbox" disabled={disabled} aria-describedby={hint} className="ui-check-input" {...props} />
+      <input id={id} type="checkbox" disabled={disabled} {...props} aria-describedby={described} className="ui-check-input" />
       <span className="ui-check-box" aria-hidden />
       <span className="min-w-0">{label}</span>
       {hint && (

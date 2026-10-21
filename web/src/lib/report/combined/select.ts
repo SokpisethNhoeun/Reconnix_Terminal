@@ -7,7 +7,8 @@
    (the first `cwe`, else the first `CWE-…` reference) and the target. Each run it appears in is
    an **occurrence**, kept whole (its own severity, CVSS, validation and masked evidence) so every
    line traces back to a uid. False positives are left out and counted; LOW and INFO findings are
-   left out when the `low` option is off, and counted too. */
+   left out when the `low` option is off, and counted too. The route masks the assessments once
+   more before they get here (lib/report/mask.ts); this builder copies text as given. */
 import { type Assessment, type Finding, SEVERITIES, type Severity, type Status, STATUSES } from "@/lib/data/schema";
 import { effectiveSeverity, isConfirmed, isFalsePositive } from "@/lib/data/stats";
 

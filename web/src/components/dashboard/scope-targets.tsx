@@ -6,6 +6,7 @@ import { RunLinkTo } from "@/components/dashboard/run-link";
 import type { Boundary, TargetRow } from "@/components/dashboard/scope-types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { RUN_STATUS } from "@/lib/status";
+import { DOCS } from "@/lib/docs-nav";
 
 const MAX_PORTS = 4;
 
@@ -18,7 +19,7 @@ function reach(t: TargetRow): string {
 
 export function ScopeTargets({ data }: { data: Extract<Boundary, { mode: "all" }> }) {
   return (
-    <DashCard id="scope-targets" title="Targets" docsHref="/docs/assessment-guide/scope" meta={data.summary} className="dash-panel">
+    <DashCard id="scope-targets" title="Targets" docsHref={DOCS.scope} meta={data.summary} className="dash-panel">
       <div className="dash-table-scroll">
         <table aria-label="Targets tested" className="dash-table">
           <thead>

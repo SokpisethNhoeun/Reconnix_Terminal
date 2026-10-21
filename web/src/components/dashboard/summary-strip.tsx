@@ -5,6 +5,7 @@
    count-up. */
 import { Bug, Clock, Gauge, Wrench } from "lucide-react";
 
+import { plural } from "@/components/dashboard/derive-shared";
 import type { SummaryStrip as Summary } from "@/components/dashboard/overview-types";
 import { Hint } from "@/components/dashboard/hint";
 import { StatCard, StatMeter, StatValue } from "@/components/dashboard/stat-card";
@@ -57,7 +58,7 @@ export function SummaryStrip({ data }: { data: Summary }) {
             </Hint>
           )}
         </div>
-        <StatMeter frac={progress.pct / 100} color="var(--primary)" label="Assessment progress" />
+        <StatMeter frac={progress.pct / 100} label="Assessment progress" />
         <p className="dash-stat-note">{progress.caption}</p>
       </StatCard>
 
@@ -75,7 +76,7 @@ export function SummaryStrip({ data }: { data: Summary }) {
         </div>
         {tools.tools.length ? (
           <Hint title="Tools used" text={tools.tools.join(", ")} className="dash-stat-note min-w-0 self-stretch truncate">
-            {`${tools.tools.length === 1 ? "1 tool" : `${tools.tools.length} tools`} · ${tools.tools.join(", ")}`}
+            {`${plural(tools.tools.length, "tool")} · ${tools.tools.join(", ")}`}
           </Hint>
         ) : (
           <p className="dash-stat-note">No approved tool named yet</p>
@@ -95,7 +96,7 @@ export function SummaryStrip({ data }: { data: Summary }) {
           )}
         </div>
         {duration.meter && (
-          <StatMeter frac={duration.meter.frac} color={duration.meter.over ? "var(--danger)" : "var(--primary)"} label="Time used of the limit" />
+          <StatMeter frac={duration.meter.frac} over={duration.meter.over} label="Time used of the limit" />
         )}
         <p className="dash-stat-note">{duration.caption}</p>
       </StatCard>

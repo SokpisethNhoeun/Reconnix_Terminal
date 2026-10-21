@@ -12,13 +12,14 @@ import { ReportTargets } from "@/components/dashboard/report-targets";
 import type { ReportCards } from "@/components/dashboard/report-types";
 import { StatStrip } from "@/components/dashboard/stat-strip";
 import { DocsLink, ViewHeader } from "@/components/dashboard/view-header";
+import { DOCS } from "@/lib/docs-nav";
 
 export function ReportsView({ data }: { data: ReportCards }) {
   return (
     <div className="dash-view dash-sheet" data-mode={data.mode}>
       <ViewHeader title="Report" tag={data.tag} about={data.about}>
         {data.mode === "run" && <ReportDownloads uid={data.uid} />}
-        <DocsLink href="/docs/reports/exporting">Report format</DocsLink>
+        <DocsLink href={DOCS.exporting}>Report format</DocsLink>
       </ViewHeader>
       <StatStrip stats={data.stats} label="Report summary" />
       {data.mode === "run" ? (

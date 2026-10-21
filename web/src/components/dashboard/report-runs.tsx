@@ -1,10 +1,10 @@
 "use client";
 
-/* Every saved run as a row of the Report view (newest first): the run (it opens that run's
-   report), target, status, findings with the worst severity, plan steps, and its PDF and HTML
-   reports to download. A search narrows the rows by ID, template, target or status; ten rows
-   show at a time. With a `selection`, each row gets a checkbox to put the run in the combined
-   report (report-selection.tsx owns which are chosen); once the most are chosen, the others are
+/* Every saved run as a row of the Report view (newest first): the shared cells (run-cells.tsx;
+   the run's name opens that run's report) and its PDF and HTML reports to download. A search
+   narrows the rows by ID, template, target or status; ten rows show at a time. With a
+   `selection`, each row gets a checkbox to put the run in the combined report
+   (report-selection.tsx owns which are chosen); once the most are chosen, the others are
    disabled and say why. */
 import { useState } from "react";
 
@@ -12,16 +12,29 @@ import { DashCard } from "@/components/dashboard/dash-card";
 import { SearchField } from "@/components/dashboard/filter-bar";
 import { runMatches } from "@/components/dashboard/filters";
 import type { ReportRunRow } from "@/components/dashboard/report-types";
+import { RUN_COLUMNS, RUN_SEARCH, RunCells, type RunCellProps, runTitle } from "@/components/dashboard/run-cells";
 import { RunLinkTo } from "@/components/dashboard/run-link";
 import { Checkbox } from "@/components/ui/checkbox";
+import { EmptyNote } from "@/components/ui/empty-note";
 import { Pagination } from "@/components/ui/pagination";
-import { SeverityBadge, StatusBadge } from "@/components/ui/status-badge";
+import { DOCS } from "@/lib/docs-nav";
 import { paginate, slicePage } from "@/lib/paging";
 import { downloadHref, exportSpec } from "@/lib/report/formats";
-import { RUN_STATUS } from "@/lib/status";
 
 const SEARCH_FROM = 7; // runs before a search field is worth it
 const QUICK = ["pdf", "html"] as const; // the other formats are on the run's own report
+// status is positioned: its sr-only "waiting on" text then overflows the table's scroller, not the page
+const CELL_CLASS: Partial<Record<RunCellProps["column"], string>> = { target: "max-w-[220px]", status: "relative", plan: "text-right" };
+
+/** A table cell: the run's name is the row header. */
+function Cell({ column, title, children }: RunCellProps) {
+  if (column === "run") return <th scope="row" className="font-normal">{children}</th>;
+  return (
+    <td title={title} className={CELL_CLASS[column]}>
+      {children}
+    </td>
+  );
+}
 
 export interface RunSelection {
   chosen: ReadonlySet<string>; // uids
@@ -41,7 +54,7 @@ export function ReportRuns({ runs, selection }: { runs: ReportRunRow[]; selectio
     <DashCard
       id="report-runs"
       title="Runs"
-      docsHref="/docs/reports/exporting"
+      docsHref={DOCS.exporting}
       meta={shown.length === runs.length ? `${runs.length} saved` : `${shown.length} of ${runs.length}`}
       className="is-wide"
       bodyClassName="flex flex-col gap-3"
@@ -49,8 +62,8 @@ export function ReportRuns({ runs, selection }: { runs: ReportRunRow[]; selectio
       {runs.length >= SEARCH_FROM && (
         <div className="w-full sm:w-[280px]">
           <SearchField
-            label="Search saved assessments"
-            placeholder="ID, template, target, status…"
+            label={RUN_SEARCH.label}
+            placeholder={RUN_SEARCH.placeholder}
             value={query}
             onChange={(v) => {
               setQuery(v);
@@ -68,11 +81,11 @@ export function ReportRuns({ runs, selection }: { runs: ReportRunRow[]; selectio
                   <span className="sr-only">Combine</span>
                 </th>
               )}
-              <th scope="col">Run</th>
-              <th scope="col">Target</th>
-              <th scope="col">Status</th>
-              <th scope="col">Findings</th>
-              <th scope="col" className="text-right">Plan</th>
+              {RUN_COLUMNS.map((c) => (
+                <th key={c.key} scope="col" className={CELL_CLASS[c.key]}>
+                  {c.label}
+                </th>
+              ))}
               <th scope="col">Download</th>
             </tr>
           </thead>
@@ -81,63 +94,55 @@ export function ReportRuns({ runs, selection }: { runs: ReportRunRow[]; selectio
               const picked = selection?.chosen.has(r.uid) ?? false;
               return (
                 <tr key={r.uid} data-selected={picked || undefined}>
-                  {selection && (
-                    <td className="w-6">
-                      <Checkbox
-                        label={<span className="sr-only">{`Combine ${r.id} (${r.template}, ${r.when})`}</span>}
-                        checked={picked}
-                        disabled={!picked && full}
-                        reason={`${selection.max} already selected`}
-                        onChange={() => selection.onToggle(r.uid)}
-                        className="rep-pick"
-                      />
-                    </td>
-                  )}
-                  <th scope="row" className="font-normal">
-                    <RunLinkTo uid={r.uid} label={`Open the report of ${r.id} (${r.template}, ${r.when})`} className="block text-foreground hover:text-primary">
-                      <span className="block whitespace-nowrap">
-                        {r.id} · {r.template}
-                      </span>
-                      <span className="block whitespace-nowrap font-mono text-[10px] text-muted-foreground">{r.when}</span>
-                    </RunLinkTo>
-                  </th>
-                  <td className="max-w-[220px] font-mono text-muted-foreground [overflow-wrap:anywhere]">{r.target}</td>
-                  <td title={r.waiting || undefined}>
-                    <StatusBadge meaning={RUN_STATUS[r.status]} />
-                  </td>
-                  <td>
-                    <span className="flex items-center gap-2 whitespace-nowrap">
-                      <span className="w-5 text-right tabnums text-foreground">{r.findings}</span>
-                      {r.worst && <SeverityBadge level={r.worst} />}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap text-right font-mono tabnums text-muted-foreground">
-                    {r.steps.done}/{r.steps.total}
-                  </td>
-                  <td>
-                    <span className="flex gap-1.5">
-                      {QUICK.map((id) => (
-                        <a
-                          key={id}
-                          href={downloadHref(r.uid, id)}
-                          download
-                          aria-label={`Download the ${exportSpec(id).title} of ${r.id} (${r.when})`}
-                          title={exportSpec(id).blurb}
-                          className="dash-chip h-[24px] border border-border px-2 text-[11px] text-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          {exportSpec(id).label}
-                        </a>
-                      ))}
-                    </span>
-                  </td>
+                  <RunCells
+                    row={r}
+                    Cell={Cell}
+                    name={(children) => (
+                      <RunLinkTo uid={r.uid} label={`Open the report of ${runTitle(r)}`} className="block whitespace-nowrap text-foreground hover:text-primary">
+                        {children}
+                      </RunLinkTo>
+                    )}
+                    before={
+                      selection && (
+                        <td className="w-6">
+                          <Checkbox
+                            label={<span className="sr-only">{`Combine ${runTitle(r)}`}</span>}
+                            checked={picked}
+                            disabled={!picked && full}
+                            reason={`${selection.max} already selected`}
+                            onChange={() => selection.onToggle(r.uid)}
+                            className="rep-pick"
+                          />
+                        </td>
+                      )
+                    }
+                    after={
+                      <td>
+                        <span className="flex gap-1.5">
+                          {QUICK.map((id) => (
+                            <a
+                              key={id}
+                              href={downloadHref(r.uid, id)}
+                              download
+                              aria-label={`Download the ${exportSpec(id).title} of ${r.id} (${r.when})`}
+                              title={exportSpec(id).blurb}
+                              className="dash-chip h-[24px] border border-border px-2 text-[11px] text-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              {exportSpec(id).label}
+                            </a>
+                          ))}
+                        </span>
+                      </td>
+                    }
+                  />
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-      {shown.length === 0 && <p className="text-sm text-muted-foreground">No saved assessment matches.</p>}
-      {paging.pages > 1 && <Pagination paging={paging} onPage={setPage} label="Saved assessment pages" />}
+      {shown.length === 0 && <EmptyNote>No saved assessment matches.</EmptyNote>}
+      <Pagination paging={paging} onPage={setPage} label="Saved assessment pages" />
     </DashCard>
   );
 }

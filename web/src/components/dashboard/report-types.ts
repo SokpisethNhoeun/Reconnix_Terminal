@@ -47,6 +47,13 @@ export interface ReportTargetRow {
   latest: RunLink;
 }
 
+/** What the Assessments view draws: its header and every saved run as a row. */
+export interface AssessmentsCards {
+  tag: string; // "All 27 runs"
+  about: string;
+  rows: ReportRunRow[]; // newest first
+}
+
 export type ReportCards =
   | {
       mode: "run";

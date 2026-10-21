@@ -145,7 +145,7 @@ export function NavMenus() {
                 m.columns === 2 ? "w-[min(36rem,calc(100vw-2rem))]" : "w-[min(22rem,calc(100vw-2rem))]"
               )}
             >
-              <div className="rounded-2xl border border-border bg-card p-2 shadow-2xl shadow-black/50">
+              <div className="rounded-2xl border border-border bg-card p-2 shadow-2xl shadow-page/50">
                 <p className="px-2.5 pb-1 pt-2 font-mono text-[10px] uppercase tracking-[0.2em] text-primary">{m.label}</p>
                 <ul className={cn("grid gap-0.5", m.columns === 2 && "grid-cols-2")}>
                   {m.items.map((item) => (

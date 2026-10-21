@@ -19,7 +19,6 @@ import { cn } from "@/lib/utils";
 import { runFindingHref } from "@/components/dashboard/view-url";
 
 const WRAP = "[overflow-wrap:anywhere]"; // saved text may hold long unbroken tokens (URLs, payloads)
-const LINK = "rounded-sm font-mono text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 // at the ends the buttons stay focusable (aria-disabled), so focus is never dropped
 const NAV_BTN = "size-7 aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent aria-disabled:hover:text-muted-foreground";
@@ -48,8 +47,9 @@ export const FindingDetail = forwardRef<HTMLElement, FindingDetailProps>(functio
       className="dash-card dash-finding scroll-mt-4 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       aria-label={`Finding ${f.id}`}
     >
+      {/* the one announcement for a change of selection: which finding, and where it sits */}
       <p role="status" className="sr-only">
-        Finding {f.id} selected
+        Finding {f.id}, {position.index + 1} of {position.total}
       </p>
       <header className="dash-finding-head">
         <div className="flex flex-wrap items-center gap-2">
@@ -61,7 +61,7 @@ export const FindingDetail = forwardRef<HTMLElement, FindingDetailProps>(functio
             <IconButton label="Previous finding" className={NAV_BTN} aria-disabled={!prev || undefined} onClick={() => prev && onSelect(prev.key)}>
               <ChevronLeft aria-hidden />
             </IconButton>
-            <span className="min-w-[4.5em] text-center font-mono text-[11px] tabnums text-muted-foreground" aria-live="polite">
+            <span className="min-w-[4.5em] text-center font-mono text-[11px] tabnums text-muted-foreground">
               {position.index + 1} of {position.total}
             </span>
             <IconButton label="Next finding" className={NAV_BTN} aria-disabled={!next || undefined} onClick={() => next && onSelect(next.key)}>
@@ -73,7 +73,7 @@ export const FindingDetail = forwardRef<HTMLElement, FindingDetailProps>(functio
         {f.run && (
           <p className="text-xs text-muted-foreground">
             From{" "}
-            <Link href={f.run ? runFindingHref(f.run.uid, f.id) : ""} className={LINK}>
+            <Link href={runFindingHref(f.run.uid, f.id)} className="ui-link font-mono">
               {f.run.label}
             </Link>
           </p>

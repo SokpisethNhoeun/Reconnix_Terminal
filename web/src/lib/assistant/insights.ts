@@ -2,12 +2,13 @@
    the reply cards (cards.ts) use, so a suggestion and the card it leads to always agree (the
    "top finding" a suggestion names is the one its card explains). Pure. */
 import { hourMinute, shortDay } from "../data/format";
-import type { Severity } from "../data/schema";
+import { SEVERITIES, type Severity } from "../data/schema";
 import type { AssessmentView, FindingView } from "../data/view-types";
 import type { RunRef, ScopeRef } from "./protocol";
 import { redact } from "./redact";
 
-export const SEVERITY_ORDER: readonly Severity[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
+/** Worst first: the schema's order (lib/data/schema.ts). */
+export const SEVERITY_ORDER: readonly Severity[] = SEVERITIES;
 const rank = (s: Severity) => SEVERITY_ORDER.indexOf(s);
 
 /** A run as card rows name it: its label and when it was created ("5 Oct 14:03"). */
