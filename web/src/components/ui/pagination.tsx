@@ -2,9 +2,10 @@
 
 /* Previous / Next paging for a list of 10 rows at a time (lib/paging.ts): the page and the
    count in words between the two buttons, each disabled at its end with a reason. Nothing is
-   drawn while everything fits on one page. The view owns the page (in the address) and hands it
-   back through `onPage`; with a `scrollTarget` (the list's top), turning a page from the bottom
-   of a long list brings that top back into view (lib/scroll.ts). */
+   drawn while everything fits on one page, unless `always` (the Assessments view keeps its
+   count line). The view owns the page (in the address) and hands it back through `onPage`;
+   with a `scrollTarget` (the list's top), turning a page from the bottom of a long list brings
+   that top back into view (lib/scroll.ts). */
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { RefObject } from "react";
 
@@ -18,16 +19,18 @@ export function Pagination({
   onPage,
   label = "Pages",
   scrollTarget,
+  always = false,
   className,
 }: {
   paging: Paging;
   onPage: (page: number) => void;
   label?: string;
   scrollTarget?: RefObject<HTMLElement | null>;
+  always?: boolean;
   className?: string;
 }) {
   const { page, pages } = paging;
-  if (pages <= 1) return null;
+  if (pages <= 1 && !always) return null;
   const first = page <= 1;
   const last = page >= pages;
   const turn = (n: number) => {

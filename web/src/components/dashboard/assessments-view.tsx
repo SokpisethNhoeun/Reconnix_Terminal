@@ -41,7 +41,7 @@ export function AssessmentsView({ data }: { data: AssessmentsCards }) {
       ) : (
         <>
           <AssessmentsRows rows={page} />
-          <Pagination paging={paging} onPage={turn} label="Assessment pages" scrollTarget={top} />
+          <Pagination paging={paging} onPage={turn} label="Assessment pages" scrollTarget={top} always />
         </>
       )}
     </div>

@@ -1,8 +1,9 @@
 "use client";
 
 /* Copy text to the clipboard, with "Copied" (or why not) for a moment after. The text is read
-   when pressed, so a reply still streaming copies what is there then. The label is static (for
-   screen readers) and the state is the one live region, so a press is announced once. */
+   when pressed, so a reply still streaming copies what is there then. The label is static (read
+   by screen readers) and the state is the one live region, so a press is announced once; the
+   button's name follows the state ("Copy code Copied"). */
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, X } from "lucide-react";
 
@@ -30,7 +31,7 @@ export function CopyButton({ text, label, className }: { text: string | (() => s
     <Button variant="quiet" size="xs" onClick={copy} title={label} className={className}>
       <Icon className="size-3.5" aria-hidden />
       <span className="sr-only">{label} </span>
-      <span role="status">{shown}</span>
+      <span aria-live="polite">{shown}</span>
     </Button>
   );
 }

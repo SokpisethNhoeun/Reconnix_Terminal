@@ -23,7 +23,8 @@ import { downloadHref, exportSpec } from "@/lib/report/formats";
 
 const SEARCH_FROM = 7; // runs before a search field is worth it
 const QUICK = ["pdf", "html"] as const; // the other formats are on the run's own report
-const CELL_CLASS: Partial<Record<RunCellProps["column"], string>> = { target: "max-w-[220px]", plan: "text-right" };
+// status is positioned: its sr-only "waiting on" text then overflows the table's scroller, not the page
+const CELL_CLASS: Partial<Record<RunCellProps["column"], string>> = { target: "max-w-[220px]", status: "relative", plan: "text-right" };
 
 /** A table cell: the run's name is the row header. */
 function Cell({ column, title, children }: RunCellProps) {
