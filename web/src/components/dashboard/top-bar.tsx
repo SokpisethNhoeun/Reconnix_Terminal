@@ -8,10 +8,11 @@ import { AttentionBell } from "@/components/dashboard/attention-bell";
 import type { Dashboard } from "@/components/dashboard/derive";
 import type { Overall } from "@/components/dashboard/derive-overall";
 import { DocsSearch } from "@/components/dashboard/docs-search";
-import { LiveRefresh, liveRefreshMs } from "@/components/dashboard/live-refresh";
+import { LiveRefresh } from "@/components/dashboard/live-refresh";
 import { OverallChips, type OverallChipsData } from "@/components/dashboard/overall-chips";
 import { RunChips, type RunChipsData } from "@/components/dashboard/run-chips";
 import type { LibraryItem, SkippedFile } from "@/lib/data/view-types";
+import { liveRefreshMs } from "@/lib/live-refresh";
 
 const runChips = (d: Dashboard): RunChipsData => ({
   assessment: { target: d.assessment.target, template: d.assessment.template, status: d.assessment.status, progress: d.assessment.progress },
