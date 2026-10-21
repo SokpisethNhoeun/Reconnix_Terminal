@@ -9,15 +9,18 @@ One `Agent` is cached per Reconix assessment. The agent runs async; the shell dr
 a worker and renders the streamed events into the chat/activity log.
 """
 
+import ipaddress
 import json
 from typing import Any, Awaitable, Callable, Dict, Optional
+from urllib.parse import urlsplit
 
-from ..models import PlanTask, PolicyVerdict
+from ..models import PlanTask
 from ..models.base import utc_now
 from . import agent_guard, lists, providers
-from .activity import log_event
 from .assessment import get_assessment
 from .errors import StoreValidationError
+from .redact import MASK, redact, redact_all
+from .scope import record_verdict
 from .snapshot import uid_for
 from .transcript import add_activity, add_chat
 
@@ -112,32 +115,37 @@ async def run(text: str, on_event: OnEvent, on_ask: Optional[OnAsk] = None) -> N
     await agent.chat(text, on_event, on_ask)
 
 
+def _is_cidr(value: str) -> bool:
+    """True for a network range ("10.0.0.0/28"); a URL with a path is not one."""
+    if "/" not in value:
+        return False
+    try:
+        ipaddress.ip_network(value, strict=False)
+    except ValueError:
+        return False
+    return True
+
+
 def _authorize_approved_target(agent, uid: str) -> None:
     """Register the scope's own target as authorized, so the model never has to (or can)
-    decide authorization. Only the approved scope's target; CIDR bases are left to the model's
-    per-host `add_target`, which the guard checks."""
+    decide authorization. Only the approved scope's target; a CIDR range is left to the
+    model's per-host `add_target`, which the guard checks."""
     snap = agent_guard.snapshot(uid)
     if snap is None or snap.scope.status != "APPROVED":
         return
     scope = snap.scope
     if scope.kind not in ("web_url", "api", "network"):
         return
-    if scope.kind == "network" and "/" in scope.target_url:
-        return
-    from urllib.parse import urlsplit
-
-    from harness.models import Target, TargetType
-
     value = scope.target_url.strip()
-    if scope.kind == "network" and "://" in value:
-        value = urlsplit(value).netloc
-    for target in agent.db.list_targets():
-        if target.value == value:
-            agent._authorize(str(target.id))
+    if scope.kind == "network":
+        if _is_cidr(value):
             return
+        if "://" in value:                      # "http://10.0.0.7:8080/" -> "10.0.0.7:8080"
+            value = urlsplit(value).netloc
+    from harness.models import TargetType
+
     kind = {"web_url": TargetType.WEB, "api": TargetType.API}.get(scope.kind, TargetType.NETWORK)
-    target = Target(name=value, type=kind, value=value, authorized=True)
-    target.id = agent.db.add_target(target)
+    agent.register_authorized_target(value, kind)
 
 
 def reset() -> None:
@@ -146,9 +154,14 @@ def reset() -> None:
     agent_guard.clear()
 
 
-def revoke_current() -> None:
-    """`revoke` for the assessment that is current now."""
-    revoke(uid_for(get_assessment()))
+def revoke_current(drop_agent: bool = False) -> None:
+    """`revoke` for the assessment that is current now. `drop_agent` also forgets its cached
+    `Agent`: a turn cancelled mid-tool leaves tool calls without replies in its history,
+    which a provider would reject on the next turn."""
+    uid = uid_for(get_assessment())
+    revoke(uid)
+    if drop_agent:
+        _agents.pop(uid, None)
 
 
 def revoke(uid: str) -> None:
@@ -250,10 +263,11 @@ def record_event(ev: Dict[str, Any]) -> None:
     """Translate one harness agent event into a chat / activity line."""
     kind = ev.get("type")
     if kind == "assistant":
-        add_chat("text", "reconix", ev.get("text") or "")
+        add_chat("text", "reconix", redact(ev.get("text") or ""))
     elif kind == "reasoning":
         # The model's chain-of-thought, shown muted so it reads as "thinking".
-        add_chat("text", "reconix", f"thinking… {ev.get('text') or ''}"[:2000], tone="muted")
+        thought = redact(f"thinking… {ev.get('text') or ''}")[:2000]
+        add_chat("text", "reconix", thought, tone="muted")
     elif kind == "plan":
         steps = ev.get("steps") or []
         set_plan(steps)             # drives the Execution task rows + spinner
@@ -262,29 +276,71 @@ def record_event(ev: Dict[str, Any]) -> None:
     elif kind == "policy":
         _record_policy(ev)
     elif kind == "tool_start":
-        add_activity("TOOL", f"{ev.get('name')}({_short(ev.get('args'))})")
+        add_activity("TOOL", f"{ev.get('name')}({_short(mask_secrets(ev.get('args')))})")
     elif kind == "tool_progress":
-        add_activity("TOOL", str(ev.get("text", ""))[:300])
+        add_activity("TOOL", redact(str(ev.get("text", "")))[:300])
     elif kind == "tool_end":
-        add_activity("TOOL", f"{ev.get('name')}: {_short(ev.get('result'))}")
+        add_activity("TOOL", f"{ev.get('name')}: {_short(mask_secrets(ev.get('result')))}")
         if ev.get("name") in ("run_scan", "http_poc"):   # scanners and ad-hoc PoC proofs
             ingest_scan_findings(ev.get("result"))
 
 
+# Keys whose values never go to the activity log: credentials, session material, request
+# bodies and header values (a header can carry a token the text patterns don't recognise).
+_SECRET_KEYS = {"password", "passwd", "pwd", "secret", "token", "cookie", "authorization",
+                "api_key", "apikey", "body", "header", "headers", "options"}
+
+
+def mask_secrets(value: Any) -> Any:
+    """`value` safe to log: secret-named keys masked (whole value, nested too), then every
+    remaining string run through `redact`. Mappings under `headers` keep their names only."""
+    if isinstance(value, dict):
+        out: Dict[Any, Any] = {}
+        for key, item in value.items():
+            if str(key).casefold().replace("-", "_") in _SECRET_KEYS:
+                out[key] = ({k: MASK for k in item} if isinstance(item, dict) else MASK)
+            else:
+                out[key] = mask_secrets(item)
+        return out
+    if isinstance(value, (list, tuple)):
+        return [mask_secrets(item) for item in value]
+    return redact_all(value)
+
+
 def _record_policy(ev: Dict[str, Any]) -> None:
     """A tool call the scope guard refused: audit it like a blocked request (app thread)."""
-    from .redact import redact
-
     tool = str(ev.get("tool") or "tool")
     args = ev.get("args") or {}
-    method = (str(args.get("method", "GET")).upper() if tool == "http_poc"
-              else "POST" if tool == "login" else tool.upper())
-    target = redact(str(args.get("url") or args.get("login_url") or args.get("target")
-                        or args.get("value") or tool))[:200]
-    reason = str(ev.get("reason") or "Outside approved scope")
-    lists.current().verdicts.append(PolicyVerdict(method, target, False, reason))
+    if tool == "http_poc":
+        method, target = str(args.get("method", "GET")).upper(), args.get("url")
+    elif tool in ("login", "request_credentials"):
+        method, target = "POST", args.get("url") or args.get("login_url")
+    elif tool == "run_scan":                    # the host the scan would have hit, with its tools
+        method, target = "SCAN", f"{_scan_tools(args)} {_resolved_target(args)}"
+    else:
+        method, target = tool.upper(), args.get("target") or args.get("value")
+    target = redact(str(target or tool))[:200]
+    reason = redact(str(ev.get("reason") or "Outside approved scope"))
+    record_verdict(method, target, reason)
     add_activity("POLICY", f"Blocked: {reason} · {tool} {target}"[:300], tone="block")
-    log_event("policy.blocked", f"{method} {target} · {reason}")
+
+
+def _scan_tools(args: Dict[str, Any]) -> str:
+    tools = args.get("tools")
+    if isinstance(tools, (list, tuple)) and tools:
+        return ",".join(str(t) for t in tools)
+    return str(args.get("profile") or "default")
+
+
+def _resolved_target(args: Dict[str, Any]) -> str:
+    """The target value a `run_scan` ref names (falls back to the ref as written)."""
+    ref = str(args.get("target", ""))
+    agent = _agents.get(uid_for(get_assessment()))
+    try:
+        found = _lookup_target(agent, ref) if agent is not None else None
+    except Exception:
+        found = None
+    return found[0] if found else ref
 
 
 _SEV = {"critical": "CRITICAL", "high": "HIGH", "medium": "MEDIUM",

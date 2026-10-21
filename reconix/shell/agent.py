@@ -117,7 +117,7 @@ class AgentMixin:
                 pass
         self._release_agent_ask()
         self._agent_busy = False
-        agent_run.revoke_current()                  # a late tool call is refused by the guard
+        agent_run.revoke_current(drop_agent=was_busy)   # late tool calls are refused
         if was_busy and mark_stopped:
             agent_run.finish(stopped="the assessment was cancelled")
             self.refresh_view()
@@ -138,40 +138,48 @@ class AgentMixin:
         return None
 
     # --- worker -------------------------------------------------------------------------------
-    def _post(self, callback, *args) -> None:
-        """Run `callback` on the app thread; a no-op once the app is shutting down."""
+    def _post(self, gen: int, callback, *args) -> None:
+        """Run `callback` on the app thread for turn `gen`.
+
+        A stale turn (cancelled since) returns at once instead of blocking on the app, and
+        a callback that raises still raises; only "the app is gone" is swallowed.
+        """
+        if gen != self._agent_gen:
+            return
         try:
             self.call_from_thread(callback, *args)
-        except RuntimeError:
-            pass
+        except RuntimeError as exc:
+            if str(exc) != "App is not running":
+                raise
 
     def _agent_worker(self, text: str, gen: int) -> None:
         loop = asyncio.new_event_loop()
         try:
             task = loop.create_task(self._agent_turn(text, gen))
-            self._agent_handle = (loop, task)
-            if gen != self._agent_gen:              # cancelled before the task existed
+            if gen == self._agent_gen:              # never overwrite a newer turn's handle
+                self._agent_handle = (loop, task)
+            if gen != self._agent_gen:              # cancelled before (or while) it started
                 task.cancel()
             loop.run_until_complete(task)
         except asyncio.CancelledError:
             pass                                    # cancel_agent(): nothing more to report
         except store.StoreValidationError as exc:
-            self._post(self._agent_note, str(exc), "warn", gen)
+            self._post(gen, self._agent_note, str(exc), "warn", gen)
         except Exception as exc:                        # never crash the UI on a backend error
-            self._post(self._agent_note, f"Agent error: {exc!r}", "block", gen)
+            self._post(gen, self._agent_note, f"Agent error: {exc!r}", "block", gen)
         finally:
             try:
                 loop.run_until_complete(loop.shutdown_default_executor())
             except Exception:
                 pass
             loop.close()
-            if self._agent_gen == gen:
+            if self._agent_handle is not None and self._agent_handle[0] is loop:
                 self._agent_handle = None
-            self._post(self._agent_finished, gen)
+            self._post(gen, self._agent_finished, gen)
 
     async def _agent_turn(self, text: str, gen: int) -> None:
         async def on_event(ev: Dict[str, Any]) -> None:
-            self._post(self._apply_agent_event, ev, gen)
+            self._post(gen, self._apply_agent_event, ev, gen)
 
         async def on_ask(request: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             return await self._agent_on_ask(request, gen)
@@ -200,15 +208,18 @@ class AgentMixin:
             callback = closed
             if request.get("type") == "confirm":
                 dialog = self._confirm_dialog(request)
-                callback = lambda choice: closed(  # noqa: E731
-                    {"answer": choice} if choice else None)
+
+                def callback(choice) -> None:
+                    closed({"answer": choice} if choice else None)
             else:
                 dialog = CredentialForm(request)
             self._agent_ask = {"done": done, "dialog": dialog}
             self.open_dialog(dialog, callback)
 
-        self._post(open_modal)
-        await asyncio.get_event_loop().run_in_executor(None, done.wait)
+        self._post(gen, open_modal)
+        if gen != self._agent_gen:                  # stale: no dialog will ever answer
+            done.set()
+        await asyncio.get_running_loop().run_in_executor(None, done.wait)
         if self._agent_ask is not None and self._agent_ask["done"] is done:
             self._agent_ask = None
         return result.get("values")

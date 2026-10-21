@@ -32,5 +32,6 @@ async def test_refused_tool_call_shows_a_policy_line(app, model_active, monkeypa
         assert "Path outside approved scope" in entry.message
         await wait_until(pilot, lambda: "Path outside approved scope" in _log_text(app),
                          what="the POLICY line in the activity log")
-        assert any(line.startswith("policy") or " policy " in line
-                   for line in _log_text(app).splitlines())
+        row = next(line for line in _log_text(app).splitlines()
+                   if "Path outside approved scope" in line)
+        assert "policy" in row.split("Blocked")[0]      # the who column, before the message
