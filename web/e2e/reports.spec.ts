@@ -8,20 +8,24 @@ import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
 
 import { combinedHref } from "../src/lib/report/combined/options";
-import { sample, signIn } from "./support";
+import { hydrated, sample } from "./support";
 
 const COMBINE_MAX = 5;
 const pick = (page: Page) => page.getByRole("checkbox", { name: /^Combine / });
 /** Tick the n-th run through its visible box (the input itself is 1px, for screen readers). */
-const tick = (page: Page, n: number) => page.locator("label.rep-pick").nth(n).click();
+const tick = (page: Page, n: number) => boxLabel(page).nth(n).click();
+const boxLabel = (page: Page) => page.locator("label").filter({ has: page.getByRole("checkbox", { name: /^Combine / }) });
+/** The run's own row (its report link names its uid), and its box's label. */
+const tickRun = (page: Page, uid: string) =>
+  page.locator("tr").filter({ has: page.locator(`a[href*="uid=${uid}"]`) }).locator("label").filter({ has: page.getByRole("checkbox", { name: /^Combine / }) }).click();
 const preview = (page: Page) => page.getByRole("button", { name: /^(Preview report|Loading preview…)$/ });
 const generate = (page: Page) => page.getByRole("button", { name: /^(Generate PDF|Generating…)$/ });
 const frame = (page: Page) => page.frameLocator('iframe[title="Combined report preview"]');
 
 async function openReports(page: Page) {
-  await signIn(page);
   await page.goto("/?view=reports");
   await expect(page.getByRole("heading", { name: "Combine runs" })).toBeVisible();
+  await hydrated(page);
 }
 
 test("two runs preview as one combined report and generate one PDF", async ({ page }) => {
@@ -75,7 +79,7 @@ test("two runs preview as one combined report and generate one PDF", async ({ pa
   await expect(generate(page)).toHaveText("Generate PDF");
 
   // a changed option makes the preview stale: the PDF waits for a new preview
-  await page.locator("label.ui-check", { hasText: "Include the appendix" }).click();
+  await page.locator("label").filter({ has: page.getByRole("checkbox", { name: "Include the appendix" }) }).click();
   await expect(page.getByRole("checkbox", { name: "Include the appendix" })).not.toBeChecked();
   await expect(generate(page)).toBeDisabled();
   await expect(page.getByText(/changed since this preview/)).toBeVisible();
@@ -114,8 +118,8 @@ test("a failed preview offers Retry, and a PDF without a printer offers the HTML
 test("the sixth run is disabled with a reason, and Clear empties the selection", async ({ page }) => {
   await openReports(page);
   const boxes = pick(page);
-  const total = await boxes.count();
-  test.skip(total <= COMBINE_MAX, `needs more than ${COMBINE_MAX} saved runs`);
+  const total = await boxes.count(); // the first page: ten runs
+  expect(total, `the sample data needs more than ${COMBINE_MAX} runs on a page`).toBeGreaterThan(COMBINE_MAX);
   for (let i = 0; i < COMBINE_MAX; i += 1) await tick(page, i);
   await expect(page.getByText(`${COMBINE_MAX} of ${COMBINE_MAX} selected`)).toBeVisible();
   const sixth = boxes.nth(COMBINE_MAX);
@@ -133,8 +137,7 @@ test("the sixth run is disabled with a reason, and Clear empties the selection",
 
 test("the selection survives a search of the table, by keyboard", async ({ page }) => {
   await openReports(page);
-  const all = sample();
-  test.skip(all.length < 7, "the search field appears from seven runs");
+  expect(sample().length, "the search field appears from seven runs").toBeGreaterThanOrEqual(7);
   const first = pick(page).first();
   await first.focus();
   await page.keyboard.press("Space");
@@ -147,12 +150,95 @@ test("the selection survives a search of the table, by keyboard", async ({ page 
   await expect(pick(page).first()).toBeChecked();
 });
 
+// the two runs that saw the same Broken object-level authorization on api.example.com
+const SHARED = ["20260930-160500-8a01_RCX-DEMO-001", "20261003-101500-3ceb_RCX-DEMO-002"];
+const STOPPED_EARLY = "20261001-083000-2265_RCX-DEMO-003"; // stopped before its scope was approved: no manifest
+/** Click an option's visible label (its input is 1px, for screen readers) and expect it off. */
+const turnOff = async (page: Page, name: string) => {
+  const box = page.getByRole("checkbox", { name });
+  await page.locator("label").filter({ has: box }).click();
+  await expect(box).not.toBeChecked();
+};
+
+test("a finding two runs share counts once, with an occurrence in each run", async ({ page }) => {
+  await openReports(page);
+  for (const uid of SHARED) await tickRun(page, uid);
+  await expect(page.getByText(`2 of ${COMBINE_MAX} selected`)).toBeVisible();
+  await preview(page).click();
+  const doc = frame(page);
+  await expect(doc.getByRole("heading", { name: "Combined security assessment report" })).toBeVisible({ timeout: 20_000 });
+  const text = await doc.locator("body").innerText();
+  const [, unique, occurrences] = text.match(/Unique findings\s*(\d+) \((\d+) occurrences?\)/)!.map(Number);
+  expect(occurrences, "a shared finding is one unique finding with two occurrences").toBeGreaterThan(unique);
+  // 3 + 4 findings recorded; the BOLA finding is in both
+  expect(occurrences).toBe(7);
+  expect(unique).toBe(6);
+  await expect(doc.getByText("2 occurrences").first()).toBeVisible();
+  await expect(doc.locator("pre.evidence").first()).toBeVisible();
+  await expect(doc.getByText("No rate limiting on login").first()).toBeVisible(); // LOW is in by default
+});
+
+test("with evidence and LOW off the preview drops the evidence blocks and the LOW findings", async ({ page }) => {
+  await openReports(page);
+  for (const uid of SHARED) await tickRun(page, uid);
+  await turnOff(page, "Include masked evidence");
+  await turnOff(page, "Include LOW and INFO findings");
+  await preview(page).click();
+  const doc = frame(page);
+  await expect(doc.getByRole("heading", { name: "Combined security assessment report" })).toBeVisible({ timeout: 20_000 });
+  await expect(doc.locator("pre.evidence")).toHaveCount(0);
+  await expect(doc.getByText("Evidence lines were left out by the report's options.")).toBeVisible();
+  await expect(doc.getByText("Broken object-level authorization").first()).toBeVisible(); // MEDIUM stays
+  await expect(doc.getByText("No rate limiting on login")).toHaveCount(0); // LOW: gone
+  await expect(doc.getByText("HSTS header missing")).toHaveCount(0);
+});
+
+test("a run with no saved scope is listed under Limitations as not recorded", async ({ page }) => {
+  await openReports(page);
+  await tickRun(page, SHARED[0]);
+  await page.getByRole("searchbox", { name: "Search saved assessments" }).fill("portal.example.net");
+  await tickRun(page, STOPPED_EARLY);
+  await preview(page).click();
+  const doc = frame(page);
+  await expect(doc.getByRole("heading", { name: "Limitations" })).toBeVisible({ timeout: 20_000 });
+  await expect(doc.getByText("has no Scope Manifest saved: the boundary of its testing is not recorded.")).toBeVisible();
+});
+
+test("a PDF the server fails on (500) shows why, offers Retry, and the button leaves Generating", async ({ page }) => {
+  await openReports(page);
+  await page.route("**/api/reports/combined?*format=pdf*", (route) =>
+    route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "Stubbed print failure." }) }),
+  );
+  await tickRun(page, SHARED[0]);
+  await preview(page).click();
+  await expect(frame(page).getByRole("heading", { name: "Combined security assessment report" })).toBeVisible({ timeout: 20_000 });
+  await generate(page).click();
+  const status = page.locator("[data-pdf]");
+  await expect(status).toHaveAttribute("data-pdf", "failed");
+  await expect(status).toContainText("The PDF could not be generated");
+  await expect(status.getByRole("button", { name: "Retry" })).toBeVisible();
+  await expect(generate(page)).toHaveText("Generate PDF"); // not stuck on "Generating…"
+  await expect(generate(page)).toBeEnabled();
+});
+
+test("a PDF request that is cut off shows the dashboard could not be reached", async ({ page }) => {
+  await openReports(page);
+  await page.route("**/api/reports/combined?*format=pdf*", (route) => route.abort("failed"));
+  await tickRun(page, SHARED[0]);
+  await preview(page).click();
+  await expect(frame(page).getByRole("heading", { name: "Combined security assessment report" })).toBeVisible({ timeout: 20_000 });
+  await generate(page).click();
+  await expect(page.locator("[data-pdf]")).toHaveAttribute("data-pdf", "failed");
+  await expect(page.locator("[data-pdf]")).toContainText("the dashboard could not be reached");
+  await expect(generate(page)).toHaveText("Generate PDF");
+});
+
 test.describe("at phone size", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
   test("the panel stacks and the preview scrolls inside its frame", async ({ page }) => {
     await openReports(page);
-    await page.locator("label.rep-pick").first().tap(); // the visible box; the input itself is 1px
+    await boxLabel(page).first().tap(); // the visible box; the input itself is 1px
     await expect(pick(page).first()).toBeChecked();
     await preview(page).tap();
     const iframe = page.locator('iframe[title="Combined report preview"]');

@@ -4,25 +4,26 @@
    a reload and a new browser; open, rename, delete); Markdown with Copy; Stop and "New
    messages"; Retry; an answer with nothing in it; what a viewer can't do; and the routes' locks.
    The chat panel holds still (text never moves), but the welcome's globe and the sidebar's icon
-   breathe, so clicks are forced outside the reduced-motion tests all the same. The
+   breathe, so this project runs with reduced motion (playwright.config.ts; the motion itself is
+   tested in motion.spec.ts) and clicks need no `force`. The
    stand-in model changes its answer only for explicit [stub:…] tokens. Conversations go to a
    test folder, and the e2e server allows more questions a minute (playwright.config.ts). */
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
 import { sessionValue } from "../src/lib/auth/session";
 import { PORT, TOKEN } from "../playwright.config";
-import { counted, newest, sample, signIn } from "./support";
+import { counted, newest, runsWithFindings, sample, signIn, signInFresh } from "./support";
 
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 const tab = (page: Page) => page.locator('nav[aria-label="Views"] button[aria-label="AI Assistant"]');
 const composer = (page: Page) => page.getByRole("textbox", { name: /^Ask about/ }).last();
 const log = (page: Page) => page.getByRole("log", { name: "Conversation" });
-const minimize = (page: Page) => page.getByRole("button", { name: "Back to the dashboard" }).click({ force: true });
+const minimize = (page: Page) => page.getByRole("button", { name: "Back to the dashboard" }).click();
 const assistantShown = (page: Page) => expect(page.getByRole("heading", { name: "Reconix AI Assistant", level: 1 })).toBeVisible();
 const history = (page: Page) => page.getByRole("dialog", { name: "Conversation history" });
 const header = (page: Page) => page.locator("header", { hasText: "Reconix AI Assistant" });
 const openHistory = async (page: Page) => {
-  await page.getByRole("button", { name: /^History/ }).click({ force: true });
+  await page.getByRole("button", { name: /^History/ }).click();
   await expect(history(page)).toBeVisible();
 };
 const ask = async (page: Page, question: string) => {
@@ -74,7 +75,6 @@ test.describe("with reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 
   test("the welcome suggests from the real data, leaves a slot for the globe, and needs no motion", async ({ page }) => {
-    await signIn(page);
     await page.goto("/assistant");
     await expect(page).toHaveURL(/\/\?view=assistant$/);
     await assistantShown(page);
@@ -102,7 +102,7 @@ test.describe("with reduced motion", () => {
     const findings = log(page).getByRole("region", { name: "Findings" });
     await expect(findings).toBeVisible();
     const total = sample().reduce((n, a) => n + counted(a).length, 0);
-    await expect(findings).toContainText(`${total} across ${sample().length} runs`);
+    await expect(findings).toContainText(`${total} across ${runsWithFindings().length} runs`);
     await expect(findings).toContainText("Saved data");
     await expect(log(page)).toContainText(`Stub answer: I saw ${sample().length} runs. Earlier turns: 0. You asked: Analyze the current findings`);
     // a follow-up gets the first turn back from the server's file, not from the page
@@ -130,9 +130,9 @@ test.describe("with reduced motion", () => {
     await expect(log(page).getByRole("region", { name: "Findings" })).toBeVisible(); // the cards were saved too
 
     // a new browser (nothing in its storage), signed in again, finds it in History
-    const other: BrowserContext = await browser.newContext({ reducedMotion: "reduce" });
+    const other: BrowserContext = await browser.newContext({ reducedMotion: "reduce", storageState: { cookies: [], origins: [] } });
     const again = await other.newPage();
-    await signIn(again);
+    await signInFresh(again);
     await again.goto("/?view=assistant");
     await expect(log(again)).not.toContainText("Stub answer");
     await openHistory(again);
@@ -182,7 +182,6 @@ test.describe("with reduced motion", () => {
 
   test("Markdown tables and code with Copy, a long answer, New messages and Stop", async ({ page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: ORIGIN });
-    await signIn(page);
     await page.goto("/?view=assistant");
     await ask(page, "Show the findings as a table [stub:markdown]");
     const table = log(page).getByRole("region", { name: "Table" });
@@ -225,7 +224,6 @@ test.describe("with reduced motion", () => {
   });
 
   test("approvals and planning stay in the TUI: guidance and Open Terminal, never a plan", async ({ page }) => {
-    await signIn(page);
     await page.goto("/?view=assistant");
     await page.getByRole("button", { name: /Plan a security assessment/ }).click();
     const plan = log(page).getByRole("region", { name: "Plan a new assessment in the TUI" });
@@ -260,7 +258,6 @@ test.describe("when the model fails", () => {
   test.use({ reducedMotion: "reduce" });
 
   test("an answer with nothing in it is said plainly, with Retry, and stays so after a reload", async ({ page }) => {
-    await signIn(page);
     await page.goto("/?view=assistant");
     await ask(page, "Say nothing at all [stub:empty]");
     const empty = log(page).getByRole("region", { name: "The model returned nothing" });
@@ -284,7 +281,6 @@ test.describe("when the model fails", () => {
   });
 
   test("the reply says why, keeps its cards, and Retry replaces the failed turn", async ({ page }) => {
-    await signIn(page);
     await page.goto("/?view=assistant");
     await ask(page, "Summarize the findings [stub:fail]");
     const failed = log(page).getByRole("region", { name: "The assistant couldn't answer" });

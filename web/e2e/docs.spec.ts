@@ -6,6 +6,7 @@ import { expect, test } from "@playwright/test";
 
 import { PORT } from "../playwright.config";
 import { DOCS_REDIRECTS } from "../src/lib/docs-redirects";
+import { DOCS_ROUTES } from "../src/lib/docs-nav";
 import { signIn } from "./support";
 
 const ORIGIN = `http://127.0.0.1:${PORT}`;
@@ -26,7 +27,6 @@ const GROUPS = [
 const sidebar = (page: import("@playwright/test").Page) => page.getByRole("navigation", { name: "Documentation", exact: true });
 
 test("the sidebar lists every group and marks the current page", async ({ page }) => {
-  await signIn(page);
   await page.goto("/docs/terminal-guide/keys");
   const nav = sidebar(page);
   for (const title of GROUPS) await expect(nav.getByRole("link", { name: title, exact: true })).toBeVisible();
@@ -40,7 +40,6 @@ test("the sidebar lists every group and marks the current page", async ({ page }
 });
 
 test("a command page shows its facts and sections", async ({ page }) => {
-  await signIn(page);
   await page.goto("/docs/commands/model");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("/model");
   for (const h of ["Purpose", "When to use it", "Syntax", "Example", "What happens", "Common errors"]) {
@@ -61,7 +60,6 @@ test("a command page shows its facts and sections", async ({ page }) => {
 
 test("every code block has a Copy button that copies its text", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: ORIGIN });
-  await signIn(page);
   await page.goto("/docs/getting-started/launching");
   await expect(page.locator("html.lenis")).toHaveCount(1); // hydrated: the buttons are live
   const blocks = page.locator("pre");
@@ -74,7 +72,6 @@ test("every code block has a Copy button that copies its text", async ({ page, c
 });
 
 test("the docs search finds /model and opens its page", async ({ page }) => {
-  await signIn(page);
   await page.goto("/docs");
   const box = page.getByRole("combobox", { name: "Search the documentation" });
   await box.fill("/model");
@@ -88,6 +85,56 @@ test("the docs search finds /model and opens its page", async ({ page }) => {
   await expect(results.getByRole("option").first()).toContainText("Approval gates");
   await results.getByRole("option").first().click();
   await expect(page).toHaveURL(/\/docs\/assessment-guide\/approval-gates#high-risk-the-double-check$/);
+});
+
+test("every documentation page answers 200 and has one h1", async ({ page }) => {
+  expect(DOCS_ROUTES.length, "the docs have pages").toBeGreaterThan(30);
+  const broken: string[] = [];
+  for (const route of DOCS_ROUTES) {
+    const res = await page.request.get(route);
+    if (res.status() !== 200) {
+      broken.push(`${route}: ${res.status()}`);
+      continue;
+    }
+    // the page, not just the route: one h1 in the served HTML
+    const h1s = (await res.text()).match(/<h1[\s>]/g)?.length ?? 0;
+    if (h1s !== 1) broken.push(`${route}: ${h1s} h1 elements`);
+  }
+  expect(broken).toEqual([]);
+});
+
+test("a search with no match opens nothing, and Enter stays on the page", async ({ page }) => {
+  await page.goto("/docs");
+  const box = page.getByRole("combobox", { name: "Search the documentation" });
+  await box.fill("zzz-no-such-topic");
+  await expect(box).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("option")).toHaveCount(0);
+  await box.press("Enter");
+  await expect(page).toHaveURL(/\/docs$/);
+});
+
+test("the search results move with ArrowDown and ArrowUp, and Escape closes them", async ({ page }) => {
+  await page.goto("/docs");
+  const box = page.getByRole("combobox", { name: "Search the documentation" });
+  await box.fill("model");
+  const options = page.getByRole("listbox", { name: "Search results" }).getByRole("option");
+  expect(await options.count()).toBeGreaterThan(1);
+  await expect(options.nth(0)).toHaveAttribute("aria-selected", "true");
+  await box.press("ArrowDown");
+  await expect(options.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(options.nth(0)).toHaveAttribute("aria-selected", "false");
+  await box.press("ArrowUp");
+  await expect(options.nth(0)).toHaveAttribute("aria-selected", "true");
+  await box.press("ArrowDown");
+  const second = (await options.nth(1).locator("span").first().textContent())!;
+  await box.press("Escape");
+  await expect(box).toHaveAttribute("aria-expanded", "false");
+  await expect(options).toHaveCount(0);
+  // typing again opens it; the arrows and Enter open the page that was highlighted
+  await box.fill("model");
+  await box.press("ArrowDown");
+  await box.press("Enter");
+  await expect(page.getByRole("heading", { level: 1 }).first()).toHaveText(second);
 });
 
 test("every old docs address redirects to a page that exists", async ({ page }) => {
@@ -105,11 +152,13 @@ test("every old docs address redirects to a page that exists", async ({ page }) 
   }
 });
 
+// Lenis (the docs' smooth scroll) runs with motion on only
+test.use({ reducedMotion: "no-preference" });
+
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test("the tree folds behind the Docs menu button and nothing overflows sideways", async ({ page }) => {
-    await signIn(page);
     await page.goto("/docs/commands/export");
     const button = page.getByRole("button", { name: "Docs menu" });
     await expect(button).toBeVisible();

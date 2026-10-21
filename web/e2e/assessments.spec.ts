@@ -4,11 +4,12 @@
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 
-import { counted, newest, sample, signIn } from "./support";
+import { counted, hydrated, newest, sample } from "./support";
 
 const PER_PAGE = 10;
 const all = sample();
 const pages = Math.max(1, Math.ceil(all.length / PER_PAGE));
+test.beforeAll(() => expect(all.length, "the sample data needs more than one page of runs").toBeGreaterThan(PER_PAGE));
 const results = `${all.length} ${all.length === 1 ? "result" : "results"}`;
 
 /** The saved file's template name (support.ts types only what the other specs read). */
@@ -19,12 +20,11 @@ const pager = (page: Page) => page.getByRole("navigation", { name: "Assessment p
 const chip = (page: Page, group: string, name: string | RegExp) => page.getByRole("group", { name: group }).getByRole("button", { name });
 
 async function open(page: Page, query = "") {
-  await signIn(page);
   await page.goto(`/?view=assessments${query}`);
   await expect(page.getByRole("heading", { name: "Assessments" })).toBeVisible();
   // hydrated before any click: a click before the router has hooked history.replaceState would
   // change the address without re-rendering the view
-  await page.waitForLoadState("networkidle");
+  await hydrated(page);
 }
 
 test("lists every saved run newest first, at most ten a page, with the pager", async ({ page }) => {
@@ -33,14 +33,9 @@ test("lists every saved run newest first, at most ten a page, with the pager", a
   await expect(page.locator("main > :not([hidden])").getByText(`All ${all.length} ${all.length === 1 ? "run" : "runs"}`)).toBeVisible();
   await expect(rows(page)).toHaveCount(Math.min(all.length, PER_PAGE));
   await expect(rows(page).first()).toContainText(newest().label);
-  await expect(pager(page)).toContainText(pages > 1 ? `Page 1 of ${pages} · ${results}` : results);
+  await expect(pager(page)).toContainText(`Page 1 of ${pages} · ${results}`);
   await expect(pager(page).getByRole("button", { name: "Previous page" })).toBeDisabled();
-  const next = pager(page).getByRole("button", { name: "Next page" });
-  if (pages === 1) {
-    await expect(next).toBeDisabled();
-    return;
-  }
-  await next.click();
+  await pager(page).getByRole("button", { name: "Next page" }).click();
   await expect(page).toHaveURL(/[?&]page=2(&|$)/);
   await expect(pager(page)).toContainText(`Page 2 of ${pages}`);
   await expect(rows(page)).toHaveCount(Math.min(all.length - PER_PAGE, PER_PAGE));
@@ -56,12 +51,10 @@ test("each row shows the run's status, findings count, worst severity and plan s
   await expect(row).toContainText(a.target);
   await expect(row.locator(".asm-findings")).toContainText(String(counted(a).length));
   await expect(row.locator(".asm-plan")).toHaveText(/^Plan\d+\/\d+$/); // the cell's label, then done/total
-  const waiting = all.find((x) => x.status === "Awaiting input");
-  if (waiting) {
-    // the tooltip is the run's gate line ("secret_validation · risk HIGH · awaiting approval")
-    const w = rows(page).filter({ hasText: "Waiting for you" }).first();
-    await expect(w.locator(".asm-status")).toHaveAttribute("title", /awaiting|approval|sign-in|code/i);
-  }
+  expect(all.some((x) => x.status === "Awaiting input"), "the sample data has a waiting run").toBe(true);
+  // the tooltip is the run's gate line ("secret_validation · risk HIGH · awaiting approval")
+  const w = rows(page).filter({ hasText: "Waiting for you" }).first();
+  await expect(w.locator(".asm-status")).toHaveAttribute("title", /awaiting|approval|sign-in|code/i);
 });
 
 test("the status chips count the runs and narrow them, in the address", async ({ page }) => {
@@ -76,11 +69,10 @@ test("the status chips count the runs and narrow them, in the address", async ({
   await expect(page.getByText(`Showing ${done} of ${all.length} runs`)).toBeVisible();
   // a second status joins the first (multi-select)
   const stopped = all.filter((x) => x.status === "Stopped").length;
-  if (stopped) {
-    await chip(page, "Status", /^Stopped/).click();
-    await expect(page).toHaveURL(/status=Completed(%2C|,)Stopped/);
-    await expect(rows(page)).toHaveCount(Math.min(done + stopped, PER_PAGE));
-  }
+  expect(stopped, "the sample data has stopped runs").toBeGreaterThan(0);
+  await chip(page, "Status", /^Stopped/).click();
+  await expect(page).toHaveURL(/status=Completed(%2C|,)Stopped/);
+  await expect(rows(page)).toHaveCount(Math.min(done + stopped, PER_PAGE));
   await page.getByRole("button", { name: "Clear filters" }).click();
   await expect(page).not.toHaveURL(/status=/);
   await expect(rows(page)).toHaveCount(Math.min(all.length, PER_PAGE));
@@ -157,7 +149,6 @@ test.describe("axe", () => {
   ]) {
     test(`${name} has no violations`, async ({ page }) => {
       await open(page, query);
-      await page.waitForLoadState("networkidle");
       const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
       expect(violations.map((v) => `${v.id}: ${v.help} — ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(" | ")}`)).toEqual([]);
     });

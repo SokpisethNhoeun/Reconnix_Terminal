@@ -1,0 +1,14 @@
+/* Signs in once and saves the cookies (both httpOnly ones) where every spec starts from, so a
+   test doesn't spend a page load on the sign-in link. access.spec.ts starts from nothing. */
+import { request } from "@playwright/test";
+
+import { PORT, STATE_FILE, TOKEN } from "./../playwright.config";
+
+export default async function globalSetup() {
+  const origin = `http://127.0.0.1:${PORT}`;
+  const api = await request.newContext({ baseURL: origin });
+  const res = await api.post("/api/session", { data: { token: TOKEN }, headers: { Origin: origin } });
+  if (!res.ok()) throw new Error(`global sign-in failed: ${res.status()} ${await res.text()}`);
+  await api.storageState({ path: STATE_FILE });
+  await api.dispose();
+}

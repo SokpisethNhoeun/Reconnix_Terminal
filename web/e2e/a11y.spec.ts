@@ -8,7 +8,7 @@ import path from "node:path";
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 
-import { newest, signIn } from "./support";
+import { hydrated, newest } from "./support";
 
 const RUN = newest().uid;
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
@@ -33,7 +33,7 @@ async function show(page: Page, url: string) {
   // a dashboard view, or the assistant's composer (the views are all hidden behind it)
   const ready = url.includes("view=assistant") ? page.getByRole("textbox", { name: /^Ask about/ }).last() : page.locator("main > :not([hidden])").first();
   await expect(ready).toBeVisible();
-  await page.waitForLoadState("networkidle");
+  await hydrated(page);
 }
 
 test.describe("axe", () => {
@@ -52,14 +52,12 @@ test.describe("axe", () => {
   ];
   for (const [name, url] of PAGES) {
     test(`the ${name} has no violations`, async ({ page }) => {
-      await signIn(page);
       await show(page, url);
       await axe(page, name);
     });
   }
 
   test("the assistant with a conversation has no violations", async ({ page }) => {
-    await signIn(page);
     await show(page, "/?view=assistant");
     const composer = page.getByRole("textbox", { name: /^Ask about/ }).last();
     await composer.fill("Which runs wait on me?");
@@ -70,6 +68,125 @@ test.describe("axe", () => {
     await expect(page.getByRole("log", { name: "Conversation" })).toContainText("Which runs wait on me?");
     await expect(page.getByRole("log", { name: "Conversation" })).not.toHaveAttribute("aria-busy", "true");
     await axe(page, "assistant with a conversation");
+  });
+});
+
+/* More states, each one axe pass: the docs, the search open, the Report view with runs ticked, a
+   preview and an error, a Findings list with no match and a finding's detail on a phone, the
+   assistant's History, the sign-in page, a 404, and the phone widths. */
+const boxLabel = (page: Page) => page.locator("label").filter({ has: page.getByRole("checkbox", { name: /^Combine / }) });
+const frameHeading = (page: Page) => page.frameLocator('iframe[title="Combined report preview"]').getByRole("heading", { name: "Combined security assessment report" });
+
+test.describe("axe, more states", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  test("the docs index has no violations", async ({ page }) => {
+    await page.goto("/docs");
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+    await axe(page, "docs index");
+  });
+
+  test("a command page has no violations", async ({ page }) => {
+    await page.goto("/docs/commands/model");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("/model");
+    await axe(page, "command page");
+  });
+
+  test("the docs search, open with results, has no violations", async ({ page }) => {
+    await page.goto("/docs");
+    await page.getByRole("combobox", { name: "Search the documentation" }).fill("model");
+    await expect(page.getByRole("listbox", { name: "Search results" }).getByRole("option").first()).toBeVisible();
+    await axe(page, "docs search open");
+  });
+
+  test("the Reports view with runs ticked has no violations", async ({ page }) => {
+    await show(page, "/?view=reports");
+    await boxLabel(page).nth(0).click();
+    await boxLabel(page).nth(1).click();
+    await expect(page.getByText("2 of 5 selected")).toBeVisible();
+    await axe(page, "reports with runs selected");
+  });
+
+  test("the Reports view with a preview has no violations", async ({ page }) => {
+    await show(page, "/?view=reports");
+    await boxLabel(page).nth(0).click();
+    await page.getByRole("button", { name: "Preview report" }).click();
+    await expect(frameHeading(page)).toBeVisible({ timeout: 20_000 });
+    await axe(page, "reports preview");
+  });
+
+  test("the Reports view with a failed preview (an alert) has no violations", async ({ page }) => {
+    await show(page, "/?view=reports");
+    await page.route("**/api/reports/combined?*", (route) => route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "Stubbed failure." }) }));
+    await boxLabel(page).nth(0).click();
+    await page.getByRole("button", { name: "Preview report" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "The preview could not be loaded" })).toBeVisible();
+    await axe(page, "reports error alert");
+  });
+
+  test("a Findings list with no match has no violations", async ({ page }) => {
+    await show(page, "/?view=findings&q=no-such-finding-zzz");
+    await expect(page.getByText("No finding matches these filters.")).toBeVisible();
+    await axe(page, "findings no match");
+  });
+
+  test("a run with no findings (the empty Findings view) has no violations", async ({ page }) => {
+    await show(page, "/?uid=20261001-083000-2265_RCX-DEMO-001&view=findings");
+    await expect(page.getByText("No findings in this assessment yet.")).toBeVisible();
+    await axe(page, "findings empty");
+  });
+
+  test("the assistant's History has no violations", async ({ page }) => {
+    await show(page, "/?view=assistant");
+    await page.getByRole("button", { name: /^History/ }).click();
+    await expect(page.getByRole("dialog", { name: "Conversation history" })).toBeVisible();
+    await axe(page, "assistant history");
+  });
+
+  test("a 404 has no violations", async ({ page }) => {
+    const res = await page.goto("/no-such-page");
+    expect(res!.status()).toBe(404);
+    await expect(page.getByRole("link", { name: "Open the dashboard" })).toBeVisible();
+    await axe(page, "404");
+  });
+
+  test.describe("signed out", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+    test("the sign-in page has no violations", async ({ page }) => {
+      await page.goto("/login");
+      await expect(page.getByText("Open your sign-in link")).toBeVisible();
+      await axe(page, "login");
+    });
+  });
+
+  test.describe("on a phone (390×844)", () => {
+    test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+    for (const [name, url] of [
+      ["overview", "/"],
+      ["findings list", "/?view=findings"],
+      ["assessments", "/?view=assessments"],
+      ["reports", "/?view=reports"],
+    ] as const) {
+      test(`the ${name} has no violations`, async ({ page }) => {
+        await show(page, url);
+        await axe(page, `phone ${name}`);
+      });
+    }
+
+    test("a finding's detail has no violations", async ({ page }) => {
+      await show(page, "/?view=findings");
+      await page.getByRole("list", { name: "Findings", exact: true }).getByRole("listitem").nth(2).locator("button").tap();
+      await expect(page.getByRole("article", { name: /^Finding / })).toBeVisible();
+      await axe(page, "phone finding detail");
+    });
+
+    test("the docs menu, open, has no violations", async ({ page }) => {
+      await page.goto("/docs/commands/export");
+      await page.getByRole("button", { name: "Docs menu" }).click();
+      await expect(page.getByRole("navigation", { name: "Documentation", exact: true })).toBeVisible();
+      await axe(page, "phone docs menu");
+    });
   });
 });
 
@@ -138,7 +255,6 @@ test.describe("the keyboard", () => {
     ["every run's report", "/?view=reports"],
   ]) {
     test(`Tab walks the ${name} sidebar → top bar → view, each stop visibly marked`, async ({ page }) => {
-      await signIn(page);
       await show(page, url);
       const stops = await tabStops(page, 30);
       const order = ["sidebar", "top bar", "content"];
@@ -157,7 +273,6 @@ test.describe("focus and the assistant", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   test("opening puts focus in the composer, Back returns it to the sidebar, and Tab never lands under the assistant", async ({ page }) => {
-    await signIn(page);
     await show(page, "/");
     const ai = page.locator('nav[aria-label="Views"] button[aria-label="AI Assistant"]');
     await ai.focus();
@@ -179,7 +294,6 @@ test.describe("focus and the assistant", () => {
   test.describe("with reduced motion", () => {
     test.use({ reducedMotion: "reduce" });
     test("Tab never lands under the assistant", async ({ page }) => {
-      await signIn(page);
       await show(page, "/?view=assistant");
       const stops = await tabStops(page, 25);
       expect(stops.filter((s) => s.region === "top bar" || s.region === "content").map((s) => s.name)).toEqual([]);
