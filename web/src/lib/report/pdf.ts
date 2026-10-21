@@ -1,7 +1,8 @@
 /* Print the HTML report to PDF with a headless Chrome/Chromium on the dashboard machine
    (no extra Node dependencies). `RECONIX_CHROME` names the browser; otherwise the usual
    names on PATH and the common install locations are tried. Returns null when none exists;
-   the export route then answers 501 with a hint and a link to the HTML export. */
+   the export route then answers 501 with a hint and a link to the HTML export. The paths it
+   probes are outside the project on purpose (turbopackIgnore, as lib/data/store.ts). */
 import "server-only";
 
 import { spawn } from "node:child_process";
@@ -19,8 +20,8 @@ const NAMES = WINDOWS
 const WINDOWS_PATHS = [process.env.PROGRAMFILES, process.env["PROGRAMFILES(X86)"], process.env.LOCALAPPDATA]
   .filter((base): base is string => Boolean(base))
   .flatMap((base) => [
-    path.join(base, "Google", "Chrome", "Application", "chrome.exe"),
-    path.join(base, "Microsoft", "Edge", "Application", "msedge.exe"),
+    path.join(/*turbopackIgnore: true*/ base, "Google", "Chrome", "Application", "chrome.exe"),
+    path.join(/*turbopackIgnore: true*/ base, "Microsoft", "Edge", "Application", "msedge.exe"),
   ]);
 const PATHS = [
   "/usr/bin/google-chrome",
@@ -33,7 +34,7 @@ const TIMEOUT_MS = 90_000;
 
 const runnable = (file: string) => {
   try {
-    accessSync(file, constants.X_OK);
+    accessSync(/*turbopackIgnore: true*/ file, constants.X_OK);
     return true;
   } catch {
     return false;
@@ -46,7 +47,7 @@ export function chromeBinary(): string | null {
   if (override) return runnable(override) ? override : null;
   for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
     for (const name of NAMES) {
-      const candidate = path.join(dir, name);
+      const candidate = path.join(/*turbopackIgnore: true*/ dir, name);
       if (dir && runnable(candidate)) return candidate;
     }
   }
