@@ -8,7 +8,17 @@ import { type Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
 
+import { MOTION } from "../src/components/assistant/motion";
 import { clickMoving, counted, newest, sample as savedRuns, signIn } from "./support";
+
+/** When a MOTION tween ends, in ms from its timeline's start (a staggered one: its last piece). */
+const ends = (t: { at: number; duration: number; stagger?: number }, pieces = 1) => Math.round((t.at + t.duration + (t.stagger ?? 0) * (pieces - 1)) * 1000);
+/** The floor of a measured time: 0.8 × the design value (a machine can only be slower). */
+const atLeast = (designMs: number) => 0.8 * designMs;
+const PIECES = 3; // the assistant's header, conversation and composer ([data-assistant-piece])
+/** The whole open: the last piece landing (≈1.6 s); the whole close: the top bar back (≈1.4 s). */
+const OPEN_MS = ends(MOTION.open.pieces, PIECES);
+const CLOSE_MS = ends(MOTION.close.topbar);
 
 test.use({
   launchOptions: {
@@ -161,7 +171,7 @@ test("opening grows the hero into the assistant while the dashboard leaves, clos
   expect(topStart).toBeGreaterThanOrEqual(t0);
   expect(rightStart).toBeGreaterThanOrEqual(topStart);
   expect(bottomStart).toBeGreaterThanOrEqual(rightStart);
-  expect(bottomEnd).toBeGreaterThan(350); // from the click, at about half the design value
+  expect(bottomEnd).toBeGreaterThan(atLeast(ends(MOTION.open.bottom))); // from the click
   expect(bottomEnd - t0).toBeLessThan(1500);
 
   // the surface: from the hero's box to the whole stage, growing the whole time it moves
@@ -174,13 +184,13 @@ test("opening grows the hero into the assistant while the dashboard leaves, clos
   for (let i = 1; i < growing.length; i++) expect(growing[i].surface!.box.w).toBeGreaterThanOrEqual(growing[i - 1].surface!.box.w - 0.5);
   const [growStart, growEnd] = moves(open, (f) => f.surface!.box.w);
   expect(growStart).toBeLessThan(bottomEnd); // continuous: it grows while the dashboard is still leaving
-  expect(growEnd).toBeGreaterThan(500);
+  expect(growEnd).toBeGreaterThan(atLeast(ends(MOTION.open.surface)));
   expect(growEnd - t0).toBeLessThan(1900);
 
   // the pieces come in at the end; the whole open lands in about 1.6 s
   expect(open.filter((f) => f.t > t0 + 50 && f.t < t0 + 850).every((f) => f.pieces.every((o) => o === 0))).toBe(true);
   const landed = open.find((f) => f.settled)!;
-  expect(landed.t).toBeGreaterThan(700);
+  expect(landed.t).toBeGreaterThan(atLeast(OPEN_MS));
   expect(landed.t - t0).toBeLessThan(2300);
   expect(landed.pieces.every((o) => o === 1)).toBe(true);
   await expect(composer(page)).toBeFocused();
@@ -190,14 +200,18 @@ test("opening grows the hero into the assistant while the dashboard leaves, clos
   await minimize(page);
   const close = await recordingClose;
   const c0 = close.find((f) => f.pieces.some((o) => o < 0.99))!.t; // the close's first frame
-  expect(close.find((f) => f.t > c0 + 600)!.pieces.every((o) => o < 0.05)).toBe(true); // the chat goes first
+  // the chat goes first: gone within twice its design time (room for a loaded machine)
+  const gone = close.find((f) => f.t > c0 && f.pieces.every((o) => o < 0.05))!;
+  expect(gone.t - c0).toBeLessThan(2 * ends(MOTION.close.pieces, PIECES));
   const onHero = close.find((f) => f.t > c0 && Math.abs(f.surface!.box.w - hero.w) < 6 && Math.abs(f.surface!.box.h - hero.h) < 6)!;
-  expect(onHero.t).toBeGreaterThan(300);
   expect(onHero.t - c0).toBeLessThan(1500);
   const atRest = (f: Frame) => f.topbar!.ty === 0 && f.top!.ty === 0 && f.right!.tx === 0 && f.bottom!.ty === 0 && f.fade!.o === 1;
   const back = close.find((f) => f.t > c0 + 200 && atRest(f))!;
-  expect(back.t).toBeGreaterThan(500);
+  expect(back.t).toBeGreaterThan(atLeast(CLOSE_MS)); // from the click
   expect(back.t - c0).toBeLessThan(2000);
+  // the surface shrinks for its design time (its last frame of movement, before everything is back)
+  const [, shrinkEnd] = moves(close.filter((f) => f.t < back.t && f.surface), (f) => f.surface!.box.w);
+  expect(shrinkEnd).toBeGreaterThan(atLeast(ends(MOTION.close.surface)));
   await closed(page);
   await expect(tab(page)).toBeFocused(); // the opener
 });
@@ -582,7 +596,7 @@ test.describe("with reduced motion", () => {
       expect(f.surface!.box.w).toBe(open.at(-1)!.stage!.box.w);
     }
     const [fadeStart, fadeEnd] = moves(open, (f) => f.front!.o, 0.01);
-    expect(fadeEnd - fadeStart).toBeLessThan(800); // short beside the 1.6 s grow, with room for a loaded machine
+    expect(fadeEnd - fadeStart).toBeLessThan(OPEN_MS / 2); // short beside the 1.6 s grow, with room for a loaded machine
     await settled(page);
     const loops = [".dash-ai-icon", ".dash-ai-halo", ".dash-assistant-globe-breath", ".dash-assistant-halo-glow"];
     const still = [".dash-assistant-panel", ".dash-assistant-card", ".dash-assistant-glow"]; // never loop, motion or not
