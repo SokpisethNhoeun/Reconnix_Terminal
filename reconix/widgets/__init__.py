@@ -1,3 +1,5 @@
+"""Reusable widgets: the chrome, prompt, menus, question, run log and finding cells."""
+
 from .activity import ActivityStatus
 from .chat import UserMessage
 from .choice_menu import ChoiceMenu, SuggestionMenu, menu_hint

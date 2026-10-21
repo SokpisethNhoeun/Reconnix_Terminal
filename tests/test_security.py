@@ -10,7 +10,7 @@ from reconix.models import Secret
 from reconix.store import lists
 from reconix.store.report_markdown import md
 
-from .support import ASK_REQUEST, TEST_PASSWORD, run_to
+from .support import ASK_REQUEST, TEST_PASSWORD, play_until_gate, run_to
 
 HIGH = "approval-002"
 
@@ -101,12 +101,7 @@ def test_json_report_is_valid_and_has_no_secret(reports_dir):
 
 
 # --- review round 2 ---------------------------------------------------------------------------
-import pytest as _pytest
-
-from .support import play_until_gate as _p
-
-
-@_pytest.mark.parametrize("target", ["/admin%00", "/admin%00x", "/admin%09", "/admin%0a",
+@pytest.mark.parametrize("target", ["/admin%00", "/admin%00x", "/admin%09", "/admin%0a",
                                      "/public/..;/admin"])
 def test_encoded_control_chars_and_matrix_params_cannot_reach_an_excluded_path(target):
     run_to("account")                                  # web_url scope, excluded /admin
@@ -120,21 +115,21 @@ def test_nmap_import_refuses_a_dtd_bomb(tmp_path):
             '<service name="http"/></port></ports></host></nmaprun>')
     path = tmp_path / "bomb.xml"
     path.write_text(bomb)
-    with _pytest.raises(store.StoreValidationError):
+    with pytest.raises(store.StoreValidationError):
         store.import_findings(str(path))
 
 
 def test_edit_scope_refuses_after_approval():
     from .support import run_to as _run_to
     _run_to("account")                                 # scope already approved by now
-    with _pytest.raises(store.StoreValidationError):
+    with pytest.raises(store.StoreValidationError):
         store.edit_scope(excluded_paths=[])
 
 
 def test_edit_scope_network_refuses_empty_ports():
     store.start_run("scan 10.0.0.0/24 for open ports")
-    assert _p() == "scope"                             # the range picked Network
-    with _pytest.raises(store.StoreValidationError):
+    assert play_until_gate() == "scope"                # the range picked Network
+    with pytest.raises(store.StoreValidationError):
         store.edit_scope(allowed_ports=[])
 
 
