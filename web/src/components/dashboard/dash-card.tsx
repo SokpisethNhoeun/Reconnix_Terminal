@@ -3,9 +3,11 @@ import { SquareArrowOutUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * Shared dashboard card: a labelled <section> with the card chrome, a header (title left, an
- * optional note and the "open in docs" icon right) and the card body. The cursor-following light
- * is CSS (.dash-card::before), moved by card-cursor-light.tsx.
+ * Shared dashboard card: a labelled <section> (a region named by its heading) with the card
+ * chrome, a header (title left, an optional note and the "open in docs" icon right) and the card
+ * body. `ref` and `tabIndex` let a view focus the card itself (the report preview takes focus
+ * when it appears). The cursor-following light is CSS (.dash-card::before), moved by
+ * card-cursor-light.tsx.
  */
 export function DashCard({
   id,
@@ -16,6 +18,8 @@ export function DashCard({
   className,
   bodyClassName,
   children,
+  ref,
+  tabIndex,
 }: {
   id: string;
   title: string;
@@ -25,9 +29,11 @@ export function DashCard({
   className?: string;
   bodyClassName?: string;
   children: React.ReactNode;
+  ref?: React.Ref<HTMLElement>;
+  tabIndex?: number;
 }) {
   return (
-    <section aria-labelledby={id} className={cn("dash-card flex flex-col", glass && "dash-glass", className)}>
+    <section ref={ref} tabIndex={tabIndex} aria-labelledby={id} className={cn("dash-card flex flex-col", glass && "dash-glass", className)}>
       <header className="mb-2.5 flex min-w-0 items-center gap-2">
         <h2 id={id} className="shrink-0 text-[13px] font-medium text-foreground">
           {title}

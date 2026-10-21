@@ -66,6 +66,7 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
   const inflight = useRef<AbortController | null>(null); // the one request allowed at a time
   const serial = useRef(0); // its number: answers to an older one are dropped
   const hintId = useId();
+  const whyId = useId(); // why Preview / Generate can't act yet (each button's description)
 
   const abortInflight = useCallback(() => {
     inflight.current?.abort();
@@ -181,6 +182,10 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
 
   const none = selected.length === 0;
   const pdfReason = none ? "Pick at least one run" : !previewed ? "Preview the report first" : null;
+  // The buttons stay focusable while they can't act (aria-disabled), so focus is never dropped
+  // when a click empties the selection or starts a request; the handlers check themselves.
+  const previewBlocked = none || busy;
+  const pdfBlocked = Boolean(pdfReason) || busy;
 
   return (
     <>
@@ -212,19 +217,25 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
           ))}
         </fieldset>
         <div className="rep-actions">
-          <button type="button" onClick={showPreview} disabled={none || busy} className="rep-btn rep-btn-primary" aria-describedby="rep-preview-why">
+          <button
+            type="button"
+            onClick={() => !previewBlocked && showPreview()}
+            aria-disabled={previewBlocked || undefined}
+            className="rep-btn rep-btn-primary"
+            aria-describedby={`${whyId}-preview`}
+          >
             <Eye className="size-3.5" aria-hidden /> {preview.kind === "loading" ? "Loading preview…" : "Preview report"}
           </button>
-          <button type="button" onClick={generatePdf} disabled={Boolean(pdfReason) || busy} className="rep-btn" aria-describedby="rep-pdf-why">
+          <button type="button" onClick={() => !pdfBlocked && generatePdf()} aria-disabled={pdfBlocked || undefined} className="rep-btn" aria-describedby={`${whyId}-pdf`}>
             <FileText className="size-3.5" aria-hidden /> {pdf.kind === "generating" ? "Generating…" : "Generate PDF"}
           </button>
-          <button type="button" onClick={clear} disabled={none} className="rep-btn rep-btn-quiet">
+          <button type="button" onClick={() => !none && clear()} aria-disabled={none || undefined} className="rep-btn rep-btn-quiet">
             <X className="size-3.5" aria-hidden /> Clear selection
           </button>
-          <span id="rep-preview-why" className="rep-reason">
+          <span id={`${whyId}-preview`} className="rep-reason">
             {none ? "Pick at least one run." : ""}
           </span>
-          <span id="rep-pdf-why" className="rep-reason">
+          <span id={`${whyId}-pdf`} className="rep-reason">
             {pdfReason && !none ? `${pdfReason}.` : ""}
           </span>
         </div>

@@ -4,7 +4,8 @@
    sandboxed <iframe> (no scripts, an opaque origin; the page's CSP applies inside) that scrolls
    inside itself. A loading state while the report is fetched, an error state with Retry when the
    fetch fails, and a note when the selection or options changed since this preview was shown.
-   The card takes focus when it appears, so the keyboard and screen readers land on it. */
+   The card (a region named by its heading) takes focus when it appears, so the keyboard and
+   screen readers land on it. */
 import { useEffect, useRef } from "react";
 import { RefreshCw, TriangleAlert } from "lucide-react";
 
@@ -17,7 +18,7 @@ export type PreviewState =
   | { kind: "failed"; href: string; message: string };
 
 export function ReportPreview({ state, runs, stale, onRetry }: { state: Exclude<PreviewState, { kind: "idle" }>; runs: number; stale: boolean; onRetry: () => void }) {
-  const card = useRef<HTMLDivElement>(null);
+  const card = useRef<HTMLElement>(null);
   useEffect(() => {
     const el = card.current;
     if (!el) return;
@@ -27,8 +28,15 @@ export function ReportPreview({ state, runs, stale, onRetry }: { state: Exclude<
   }, []);
   const loading = state.kind === "loading";
   return (
-    <div ref={card} tabIndex={-1} className="is-wide rep-preview-card">
-      <DashCard id="report-preview" title="Preview" docsHref="/docs/reports/exporting" meta={`${runs} ${runs === 1 ? "run" : "runs"} · the same HTML the PDF prints`}>
+    <DashCard
+      ref={card}
+      tabIndex={-1}
+      id="report-preview"
+      title="Preview"
+      docsHref="/docs/reports/exporting"
+      meta={`${runs} ${runs === 1 ? "run" : "runs"} · the same HTML the PDF prints`}
+      className="is-wide rep-preview-card"
+    >
         {state.kind === "failed" ? (
           <div role="alert" className="rep-error">
             <TriangleAlert className="size-4 shrink-0" aria-hidden />
@@ -52,7 +60,6 @@ export function ReportPreview({ state, runs, stale, onRetry }: { state: Exclude<
             The selection or the options changed since this preview. Preview again before generating the PDF.
           </p>
         )}
-      </DashCard>
-    </div>
+    </DashCard>
   );
 }
