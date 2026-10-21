@@ -314,3 +314,48 @@ async def test_a_guard_that_raises_refuses(tmp_path):
 async def test_no_guard_changes_nothing(tmp_path):
     agent = Agent(_settings(tmp_path))
     assert await agent._dispatch("list_targets", {}) == []
+
+
+async def test_login_never_follows_redirects(tmp_path, monkeypatch):
+    import httpx
+
+    seen = {}
+
+    class _Redirect:
+        status_code = 307
+        headers = {"location": "https://elsewhere.example/steal"}
+        cookies: dict = {}
+
+        def json(self):
+            raise ValueError
+
+    class _Client:
+        def __init__(self, **kw):
+            seen.update(kw)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, **kw):
+            return _Redirect()
+
+    monkeypatch.setattr(httpx, "AsyncClient", _Client)
+    agent = Agent(_settings(tmp_path))
+    out = await agent._login({"url": "http://10.0.0.5/login", "username": "u", "password": "p"})
+    assert seen["follow_redirects"] is False
+    assert "HTTP 307" in out["error"] and "not followed" in out["error"]
+
+
+def test_register_authorized_target_is_idempotent(tmp_path):
+    from harness.models import Target, TargetType
+
+    agent = Agent(_settings(tmp_path))
+    agent.db.add_target(Target(name="a", type=TargetType.WEB, value="http://a.example"))
+    agent.register_authorized_target("http://a.example", TargetType.WEB)
+    agent.register_authorized_target("http://b.example", TargetType.WEB)
+    agent.register_authorized_target("http://b.example", TargetType.WEB)
+    got = sorted((t.value, t.authorized) for t in agent.db.list_targets())
+    assert got == [("http://a.example", True), ("http://b.example", True)]

@@ -571,6 +571,18 @@ class Agent:
         t.authorized = True
         return self._target_dict(t)
 
+    def register_authorized_target(self, value: str, type_: TargetType) -> Target:
+        """Make sure `value` is a target and mark it authorized (the embedding app's call,
+        not the model's: the model's own route is `add_target` / `authorize_target`)."""
+        for t in self.db.list_targets():
+            if t.value == value:
+                self._authorize(str(t.id))
+                t.authorized = True
+                return t
+        t = Target(name=value, type=type_, value=value, authorized=True)
+        t.id = self.db.add_target(t)
+        return t
+
     def _poc_in_scope(self, url: str) -> Target | None:
         """Return the authorized target whose host:port matches the URL, or None."""
         from urllib.parse import urlparse
@@ -675,7 +687,7 @@ class Agent:
         pf = args.get("pass_field") or "password"
         body = {uf: user, pf: pw}
         try:
-            async with httpx.AsyncClient(timeout=15, verify=False, follow_redirects=True) as c:
+            async with httpx.AsyncClient(timeout=15, verify=False, follow_redirects=False) as c:
                 r = await c.post(url, data=body) if args.get("form") else await c.post(url, json=body)
                 token = None
                 try:
@@ -686,6 +698,13 @@ class Agent:
         except Exception as exc:  # noqa: BLE001 - surface to the model
             return {"error": f"login request failed: {exc!r}"}
 
+        if not token and not cookie and 300 <= r.status_code < 400:
+            # Redirects are never followed: a 307/308 would re-POST the credentials to
+            # wherever Location points, which may be outside the approved scope.
+            where = r.headers.get("location", "") if hasattr(r, "headers") else ""
+            return {"error": f"login answered with a redirect (HTTP {r.status_code}"
+                    f"{' to ' + where if where else ''}); redirects are not followed. "
+                    "Post to the final URL instead, once you know it is in scope."}
         if not token and not cookie:
             return {"error": f"login returned no token or cookie (HTTP {r.status_code}); "
                     "check the endpoint/field names, or ask the user for a token/cookie directly."}
