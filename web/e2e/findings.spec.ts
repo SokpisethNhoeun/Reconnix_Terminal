@@ -193,6 +193,21 @@ test("a critical finding, an info finding and a false positive show their own ba
   expect(html).not.toContain("<b>Status page</b>");
 });
 
+/* The sample run whose target held a login (scripts/make_sample_data.py): the store masked it
+   when it saved the run, and the dashboard and its export mask the saved copy once more. */
+const MASKED_RUN = "20260929-112000-8c51_RCX-DEMO-001";
+
+test("a login in a target is masked in the finding's detail and in the HTML export", async ({ page }) => {
+  await go(page, `/?uid=${MASKED_RUN}&view=findings&finding=IMP-001`);
+  await expect(detail(page)).toContainText("••••@portal.example.com");
+  await expect(detail(page)).not.toContainText("hunter2");
+  const res = await page.request.get(`/api/assessments/${MASKED_RUN}/export?format=html`);
+  expect(res.status()).toBe(200);
+  const html = await res.text();
+  expect(html).toContain("••••@portal.example.com");
+  expect(html).not.toContain("hunter2");
+});
+
 test.describe("on the fixed frame (1366×768)", () => {
   test.use({ viewport: { width: 1366, height: 768 } });
 
