@@ -10,9 +10,10 @@ export const guardrails: GroupContent = {
         <DocSection title="Your responsibility">
           <p>
             Only assess targets you are authorized to test. In the scripted run Reconix enforces the scope you approve;
-            in agent mode the approved scope authorizes the target and the tool set, and methods, excluded paths, ports,
-            the time limit and the per-action approval gates are not enforced on the agent. The authorization itself
-            always comes from you or your organization. Keep written permission for every target.
+            in agent mode Reconix also checks every tool call against it (target, tool set, allowed methods, excluded
+            paths, ports and the time limit) and refuses what falls outside, but the per-action MEDIUM and HIGH
+            approval gates are not applied to the agent. The authorization itself always comes from you or your
+            organization. Keep written permission for every target.
           </p>
           <Callout variant="warning" title="Before you start">
             Typing a target or picking a template never authorizes testing on its own. Nothing runs until you approve the

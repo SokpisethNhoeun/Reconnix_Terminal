@@ -244,6 +244,14 @@ password never reaches the model. Configure the Kali MCP server and point the `L
 at your model in `.env` (see `.env.example`); `backend/` must be installed
 (`pip install -e backend`). Without a model or the harness, the scripted demo runs instead.
 
+**What is enforced on the agent:** approving the scope authorizes the target (Reconix registers
+it, not the model), and every tool call the agent makes is checked against that scope before it
+runs: target host and port, the tool set, allowed methods, excluded paths and the time limit.
+A refused call is not executed; it shows as a POLICY line, raises the blocked count and is
+audited. The per-action MEDIUM/HIGH approval gates are **not** applied to the agent, and a
+scanner's own traffic inside an allowed target is not checked request by request.
+`/assess` or `/new` while a turn runs cancels it and marks that run stopped.
+
 With no active model (or if a call fails) the built-in reply is used, so the demo runs
 offline.
 
