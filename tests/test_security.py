@@ -120,8 +120,7 @@ def test_nmap_import_refuses_a_dtd_bomb(tmp_path):
 
 
 def test_edit_scope_refuses_after_approval():
-    from .support import run_to as _run_to
-    _run_to("account")                                 # scope already approved by now
+    run_to("account")                                  # scope already approved by now
     with pytest.raises(store.StoreValidationError):
         store.edit_scope(excluded_paths=[])
 

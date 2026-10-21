@@ -83,12 +83,13 @@ def test_check_passes_on_a_current_file(capsys, monkeypatch, tmp_path):
 def test_check_fails_on_a_stale_file_without_writing(capsys, monkeypatch, tmp_path):
     exporter = _exporter()
     data = exporter.build()
-    data["groups"][0]["commands"][0]["description"] = "something else"
+    first = data["groups"][0]["commands"][0]
+    first["description"] = "something else"
     stale = exporter.render(data)
     status, out = _run_check(exporter, monkeypatch, tmp_path, stale)
     assert status == 1
     err = capsys.readouterr().err
-    assert "stale" in err and "changed /help" in err and "export_commands.py" in err
+    assert "stale" in err and f"changed /{first['name']}" in err and "export_commands.py" in err
     assert out.read_text(encoding="utf-8") == stale        # nothing written
 
 
@@ -98,16 +99,19 @@ def test_check_names_a_missing_or_foreign_file(capsys, monkeypatch, tmp_path):
     assert "missing" in capsys.readouterr().err
     assert _run_check(exporter, monkeypatch, tmp_path, "not json")[0] == 1
     assert "not the exporter's JSON" in capsys.readouterr().err
+    (tmp_path / "commands.json").write_bytes(b"\xff\xfe not utf-8")   # undecodable
+    assert exporter.main(["--check"]) == 1
+    assert "not the exporter's JSON" in capsys.readouterr().err
 
 
 def test_check_names_added_and_removed_commands():
     exporter = _exporter()
     current = exporter.render(exporter.build())
     data = json.loads(current)
-    gone = data["groups"][-1]["commands"].pop()               # /quit removed from the file
+    gone = data["groups"][-1]["commands"].pop()               # the last command left the file
     data["groups"][0]["commands"].append(dict(gone, name="extra"))
     reasons = exporter.stale(current, json.dumps(data))
-    assert reasons == ["added /quit", "removed /extra"]
+    assert reasons == [f"added /{gone['name']}", "removed /extra"]
     assert exporter.stale(current, current) == []
 
 

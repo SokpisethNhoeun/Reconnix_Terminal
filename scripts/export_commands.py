@@ -101,7 +101,12 @@ def stale(expected: str, on_disk: Optional[str]) -> List[str]:
 
 def check() -> int:
     """Exit status for `--check`: 0 when the file on disk is current, 1 (and why) when not."""
-    on_disk = OUT.read_text(encoding="utf-8") if OUT.exists() else None
+    on_disk: Optional[str] = None
+    if OUT.exists():
+        try:
+            on_disk = OUT.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            on_disk = ""                       # unreadable: stale, like a file that isn't JSON
     reasons = stale(render(build()), on_disk)
     if not reasons:
         print(f"{OUT.relative_to(ROOT)} is up to date")
