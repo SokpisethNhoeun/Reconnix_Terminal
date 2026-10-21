@@ -17,6 +17,27 @@ describe("maskDeep", () => {
     expect(maskDeep("open https://admin:hunter2@app.example.com/x")).toContain("••••@app.example.com");
     expect(maskDeep(["https://admin:hunter2@app.example.com/x", "plain"])).toEqual(["https://••••@app.example.com/x", "plain"]);
   });
+
+  it("keeps an element holding newlines as one element", () => {
+    expect(maskDeep(["one\ntwo", "password=hunter2\nthree"])).toEqual(["one\ntwo", "password=••••\nthree"]);
+    expect(maskDeep(["a\n", "", "\nb"])).toEqual(["a\n", "", "\nb"]);
+  });
+
+  it("masks a value at an element's end without reading into the next element", () => {
+    expect(maskDeep(["password=hunter2", "x", "Cookie: sid=1", "kept"])).toEqual(["password=••••", "x", "Cookie: ••••", "kept"]);
+  });
+
+  it("catches a private key spread over several elements as one block", () => {
+    const lines = ["-----BEGIN RSA PRIVATE KEY-----", "MIIEowIBAAKCAQEA", "-----END RSA PRIVATE KEY-----", "after"];
+    const masked = maskDeep(lines);
+    expect(masked.join("\n")).not.toContain("MIIEowIBAAKCAQEA");
+    expect(masked).toEqual(["•••• (private key)", "after"]);
+  });
+
+  it("works whatever the elements hold, even the separator's own characters", () => {
+    const odd = ["x\n\u0000\ny", "\u0000", "password=hunter2"];
+    expect(maskDeep(odd)).toEqual(["x\n\u0000\ny", "\u0000", "password=••••"]);
+  });
 });
 
 describe("a run that stopped before its scope (no scope, no plan, no findings)", () => {
