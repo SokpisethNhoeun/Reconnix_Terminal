@@ -165,3 +165,39 @@ def repo_path_reason(target: str, excluded: list) -> str:
     if any(is_under(path, "/" + e.strip().lstrip("/")) for e in excluded):
         return "Path excluded from the review"
     return ""
+
+
+# --- one decision for every kind of scope ------------------------------------------------
+def request_reason(scope, method: Optional[str], target: str) -> str:
+    """"" when `target` may be reached under `scope`, else the reason it is blocked.
+
+    The one implementation of the scope rules, used by the policy engine (`scope._decide`)
+    and by the agent guard. By kind: HTTP method (when `method` is given), canonical path,
+    host and excluded paths for web_url and api; host-and-port for network (a URL's default
+    port is made explicit so the port list applies); a repo-relative path for source.
+    Status and time limit are the caller's: this judges the target only.
+    """
+    if scope.kind == "network":
+        text = target.strip()
+        if "://" in text:
+            try:
+                parts = urlsplit(text)
+                port = parts.port or DEFAULT_PORTS.get(parts.scheme.lower())
+            except ValueError:
+                return "Malformed request target"
+            if not parts.hostname or parts.username or parts.password:
+                return "Malformed request target"
+            text = f"{parts.hostname}:{port}" if port else parts.hostname
+        return host_port_reason(text, scope.target_url, scope.allowed_ports,
+                                scope.excluded_paths)
+    if scope.kind == "source":
+        return repo_path_reason(target, scope.excluded_paths)
+    if method is not None and method not in scope.allowed_methods:
+        return f"Method {method} not allowed"
+    try:
+        path = canonical_path(target, scope.target_url)
+    except TargetError as exc:
+        return str(exc)
+    if any(is_under(path, excluded) for excluded in scope.excluded_paths):
+        return "Path outside approved scope"
+    return ""

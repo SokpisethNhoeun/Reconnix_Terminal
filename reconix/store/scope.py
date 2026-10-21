@@ -13,7 +13,7 @@ from . import lists
 from .activity import log_event
 from .errors import StoreValidationError
 from .policy import (
-    TargetError, canonical_path, host_port_reason, is_under, network_entry, repo_path_reason,
+    network_entry, request_reason,
 )
 from .transcript import add_activity, add_chat
 
@@ -148,29 +148,15 @@ def time_limit_reached() -> bool:
 def _decide(method: str, target: str) -> str:
     """"" when the request may run, else the reason it is blocked.
 
-    The check depends on the scope's kind: HTTP path/host/method for web_url and api,
-    host-and-port for network, and a repo-relative path for source.
+    Status and time limit are checked here; the rest depends on the scope's kind and lives in
+    `policy.request_reason` (shared with the agent guard).
     """
     scope = get_scope()
     if scope is None or scope.status != "APPROVED":
         return "Scope not approved"
     if time_limit_reached():
         return "Time limit reached"
-    if scope.kind == "network":
-        return host_port_reason(target, scope.target_url, scope.allowed_ports,
-                                scope.excluded_paths)
-    if scope.kind == "source":
-        return repo_path_reason(target, scope.excluded_paths)
-    # web_url and api: HTTP method + normalized path, on the approved host.
-    if method not in scope.allowed_methods:
-        return f"Method {method} not allowed"
-    try:
-        path = canonical_path(target, scope.target_url)
-    except TargetError as exc:
-        return str(exc)
-    if any(is_under(path, excluded) for excluded in scope.excluded_paths):
-        return "Path outside approved scope"
-    return ""
+    return request_reason(scope, method, target)
 
 
 def policy_reason(method: str, target: str) -> str:
@@ -186,7 +172,11 @@ def check_request(method: str, target: str) -> PolicyVerdict:
     excluded paths are compared, so case, encoding, `..` and `;params` can't slip past.
     """
     method = method.strip().upper()
-    reason = _decide(method, target)
+    return record_verdict(method, target, _decide(method, target))
+
+
+def record_verdict(method: str, target: str, reason: str) -> PolicyVerdict:
+    """Record a verdict on the current assessment ("" reason = allowed) and audit a block."""
     verdict = PolicyVerdict(method, target, not reason, reason or "Within approved scope")
     lists.current().verdicts.append(verdict)
     if reason:

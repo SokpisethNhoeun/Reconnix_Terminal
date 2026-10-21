@@ -22,7 +22,7 @@ from urllib.parse import urlsplit
 
 from ..models import ScopeManifest
 from ..models.base import utc_now
-from .policy import TargetError, canonical_path, host_port_reason, is_under
+from .policy import request_reason
 
 Guard = Callable[[str, Dict[str, Any]], str]
 # ref -> (value, type) of a harness target, or None; (args, target type) -> effective tools
@@ -31,7 +31,10 @@ ToolsFor = Callable[[Dict[str, Any], str], list]
 
 _READ_ONLY = {"update_plan", "list_capabilities", "list_targets", "list_findings",
               "get_finding", "ask_operator"}
-_DEFAULT_PORTS = {"http": 80, "https": 443}
+_GUARDED = {"run_scan", "http_poc", "login", "request_credentials", "add_target",
+            "authorize_target"}
+KNOWN_TOOLS = _READ_ONLY | _GUARDED          # every tool name `decide` has a rule for
+_NO_SOURCE = "Source-code scopes have no network tools for the agent"
 
 
 @dataclass
@@ -115,50 +118,23 @@ def _scan_reason(scope: ScopeManifest, args: Dict[str, Any], lookup: Lookup,
 
 
 def _target_reason(scope: ScopeManifest, value: str) -> str:
-    """Whether a target (URL, host or host:port) lies inside the scope; no method rule."""
-    if scope.kind == "network":
-        return _network_reason(scope, value)
-    if scope.kind in ("web_url", "api"):
+    """Whether a target (URL, host or host:port) lies inside the scope; no method rule.
+
+    A bare host on a network scope is judged by host only (no port is named), so the scanner
+    then covers every port; an explicit host:port is held to the scope's port list.
+    """
+    if scope.kind == "source":
+        return _NO_SOURCE
+    if scope.kind != "network":
         base = urlsplit(scope.target_url)
-        url = value if "://" in value else f"{base.scheme}://{value}"
-        return _web_reason(scope, None, url)
-    return "Source-code scopes have no network tools for the agent"
+        value = value if "://" in value else f"{base.scheme}://{value}"
+    return request_reason(scope, None, value)
 
 
 def _request_reason(scope: ScopeManifest, method: str, url: str) -> str:
     """Whether an HTTP request (absolute URL) is allowed by the scope."""
+    if scope.kind == "source":
+        return _NO_SOURCE
     if "://" not in url:
         return "Malformed request target"
-    if scope.kind == "network":
-        return _network_reason(scope, url)
-    if scope.kind in ("web_url", "api"):
-        return _web_reason(scope, method, url)
-    return "Source-code scopes have no network tools for the agent"
-
-
-def _web_reason(scope: ScopeManifest, method: Optional[str], url: str) -> str:
-    """The web_url/api rules of `scope._decide`: method, canonical path, excluded paths."""
-    if method is not None and method not in scope.allowed_methods:
-        return f"Method {method} not allowed"
-    try:
-        path = canonical_path(url, scope.target_url)
-    except TargetError as exc:
-        return str(exc)
-    if any(is_under(path, excluded) for excluded in scope.excluded_paths):
-        return "Path outside approved scope"
-    return ""
-
-
-def _network_reason(scope: ScopeManifest, value: str) -> str:
-    """Host-and-port rules; a URL's default port is made explicit so the port list applies."""
-    text = value.strip()
-    if "://" in text:
-        try:
-            parts = urlsplit(text)
-            port = parts.port or _DEFAULT_PORTS.get(parts.scheme.lower())
-        except ValueError:
-            return "Malformed request target"
-        if not parts.hostname or parts.username or parts.password:
-            return "Malformed request target"
-        text = f"{parts.hostname}:{port}" if port else parts.hostname
-    return host_port_reason(text, scope.target_url, scope.allowed_ports, scope.excluded_paths)
+    return request_reason(scope, method, url)
