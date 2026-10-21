@@ -18,8 +18,11 @@ import { DashCard } from "@/components/dashboard/dash-card";
 import { ReportPreview, type PreviewState } from "@/components/dashboard/report-preview";
 import { ReportRuns } from "@/components/dashboard/report-runs";
 import type { ReportRunRow } from "@/components/dashboard/report-types";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { COMBINE_MAX, type CombineOptions, combinedFileName, combinedHref, DEFAULT_COMBINE_OPTIONS } from "@/lib/report/combined/options";
+import { DOCS } from "@/lib/docs-nav";
+import { COMBINE_MAX, COMBINE_OPTION_META, type CombineOptions, combinedFileName, combinedHref, DEFAULT_COMBINE_OPTIONS } from "@/lib/report/combined/options";
+import { NO_PRINTER } from "@/lib/report/formats";
 import { cn } from "@/lib/utils";
 
 type PdfState =
@@ -29,15 +32,8 @@ type PdfState =
   | { kind: "unsupported"; message: string; html: string }
   | { kind: "failed"; message: string };
 
-const OPTIONS: { key: keyof CombineOptions; label: string; hint: string }[] = [
-  { key: "evidence", label: "Include masked evidence", hint: "each occurrence's evidence lines, as masked when they were saved" },
-  { key: "low", label: "Include LOW and INFO findings", hint: "off: only CRITICAL, HIGH and MEDIUM" },
-  { key: "appendix", label: "Include the appendix", hint: "tools, references and the saved copies' ids" },
-];
-
 const FETCH_TIMEOUT_MS = 15_000; // the HTML is built in milliseconds; the PDF gets the printer's own 90 s
 const PDF_TIMEOUT_MS = 120_000;
-const UNSUPPORTED = "PDF export needs a Chrome/Chromium browser on the dashboard machine (set RECONIX_CHROME). Download the HTML report instead and print it to PDF.";
 
 /** Why a response was refused, from its JSON `detail` when it has one. */
 async function describe(res: Response): Promise<string> {
@@ -66,6 +62,7 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
   const inflight = useRef<AbortController | null>(null); // the one request allowed at a time
   const serial = useRef(0); // its number: answers to an older one are dropped
   const hintId = useId();
+  const whyId = useId(); // why Preview / Generate can't act yet (each button's description)
 
   const abortInflight = useCallback(() => {
     inflight.current?.abort();
@@ -96,14 +93,10 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
     setPreview((p) => (p.kind === "loading" ? { kind: "idle" } : p));
     setPdf({ kind: "idle" });
   };
-  const toggle = useCallback(
-    (uid: string) => {
-      setSelected((list) => (list.includes(uid) ? list.filter((u) => u !== uid) : list.length < COMBINE_MAX ? [...list, uid] : list));
-      changed();
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `changed` only touches refs and setters
-    [],
-  );
+  const toggle = (uid: string) => {
+    setSelected((list) => (list.includes(uid) ? list.filter((u) => u !== uid) : list.length < COMBINE_MAX ? [...list, uid] : list));
+    changed();
+  };
   const setOption = (key: keyof CombineOptions, on: boolean) => {
     setOptions((o) => ({ ...o, [key]: on }));
     changed();
@@ -150,7 +143,7 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
           /* not JSON: the fixed message and the HTML link still apply */
         }
         if (!mine()) return;
-        setPdf({ kind: "unsupported", message: typeof body.detail === "string" && body.detail ? body.detail : UNSUPPORTED, html: typeof body.html === "string" ? body.html : href });
+        setPdf({ kind: "unsupported", message: typeof body.detail === "string" && body.detail ? body.detail : NO_PRINTER, html: typeof body.html === "string" ? body.html : href });
         return;
       }
       if (!res.ok) {
@@ -181,13 +174,17 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
 
   const none = selected.length === 0;
   const pdfReason = none ? "Pick at least one run" : !previewed ? "Preview the report first" : null;
+  // The buttons stay focusable while they can't act (aria-disabled), so focus is never dropped
+  // when a click empties the selection or starts a request; the handlers check themselves.
+  const previewBlocked = none || busy;
+  const pdfBlocked = Boolean(pdfReason) || busy;
 
   return (
     <>
       <DashCard
         id="report-combine"
         title="Combine runs"
-        docsHref="/docs/reports/exporting"
+        docsHref={DOCS.exporting}
         meta={
           <span aria-live="polite">
             {selected.length} of {COMBINE_MAX} selected
@@ -202,7 +199,7 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
         </p>
         <fieldset className="rep-options">
           <legend className="rep-legend">Options</legend>
-          {OPTIONS.map((o) => (
+          {COMBINE_OPTION_META.map((o) => (
             <div key={o.key} className="rep-option">
               <Checkbox label={o.label} checked={options[o.key]} onChange={(e) => setOption(o.key, e.target.checked)} aria-describedby={`${hintId}-${o.key}`} />
               <span id={`${hintId}-${o.key}`} className="rep-hint">
@@ -212,19 +209,19 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
           ))}
         </fieldset>
         <div className="rep-actions">
-          <button type="button" onClick={showPreview} disabled={none || busy} className="rep-btn rep-btn-primary" aria-describedby="rep-preview-why">
+          <Button onClick={() => !previewBlocked && showPreview()} aria-disabled={previewBlocked || undefined} aria-describedby={`${whyId}-preview`}>
             <Eye className="size-3.5" aria-hidden /> {preview.kind === "loading" ? "Loading preview…" : "Preview report"}
-          </button>
-          <button type="button" onClick={generatePdf} disabled={Boolean(pdfReason) || busy} className="rep-btn" aria-describedby="rep-pdf-why">
+          </Button>
+          <Button variant="outline" onClick={() => !pdfBlocked && generatePdf()} aria-disabled={pdfBlocked || undefined} aria-describedby={`${whyId}-pdf`}>
             <FileText className="size-3.5" aria-hidden /> {pdf.kind === "generating" ? "Generating…" : "Generate PDF"}
-          </button>
-          <button type="button" onClick={clear} disabled={none} className="rep-btn rep-btn-quiet">
+          </Button>
+          <Button variant="quiet" onClick={() => !none && clear()} aria-disabled={none || undefined}>
             <X className="size-3.5" aria-hidden /> Clear selection
-          </button>
-          <span id="rep-preview-why" className="rep-reason">
+          </Button>
+          <span id={`${whyId}-preview`} className="rep-reason">
             {none ? "Pick at least one run." : ""}
           </span>
-          <span id="rep-pdf-why" className="rep-reason">
+          <span id={`${whyId}-pdf`} className="rep-reason">
             {pdfReason && !none ? `${pdfReason}.` : ""}
           </span>
         </div>
@@ -241,13 +238,13 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
 function PdfStatus({ state, onRetry }: { state: PdfState; onRetry: () => void }) {
   const failed = state.kind === "failed" || state.kind === "unsupported";
   return (
-    <p role="status" aria-live="polite" className={cn("rep-status", failed && "is-error")} data-pdf={state.kind}>
+    <p role="status" className={cn("rep-status", state.kind === "idle" && "sr-only", failed && "is-error")} data-pdf={state.kind}>
       {state.kind === "generating" && "Generating the PDF on this computer — the download starts when the file is complete."}
       {state.kind === "done" && `Downloaded ${state.name}.`}
       {state.kind === "unsupported" && (
         <>
           {state.message}{" "}
-          <a href={state.html} download className="rep-link">
+          <a href={state.html} download className="ui-link inline-flex items-center gap-1">
             <Download className="size-3.5" aria-hidden /> Download HTML
           </a>
         </>
@@ -255,7 +252,7 @@ function PdfStatus({ state, onRetry }: { state: PdfState; onRetry: () => void })
       {state.kind === "failed" && (
         <>
           The PDF could not be generated: {state.message}.{" "}
-          <button type="button" onClick={onRetry} className="rep-link">
+          <button type="button" onClick={onRetry} className="ui-link">
             Retry
           </button>
         </>

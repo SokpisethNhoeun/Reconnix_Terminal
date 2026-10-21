@@ -4,7 +4,7 @@ saved copy; a cancelled turn drops its Agent (no dangling tool calls in its hist
 import json
 
 from reconix import store
-from reconix.store import agent_run
+from reconix.store import agent_run, lists
 from reconix.store.snapshot import snapshot
 
 from .support import TEST_PASSWORD, run_to
@@ -60,3 +60,13 @@ def test_a_refused_run_scan_is_audited_with_its_tools_and_host():
                             "args": {"target": "http://evil.example.net", "tools": ["nmap"]}})
     verdict = store.list_verdicts()[-1]
     assert (verdict.method, verdict.path) == ("SCAN", "nmap http://evil.example.net")
+
+
+def test_plan_labels_are_masked_before_they_are_cut():
+    """A credential URL longer than the label cut must not leave a password prefix behind."""
+    run_to("account")
+    secret_url = f"https://administrator:{TEST_PASSWORD}@app.example.com/login"
+    agent_run.set_plan([{"text": f"Scan the login at {secret_url}", "status": "pending"}])
+    labels = [task.label for task in lists.current().plan]
+    assert labels and all(TEST_PASSWORD[:8] not in label for label in labels)
+    assert "••••" in labels[0]

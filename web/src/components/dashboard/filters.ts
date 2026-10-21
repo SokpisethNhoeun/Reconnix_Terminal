@@ -2,11 +2,15 @@
    no React), so the views and the unit tests share them. Filter values come from the address
    (`?sev=HIGH,LOW&val=review&q=sql`), so anything unknown is ignored rather than trusted. */
 import type { FindingRow } from "@/components/dashboard/derive";
-import type { LibraryItem } from "@/lib/data/view-types";
+import { SEVERITIES } from "@/lib/data/schema";
+import type { LibraryItem, Severity } from "@/lib/data/view-types";
 import { type Paging, pageOf, paginate, slicePage } from "@/lib/paging";
-import { FINDING_REVIEW, RUN_STATUS } from "@/lib/status";
+import { FINDING_REVIEW, RUN_STATUS, SEVERITY_META, toneColor } from "@/lib/status";
 
-export const SEVERITY_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
+import { plural } from "./derive-shared";
+
+/** Worst first: the schema's order (lib/data/schema.ts). */
+export const SEVERITY_ORDER = SEVERITIES;
 
 /** Validation buckets: confirmed; open and not confirmed (to review); closed by triage. */
 export const VALIDATION = ["confirmed", "review", "closed"] as const;
@@ -34,8 +38,8 @@ export function reviewLabel(f: FindingRow): string {
 /** The view's first line: how many findings, across how many assessments when every run is shown. */
 export function findingsHeadline(total: number, across: number | null): string {
   if (total === 0) return across !== null ? "No findings in any saved assessment yet." : "No findings in this assessment yet.";
-  const runs = across !== null ? ` across ${across} ${across === 1 ? "assessment" : "assessments"}` : "";
-  return `${total} ${total === 1 ? "finding" : "findings"}${runs} · select one to see its evidence and remediation.`;
+  const runs = across !== null ? ` across ${plural(across, "assessment")}` : "";
+  return `${plural(total, "finding")}${runs} · select one to see its evidence and remediation.`;
 }
 
 /** Whether an address's `finding` value looks like a key the view hands out (`F-001`, or
@@ -70,8 +74,36 @@ export function findingMatches(f: FindingRow, { sev, val, q }: FindingFilter): b
 
 /** Highest severity first, then the highest CVSS. */
 export function sortFindings(findings: FindingRow[]): FindingRow[] {
-  const rank = (s: string) => SEVERITY_ORDER.indexOf(s as (typeof SEVERITY_ORDER)[number]);
+  const rank = (s: string) => SEVERITY_ORDER.indexOf(s as Severity);
   return [...findings].sort((a, b) => rank(a.severity) - rank(b.severity) || (b.score ?? 0) - (a.score ?? 0));
+}
+
+/** A filter chip: a value with how many items have it, its meaning's label, colour and hint. */
+export interface ChipOption {
+  value: string;
+  label: string;
+  count: number;
+  color?: string; // its meaning's colour (a CSS variable), shown as a dot beside the label
+  hint?: string; // what it means (the tooltip)
+}
+
+/** One chip per severity (lib/status.ts SEVERITY_META), worst first; levels with no finding
+    are left out unless they are selected (so a selection can always be undone). */
+export function severityChips(findings: FindingRow[], selected: readonly string[]): ChipOption[] {
+  return countBy(findings, (f) => f.severity, SEVERITY_ORDER)
+    .filter((c) => c.count > 0 || selected.includes(c.value))
+    .map((c) => {
+      const meaning = SEVERITY_META[c.value as Severity];
+      return { ...c, label: c.value.toLowerCase(), color: meaning?.color, hint: meaning ? `${meaning.label}: ${meaning.hint}` : undefined };
+    });
+}
+
+/** One chip per validation bucket (lib/status.ts FINDING_REVIEW), every bucket listed. */
+export function validationChips(findings: FindingRow[]): ChipOption[] {
+  return countBy(findings, validationOf, VALIDATION).map((c) => {
+    const meaning = FINDING_REVIEW[c.value as Validation];
+    return { ...c, label: meaning.label, color: toneColor(meaning.tone), hint: meaning.hint };
+  });
 }
 
 

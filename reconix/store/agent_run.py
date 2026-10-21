@@ -227,7 +227,8 @@ def set_plan(steps) -> None:
     tasks = []
     for i, step in enumerate(steps or []):
         key = f"s{i}"
-        label = (str(step.get("text", "")).strip() or f"step {i + 1}")[:48]
+        # masked before the cut: a credential URL cut mid-password would slip past redact()
+        label = (redact(str(step.get("text", "")).strip()) or f"step {i + 1}")[:48]
         tasks.append(PlanTask(key=key, label=label))
         run.progress[key] = _PCT.get(str(step.get("status", "")).lower(), 0)
     lists.current().plan = tasks

@@ -5,13 +5,14 @@ import { DashCard } from "@/components/dashboard/dash-card";
 import { EventLanes } from "@/components/dashboard/event-lanes";
 import type { ActivityCard } from "@/components/dashboard/overview-types";
 import { RunsPerDay } from "@/components/dashboard/runs-per-day";
+import { DOCS } from "@/lib/docs-nav";
 
 export function ActivityTimeline({ data }: { data: ActivityCard }) {
   return (
     <DashCard
       id="activity-timeline"
       title="Activity Timeline"
-      docsHref="/docs/assessment-guide"
+      docsHref={DOCS.assessmentGuide}
       meta={data.window}
       className="dash-panel"
       bodyClassName="flex flex-col gap-2"

@@ -4,9 +4,9 @@
    template=API`), so anything unknown is ignored rather than trusted. */
 import type { LibraryItem, Status } from "@/lib/data/view-types";
 import { ASSESSMENT_KEYS } from "@/components/dashboard/view-url";
-import { RUN_STATUS } from "@/lib/status";
+import { RUN_STATUS, toneColor } from "@/lib/status";
 
-import { countBy, list, runMatches } from "./filters";
+import { type ChipOption, countBy, list, runMatches } from "./filters";
 
 /** The address keys the view owns: view-url.ts's one list (a drill-down link clears exactly these). */
 export { ASSESSMENT_KEYS };
@@ -58,3 +58,13 @@ export function templateCounts(rows: LibraryItem[]): ChipCount[] {
     .filter((c) => c.count > 0)
     .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
 }
+
+/** The status chips: each status some run has, with its meaning (lib/status.ts RUN_STATUS). */
+export const statusChips = (rows: LibraryItem[]): ChipOption[] =>
+  statusCounts(rows).map((c) => {
+    const meaning = RUN_STATUS[c.value as Status];
+    return { ...c, label: meaning.label, color: toneColor(meaning.tone), hint: meaning.hint };
+  });
+
+/** The template chips: each template some run used. */
+export const templateChips = (rows: LibraryItem[]): ChipOption[] => templateCounts(rows).map((c) => ({ ...c, label: c.value, hint: `Runs of the ${c.value} template` }));

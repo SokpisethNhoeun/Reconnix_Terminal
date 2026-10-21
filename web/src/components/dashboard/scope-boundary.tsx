@@ -6,10 +6,11 @@ import { ChipList } from "@/components/dashboard/chip-panel";
 import { DashCard } from "@/components/dashboard/dash-card";
 import type { Boundary } from "@/components/dashboard/scope-types";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { DOCS } from "@/lib/docs-nav";
 
 export function ScopeBoundary({ data }: { data: Extract<Boundary, { mode: "run" }> }) {
   return (
-    <DashCard id="scope-boundary" title="Boundary" docsHref="/docs/assessment-guide/scope" className="dash-panel" bodyClassName="flex flex-col gap-4">
+    <DashCard id="scope-boundary" title="Boundary" docsHref={DOCS.scope} className="dash-panel" bodyClassName="flex flex-col gap-4">
       <div>
         <h3 className="dash-subhead">
           <Check className="size-3.5 text-success" aria-hidden /> In scope

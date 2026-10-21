@@ -10,8 +10,8 @@ import { TEMPLATES, type Dashboard } from "@/components/dashboard/derive";
 import { Popover } from "@/components/dashboard/popover";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { RUN_STATUS, STEP_STATUS } from "@/lib/status";
+import { DOCS } from "@/lib/docs-nav";
 
-const LINK = "rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export interface RunChipsData {
   assessment: Pick<Dashboard["assessment"], "target" | "template" | "status" | "progress">;
@@ -71,7 +71,7 @@ export function RunChips({ dash }: { dash: RunChipsData }) {
             );
           })}
         </ul>
-        <Link href="/docs/assessment-guide/request" className={`inline-block ${LINK}`}>
+        <Link href={DOCS.request} className="ui-link inline-block">
           About templates
         </Link>
       </Popover>

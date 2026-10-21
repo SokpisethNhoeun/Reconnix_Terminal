@@ -7,6 +7,7 @@ import { useAssistant } from "@/components/assistant/assistant-provider";
 import type { OverviewCards } from "@/components/dashboard/derive";
 import { TypedPlaceholder } from "@/components/dashboard/typed-placeholder";
 import { openAssistant } from "@/components/dashboard/view-url";
+import { DOCS } from "@/lib/docs-nav";
 
 // Ask bar: the AI Assistant's entry, at the foot of the Overview's hero. A click anywhere on it
 // opens the assistant (once: opening while it is open does nothing); its field edits the same
@@ -72,7 +73,7 @@ export function AskBar({ data }: { data: OverviewCards["ask"] }) {
           <Target className="size-3 text-primary" aria-hidden /> {data.reach}
         </span>
         <Link
-          href="/docs/guardrails/llm-data-handling"
+          href={DOCS.llmData}
           data-keep
           className="dash-chip ml-auto h-[26px] rounded-sm text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >

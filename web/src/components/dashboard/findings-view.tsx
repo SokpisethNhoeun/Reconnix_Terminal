@@ -8,9 +8,6 @@ import { FilterChips, FilterSummary, SearchField } from "@/components/dashboard/
 import { FindingDetail } from "@/components/dashboard/finding-detail";
 import { FindingsList } from "@/components/dashboard/findings-list";
 import {
-  SEVERITY_ORDER,
-  VALIDATION,
-  countBy,
   filterActive,
   filterPatch,
   findingMatches,
@@ -20,17 +17,18 @@ import {
   parseFindingFilter,
   resolveFindingsPage,
   safeFindingKey,
+  severityChips,
   sortFindings,
-  validationOf,
+  validationChips,
 } from "@/components/dashboard/filters";
-import { FINDINGS_KEYS, useQueryParams } from "@/components/dashboard/view-url";
+import { ViewHeader } from "@/components/dashboard/view-header";
+import { FINDINGS_KEYS, useQueryParams, writeQuery } from "@/components/dashboard/view-url";
+import { EmptyNote } from "@/components/ui/empty-note";
 import { ListDetail } from "@/components/ui/list-detail";
-import type { Severity } from "@/lib/data/view-types";
-import { FINDING_REVIEW, SEVERITY_META, toneColor } from "@/lib/status";
+import { DOCS } from "@/lib/docs-nav";
+import { revealCentred, revealTop } from "@/lib/scroll";
 
 const NARROW = "(max-width: 1023.98px)"; // one pane at a time (components/ui/list-detail.tsx)
-const LINK = "rounded-sm text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-const NOTICE_BTN = "rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 const narrow = () => window.matchMedia(NARROW).matches;
 
@@ -45,15 +43,17 @@ interface FindingState {
 
 const pushedHere = (): boolean => (window.history.state as FindingState | null)?.rxFinding === true;
 
-/** Names `key` in the address: as a new history entry (`push`), or in place keeping the mark. */
-function writeFinding(key: string, mode: "push" | "replace"): void {
+/** Names `key` in the address: as a new history entry (`push`), or in place keeping the mark;
+    `done` runs once it is written (view-url.ts: now, or after hydration). */
+function writeFinding(key: string, mode: "push" | "replace", done?: () => void): boolean {
   const params = new URLSearchParams(window.location.search);
   params.set("finding", key);
   const state: FindingState = { rxFinding: mode === "push" || pushedHere() };
-  window.history[mode === "push" ? "pushState" : "replaceState"](state, "", `?${params.toString()}`);
+  return writeQuery(params, mode, state, done);
 }
 
-// Hydrated or not, without an effect: the server snapshot says no, the browser's says yes.
+// Hydrated or not, without an effect: the server snapshot says no, the browser's says yes. Only
+// the e2e specs read it (`data-ready`); the address writers gate themselves (view-url.ts).
 const subscribeNever = () => () => {};
 const useHydrated = () => useSyncExternalStore(subscribeNever, () => true, () => false);
 
@@ -69,11 +69,7 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
   const [p, update] = useQueryParams(FINDINGS_KEYS);
   const root = useRef<HTMLDivElement>(null);
   const detail = useRef<HTMLElement>(null);
-  // The controls act once the view has hydrated: a click replayed from before that would change
-  // the address before the router listens for it, and the view would not follow. Until then
-  // the buttons also take no pointer events (findings.css), so a tester's click waits.
   const ready = useHydrated();
-  const guard = <A extends unknown[]>(fn: (...args: A) => void) => (...args: A) => { if (ready) fn(...args); };
   // The row a phone opened last: highlighted and focused again when Back returns to the list.
   const [lastOpened, setLastOpened] = useState<string | null>(null);
 
@@ -86,24 +82,23 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
   const highlight = !page.explicit && lastOpened && page.rows.some((f) => f.key === lastOpened) ? lastOpened : page.current?.key ?? null;
 
   // A row: on a phone or tablet the detail pane replaces the list, as a history entry.
-  const open = guard((key: string) => {
+  const open = (key: string) => {
     if (!narrow()) return update({ finding: key });
-    setLastOpened(key);
-    writeFinding(key, "push");
-  });
-  const select = guard((key: string) => {
+    writeFinding(key, "push", () => setLastOpened(key)); // the row to return to, once the pane is open
+  };
+  const select = (key: string) => {
     if (narrow() && page.explicit) return writeFinding(key, "replace"); // the pane stays, and so does its mark
     update({ finding: key, page: "" });
-  });
-  const back = guard(() => {
+  };
+  const back = () => {
     if (pushedHere()) return window.history.back();
     update({ finding: "" }); // a link or a reload opened the detail: nothing to go back to
-  });
+  };
 
   // The phone's panes and the keyboard: the detail pane takes focus and starts at its top (the
   // list may have been scrolled far down); back on the list, the row opened last takes focus
-  // again, which brings it into view. The window is scrolled by hand, never with scrollIntoView
-  // (that would also move where the keyboard's Tab starts from).
+  // again, which brings it into view (lib/scroll.ts: by hand, never scrollIntoView, at the
+  // content area's scroll padding).
   const wasPane = useRef(pane);
   useEffect(() => {
     const was = wasPane.current;
@@ -113,40 +108,31 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
       const el = detail.current;
       if (!el) return;
       el.focus({ preventScroll: true });
-      const top = el.getBoundingClientRect().top;
-      const margin = 12; // the content area's scroll padding
-      if (top < 0 || top > margin) window.scrollTo({ top: Math.max(0, window.scrollY + top - margin), behavior: "instant" });
+      revealTop(el);
     } else if (was === "detail" && lastOpened) {
       const el = root.current?.querySelector<HTMLElement>(`[data-finding-key="${CSS.escape(lastOpened)}"]`);
       if (!el) return;
       el.focus({ preventScroll: true });
-      const r = el.getBoundingClientRect();
-      if (r.top < 0 || r.bottom > window.innerHeight) window.scrollTo({ top: Math.max(0, window.scrollY + r.top - (window.innerHeight - r.height) / 2), behavior: "instant" });
+      revealCentred(el);
     }
   }, [pane, page.current?.key, lastOpened]);
 
-  const setFilter = guard((patch: Partial<Record<"sev" | "val" | "q", string>>) => {
+  const setFilter = (patch: Partial<Record<"sev" | "val" | "q", string>>) => {
     const nextFilter = parseFindingFilter({ ...p, ...patch });
     update({ ...patch, ...filterPatch(findings, nextFilter, p.finding) });
-  });
+  };
   const clearFilters = () => setFilter({ sev: "", val: "", q: "" });
 
-  const sevChips = countBy(findings, (f) => f.severity, SEVERITY_ORDER)
-    .filter((c) => c.count > 0 || filter.sev.includes(c.value))
-    .map((c) => ({ ...c, label: c.value.toLowerCase(), color: SEVERITY_META[c.value as Severity]?.color }));
-  const valChips = countBy(findings, validationOf, VALIDATION).map((c) => {
-    const meaning = FINDING_REVIEW[c.value as keyof typeof FINDING_REVIEW];
-    return { ...c, label: meaning?.label ?? c.value, color: meaning ? toneColor(meaning.tone) : undefined, hint: meaning?.hint };
-  });
+  const sevChips = severityChips(findings, filter.sev);
+  const valChips = validationChips(findings);
   // the address's finding is repeated only when it looks like a key (it is untrusted input)
   const named = safeFindingKey(p.finding) ? <span className="font-mono text-foreground">{p.finding}</span> : null;
 
   return (
     <div ref={root} className="dash-view dash-findings" data-pane={pane} data-ready={ready ? "" : undefined}>
-      <header className="mb-3">
-        <h1 className="text-[20px] font-medium text-foreground">Findings</h1>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">{findingsHeadline(findings.length, across)}</p>
-      </header>
+      <div className="mb-3">
+        <ViewHeader title="Findings" about={findingsHeadline(findings.length, across)} />
+      </div>
 
       {findings.length > 0 && (
         <div className="dash-findings-filters mb-4 flex flex-col gap-2.5">
@@ -162,21 +148,19 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
               onChange={([next]) => setFilter({ val: next === p.val ? "" : next })}
             />
           </div>
-          <FilterSummary shown={sorted.length} total={findings.length} noun="findings" active={active} onClear={clearFilters} />
+          <FilterSummary shown={sorted.length} total={findings.length} noun="finding" active={active} onClear={clearFilters} />
         </div>
       )}
 
       {findings.length === 0 && (
-        <p className="dash-findings-empty rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+        <EmptyNote className="dash-findings-empty">
           {across !== null
             ? "Findings appear here once a saved assessment records some."
             : "Findings appear here once this assessment's run records some. The Overview shows how far the run has come."}
-        </p>
+        </EmptyNote>
       )}
 
-      {findings.length > 0 && sorted.length === 0 && (
-        <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">No finding matches these filters.</p>
-      )}
+      {findings.length > 0 && sorted.length === 0 && <EmptyNote>No finding matches these filters.</EmptyNote>}
 
       {page.missing && (
         <p role="status" className="dash-findings-notice mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
@@ -192,11 +176,11 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
             )}
           </span>
           {page.missing === "filtered" && (
-            <button type="button" onClick={guard(() => update({ sev: "", val: "", q: "", page: "" }))} className={NOTICE_BTN}>
+            <button type="button" onClick={() => update({ sev: "", val: "", q: "", page: "" })} className="ui-link">
               Show it
             </button>
           )}
-          <button type="button" onClick={guard(() => update({ finding: "" }))} className={NOTICE_BTN}>
+          <button type="button" onClick={() => update({ finding: "" })} className="ui-link">
             Dismiss
           </button>
         </p>
@@ -208,14 +192,14 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
           onBack={back}
           backLabel="Back to the findings"
           listLabel="Findings list"
-          list={<FindingsList rows={page.rows} currentKey={highlight} paging={page.paging} onOpen={open} onPage={guard((n: number) => update(pagePatch(sorted, n, p.finding)))} />}
+          list={<FindingsList rows={page.rows} currentKey={highlight} paging={page.paging} onOpen={open} onPage={(n) => update(pagePatch(sorted, n, p.finding))} />}
           detail={<FindingDetail ref={detail} finding={page.current} position={{ index: page.index, total: sorted.length }} prev={prev} next={next} onSelect={select} />}
         />
       )}
 
       <p className="dash-findings-foot mt-4 text-xs text-muted-foreground">
         See{" "}
-        <Link href="/docs/reports/understanding-findings" className={LINK}>
+        <Link href={DOCS.findings} className="ui-link">
           the findings format
         </Link>{" "}
         for how severity, validation and evidence are recorded.

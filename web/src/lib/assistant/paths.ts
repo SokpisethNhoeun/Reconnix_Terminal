@@ -8,6 +8,5 @@ export const isAssistantPath = (pathname: string) => pathname === ASSISTANT_ROUT
 export const CONVERSATIONS_ROUTE = `${ASSISTANT_ROUTE}/conversations`;
 /** One saved conversation (GET, PATCH to rename, DELETE). */
 export const conversationRoute = (id: string) => `${CONVERSATIONS_ROUTE}/${encodeURIComponent(id)}`;
-export const ASSISTANT_PAGE = "/assistant";
 /** The assistant on the dashboard page; /assistant redirects here. */
 export const ASSISTANT_VIEW = "/?view=assistant";

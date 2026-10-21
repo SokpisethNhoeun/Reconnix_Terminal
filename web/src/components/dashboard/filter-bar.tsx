@@ -1,18 +1,17 @@
 "use client";
 
-/* The Findings view's filter controls: toggle chips with counts, a
-   search field, and a "Clear filters" button. Purely presentational: the views keep the
-   values in the address (view-url.ts) and do the filtering. */
+/* The Findings and Assessments views' filter controls: toggle chips with counts (ChipOption,
+   built by the filters modules from lib/status.ts), a search field, and "Showing 4 of 60 · Clear
+   filters". Purely presentational: the views keep the values in the address (view-url.ts) and
+   do the filtering. */
 import { Search, X } from "lucide-react";
+
+import { plural } from "@/components/dashboard/derive-shared";
+import type { ChipOption } from "@/components/dashboard/filters";
+import { toneColor } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
-export interface ChipOption {
-  value: string;
-  label: string;
-  count: number;
-  color?: string; // its meaning's colour (a CSS variable), shown as a dot beside the label
-  hint?: string; // what it means (the tooltip)
-}
+export type { ChipOption };
 
 const CHIP =
   "dash-chip h-[26px] gap-1.5 border px-2.5 text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40";
@@ -40,7 +39,7 @@ export function FilterChips({
       <span className="mr-0.5 text-[11px] text-muted-foreground">{label}</span>
       {options.map((o) => {
         const on = selected.includes(o.value);
-        const color = o.color ?? "var(--primary)";
+        const color = o.color ?? toneColor("primary"); // a chip without a meaning of its own (a template)
         return (
           <button
             key={o.value}
@@ -78,19 +77,16 @@ export function SearchField({ value, onChange, placeholder, label }: { value: st
   );
 }
 
-/** "Showing 4 of 60 · Clear filters" (the button only while a filter is on). */
+/** "Showing 4 of 60 findings · Clear filters" (the button only while a filter is on); `noun` is
+    the singular. The filters' one live region. */
 export function FilterSummary({ shown, total, noun, active, onClear }: { shown: number; total: number; noun: string; active: boolean; onClear: () => void }) {
   return (
     <div className="flex items-center gap-2 text-[11px] text-muted-foreground" aria-live="polite">
       <span>
-        Showing <span className="tabnums text-foreground">{shown}</span> of <span className="tabnums">{total}</span> {noun}
+        Showing <span className="tabnums text-foreground">{shown}</span> of <span className="tabnums">{plural(total, noun)}</span>
       </span>
       {active && (
-        <button
-          type="button"
-          onClick={onClear}
-          className="inline-flex items-center gap-1 rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
+        <button type="button" onClick={onClear} className="ui-link inline-flex items-center gap-1">
           <X className="size-3" aria-hidden /> Clear filters
         </button>
       )}

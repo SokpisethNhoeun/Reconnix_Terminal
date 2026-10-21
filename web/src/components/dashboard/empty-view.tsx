@@ -4,9 +4,9 @@ import Link from "next/link";
 import { FolderOpen } from "lucide-react";
 
 import type { Problem } from "@/lib/data/store";
+import { DOCS } from "@/lib/docs-nav";
 
 const CODE = "rounded bg-muted px-1.5 py-0.5 font-mono text-[12px] text-foreground";
-const LINK = "rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function EmptyView({ dir, problems, compact = false }: { dir: string; problems: Problem[]; compact?: boolean }) {
   if (compact) {
@@ -44,7 +44,7 @@ export function EmptyView({ dir, problems, compact = false }: { dir: string; pro
             </ul>
           </div>
         )}
-        <Link href="/docs/getting-started" className={`w-fit text-sm ${LINK}`}>
+        <Link href={DOCS.gettingStarted} className="ui-link w-fit text-sm">
           Getting started
         </Link>
       </section>

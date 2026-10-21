@@ -1,10 +1,13 @@
 "use client";
 
 /* Copy text to the clipboard, with "Copied" (or why not) for a moment after. The text is read
-   when pressed, so a reply still streaming copies what is there then. */
+   when pressed, so a reply still streaming copies what is there then. The label is static (read
+   by screen readers) and the state is the one live region, so a press is announced once; the
+   button's name follows the state ("Copy code Copied"). */
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+
+import { Button } from "@/components/ui/button";
 
 export function CopyButton({ text, label, className }: { text: string | (() => string); label: string; className?: string }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
@@ -25,9 +28,10 @@ export function CopyButton({ text, label, className }: { text: string | (() => s
   const Icon = state === "copied" ? Check : state === "failed" ? X : Copy;
   const shown = state === "copied" ? "Copied" : state === "failed" ? "Couldn't copy" : "Copy";
   return (
-    <button type="button" onClick={copy} aria-label={state === "idle" ? label : shown} title={label} className={cn("ai-btn ai-btn-small", className)}>
+    <Button variant="quiet" size="xs" onClick={copy} title={label} className={className}>
       <Icon className="size-3.5" aria-hidden />
+      <span className="sr-only">{label} </span>
       <span aria-live="polite">{shown}</span>
-    </button>
+    </Button>
   );
 }

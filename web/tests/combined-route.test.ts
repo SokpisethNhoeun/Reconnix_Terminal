@@ -15,7 +15,6 @@ const TOKEN = "route-test-token-0123456789";
 let cookie = "";
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: (name: string) => (name === COOKIE && cookie ? { value: cookie } : undefined) }) }));
 vi.mock("next/server", async (load) => ({ ...(await load<typeof import("next/server")>()), connection: async () => undefined }));
-vi.mock("@/lib/auth/guard", () => ({ requireViewer: async () => undefined }));
 
 const { GET } = await import("@/app/api/reports/combined/route");
 

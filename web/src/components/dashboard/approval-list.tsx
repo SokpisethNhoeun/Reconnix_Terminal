@@ -5,10 +5,11 @@ import { DashCard } from "@/components/dashboard/dash-card";
 import { RunLinkTo } from "@/components/dashboard/run-link";
 import type { ScopeCards } from "@/components/dashboard/scope-types";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { DOCS } from "@/lib/docs-nav";
 
 export function ApprovalList({ data }: { data: ScopeCards["approvals"] }) {
   return (
-    <DashCard id="scope-approvals" title="Approval requests" docsHref="/docs/guardrails/approval-model" meta={data.meta} className="dash-panel" bodyClassName="flex flex-col gap-2">
+    <DashCard id="scope-approvals" title="Approval requests" docsHref={DOCS.approvalModel} meta={data.meta} className="dash-panel" bodyClassName="flex flex-col gap-2">
       {data.rows.length ? (
         <ul aria-label="Approval requests" className="flex flex-col">
           {data.rows.map((a) => (
