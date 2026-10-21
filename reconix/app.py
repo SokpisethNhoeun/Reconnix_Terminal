@@ -74,6 +74,7 @@ class ReconixApp(NavigationMixin, RunHostMixin, ActionsMixin, AgentMixin, Dialog
     def on_unmount(self) -> None:
         # Quitting ends the session: mark the saved copies so the web dashboard shows an
         # unfinished run as interrupted rather than still waiting.
+        self.cancel_agent(mark_stopped=False)    # close_session marks it interrupted
         self.controller.stop()
         self.stop_web_dashboard()
         store.close_session()
