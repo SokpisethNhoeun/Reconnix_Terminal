@@ -10,7 +10,7 @@ import pytest
 from reconix import store
 from reconix.store import agent_run
 
-from .support import SIZE, settle
+from .support import SIZE, settle, wait_until
 
 
 @pytest.fixture
@@ -36,12 +36,14 @@ def _chat_texts():
 async def test_assess_enters_template_then_runs_on_scope_approval(app, model_active, fake_agent):
     async with app.run_test(size=SIZE) as pilot:
         app.run_command_line("/assess http://target.example")
-        await settle(pilot, rounds=8)
+        await wait_until(pilot, lambda: app.agent_mode, what="agent mode")
+        await settle(pilot)                            # the Template frame mounts
         assert app.agent_mode is True
         assert fake_agent == []                       # not run yet — waiting at Template/scope
 
         app.approve_scope()                            # operator approves the scope
-        await settle(pilot, rounds=10)
+        await wait_until(pilot, lambda: any("done with" in t for t in _chat_texts()),
+                         what="the agent reply")
         assert len(fake_agent) == 1                     # agent ran once
         assert "http://target.example" in fake_agent[0]  # on the approved target
         assert "authorized" in fake_agent[0].lower()     # told to proceed, not ask
@@ -55,7 +57,8 @@ async def test_natural_language_chats_with_the_agent(app, model_active, fake_age
     # A non-target sentence is a chat turn with the agent, not a scan target rejection.
     async with app.run_test(size=SIZE) as pilot:
         app.submit_request("what vulnerabilities should I look for?")
-        await settle(pilot, rounds=8)
+        await wait_until(pilot, lambda: any("done with what" in t for t in _chat_texts()),
+                         what="the agent reply")
         assert app.agent_mode is False                # plain chat, no assessment started
         assert store.get_run().started is False
         assert fake_agent == ["what vulnerabilities should I look for?"]
@@ -65,7 +68,8 @@ async def test_natural_language_chats_with_the_agent(app, model_active, fake_age
 async def test_typed_target_routes_to_agent_when_model_active(app, model_active, fake_agent):
     async with app.run_test(size=SIZE) as pilot:
         app.submit_request("scan http://host.example")
-        await settle(pilot, rounds=8)
+        await wait_until(pilot, lambda: app.agent_mode, what="agent mode")
+        await settle(pilot)                            # the Template frame mounts
         assert app.agent_mode is True                 # entered agent flow (Template), not run yet
         assert fake_agent == []
 
@@ -77,13 +81,14 @@ async def test_chat_blocked_while_running_then_allowed_when_done(app, model_acti
         app._agent_busy = True                        # a turn is running
         before = len(store.list_chat())
         app._send_to_agent("what have you found so far?")
-        await settle(pilot, rounds=4)
+        await settle(pilot)
         assert len(store.list_chat()) == before       # the line was not accepted
         assert fake_agent == []                        # no agent turn ran
 
         app._agent_busy = False                        # the assessment turn finished
         app._send_to_agent("now what did you find?")
-        await settle(pilot, rounds=8)
+        await wait_until(pilot, lambda: fake_agent == ["now what did you find?"],
+                         what="the agent turn")
         assert fake_agent == ["now what did you find?"]   # chat accepted once done
 
 
