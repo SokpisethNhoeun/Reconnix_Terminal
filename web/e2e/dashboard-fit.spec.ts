@@ -82,6 +82,9 @@ test.describe("at 1440×900 with motion on", () => {
     test(`the Overview for ${mode.name} fits once the intro has settled`, async ({ page }) => {
       await page.goto(`/?view=${mode.view}`);
       await expect(page.locator(".dash-overview")).toBeVisible();
+      // the intro's last frames: the frame scales in (transform) and a card still settles by a few px
+      // while it does; the layout is the one measured once the frame holds no transform
+      await page.waitForFunction(() => getComputedStyle(document.querySelector(".dash-frame")!).transform === "none", undefined, { timeout: 20_000 });
       await settled(page);
       const state = await fit(page);
       expect(state.overflow, `${mode.name}: the content area scrolls`).toBe(0);
