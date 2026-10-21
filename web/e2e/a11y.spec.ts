@@ -1,43 +1,19 @@
 /* Accessibility (docs/WEB_REDESIGN_V2_PLAN.md §6.5): an axe-core check (WCAG 2.2 A/AA rules) of
    the Overview, Findings, Scope and Reports (one run and every run) and the AI Assistant; the keyboard's path through the
    frame with a visible focus mark at every stop; where focus goes when the assistant opens and
-   closes; and the contrast of the meaning colours on the cards and in their badges. */
+   closes; and the contrast of the meaning colours on the cards and in their badges. The assistant
+   states that write a conversation are in e2e/a11y-assistant.spec.ts (run on their own). */
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { AxeBuilder } from "@axe-core/playwright";
 import { type Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
 
-import { hydrated, newest } from "./support";
+import { axe, show } from "./axe";
+import { newest } from "./support";
 
 const RUN = newest().uid;
-const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
-
-/* Known violations by page and axe rule (none today). Each entry is expected to be found, and the
-   test fails with "remove it from KNOWN" once it is gone, so a stale entry can't hide a new one. */
-const KNOWN: Record<string, string[]> = {};
-
-async function axe(page: Page, name: string) {
-  const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  const known = KNOWN[name] ?? [];
-  const found = violations
-    .filter((v) => !known.includes(v.id))
-    .map((v) => `${v.id} (${v.impact}): ${v.help} — ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(" | ")}`);
-  expect(found, `${name}: axe violations`).toEqual([]);
-  const ids = violations.map((v) => v.id);
-  for (const rule of known) expect(ids, `${name}: ${rule} is fixed: remove it from KNOWN`).toContain(rule);
-}
-
-async function show(page: Page, url: string) {
-  await page.goto(url);
-  // a dashboard view, or the assistant's composer (the views are all hidden behind it)
-  const ready = url.includes("view=assistant") ? page.getByRole("textbox", { name: /^Ask about/ }).last() : page.locator("main > :not([hidden])").first();
-  await expect(ready).toBeVisible();
-  await hydrated(page);
-}
-
 test.describe("axe", () => {
   test.use({ reducedMotion: "reduce" }); // everything on screen at once, nothing mid-animation
 
@@ -59,23 +35,11 @@ test.describe("axe", () => {
     });
   }
 
-  test("the assistant with a conversation has no violations", async ({ page }) => {
-    await show(page, "/?view=assistant");
-    const composer = page.getByRole("textbox", { name: /^Ask about/ }).last();
-    await composer.fill("Which runs wait on me?");
-    await expect(async () => {
-      if (await composer.inputValue()) await composer.press("Enter");
-      expect(await composer.inputValue()).toBe("");
-    }).toPass({ timeout: 15_000 });
-    await expect(page.getByRole("log", { name: "Conversation" })).toContainText("Which runs wait on me?");
-    await expect(page.getByRole("log", { name: "Conversation" })).not.toHaveAttribute("aria-busy", "true");
-    await axe(page, "assistant with a conversation");
-  });
 });
 
 /* More states, each one axe pass: the docs, the search open, the Report view with runs ticked, a
    preview and an error, a Findings list with no match and a finding's detail on a phone, the
-   assistant's History, the sign-in page, a 404, and the phone widths. */
+   sign-in page, a 404, and the phone widths. */
 const boxLabel = (page: Page) => page.locator("label").filter({ has: page.getByRole("checkbox", { name: /^Combine / }) });
 const frameHeading = (page: Page) => page.frameLocator('iframe[title="Combined report preview"]').getByRole("heading", { name: "Combined security assessment report" });
 
@@ -139,12 +103,6 @@ test.describe("axe, more states", () => {
     await axe(page, "findings empty");
   });
 
-  test("the assistant's History has no violations", async ({ page }) => {
-    await show(page, "/?view=assistant");
-    await page.getByRole("button", { name: /^History/ }).click();
-    await expect(page.getByRole("dialog", { name: "Conversation history" })).toBeVisible();
-    await axe(page, "assistant history");
-  });
 
   test("a 404 has no violations", async ({ page }) => {
     const res = await page.goto("/no-such-page");

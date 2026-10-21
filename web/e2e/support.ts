@@ -19,6 +19,18 @@ export async function signInFresh(page: Page, token = TOKEN) {
     The attribute sits on <html>, which Playwright never counts as "visible": wait for it attached. */
 export const hydrated = (page: Page) => page.locator("html[data-hydrated]").waitFor({ state: "attached" });
 
+/** A viewport's name in a test title. */
+export const sizeLabel = (s: { width: number; height: number }) => `${s.width}×${s.height}`;
+
+/** How far the page and the content area overflow sideways (0: nothing does). */
+export function sideways(page: Page) {
+  return page.evaluate(() => {
+    const root = document.scrollingElement!;
+    const main = document.querySelector("main")!;
+    return { page: root.scrollWidth - root.clientWidth, content: main.scrollWidth - main.clientWidth };
+  });
+}
+
 /** Wait for `n` painted frames (layout, observers and effects triggered by a change have run). */
 export const frames = (page: Page, n = 2) =>
   page.evaluate(

@@ -31,18 +31,26 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   /* `parallel`: the specs that share nothing, three at a time, with motion reduced (they test
-     content, not the transition). Then the specs that share the assistant's conversation folder
-     or need the whole CPU for frame timing run one after the other: each is its own project
-     chained by `dependencies`, so no two of them (nor any parallel spec) run at once. */
+     content, not the transition). Then, after it, the specs that write to the assistant's
+     conversation folder on one worker (`serial-assistant`: no two of them at once) and the one
+     that opens a terminal (`serial-terminal`: the helper allows two sessions); last, alone, the
+     one that needs the whole CPU for frame timing (`serial-motion`). */
   projects: [
     {
       name: "parallel",
-      testMatch: /(access|assessments|findings|docs|dashboard-fit|scroll|a11y|pages|reports|live-refresh)\.spec\.ts/,
+      testMatch: /\/(access|assessments|findings|docs|dashboard-fit|scroll|a11y|pages|reports|live-refresh)\.spec\.ts$/,
       fullyParallel: true,
       use: { ...DESKTOP, reducedMotion: "reduce" },
     },
-    { name: "serial-assistant", testMatch: /assistant\.spec\.ts/, dependencies: ["parallel"], use: { ...DESKTOP, reducedMotion: "reduce" } },
-    { name: "serial-motion", testMatch: /motion\.spec\.ts/, dependencies: ["serial-assistant"], use: DESKTOP },
+    {
+      name: "serial-assistant",
+      testMatch: /\/(assistant|a11y-assistant|scroll-assistant)\.spec\.ts$/,
+      workers: 1,
+      dependencies: ["parallel"],
+      use: { ...DESKTOP, reducedMotion: "reduce" },
+    },
+    { name: "serial-terminal", testMatch: /\/terminal\.spec\.ts$/, workers: 1, dependencies: ["parallel"], use: { ...DESKTOP, reducedMotion: "reduce" } },
+    { name: "serial-motion", testMatch: /\/motion\.spec\.ts$/, dependencies: ["serial-assistant", "serial-terminal"], use: DESKTOP },
   ],
   webServer: [
     {

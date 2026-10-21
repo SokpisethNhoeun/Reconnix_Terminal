@@ -1,6 +1,5 @@
 /* The globe dashboard on the sample data: every view, the assessment switcher, the report
-   downloads, the docs, and the Terminal view (with the stand-in program from
-   playwright.config.ts instead of the TUI). */
+   downloads and the docs. The Terminal view is e2e/terminal.spec.ts (run on its own). */
 import { type Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
@@ -208,20 +207,6 @@ test("a card opens its documentation", async ({ page }) => {
   await expect(page).toHaveURL(/\/docs\/reports\/understanding-findings$/);
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
   expect((await page.request.get(page.url())).status()).toBe(200);
-});
-
-test("the terminal view runs a session and keeps it while you browse", async ({ page }) => {
-  await signIn(page);
-  await page.click(view("Terminal"));
-  await expect(page.getByText("Connected", { exact: true })).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator(".xterm-rows")).toContainText("READY");
-  await page.locator(".xterm").click();
-  await page.keyboard.type("hello-reconix");
-  await expect(page.locator(".xterm-rows")).toContainText("hello-reconix");
-  await page.click(view("Overview"));
-  await page.click(view("Terminal"));
-  await expect(page.getByText("Connected", { exact: true })).toBeVisible();
-  await expect(page.locator(".xterm-rows")).toContainText("hello-reconix"); // the same session
 });
 
 test("the removed Audit log address opens the Overview", async ({ page }) => {
