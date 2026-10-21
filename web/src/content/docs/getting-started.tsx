@@ -112,8 +112,9 @@ export const gettingStarted: GroupContent = {
         <DocSection title="Authorization">
           <p>Written authorization for every target you plan to assess.</p>
           <Callout variant="warning" title="Authorized use only">
-            The scripted run enforces the scope you approve; the AI agent is bound only to the target and tool set you
-            approve. The authorization itself comes from you or your organization. See{" "}
+            The scripted run enforces the scope you approve. The AI agent is checked against it on every tool call
+            (target host, tool set, the time limit, methods and excluded paths on web scopes, ports on network
+            scopes), but the per-action approval gates are not applied to it. The authorization itself comes from you or your organization. See{" "}
             <DocLink href="/docs/guardrails/authorized-use">Authorized use</DocLink>.
           </Callout>
         </DocSection>

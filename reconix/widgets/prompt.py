@@ -18,7 +18,7 @@ from .history import PromptHistory
 
 
 class PromptInput(Input):
-    """An Input that offers ↑/↓, Tab, Esc and Ctrl+R to its PromptBox before the screen sees them."""
+    """An Input that offers ↑/↓, Tab, Esc and Ctrl+R to its PromptBox before the screen does."""
 
     BINDINGS = [
         Binding("up", "prompt('up')", "previous", show=False),
@@ -221,7 +221,8 @@ class PromptBox(Vertical):
             if self.menu_open:
                 self.menu.action_cursor_up() if key == "up" else self.menu.action_cursor_down()
             elif self._mode != "history":
-                text = self._history.older(self.input.value) if key == "up" else self._history.newer()
+                text = (self._history.older(self.input.value) if key == "up"
+                        else self._history.newer())
                 if text is not None:
                     self._set_text(text)
             return True

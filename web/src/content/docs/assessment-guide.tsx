@@ -463,7 +463,8 @@ export const assessmentGuide: GroupContent = {
             <li>
               The scope manifest lists the agent&apos;s whole tool set (the harness&apos;s scanners: gobuster, httpprobe,
               nikto, nmap, nuclei, sqlmap, whatweb, zap), since the agent plans dynamically. <strong>Approving the scope
-              is the authorization</strong>: the agent is told the engagement is approved and starts at once.
+              is the authorization</strong>: Reconix registers the approved target as authorized (the model does not
+              decide that), the agent is told the engagement is approved and starts at once.
             </li>
             <li>
               The Execution screen shows the agent&apos;s own plan as task rows (updated as it revises them), its tool
@@ -493,15 +494,24 @@ export const assessmentGuide: GroupContent = {
           </p>
         </DocSection>
         <DocSection title="What is and is not enforced">
-          <Callout variant="warning" title="Real tools, fewer guardrails">
+          <Callout variant="warning" title="Real tools, scope checked on every call">
             The agent runs real tools against the target you named. Only assess what you are authorized to test. In
-            agent mode the approved scope <strong>authorizes the target and the tool set</strong>, and that is all it
-            does: the allowed methods, the excluded paths, the ports, the time limit and the per-action approval gates
-            (MEDIUM, and the HIGH double check) are <strong>not enforced on the agent</strong>. It is told the engagement
-            is approved and not to ask for confirmation, and nothing it sends passes the policy engine. What does apply:
-            the scope approval before anything starts, the dialogs it opens for decisions and logins, the redaction of
-            the evidence it records, and the audit trail. Without a model or the harness, the scripted demo runs
-            instead.
+            agent mode Reconix checks <strong>every tool call</strong> against the scope you approved before it runs:
+            the target host (and, on a network scope, the port list), the allowed methods and excluded paths on a web
+            or API scope, the tool set and the time limit. A refused call is not executed; the agent is told why, and
+            the refusal appears as a policy line in the activity log, in the blocked count and in the audit trail.
+            Authorizing a target outside the scope is refused too, and a source-code scope refuses every network tool.
+            Two limits to know. The tool set is listed in full on the manifest before you approve, so it restricts the
+            agent only if you edit the tools down. And the check is on the call, not on the traffic inside it: a
+            scanner&apos;s own crawling or probing of an allowed target is not checked request by request, and a scan of
+            a bare host on a network scope is judged by host only (so nmap may then try every port). The per-action
+            approval gates (MEDIUM, and the HIGH double check) are <strong>not applied to the agent</strong>: it is
+            told the engagement is approved and not to ask for confirmation. A login request never follows redirects,
+            so credentials are not re-sent to another address. What also applies: the scope approval before anything
+            starts, the dialogs it opens for decisions and logins, the redaction of what it logs and the evidence it
+            records, and the audit trail. <Mono>/assess</Mono>, <Mono>/new</Mono>, opening another assessment and
+            quitting cancel a running agent turn; the run you leave is marked stopped. Without a model or the harness,
+            the scripted demo runs instead.
           </Callout>
         </DocSection>
       </>
