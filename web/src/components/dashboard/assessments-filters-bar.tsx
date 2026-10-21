@@ -6,6 +6,7 @@
    address and does the filtering (assessments-filters.ts). */
 import { type RunFilter, statusCounts, templateCounts } from "@/components/dashboard/assessments-filters";
 import { FilterChips, FilterSummary, SearchField } from "@/components/dashboard/filter-bar";
+import { RUN_SEARCH } from "@/components/dashboard/run-cells";
 import type { LibraryItem, Status } from "@/lib/data/view-types";
 import { RUN_STATUS, toneColor } from "@/lib/status";
 
@@ -33,7 +34,7 @@ export function AssessmentsFilters({
     <div className="asm-controls">
       <div className="asm-controls-row">
         <div className="w-full sm:w-[280px]">
-          <SearchField label="Search saved assessments" placeholder="ID, template, target, status…" value={filter.q} onChange={(q) => onChange({ q })} />
+          <SearchField label={RUN_SEARCH.label} placeholder={RUN_SEARCH.placeholder} value={filter.q} onChange={(q) => onChange({ q })} />
         </div>
         <FilterChips label="Status" multi options={statuses} selected={filter.status} onChange={(next) => onChange({ status: next.join(",") })} />
         <FilterChips label="Template" multi options={templates} selected={filter.template} onChange={(next) => onChange({ template: next.join(",") })} />

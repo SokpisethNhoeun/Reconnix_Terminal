@@ -54,7 +54,7 @@ export function FindingsList({
                 data-severity={f.severity}
                 aria-current={f.key === currentKey ? "true" : undefined}
                 onClick={() => onOpen(f.key)}
-                className="dash-finding-row flex items-start gap-3 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="ui-row flex items-start gap-3 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span className="dash-tile mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg">
                   <Icon className="size-4 text-muted-foreground" strokeWidth={1.6} aria-hidden />
