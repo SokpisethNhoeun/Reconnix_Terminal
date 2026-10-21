@@ -37,6 +37,11 @@ describe("maskDeep", () => {
   it("works whatever the elements hold, even the separator's own characters", () => {
     const odd = ["x\n\u0000\ny", "\u0000", "password=hunter2"];
     expect(maskDeep(odd)).toEqual(["x\n\u0000\ny", "\u0000", "password=••••"]);
+    // the separator formed across a boundary by the join
+    expect(maskDeep(["a\n\u0000", "x"])).toEqual(["a\n\u0000", "x"]);
+    expect(maskDeep(["a\n", "\u0000\nx"])).toEqual(["a\n", "\u0000\nx"]);
+    expect(maskDeep(["a\n\u0000", "\n\u0000\nx", "password=hunter2"])).toEqual(["a\n\u0000", "\n\u0000\nx", "password=••••"]);
+    expect(maskDeep(["a\n\u00000", "\u00000\u0000\nx", "\u00001\u0000"])).toEqual(["a\n\u00000", "\u00000\u0000\nx", "\u00001\u0000"]);
   });
 });
 

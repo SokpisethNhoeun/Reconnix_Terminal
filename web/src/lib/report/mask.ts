@@ -9,14 +9,24 @@ import type { Assessment } from "@/lib/data/schema";
 
 const isStrings = (value: unknown[]): value is string[] => value.length > 0 && value.every((v) => typeof v === "string"); // [] stays []
 
-/** A list of strings masked as one text: the elements are joined by a separator no element
-    holds (a newline inside it ends a value or a header line the way a line's end does, so no
-    pattern reads across the boundary except the private-key block, which is meant to) and
-    split back on it. A key block across elements leaves one element in their place. */
+/** A list of strings masked as one text: the elements are joined by a separator the joined text
+    splits back on exactly (a newline inside it ends a value or a header line the way a line's end
+    does, so no pattern reads across a boundary except the private-key block, which is meant to)
+    and split back on it. When a match did run across elements (a key block, a quoted value), the
+    elements it covered become one: masking them one by one instead would leave a key's middle
+    lines bare, since the BEGIN line is a match on its own. */
 function maskStrings(list: string[]): string[] {
-  let separator = "\n\u0000\n";
-  while (list.some((s) => s.includes(separator))) separator += "\u0000\n";
-  return redact(list.join(separator)).split(separator);
+  // "\n\u0000<n>\u0000\n" for the first n whose core no element holds: the core then occurs only
+  // inside a real separator (none of its characters is a newline, so it can't straddle one), so
+  // the split is exact; the round trip is checked all the same
+  let n = 0;
+  const separator = () => `\n\u0000${n}\u0000\n`;
+  const exact = () => {
+    const back = list.join(separator()).split(separator());
+    return back.length === list.length && back.every((s, i) => s === list[i]);
+  };
+  while (list.some((s) => s.includes(`\u0000${n}\u0000`)) || !exact()) n++;
+  return redact(list.join(separator())).split(separator());
 }
 
 /** `value` with every string inside it masked (arrays and plain objects are walked). */

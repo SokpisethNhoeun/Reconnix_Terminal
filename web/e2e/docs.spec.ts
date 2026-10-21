@@ -137,6 +137,42 @@ test("the search results move with ArrowDown and ArrowUp, and Escape closes them
   await expect(page.getByRole("heading", { level: 1 }).first()).toHaveText(second);
 });
 
+test("the box names the active result, keeps it in range when the hits shrink, opens it with Enter, and an option opens on click", async ({ page }) => {
+  await page.goto("/docs");
+  const box = page.getByRole("combobox", { name: "Search the documentation" });
+  const options = page.getByRole("listbox", { name: "Search results" }).getByRole("option");
+  const activeId = async () => (await box.getAttribute("aria-activedescendant"))!;
+  await box.fill("model");
+  const many = await options.count();
+  expect(many).toBeGreaterThan(2);
+  expect(await activeId()).toBe(await options.nth(0).getAttribute("id"));
+  for (let i = 0; i < many - 1; i++) await box.press("ArrowDown");
+  expect(await activeId()).toBe(await options.nth(many - 1).getAttribute("id")); // the last one
+  await box.press("ArrowDown"); // and no further
+  expect(await activeId()).toBe(await options.nth(many - 1).getAttribute("id"));
+  await box.press("ArrowUp");
+  expect(await activeId()).toBe(await options.nth(many - 2).getAttribute("id"));
+  // fewer hits: the active one is clamped to one that exists, and it is the one marked
+  await box.fill("/model");
+  const few = await options.count();
+  expect(few).toBeLessThan(many);
+  const marked = page.getByRole("listbox", { name: "Search results" }).getByRole("option", { selected: true });
+  await expect(marked).toHaveCount(1);
+  expect(await activeId()).toBe(await marked.getAttribute("id"));
+  expect(await page.locator(`[id="${await activeId()}"]`).count()).toBe(1); // it points at an element
+  await box.press("Escape");
+  await expect(box).not.toHaveAttribute("aria-activedescendant", /./);
+  await expect(options).toHaveCount(0);
+  await box.fill("/model");
+  await box.press("Enter");
+  await expect(page).toHaveURL(/\/docs\/commands\/model$/);
+  await box.fill("export");
+  await expect(options.first()).toBeVisible();
+  const chosen = (await options.first().locator("span").first().textContent())!;
+  await options.first().click();
+  await expect(page.getByRole("heading", { level: 1 }).first()).toHaveText(chosen);
+});
+
 test("every old docs address redirects to a page that exists", async ({ page }) => {
   await signIn(page);
   for (const r of DOCS_REDIRECTS) {
@@ -187,7 +223,7 @@ test.describe("on a phone", () => {
     await expect(page.locator('.docs-code pre[tabindex="0"]').first()).toBeVisible(); // hydrated and measured
     const blocks = await page.locator(".docs-code pre").evaluateAll((els) =>
       els.map((el) => ({
-        scrolls: el.scrollWidth > el.clientWidth,
+        scrolls: el.scrollWidth > el.clientWidth + 1, // ScrollRegion's own tolerance
         stop: el.getAttribute("tabindex") === "0" && el.getAttribute("role") === "region" && el.getAttribute("aria-label") === "Code",
       })),
     );

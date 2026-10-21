@@ -25,7 +25,7 @@ export function ScrollRegion({ as: Tag = "div", label, className, children, ...r
     const el = ref.current;
     if (el) setScrolls(el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1);
   };
-  useEffect(measure); // the content may have changed
+  useEffect(measure); // no dependency list: the content is whatever the parent rendered this time
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof ResizeObserver === "undefined") return;
@@ -34,9 +34,10 @@ export function ScrollRegion({ as: Tag = "div", label, className, children, ...r
     return () => observer.disconnect();
   }, []);
 
+  // the tab stop's attributes come last, so nothing in `rest` can override them
   const stop = scrolls ? { tabIndex: 0, role: "region", "aria-label": label } : {};
   return (
-    <Tag ref={ref} className={cn("ui-scroll-region", className)} {...stop} {...rest}>
+    <Tag ref={ref} className={cn("ui-scroll-region", className)} {...rest} {...stop}>
       {children}
     </Tag>
   );
