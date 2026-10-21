@@ -110,9 +110,11 @@ describe("the rows", () => {
     expect(slicePage(many, p2).map((r) => r.uid)).toEqual(many.slice(PER_PAGE, 2 * PER_PAGE).map((r) => r.uid));
     expect(slicePage(many, paginate(many.length, "3"))).toHaveLength(7);
     expect(slicePage(many, paginate(many.length, "9")).map((r) => r.uid)).toEqual(many.slice(20).map((r) => r.uid)); // clamped
-    const one = paginate(rows.length, "");
+    const few = rows.slice(0, PER_PAGE);
+    const one = paginate(few.length, "");
     expect(one.pages).toBe(1);
-    expect(slicePage(rows, one)).toHaveLength(rows.length);
+    expect(slicePage(few, one)).toHaveLength(few.length);
+    expect(paginate(rows.length, "").pages).toBe(Math.ceil(rows.length / PER_PAGE)); // the sample spans pages
   });
 });
 

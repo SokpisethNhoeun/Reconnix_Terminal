@@ -31,7 +31,11 @@ import { sampleAssessments } from "./fixtures";
 
 const samples = sampleAssessments();
 const waiting = samples.find((a) => a.status === "Awaiting input")!;
-const completed = samples.find((a) => a.status === "Completed" && a.template.name === "Web URL")!;
+// a plain run: no CRITICAL or INFO finding and no false positive (the edge-case runs are tested below)
+const completed = samples.find(
+  (a) => a.status === "Completed" && a.template.name === "Web URL" && a.findings.length > 0 && a.findings.every((f) => !["CRITICAL", "INFO"].includes(f.severity) && f.status !== "false-positive"),
+)!;
+const everySeverity = samples.find((a) => a.uid === "20260929-112000-8c51_RCX-DEMO-001")!;
 const activityOf = (a: Assessment) => deriveDashboard(assessmentView(a)).cards.activity as Extract<ActivityCard, { mode: "events" }>;
 const executionOf = (a: Assessment) => deriveDashboard(assessmentView(a)).cards.execution as Extract<ExecutionCard, { mode: "phases" }>;
 const inAxis = (p: number) => p >= 0 && p <= 1;
@@ -454,5 +458,19 @@ describe("chart tab stop", () => {
     expect(tabStop("b", ["a", "b"])).toBe("b");
     expect(tabStop("gone", ["a", "b"])).toBe("a"); // merged away by a refresh, or another run
     expect(tabStop("b", [])).toBeNull();
+  });
+});
+
+describe("the run with every severity and a false positive", () => {
+  const d = deriveDashboard(assessmentView(everySeverity));
+  const rows = d.cards.findings;
+
+  it("shows the CRITICAL and INFO rows, and leaves the false positive out of the total", () => {
+    expect(everySeverity.findings.some((f) => f.status === "false-positive")).toBe(true);
+    expect(d.findingTotal).toBe(everySeverity.findings.length - 1);
+    // the only INFO finding is the false positive: that row stays hidden, CRITICAL shows
+    expect(rows.severity.filter((s) => s.hidden).map((s) => s.level)).toEqual(["INFO"]);
+    expect(rows.severity.find((s) => s.level === "CRITICAL")!.count).toBe(1);
+    expect(rows.severity.reduce((n, s) => n + s.count, 0)).toBe(d.findingTotal);
   });
 });

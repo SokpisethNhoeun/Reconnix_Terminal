@@ -179,7 +179,7 @@ describe("pickCards", () => {
       for (const state of STATE_ORDER) expect(card.counts![state]).toBe(view.approvals.filter((x) => x.state === state).length);
       expect(card.more).toBe(0);
     }
-    expect([...states].sort()).toEqual(["APPROVED", "PENDING", "REJECTED"]); // what the sample data holds
+    expect([...states]).toEqual(expect.arrayContaining(["APPROVED", "PENDING", "REJECTED"])); // what the sample data holds (and NOT REACHED)
   });
   it("keeps the counts whole when the rows are cut: a rejected decision sorts last and drops first", () => {
     const all = views.flatMap((v) => v.approvals);
@@ -234,7 +234,9 @@ describe("pickCards", () => {
   it("offers one run's downloads, or asks which run", () => {
     expect(of(pickCards(samples, completed.uid, "Generate a report"), "report").runs).toHaveLength(1);
     const all = of(pickCards(samples, null, "Generate a report"), "report");
-    expect(all.runs.map((r) => r.run.uid)).toEqual(scopedViews(views, null).map((v) => v.uid));
+    // the card lists the newest runs (it caps the list), in the views' order
+    expect(all.runs.length).toBeGreaterThan(1);
+    expect(all.runs.map((r) => r.run.uid)).toEqual(scopedViews(views, null).map((v) => v.uid).slice(0, all.runs.length));
   });
   it("never answers an ordinary question about new findings or tools with a notice", () => {
     for (const q of ["Which findings are new in this assessment?", "Show me the new findings in the latest assessment"]) expect(kinds(pickCards(samples, null, q))).toEqual(["findings"]);
