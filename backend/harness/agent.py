@@ -372,9 +372,19 @@ TOOLS: list[dict[str, Any]] = [
 ]
 
 
+# Guard: (tool name, args) -> a refusal reason, or None/"" to let the call run.
+Guard = Callable[[str, dict], "str | None"]
+
+# Argument keys a ``policy`` event may carry (never passwords, tokens or bodies).
+_POLICY_ARGS = ("method", "url", "target", "value", "tools", "login_url", "profile")
+
+
 class Agent:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, guard: Guard | None = None):
         self.settings = settings
+        # An embedding app (Reconix) can veto any tool call before it runs. None = no check,
+        # which is how the harness's own CLI/TUI behaves.
+        self.guard = guard
         self.db = Database(settings.db_path)
         self.llm = LLMClient(settings.llm)
         self.analyzer = Analyzer(self.llm)
@@ -474,7 +484,25 @@ class Agent:
             await self._on_event(ev)
 
     # --- tool implementations ---------------------------------------------
+    async def _refusal(self, name: str, args: dict[str, Any]) -> dict[str, Any] | None:
+        """Ask the guard; on a refusal emit a ``policy`` event and return the error for the
+        model. A guard that raises refuses (fail closed). No guard, no check."""
+        if self.guard is None:
+            return None
+        try:
+            reason = self.guard(name, args)
+        except Exception as exc:  # noqa: BLE001 - an unreadable verdict is a refusal
+            reason = f"scope check failed ({type(exc).__name__})"
+        if not reason:
+            return None
+        shown = {k: args[k] for k in _POLICY_ARGS if k in args}
+        await self._emit({"type": "policy", "tool": name, "reason": reason, "args": shown})
+        return {"error": f"blocked by Reconix scope: {reason}"}
+
     async def _dispatch(self, name: str, args: dict[str, Any]) -> Any:
+        refused = await self._refusal(name, args)
+        if refused is not None:
+            return refused
         if name == "update_plan":
             return await self._update_plan(args)
         if name == "list_capabilities":
@@ -627,6 +655,10 @@ class Agent:
             return {"ok": True, "auth": "cookie", "cookie": vals["cookie"],
                     "header": f"Cookie: {vals['cookie']}"}
         if vals.get("username") and vals.get("login_url"):
+            # The operator typed this URL, but the login request still has to stay in scope.
+            refused = await self._refusal("login", {"url": vals["login_url"]})
+            if refused is not None:
+                return refused
             return await self._login({"url": vals["login_url"], "username": vals["username"],
                                       "password": vals.get("password", "")})
         return {"error": "need either a token/cookie, or login_url+username+password."}
