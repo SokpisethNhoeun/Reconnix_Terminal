@@ -2,7 +2,7 @@
    a command page has its sections, code blocks carry a Copy button, the docs search finds a
    command, every old address redirects to a live page, and on a phone the tree folds behind the
    "Docs menu" button with nothing overflowing sideways. */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 import { PORT } from "../playwright.config";
 import { DOCS_REDIRECTS } from "../src/lib/docs-redirects";

@@ -4,7 +4,9 @@
    the list pane that scrolls on its own on the fixed frame while the detail keeps its header,
    and the phone's list → detail → Back (a history entry). The every-run list of the sample data
    is the one with more than one page. */
-import { expect, type Page, test } from "@playwright/test";
+import { type Page } from "@playwright/test";
+
+import { expect, test } from "./fixtures";
 
 import { PER_PAGE } from "../src/lib/paging";
 import { hydrated, sample, signIn } from "./support";

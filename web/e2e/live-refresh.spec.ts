@@ -2,7 +2,7 @@
    (RECONIX_LIVE_REFRESH_MS=0: a self-refresh under a test would re-render a view mid-assertion),
    so it shows "Static". A second dashboard (playwright.config.ts, LIVE_PORT) refreshes every
    second: its pill is "Live", re-reads on its own, and pauses on a click. */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 import { LIVE_PORT, PORT } from "../playwright.config";
 import { hydrated } from "./support";

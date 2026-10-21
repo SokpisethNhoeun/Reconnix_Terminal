@@ -2,7 +2,9 @@
    the pager, the status and template chips, the search, a row opening that run's Overview, the
    filters kept in the address, no sideways overflow on a phone, and an axe check. */
 import { AxeBuilder } from "@axe-core/playwright";
-import { expect, type Page, test } from "@playwright/test";
+import { type Page } from "@playwright/test";
+
+import { expect, test } from "./fixtures";
 
 import { counted, hydrated, newest, sample } from "./support";
 

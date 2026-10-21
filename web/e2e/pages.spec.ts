@@ -1,7 +1,9 @@
 /* The globe dashboard on the sample data: every view, the assessment switcher, the report
    downloads, the docs, and the Terminal view (with the stand-in program from
    playwright.config.ts instead of the TUI). */
-import { expect, type Page, test } from "@playwright/test";
+import { type Page } from "@playwright/test";
+
+import { expect, test } from "./fixtures";
 
 import { PER_PAGE } from "../src/lib/paging";
 import { counted, hydrated, newest, sample, signIn, toolSteps } from "./support";

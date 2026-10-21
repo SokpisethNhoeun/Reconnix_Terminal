@@ -1,5 +1,5 @@
 /* Access control: sign-in, the roles on every page and route, Host checks, headers. */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 import { sessionValue } from "../src/lib/auth/session";
 import { PORT, TOKEN } from "../playwright.config";

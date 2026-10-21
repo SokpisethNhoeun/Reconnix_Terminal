@@ -4,7 +4,9 @@
    phones and reduced motion. The globe runs on SwiftShader here, so the timing tests hide its
    canvas (the carrier still travels) to keep the frames coming. Times are measured from the first
    frame that moves, with room for a slow (2–4 core) machine. */
-import { expect, type Page, test } from "@playwright/test";
+import { type Page } from "@playwright/test";
+
+import { expect, test } from "./fixtures";
 
 import { clickMoving, counted, newest, sample as savedRuns, signIn } from "./support";
 

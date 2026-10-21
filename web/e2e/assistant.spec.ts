@@ -8,7 +8,9 @@
    tested in motion.spec.ts) and clicks need no `force`. The
    stand-in model changes its answer only for explicit [stub:…] tokens. Conversations go to a
    test folder, and the e2e server allows more questions a minute (playwright.config.ts). */
-import { type BrowserContext, expect, type Page, test } from "@playwright/test";
+import { type BrowserContext, type Page } from "@playwright/test";
+
+import { expect, test } from "./fixtures";
 
 import { sessionValue } from "../src/lib/auth/session";
 import { PORT, TOKEN } from "../playwright.config";

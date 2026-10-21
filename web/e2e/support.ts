@@ -2,7 +2,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { expect, type Locator, type Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+
+import { expect } from "./fixtures";
 
 import { TOKEN } from "../playwright.config";
 

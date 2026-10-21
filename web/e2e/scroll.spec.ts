@@ -6,7 +6,9 @@
    because the old bug (Lenis taking the wheel on the dashboard) only existed with motion on.
    The long view they scroll is the every-run Report: on the fixed frame the Findings view
    scrolls its list pane, not the content area (e2e/findings.spec.ts). */
-import { type CDPSession, expect, type Page, test } from "@playwright/test";
+import { type CDPSession, type Page } from "@playwright/test";
+
+import { expect, test } from "./fixtures";
 
 import { clickMoving, frames, newest, signIn } from "./support";
 

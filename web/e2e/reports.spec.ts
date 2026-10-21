@@ -5,7 +5,9 @@
    offers the HTML), and the panel works at phone size. */
 import { readFileSync } from "node:fs";
 
-import { expect, type Page, test } from "@playwright/test";
+import { type Page } from "@playwright/test";
+
+import { expect, test } from "./fixtures";
 
 import { combinedHref } from "../src/lib/report/combined/options";
 import { hydrated, sample } from "./support";
