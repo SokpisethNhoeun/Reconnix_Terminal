@@ -93,14 +93,10 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
     setPreview((p) => (p.kind === "loading" ? { kind: "idle" } : p));
     setPdf({ kind: "idle" });
   };
-  const toggle = useCallback(
-    (uid: string) => {
-      setSelected((list) => (list.includes(uid) ? list.filter((u) => u !== uid) : list.length < COMBINE_MAX ? [...list, uid] : list));
-      changed();
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `changed` only touches refs and setters
-    [],
-  );
+  const toggle = (uid: string) => {
+    setSelected((list) => (list.includes(uid) ? list.filter((u) => u !== uid) : list.length < COMBINE_MAX ? [...list, uid] : list));
+    changed();
+  };
   const setOption = (key: keyof CombineOptions, on: boolean) => {
     setOptions((o) => ({ ...o, [key]: on }));
     changed();
