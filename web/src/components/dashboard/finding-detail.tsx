@@ -13,6 +13,7 @@ import { forwardRef } from "react";
 import type { FindingRow } from "@/components/dashboard/derive";
 import { reviewLabel, validationOf } from "@/components/dashboard/filters";
 import { IconButton } from "@/components/ui/icon-button";
+import { ScrollRegion } from "@/components/ui/scroll-region";
 import { SeverityBadge, StatusBadge } from "@/components/ui/status-badge";
 import { FINDING_REVIEW } from "@/lib/status";
 import { cn } from "@/lib/utils";
@@ -111,13 +112,13 @@ export const FindingDetail = forwardRef<HTMLElement, FindingDetailProps>(functio
         {f.evidence.length > 0 && (
           <section>
             <h3 className="mb-1.5 text-[13px] font-medium text-foreground">Evidence</h3>
-            <div className="dash-tile overflow-x-auto rounded-lg p-3 font-mono text-[11px] leading-relaxed">
+            <ScrollRegion label="Evidence" className="dash-tile overflow-x-auto rounded-lg p-3 font-mono text-[11px] leading-relaxed">
               {f.evidence.map((e, i) => (
                 <div key={i} className={cn("whitespace-pre", EV_STYLE[e.tone])}>
                   {e.text}
                 </div>
               ))}
-            </div>
+            </ScrollRegion>
           </section>
         )}
 

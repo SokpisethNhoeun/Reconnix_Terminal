@@ -24,8 +24,6 @@ const KNOWN: Record<string, string[]> = {
   "command page": ["color-contrast", "link-in-text-block"],
   "docs search open": ["color-contrast", "link-in-text-block", "nested-interactive"],
   "phone docs menu": ["color-contrast", "link-in-text-block", "scrollable-region-focusable"],
-  // a finding's detail on a phone: a table inside it scrolls sideways with no tab stop
-  "phone finding detail": ["scrollable-region-focusable"],
 };
 
 async function axe(page: Page, name: string) {

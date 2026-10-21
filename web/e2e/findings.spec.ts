@@ -331,4 +331,14 @@ test.describe("on a phone (390×844)", () => {
     await expect(detail(page)).toBeVisible(); // the entry was left behind, not replaced
     await expect(page).toHaveURL(/finding=/);
   });
+
+  test("the detail's evidence scrolls sideways inside a tab stop named Evidence", async ({ page }) => {
+    await go(page, "/?view=findings");
+    await row(page, 2).tap();
+    await expect(detail(page)).toBeVisible();
+    const evidence = detail(page).getByRole("region", { name: "Evidence" });
+    await expect(evidence).toHaveAttribute("tabindex", "0");
+    expect(await evidence.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+    expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - document.scrollingElement!.clientWidth)).toBe(0); // the page itself does not
+  });
 });
