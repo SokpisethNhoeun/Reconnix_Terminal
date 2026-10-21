@@ -24,7 +24,7 @@ export function Pagination({ paging, onPage, label = "Pages", className }: { pag
       >
         <ChevronLeft className="size-3.5" aria-hidden /> Previous
       </button>
-      <span className="ui-pager-label tabnums" aria-live="polite">
+      <span className="ui-pager-label tabnums">
         {paging.label}
       </span>
       <button type="button" onClick={() => onPage(page + 1)} disabled={last} aria-label="Next page" title={last ? "This is the last page" : "Next page"} className="ui-pager-btn">

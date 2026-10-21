@@ -48,8 +48,9 @@ export const FindingDetail = forwardRef<HTMLElement, FindingDetailProps>(functio
       className="dash-card dash-finding scroll-mt-4 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       aria-label={`Finding ${f.id}`}
     >
+      {/* the one announcement for a change of selection: which finding, and where it sits */}
       <p role="status" className="sr-only">
-        Finding {f.id} selected
+        Finding {f.id}, {position.index + 1} of {position.total}
       </p>
       <header className="dash-finding-head">
         <div className="flex flex-wrap items-center gap-2">
@@ -61,7 +62,7 @@ export const FindingDetail = forwardRef<HTMLElement, FindingDetailProps>(functio
             <IconButton label="Previous finding" className={NAV_BTN} aria-disabled={!prev || undefined} onClick={() => prev && onSelect(prev.key)}>
               <ChevronLeft aria-hidden />
             </IconButton>
-            <span className="min-w-[4.5em] text-center font-mono text-[11px] tabnums text-muted-foreground" aria-live="polite">
+            <span className="min-w-[4.5em] text-center font-mono text-[11px] tabnums text-muted-foreground">
               {position.index + 1} of {position.total}
             </span>
             <IconButton label="Next finding" className={NAV_BTN} aria-disabled={!next || undefined} onClick={() => next && onSelect(next.key)}>

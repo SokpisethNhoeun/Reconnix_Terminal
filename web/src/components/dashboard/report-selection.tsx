@@ -252,7 +252,7 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
 function PdfStatus({ state, onRetry }: { state: PdfState; onRetry: () => void }) {
   const failed = state.kind === "failed" || state.kind === "unsupported";
   return (
-    <p role="status" aria-live="polite" className={cn("rep-status", failed && "is-error")} data-pdf={state.kind}>
+    <p role="status" className={cn("rep-status", state.kind === "idle" && "sr-only", failed && "is-error")} data-pdf={state.kind}>
       {state.kind === "generating" && "Generating the PDF on this computer — the download starts when the file is complete."}
       {state.kind === "done" && `Downloaded ${state.name}.`}
       {state.kind === "unsupported" && (

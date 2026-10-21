@@ -36,8 +36,7 @@
 .rep-btn-quiet { border-color: transparent; color: var(--muted-foreground); }
 .rep-btn-small { height: 28px; padding: 0 10px; border-radius: 8px; font-size: 12px; }
 
-.rep-status { font-size: 12.5px; color: var(--muted-foreground); }
-.rep-status:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } /* in the DOM, out of sight */
+.rep-status { font-size: 12.5px; color: var(--muted-foreground); } /* sr-only while idle: in the DOM, out of sight */
 .rep-status.is-error { color: var(--danger); }
 .rep-link {
   display: inline-flex;
