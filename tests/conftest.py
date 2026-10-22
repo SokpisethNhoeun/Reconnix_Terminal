@@ -1,5 +1,7 @@
 """Shared fixtures: every test starts from fresh demo data, and the UI never waits."""
 
+import sys
+from pathlib import Path
 from typing import List
 
 import pytest
@@ -9,6 +11,13 @@ from reconix.app import ReconixApp
 from reconix.flow import RunController
 from reconix.llm import config as llm_config
 from reconix.store import persist, report
+
+# Test the harness that ships in this checkout (backend/), not any editable install elsewhere,
+# so local backend/harness changes are exercised. Done at conftest import, before any test
+# imports harness (reconix imports it lazily, so nothing above has pulled it in yet).
+_BACKEND = Path(__file__).resolve().parents[1] / "backend"
+if _BACKEND.is_dir() and str(_BACKEND) not in sys.path:
+    sys.path.insert(0, str(_BACKEND))
 
 
 @pytest.fixture(autouse=True)
@@ -40,6 +49,14 @@ def llm_paths(monkeypatch, tmp_path):
     agent_run.reset()
     yield
     agent_run.reset()
+
+
+@pytest.fixture(autouse=True)
+def knowledge_dir(monkeypatch, tmp_path):
+    """Point the /add-on knowledge folder at temp, never ~/.reconix/knowledge."""
+    from reconix.store.knowledge import paths
+
+    monkeypatch.setattr(paths, "KNOWLEDGE_DIR", tmp_path / "knowledge")
 
 
 @pytest.fixture

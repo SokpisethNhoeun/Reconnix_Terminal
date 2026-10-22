@@ -1,0 +1,119 @@
+{
+  "tokens": [
+    {
+      "input": "SQL Injection in the Search API!",
+      "expected": [
+        "sql",
+        "injection",
+        "search",
+        "api"
+      ]
+    },
+    {
+      "input": "A an the of to",
+      "expected": []
+    },
+    {
+      "input": "CVE-2021-44228 log4j RCE",
+      "expected": [
+        "cve",
+        "2021",
+        "44228",
+        "log4j",
+        "rce"
+      ]
+    },
+    {
+      "input": "Don't reuse passwords!!!",
+      "expected": [
+        "don",
+        "reuse",
+        "passwords"
+      ]
+    },
+    {
+      "input": "x y ab 12 999",
+      "expected": [
+        "ab",
+        "12",
+        "999"
+      ]
+    }
+  ],
+  "corpus": [
+    {
+      "name": "runbook.md",
+      "chunks": [
+        "The staging environment uses a shared database for all the test accounts.",
+        "SQL injection was found in the search endpoint.",
+        "The report lists each finding ranked by severity."
+      ]
+    },
+    {
+      "name": "policy.txt",
+      "chunks": [
+        "Scope approval requires a signed authorization from the system owner.",
+        "High risk actions need a double confirmation before the scanner runs.",
+        "Never store plaintext passwords in the findings or the exported report."
+      ]
+    },
+    {
+      "name": "alert.md",
+      "chunks": [
+        "Firewall blocks outbound DNS traffic on the staging host."
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query": "severity",
+      "expected": [
+        {
+          "source": "runbook.md",
+          "index": 2,
+          "score": 1.7779
+        }
+      ]
+    },
+    {
+      "query": "firewall dns",
+      "expected": [
+        {
+          "source": "alert.md",
+          "index": 0,
+          "score": 3.348
+        }
+      ]
+    },
+    {
+      "query": "sql injection severity",
+      "expected": [
+        {
+          "source": "runbook.md",
+          "index": 1,
+          "score": 3.7911
+        }
+      ]
+    },
+    {
+      "query": "scope approval authorization owner",
+      "expected": [
+        {
+          "source": "policy.txt",
+          "index": 0,
+          "score": 6.6959
+        }
+      ]
+    },
+    {
+      "query": "test accounts database staging",
+      "expected": [
+        {
+          "source": "runbook.md",
+          "index": 0,
+          "score": 5.8436
+        }
+      ]
+    }
+  ]
+}
