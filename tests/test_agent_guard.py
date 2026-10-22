@@ -136,9 +136,11 @@ def test_source_scope_refuses_every_network_tool(source_guard):
 
 def test_the_guard_covers_exactly_the_harness_tools(web_guard):
     harness = pytest.importorskip("harness")
-    from harness.agent import TOOLS
+    from harness.agent import KNOWLEDGE_TOOL, TOOLS
 
+    # The base tools, plus the optional read-only knowledge tool Reconix always wires in.
     names = {t["function"]["name"] for t in TOOLS}
+    names.add(KNOWLEDGE_TOOL["function"]["name"])
     assert agent_guard.KNOWN_TOOLS == names         # a new tool needs a rule, or this fails
     snap = agent_guard.snapshot(uid_for(store.get_assessment()))
     for name in names:

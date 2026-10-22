@@ -30,7 +30,7 @@ Lookup = Callable[[str], Optional[Tuple[str, str]]]
 ToolsFor = Callable[[Dict[str, Any], str], list]
 
 _READ_ONLY = {"update_plan", "list_capabilities", "list_targets", "list_findings",
-              "get_finding", "ask_operator"}
+              "get_finding", "ask_operator", "search_knowledge"}
 _GUARDED = {"run_scan", "http_poc", "login", "request_credentials", "add_target",
             "authorize_target"}
 KNOWN_TOOLS = _READ_ONLY | _GUARDED          # every tool name `decide` has a rule for
