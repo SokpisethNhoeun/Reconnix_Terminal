@@ -14,6 +14,9 @@ export const LLM_PORT = PORT - 4; // e2e/llm-stub.mjs, the AI Assistant's stand-
 export const LIVE_PORT = PORT - 2; // a second dashboard with live refresh on (e2e/live-refresh.spec.ts)
 /** The signed-in state every spec starts from (e2e/global-setup.ts writes it once per run). */
 export const STATE_FILE = path.join(tmpdir(), `reconix-e2e-state-${PORT}.json`);
+/** The /add-on knowledge folder the e2e server reads: missing (no knowledge) except while
+    e2e/assistant-knowledge.spec.ts writes it, never ~/.reconix/knowledge. */
+export const KNOWLEDGE_DIR = path.join(tmpdir(), `reconix-e2e-knowledge-${PORT}`);
 
 const DESKTOP = { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } };
 
@@ -44,7 +47,7 @@ export default defineConfig({
     },
     {
       name: "serial-assistant",
-      testMatch: /\/(assistant|a11y-assistant|scroll-assistant)\.spec\.ts$/,
+      testMatch: /\/(assistant|assistant-knowledge|a11y-assistant|scroll-assistant)\.spec\.ts$/,
       workers: 1,
       dependencies: ["parallel"],
       use: { ...DESKTOP, reducedMotion: "reduce" },
@@ -92,6 +95,8 @@ export default defineConfig({
         RECONIX_WEB_URL_FILE: path.join(tmpdir(), `reconix-e2e-${PORT}.url`),
         // the AI Assistant's saved conversations go to a test folder, never ~/.reconix/assistant
         RECONIX_ASSISTANT_DIR: path.join(tmpdir(), `reconix-e2e-assistant-${PORT}`),
+        // the /add-on knowledge it reads (written only by e2e/assistant-knowledge.spec.ts)
+        RECONIX_KNOWLEDGE_DIR: KNOWLEDGE_DIR,
         // the specs ask more than the default 12 questions a minute
         RECONIX_ASSISTANT_RATE_PER_MINUTE: "120",
         // the AI Assistant asks the stand-in, never a real model (these override web/.env.local)
