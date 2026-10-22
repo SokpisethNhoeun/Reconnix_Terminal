@@ -1,4 +1,4 @@
-"""Attach an OpenAPI spec from the Template screen's scope review (Pilot)."""
+"""The API template's base URL and spec form, from the Template screen's scope review (Pilot)."""
 
 import json
 
@@ -39,11 +39,15 @@ async def test_attach_a_spec_from_the_scope_review(app, tmp_path):
     async with app.run_test(size=SIZE) as pilot:
         await to_api_review(app, pilot)
         assert "Attach OpenAPI spec" in choice_labels(app)
+        spec_choice = app.screen.query_one("#scope-menu", ChoiceMenu)._choices[1]
+        assert spec_choice.hint == (
+            "a .json or .yaml OpenAPI 3 / Swagger 2 file or URL; read, never run")
         await pilot.press("2")
         await settle(pilot)
         assert isinstance(app.screen, OpenApiForm)
-        field = app.screen.query_one("#path", Input)
-        assert field.placeholder == "~/specs/openapi.yaml"
+        field = app.screen.query_one("#spec", Input)
+        assert field.placeholder == (
+            "~/specs/openapi.yaml or https://api.example.com/openapi.json")
         field.value = str(path)
         app.screen.query_one("#submit").press()
         await settle(pilot, 8)
@@ -64,7 +68,7 @@ async def test_a_bad_file_shows_the_store_error_and_keeps_the_form(app, tmp_path
         await to_api_review(app, pilot)
         await pilot.press("2")
         await settle(pilot)
-        app.screen.query_one("#path", Input).value = str(path)
+        app.screen.query_one("#spec", Input).value = str(path)
         app.screen.query_one("#submit").press()
         await settle(pilot)
         assert isinstance(app.screen, OpenApiForm)
@@ -79,8 +83,8 @@ async def test_api_template_auto_opens_the_spec_form(app, tmp_path):
         await type_request(pilot, API_REQUEST)
         await settle(pilot, 8)
         assert isinstance(app.screen, OpenApiForm)       # it opens on its own at the API scope
-        field = app.screen.query_one("#path", Input)
-        field.value = str(path)
+        assert app.screen.query_one("#base_url", Input).value == "https://api.example.com"
+        app.screen.query_one("#spec", Input).value = str(path)
         app.screen.query_one("#submit").press()
         await settle(pilot, 8)
         assert isinstance(app.screen, TemplateScreen)
@@ -116,7 +120,7 @@ async def attach_through_the_form(app, pilot, path) -> None:
     await pilot.press("2")
     await settle(pilot)
     assert isinstance(app.screen, OpenApiForm)
-    app.screen.query_one("#path", Input).value = str(path)
+    app.screen.query_one("#spec", Input).value = str(path)
     app.screen.query_one("#submit").press()
     await settle(pilot, 8)
     assert isinstance(app.screen, TemplateScreen)
@@ -177,17 +181,66 @@ async def test_replace_keeps_the_operators_edit(app, tmp_path):
 
 
 async def test_an_unexpected_error_is_a_friendly_form_error(app, tmp_path, monkeypatch):
-    def boom(_path):
+    def boom(_base_url, _spec):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(store, "attach_api_spec", boom)
+    monkeypatch.setattr(store, "save_api_form", boom)
     async with app.run_test(size=SIZE) as pilot:
         await to_api_review(app, pilot)
         await pilot.press("2")
         await settle(pilot)
-        app.screen.query_one("#path", Input).value = str(tmp_path / "x.json")
+        app.screen.query_one("#spec", Input).value = str(tmp_path / "x.json")
         app.screen.query_one("#submit").press()
         await settle(pilot, 8)
         assert isinstance(app.screen, OpenApiForm)
         assert "Couldn't read" in str(app.screen.query_one("#form-error", Static).render())
         assert not app.screen.query_one("#submit").disabled
+
+
+# --- the form's two fields -------------------------------------------------------------------
+async def test_the_form_reads_as_planned(app):
+    async with app.run_test(size=SIZE) as pilot:
+        await type_request(pilot, API_REQUEST)
+        await settle(pilot, 8)
+        form = app.screen
+        assert isinstance(form, OpenApiForm)
+        assert str(form.query_one(".dialog").border_title) == "⇡ API TEMPLATE: BASE URL AND SPEC"
+        base = form.query_one("#base_url", Input)
+        assert base.value == "https://api.example.com"
+        assert base.placeholder == "https://api.example.com"
+        labels = [str(label.render()) for label in form.query(".field-label")]
+        assert labels == ["API base URL", "OpenAPI spec (optional)"]
+        assert str(form.query_one("#submit").label) == "Save"
+        shown = " ".join(str(w.render()) for w in form.query(Static))
+        assert "The spec is only read, never run, and never widens the scope." in shown
+        assert "Leave the spec empty to skip it · Esc to cancel" in shown
+
+
+async def test_save_with_a_new_base_url_redrafts_the_manifest(app):
+    async with app.run_test(size=SIZE) as pilot:
+        await type_request(pilot, API_REQUEST)
+        await settle(pilot, 8)
+        assert isinstance(app.screen, OpenApiForm)
+        app.screen.query_one("#base_url", Input).value = "https://orders.example.org"
+        app.screen.query_one("#submit").press()
+        await settle(pilot, 8)
+        assert isinstance(app.screen, TemplateScreen)
+        assert store.get_scope().target_url == "https://orders.example.org"
+        shown = str(app.screen.query_one(ScopeManifestView).render())
+        assert "https://orders.example.org" in shown
+        assert store.get_api_spec() is None
+
+
+async def test_a_foreign_spec_url_is_refused_in_the_form(app):
+    async with app.run_test(size=SIZE) as pilot:
+        await type_request(pilot, API_REQUEST)
+        await settle(pilot, 8)
+        form = app.screen
+        form.query_one("#spec", Input).value = "https://evil.example.net/openapi.json"
+        form.query_one("#submit").press()
+        await settle(pilot, 8)
+        assert app.screen is form                         # the form stays open
+        error = str(form.query_one("#form-error", Static).render())
+        assert error == "The spec URL must be on api.example.com."
+        assert not form.query_one("#submit").disabled
+        assert store.get_api_spec() is None

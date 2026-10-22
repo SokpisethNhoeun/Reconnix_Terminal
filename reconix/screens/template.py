@@ -150,12 +150,12 @@ class TemplateScreen(ReconixScreen):
 
     @staticmethod
     def _spec_choices() -> List[Choice]:
-        """The API template can take an OpenAPI file; it is read, never run."""
+        """The API template can take an OpenAPI file or URL; it is read, never run."""
         if not store.can_attach_api_spec():
             return []
         attached = store.get_api_spec() is not None
         choices = [Choice("spec", "Replace OpenAPI spec" if attached else "Attach OpenAPI spec",
-                          "a .json or .yaml OpenAPI 3 / Swagger 2 file; read, never run")]
+                          "a .json or .yaml OpenAPI 3 / Swagger 2 file or URL; read, never run")]
         if attached:
             choices.append(Choice("unspec", "Remove OpenAPI spec",
                                   "go back to the template's endpoints and methods"))

@@ -27,3 +27,14 @@ class ApiSpec:
     def label(self) -> str:
         """e.g. "Orders API 1.2.0" (the title, then the version when it has one)."""
         return f"{self.title} {self.version}".strip()
+
+
+@dataclass
+class ApiFormResult:
+    """What saving the API template's form did (`store.save_api_form`)."""
+
+    target_url: str                     # the draft scope's target after the save
+    target_changed: bool = False        # the base URL re-drafted the scope
+    spec: Optional[ApiSpec] = None      # the spec attached now (a copy), if any
+    spec_attached: bool = False         # this save read a spec (attached or replaced)
+    spec_dropped: str = ""              # a spec removed because the new target isn't its host

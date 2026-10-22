@@ -6,6 +6,7 @@ their bodies to call the API; the screens do not need to change.
 """
 
 from .activity import add_feedback, current_operator, list_events, list_feedback, log_event
+from .api_form import save_api_form
 from .approvals import (
     approvals_count, approve, can_edit, decision_for, decline_confirmation, edit_approval,
     get_approval, is_approved, list_approval_decisions, needs_confirmation, reject,
@@ -113,7 +114,7 @@ __all__ = [
     # the saved copy the web dashboard reads
     "autosave", "close_session", "web_dashboard_url",
     # the API template's OpenAPI spec
-    "attach_api_spec", "remove_api_spec", "get_api_spec", "can_attach_api_spec",
+    "attach_api_spec", "remove_api_spec", "get_api_spec", "can_attach_api_spec", "save_api_form",
     "api_spec_handoff", "api_spec_methods_outside",
     "api_schema_handoff", "api_schema_chat_block", "api_schema_endpoint",
     # knowledge add-ons (/add-on): reference files for the AI

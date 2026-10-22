@@ -148,8 +148,9 @@ async def pass_gate(app, pilot) -> str:
     gate = store.waiting_gate()
     screen = app.screen
     if isinstance(screen, OpenApiForm):
-        # The API template auto-opens the spec form at the scope gate; skip it (Cancel) and
-        # decide the scope on the review screen underneath.
+        # The API template auto-opens its base URL and spec form at the scope gate (two fields,
+        # the base URL prefilled); skip it (Cancel) and decide the scope on the review screen
+        # underneath.
         await pilot.press("escape")
         await settle(pilot)
         screen = app.screen

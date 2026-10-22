@@ -143,7 +143,8 @@ class ActionsMixin:
         self.open_dialog(ScopeEditForm(), lambda _result: self.refresh_view())
 
     def attach_api_spec(self) -> None:
-        """Ask for an OpenAPI file (the API template's scope draft); the store reads it."""
+        """The API template's form: its base URL and an OpenAPI spec (a file or a URL on the
+        API's host); the store validates and reads them."""
         self.open_dialog(OpenApiForm(), lambda _result: self.refresh_view())
 
     def remove_api_spec(self) -> None:

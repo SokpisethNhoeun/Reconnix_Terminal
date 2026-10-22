@@ -54,7 +54,8 @@ class RunHostMixin:
             self._offer_api_spec()
 
     def _offer_api_spec(self) -> None:
-        """On the API template's scope gate, open the OpenAPI form once (Cancel skips it).
+        """On the API template's scope gate, open its base URL and spec form once (Cancel
+        skips it).
 
         Only for the API template, only while a spec can still be attached, and only once per
         assessment — so cancelling, or attaching then removing, never reopens it. Replace and
