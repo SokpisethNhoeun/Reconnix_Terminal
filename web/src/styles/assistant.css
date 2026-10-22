@@ -80,8 +80,9 @@
 .ai-btn-small { height: 28px; padding: 0 8px; border-radius: 8px; font-size: 12px; }
 .ai-btn-danger { color: var(--danger); }
 .ai-btn-danger:hover:not(:disabled) { color: var(--danger); background: color-mix(in oklab, var(--danger) 10%, transparent); }
-.ai-btn-danger-solid { color: var(--foreground); background: color-mix(in oklab, var(--danger) 70%, var(--card)); }
-.ai-btn-danger-solid:hover:not(:disabled) { color: var(--foreground); background: var(--danger); }
+/* the light text keeps 4.5:1 on it, also on a confirm's red tint (axe on the model picker's) */
+.ai-btn-danger-solid { color: var(--foreground); background: color-mix(in oklab, var(--danger) 55%, var(--card)); }
+.ai-btn-danger-solid:hover:not(:disabled) { color: var(--foreground); background: color-mix(in oklab, var(--danger) 65%, var(--card)); }
 .ai-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 @media (max-width: 640px) {
   .ai-btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

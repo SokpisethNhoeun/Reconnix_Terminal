@@ -148,7 +148,8 @@ export function ModelProviderForm({ view, models, onCancel, onDone }: Props) {
     if (next.next === "list") {
       const found = next;
       setList({ status: "ready", sig, ...found });
-      setChoice((was) => (found.models.includes(was) ? was : found.models.length ? (initialChoice(found.models, s, view) ?? TYPED) : TYPED));
+      // a model chosen, or a name being typed, stays; otherwise the list's first choice
+      setChoice((was) => (was === TYPED || found.models.includes(was) ? was : found.models.length ? (initialChoice(found.models, s, view) ?? TYPED) : TYPED));
     } else if (next.next === "stay") {
       setList({ status: "none" });
       setChoice((was) => (was === TYPED ? was : NO_MODEL_YET));

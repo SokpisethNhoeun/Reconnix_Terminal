@@ -125,34 +125,35 @@ export function ModelList({ models, fromForm, onChosen, onAdd }: Props) {
               if (row.key === confirm) {
                 const q = removeQuestion(view, row);
                 return (
-                  <li
-                    key={row.key}
-                    role="group"
-                    aria-label={q.title}
-                    className="ai-menu-confirm"
-                    onKeyDown={(e) => {
-                      if (e.key !== "Escape") return;
-                      e.preventDefault(); // keeps it; the picker stays open
-                      e.stopPropagation();
-                      keep(row);
-                    }}
-                  >
-                    <p className="text-foreground">
-                      Remove <span className="ai-mono">{row.model}</span> ({row.provider})? {q.detail}
-                    </p>
-                    {error && (
-                      <p className="ai-error-text mt-1" role="alert">
-                        {error}
+                  <li key={row.key}>
+                    <div
+                      role="group"
+                      aria-label={q.title}
+                      className="ai-menu-confirm"
+                      onKeyDown={(e) => {
+                        if (e.key !== "Escape") return;
+                        e.preventDefault(); // keeps it; the picker stays open
+                        e.stopPropagation();
+                        keep(row);
+                      }}
+                    >
+                      <p className="text-foreground">
+                        Remove <span className="ai-mono">{row.model}</span> ({row.provider})? {q.detail}
                       </p>
-                    )}
-                    <div className="mt-2 flex justify-end gap-1.5">
-                      <button type="button" autoFocus onClick={() => keep(row)} className="ai-btn ai-btn-small ai-btn-outline">
-                        No
-                      </button>
-                      <button type="button" onClick={() => void remove(row)} disabled={models.pending !== null} className="ai-btn ai-btn-small ai-btn-danger-solid">
-                        {models.pending === `remove:${row.key}` && <Loader className="size-3.5 animate-spin" aria-hidden />}
-                        Remove
-                      </button>
+                      {error && (
+                        <p className="ai-error-text mt-1" role="alert">
+                          {error}
+                        </p>
+                      )}
+                      <div className="mt-2 flex justify-end gap-1.5">
+                        <button type="button" autoFocus onClick={() => keep(row)} className="ai-btn ai-btn-small ai-btn-outline">
+                          No
+                        </button>
+                        <button type="button" onClick={() => void remove(row)} disabled={models.pending !== null} className="ai-btn ai-btn-small ai-btn-danger-solid">
+                          {models.pending === `remove:${row.key}` && <Loader className="size-3.5 animate-spin" aria-hidden />}
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   </li>
                 );
