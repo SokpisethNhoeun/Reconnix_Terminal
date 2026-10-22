@@ -57,6 +57,7 @@ def knowledge_dir(monkeypatch, tmp_path):
     from reconix.store.knowledge import paths
 
     monkeypatch.setattr(paths, "KNOWLEDGE_DIR", tmp_path / "knowledge")
+    monkeypatch.setenv("RECONIX_KNOWLEDGE_KEY_FILE", str(tmp_path / "keys" / "knowledge.key"))
 
 
 @pytest.fixture

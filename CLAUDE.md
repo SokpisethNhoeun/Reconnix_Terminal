@@ -67,6 +67,7 @@ reconix/
 │   ├── agent.py      # agent mode: /assess drives the backend harness, streams events
 │   └── web.py        # /web: open the dashboard, starting it in the background if needed
 ├── flow/             # RunController (plays store steps), gates.py (gate → screen), phases
+├── knowledge/        # `python -m reconix.knowledge` (add/list/original/remove): the web's /add-on
 ├── llm/              # flexible LLM (no UI, no store.lists): config, crypto (Fernet),
 │                     #   db (sqlite3), catalog (6 providers), client (LiteLLM), guardrail
 ├── commands/         # registry.py (Command: choices, ask, empty) + builtin.py (COMMANDS)
@@ -234,8 +235,9 @@ vectors in `web/tests/redact-vectors.json` check both), streams NDJSON frames wi
 server builds from the saved data (`lib/assistant/cards.ts`; the model never supplies numbers,
 and nothing is run or approved from the chat), and keeps conversations on disk
 (`lib/assistant/history-store.ts`, `~/.reconix/assistant`, 0700/0600, 30-day retention).
-It also reads, never writes, the knowledge the TUI's `/add-on` keeps in `~/.reconix/knowledge`
-(`lib/assistant/knowledge/`: no-follow, owner and size checks, the TUI's BM25), putting the
+It also reads, never writes, the knowledge index and passages the TUI's `/add-on` keeps in `~/.reconix/knowledge`
+(originals are kept encrypted as `<id>.orig` with `~/.reconix/knowledge.key`; uploads, opens and
+removals go through `python -m reconix.knowledge`, `reconix/knowledge/`; `lib/assistant/knowledge/`: no-follow, owner and size checks, the TUI's BM25), putting the
 passages relevant to the masked question inside the fence framed as untrusted reference material
 and naming their files in `meta` ("Knowledge used: …").
 The model is chosen with the **model chip** in the assistant's composer (`model-chip.tsx` opens

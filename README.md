@@ -277,6 +277,19 @@ and saved under `~/.reconix/knowledge` (`RECONIX_KNOWLEDGE_DIR`; the folder is `
 `0600`, atomic writes); at most 50 sources are kept. The files are only ever read — nothing in
 them is run. If the index can't be read, `/add-on` offers only to remove everything.
 
+**Originals are kept.** Besides the passages, each file's original bytes (as read, at most 10 MB,
+never redacted) are saved as `<id>.orig`, Fernet-encrypted with a key of their own
+(`~/.reconix/knowledge.key`, `RECONIX_KNOWLEDGE_KEY_FILE`; `0600`, created exclusively, refused
+when group or others can read it). Only the passages are redacted and sent to a model. Each source
+records `"source": "web" | "terminal"` and `"original": true | false` (an older source reads as
+`terminal`, `false`); removing a source or all of them deletes the `.orig` files too.
+
+The dashboard's upload, open and remove use the same code through a small command line:
+`python -m reconix.knowledge add --file <path> --name <name> --source web|terminal`, `list`,
+`original <id>` (the decrypted bytes on stdout) and `remove <id>`. It prints one JSON object
+(`{"ok":true,…}`); exit 0 is ok, 2 is a refusal (`{"ok":false,"error":"…"}`, such as "Save it as
+.docx first" for a `.doc` file) and 1 is an internal error.
+
 When you ask a question, the passages that share your words are found with BM25 (at least two
 matching terms, or the whole query when it is shorter; the best four, up to 4,000 characters)
 and added to the context as **untrusted reference material**, never instructions. **Those
