@@ -22,7 +22,7 @@ import yaml
 
 from ..models import GATE_SCOPE, ApiSpec
 from ..models.api_spec import MAX_ENDPOINTS
-from . import lists
+from . import lists, yaml_safe
 from .activity import log_event
 from .errors import StoreValidationError
 from .redact import redact
@@ -39,15 +39,6 @@ HANDOFF_ENDPOINTS = 50
 HANDOFF_PATH = 120
 DEFAULT_PORTS = {"http": 80, "https": 443}
 _PATH_CHARS = re.compile(r"[^A-Za-z0-9._~{}/:%-]")
-
-
-class _NoAliasLoader(yaml.SafeLoader):
-    """`yaml.safe_load` without anchors and aliases (they can expand a small file hugely)."""
-
-    def compose_node(self, parent, index):
-        if self.check_event(yaml.AliasEvent):
-            raise yaml.YAMLError("YAML anchors and aliases are not supported")
-        return super().compose_node(parent, index)
 
 
 # --- reading the file -----------------------------------------------------------------------
@@ -93,7 +84,9 @@ def _read_spec_file(path_text: str) -> Tuple[Path, str]:
 def _parse_document(path: Path, content: str) -> Dict[str, Any]:
     is_json = path.suffix.lower() == ".json"
     try:
-        document = json.loads(content) if is_json else yaml.load(content, _NoAliasLoader)
+        document = json.loads(content) if is_json else yaml_safe.load(content)
+    except yaml_safe.Refused as exc:      # anchors, aliases, merge keys, deep nesting
+        raise StoreValidationError(f"That spec can't be read: {exc}") from None
     except (ValueError, yaml.YAMLError, RecursionError) as exc:
         reason = str(exc).splitlines()[0][:100] if str(exc) else ""
         kind = "JSON" if is_json else "YAML"
