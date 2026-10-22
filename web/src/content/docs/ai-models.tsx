@@ -239,15 +239,15 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
             <li>
               <strong>Model.</strong> Your saved models, each with its provider and where it runs (
               <Mono>stub-model · Stub · local</Mono>), a check on the one that answers next. One click, Enter or Space uses
-              a model and closes the picker. A remote one is disabled, with the reason, unless the dashboard was started
-              with <Mono>LLM_ALLOW_REMOTE=1</Mono>. Each has a bin: removing asks first, with No as the default; removing a
+              a model and closes the picker. Each has a bin: removing asks first, with No as the default; removing a
               provider&apos;s last model removes the provider and its saved key. With nothing saved the list says{" "}
               <em>No model yet.</em> <strong>+ Model</strong> at the bottom opens the next step.
             </li>
             <li>
               <strong>Set the provider.</strong> <em>Provider</em>: OpenAI, Anthropic, DeepSeek, OpenRouter, Groq, Ollama
-              (local), LM Studio (local) or Custom (OpenAI-compatible); the cloud ones are disabled, with the reason, unless
-              the dashboard was started with <Mono>LLM_ALLOW_REMOTE=1</Mono>. <em>Base URL</em>, for Custom, Ollama and LM
+              (local), LM Studio (local) or Custom (OpenAI-compatible), every one usable; it starts on Ollama. A cloud one
+              says where your data goes: &quot;Groq runs at api.groq.com: your questions, the assessment data they need and
+              relevant /add-on knowledge passages are sent there.&quot; <em>Base URL</em>, for Custom, Ollama and LM
               Studio only, filled in from the preset. <em>API key</em>, a password field that is never filled in (&quot;Needed
               by &lt;Provider&gt;&quot; or &quot;Optional&quot;; with a key saved for that provider, leave it empty to keep it, or tick{" "}
               <strong>Remove key</strong>); choosing another provider empties it. <em>Model</em>: the list{" "}
@@ -259,8 +259,8 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
               <strong>Add model.</strong> A typed model, or one not from the list fetched for these exact values, is tested
               first with one tiny chat completion. The provider is then saved (named after its preset), or, when that preset
               at that address is saved already, the model is added to it; it becomes the active model and the picker
-              closes: the chip names it at once. A refusal (an address off this machine, a bad address, a key over http, a
-              key the provider turns down) stays on the form, in red. <strong>Cancel</strong> goes back to the list.
+              closes: the chip names it at once. A refusal (a bad address, a key over http, a cloud provider&apos;s name at
+              another address, a key the provider turns down) stays on the form, in red. <strong>Cancel</strong> goes back to the list.
             </li>
           </Steps>
           <DocTable
@@ -278,9 +278,9 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
           </p>
           <Callout variant="warning" title="The same rules for every model">
             Every model must use http(s) with no user or password in the address and a plain model name; a key goes only
-            over https to a model off this machine; and an address off this machine is used only when the dashboard was
-            started with <Mono>LLM_ALLOW_REMOTE=1</Mono> (the browser can&apos;t turn it on). The rules are checked again on
-            every question: a chosen model that no longer passes says why in the assistant, and nothing else answers in its
+            over https to a model off this machine; and a cloud provider&apos;s name only goes with its own address. Cloud
+            providers and other addresses off this machine are allowed by default, for operators only. The rules are
+            checked again on every question: a chosen model that no longer passes says why in the assistant, and nothing else answers in its
             place. Remote models receive your questions and the assessment data they need; see{" "}
             <DocRef>LLM data handling</DocRef>.
           </Callout>
