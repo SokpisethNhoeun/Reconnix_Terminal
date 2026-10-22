@@ -214,7 +214,7 @@ for (const size of SIZES) {
       expect((await sideways(page)).page).toBe(0);
 
       // a docs page: the window scrolls to its foot and nothing hangs out sideways
-      await page.goto("/docs/commands/import");
+      await page.goto("/docs/commands/add-on");
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await page.evaluate(() => window.scrollTo(0, document.scrollingElement!.scrollHeight));
       await expect

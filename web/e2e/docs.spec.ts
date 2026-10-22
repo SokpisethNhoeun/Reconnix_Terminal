@@ -72,7 +72,7 @@ test("a command page shows its facts and sections", async ({ page }) => {
   await expect(page.locator("dl")).toContainText("/models"); // the alias
   await expect(page.locator("pre").first()).toContainText("/model [<provider>/<model>]");
   // the error table's meaning column keeps room to read (a long key never squeezes it)
-  await page.goto("/docs/commands/import");
+  await page.goto("/docs/commands/add-on");
   const widths = await page.locator("table.docs-table td").evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width));
   expect(widths.length).toBeGreaterThan(5);
   for (const w of widths) expect(w).toBeGreaterThanOrEqual(220);
@@ -228,7 +228,7 @@ test.describe("on a phone", () => {
     await sidebar(page).getByRole("link", { name: "/finding", exact: true }).click();
     await expect(page).toHaveURL(/\/docs\/commands\/finding$/);
     await expect(sidebar(page)).toBeHidden(); // closed again after choosing a page
-    for (const url of ["/docs/commands/finding", "/docs/terminal-guide/keys", "/docs/ai-models/errors", "/docs/commands/import"]) {
+    for (const url of ["/docs/commands/finding", "/docs/terminal-guide/keys", "/docs/ai-models/errors", "/docs/commands/add-on"]) {
       await page.goto(url);
       const overflow = await page.evaluate(() => document.scrollingElement!.scrollWidth - document.scrollingElement!.clientWidth);
       expect(overflow, `${url} overflows sideways`).toBeLessThanOrEqual(0);

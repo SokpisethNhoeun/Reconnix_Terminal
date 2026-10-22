@@ -15,8 +15,8 @@ the reports and the TUI.)
 - **Overview:** a summary strip (Findings with the worst severity, Assessment progress with its
   state, Tool execution, Duration with a meter against the time limit) over the globe hero with
   the Ask bar; three panels: **Findings by Severity** (a stacked bar and four rows, Critical,
-  High, Medium, Low, each even at 0; Info is never on the card, the summary strip and Findings
-  count it; review state, top CVSS findings), the **Activity Timeline** (lanes by kind with clustered marks that expand,
+  High, Medium, Low, each even at 0: the only levels there are (an older file's Info findings are
+  dropped as it is read); review state, top CVSS findings), the **Activity Timeline** (lanes by kind with clustered marks that expand,
   masked text; with every run shown, runs per day stacked by status) and the **Execution
   Timeline** (a row per plan step, a shared tool track and the waiting gate; with every run
   shown, the newest 8 runs).
