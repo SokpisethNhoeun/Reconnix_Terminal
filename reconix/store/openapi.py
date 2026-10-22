@@ -6,7 +6,8 @@ another host is listed as out of scope and nothing is added to the manifest's ta
 draft scope's allowed methods become the methods it already had that the spec also uses
 (never more), so a spec can't add DELETE or PUT; the spec's other methods are only listed.
 Adding one stays an explicit operator action (Edit manifest). The operator approves the
-manifest as usual.
+manifest as usual. A spec URL on the API's own host is downloaded once by `openapi_fetch` and
+then goes through the same checks; the API template's form saves through `api_form`.
 """
 
 import json
@@ -27,6 +28,7 @@ from ..models.api_spec import MAX_ENDPOINTS
 from . import lists, yaml_safe
 from .activity import log_event
 from .errors import StoreValidationError
+from .openapi_fetch import fetch_spec, is_spec_url
 from .redact import clean, redact
 from .transcript import add_activity, add_chat
 
@@ -96,8 +98,7 @@ def _read_spec_file(path_text: str) -> Tuple[Path, str]:
         raise StoreValidationError("That file is not valid UTF-8 text.") from None
 
 
-def _parse_document(path: Path, content: str) -> Dict[str, Any]:
-    is_json = path.suffix.lower() == ".json"
+def _parse_document(content: str, is_json: bool) -> Dict[str, Any]:
     try:
         document = json.loads(content) if is_json else yaml_safe.load(content)
     except yaml_safe.Refused as exc:      # anchors, aliases, merge keys, deep nesting
@@ -604,18 +605,19 @@ def _refresh_run(assessment) -> None:
     assessment.methodology = bundle.methodology or []
 
 
-def attach_api_spec(path_text: str) -> ApiSpec:
-    """Read an OpenAPI / Swagger file and attach its summary to the drafted API scope.
+def load_spec(text: str, target_url: str) -> Tuple[Dict[str, Any], str]:
+    """Read the spec named by `text` (a file path, or a URL on the target's host, downloaded
+    by `openapi_fetch`): (the parsed document, its display name). Nothing is changed."""
+    if is_spec_url(text):
+        name, content, is_json = fetch_spec(text, target_url)
+        return _parse_document(content, is_json), name
+    path, content = _read_spec_file(text)
+    return _parse_document(content, path.suffix.lower() == ".json"), path.name
 
-    Raises StoreValidationError for anything but a small regular .json / .yaml / .yml file in
-    UTF-8 holding an OpenAPI 3.x or Swagger 2.0 document with paths. Attaching again replaces.
-    The draft's allowed methods become the current ones the spec also uses (current order); if
-    none is shared they stay as they are. The spec never adds a method.
-    """
-    assessment = _draft_api_assessment()
-    path, content = _read_spec_file(path_text)
-    document = _parse_document(path, content)
-    spec = summarize(document, path.name, assessment.scope.target_url)
+
+def attach_document(assessment, document: Dict[str, Any], name: str) -> ApiSpec:
+    """Attach a document read by `load_spec` to the draft (store-internal; see below)."""
+    spec = summarize(document, name, assessment.scope.target_url)
     assessment.api_schema_digest = build_digest(document)   # the AI's digest (in memory only)
     previous = assessment.api_spec
     verb = "replaced" if previous is not None else "attached"
@@ -641,6 +643,22 @@ def attach_api_spec(path_text: str) -> ApiSpec:
     return get_api_spec()
 
 
+def attach_api_spec(path_text: str) -> ApiSpec:
+    """Read an OpenAPI / Swagger file (or URL) and attach its summary to the drafted API scope.
+
+    Raises StoreValidationError for anything but a small regular .json / .yaml / .yml file in
+    UTF-8 (or a URL `openapi_fetch` accepts) holding an OpenAPI 3.x or Swagger 2.0 document
+    with paths. Attaching again replaces. The draft's allowed methods become the current ones
+    the spec also uses (current order); if none is shared they stay as they are. The spec
+    never adds a method.
+    """
+    assessment = _draft_api_assessment()
+    document, name = load_spec(path_text, assessment.scope.target_url)
+    if _draft_api_assessment() is not assessment:            # changed during a download
+        raise StoreValidationError("The assessment changed while the spec was read.")
+    return attach_document(assessment, document, name)
+
+
 def api_spec_methods_outside() -> List[str]:
     """The spec's methods the draft scope does not allow (in the spec, not allowed)."""
     spec = lists.current().api_spec
@@ -650,20 +668,46 @@ def api_spec_methods_outside() -> List[str]:
     return [m for m in spec.methods if m not in scope.allowed_methods]
 
 
+def detach_spec(assessment) -> str:
+    """Drop the spec and its digest and restore the allowed methods the scope had before the
+    first spec was attached; returns the spec's name (store-internal)."""
+    spec = assessment.api_spec
+    if spec.base_methods is not None:
+        assessment.scope.allowed_methods = list(spec.base_methods)
+    assessment.api_spec = None
+    assessment.api_schema_digest = None
+    _refresh_run(assessment)
+    return spec.file_name
+
+
 def remove_api_spec() -> None:
     """Detach the spec while the scope is still a draft and restore the allowed methods the
     scope had before the first spec was attached."""
     assessment = _draft_api_assessment()
     if assessment.api_spec is None:
         raise StoreValidationError("No OpenAPI spec is attached.")
-    name = assessment.api_spec.file_name
-    if assessment.api_spec.base_methods is not None:
-        assessment.scope.allowed_methods = list(assessment.api_spec.base_methods)
-    assessment.api_spec = None
-    assessment.api_schema_digest = None
-    _refresh_run(assessment)
+    name = detach_spec(assessment)
     add_activity("USER", "OpenAPI spec removed", tone="ok")
     log_event("api_spec.removed", name)
+
+
+def recheck_spec_servers(assessment) -> bool:
+    """After the target changed: sort the spec's servers again against the new target.
+
+    A spec that names servers but none on the new target is about another API, so it is
+    dropped (False); a spec with only relative servers, or one on the new host, stays (True).
+    Its endpoints are paths under the target, so keeping them never widens the scope.
+    """
+    spec = assessment.api_spec
+    if spec is None:
+        return True
+    urls = list(spec.servers) + list(spec.out_of_scope_servers)
+    inside, outside = _split_servers(urls, assessment.scope.target_url)
+    absolute = [u for u in urls if not u.startswith("/")]
+    if absolute and not any(not u.startswith("/") for u in inside):
+        return False
+    spec.servers, spec.out_of_scope_servers = inside, outside
+    return True
 
 
 def _handoff_path(path: str) -> str:
