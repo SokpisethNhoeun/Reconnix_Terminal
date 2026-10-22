@@ -1,11 +1,12 @@
 /* A saved conversation, as the dashboard's server keeps it (lib/assistant/history-store.ts):
    its id, title, the run it is about, when it was started and last used, and its messages:
-   each question (masked) and each reply with the cards that were shown with it. The browser
+   each question (masked) and each reply with the cards that were shown with it and the names of
+   the /add-on files it used. The browser
    reads the same shapes back from the conversation routes. Pure: browser and server. */
 import { z } from "zod";
 
 import { redact } from "./redact";
-import { CardSchema, CONVERSATION_ID, MAX_CARDS, ScopeRefSchema } from "./protocol";
+import { CardSchema, CONVERSATION_ID, KnowledgeNamesSchema, MAX_CARDS, ScopeRefSchema } from "./protocol";
 import { MAX_QUESTION } from "./request";
 
 export const CONVERSATION_FORMAT = "reconix.assistant.conversation/v1";
@@ -34,6 +35,8 @@ export const ReplyMessageSchema = z
     cards: z.array(CardSchema).max(MAX_CARDS),
     state: ReplyStateSchema,
     detail: z.string().max(400).optional(), // what went wrong (state "error")
+    // the /add-on files whose passages went to the model (came later: older replies have none)
+    knowledge: KnowledgeNamesSchema.optional(),
     at: Time,
   })
   .strict();

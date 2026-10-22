@@ -26,6 +26,7 @@ export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   cards?: Card[]; // verified cards shown with a reply (built by the server from the saved data)
+  knowledge?: string[]; // the /add-on files whose passages the model was given (their names)
   state?: "streaming" | "error" | "stopped"; // none: answered
   detail?: string; // what went wrong (state "error")
   question?: string; // the question a failed reply answers (for Retry)
@@ -42,6 +43,7 @@ export function toMessages(c: Conversation): ChatMessage[] {
           role: "assistant",
           content: m.content,
           cards: m.cards,
+          knowledge: m.knowledge,
           state: m.state === "done" ? undefined : m.state,
           detail: m.detail,
           question: questions.get(m.replyTo),

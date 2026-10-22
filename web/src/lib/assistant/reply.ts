@@ -1,4 +1,5 @@
-/* One answer as the NDJSON stream the page reads (protocol.ts), server only: `meta`, the cards,
+/* One answer as the NDJSON stream the page reads (protocol.ts), server only: `meta` (with the
+   names of the /add-on files the model was given, kept with the reply too), the cards,
    the model's text as it arrives, an `error` if the model fails, then `done`. When it ends the
    reply is saved after its question with the cards that were shown (history-store.ts): "done",
    "error" with what went wrong, or "stopped" with the part that arrived when the operator
@@ -19,11 +20,13 @@ export interface ReplyInput {
   conversation: Conversation;
   asked: UserMessage;
   cards: Card[];
+  knowledge?: string[]; // the /add-on files whose passages went to the model (their names)
   signal: AbortSignal; // the request's: aborted when the page stops or leaves
   release: () => void; // the rate slot
 }
 
-export function replyStream({ config, turns, conversation, asked, cards, signal, release }: ReplyInput): ReadableStream<Uint8Array> {
+export function replyStream({ config, turns, conversation, asked, cards, knowledge = [], signal, release }: ReplyInput): ReadableStream<Uint8Array> {
+  const used = knowledge.length ? { knowledge } : {};
   const encoder = new TextEncoder();
   const abort = new AbortController();
   const onAbort = () => abort.abort();
@@ -41,7 +44,7 @@ export function replyStream({ config, turns, conversation, asked, cards, signal,
         open = false; // the page went away
       }
     };
-    send({ t: "meta", conversationId: conversation.id, title: conversation.title, scope: conversation.scope });
+    send({ t: "meta", conversationId: conversation.id, title: conversation.title, scope: conversation.scope, ...used });
     for (const card of cards) send({ t: "card", card });
 
     let reply = "";
@@ -74,7 +77,7 @@ export function replyStream({ config, turns, conversation, asked, cards, signal,
     }
     if (detail) send({ t: "error", detail });
     try {
-      const kept = await saveReply(conversation.id, { replyTo: asked.id, content: reply, cards, state, ...(detail ? { detail } : {}) });
+      const kept = await saveReply(conversation.id, { replyTo: asked.id, content: reply, cards, state, ...(detail ? { detail } : {}), ...used });
       if (!kept) send({ t: "error", detail: "The reply was not saved: the conversation was deleted meanwhile." });
     } catch {
       send({ t: "error", detail: "The reply could not be saved." });

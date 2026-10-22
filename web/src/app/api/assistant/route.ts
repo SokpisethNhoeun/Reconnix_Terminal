@@ -2,8 +2,10 @@
    order: the launch token, the page's origin, the operator role, a usable model (the one chosen
    in the Model menu, else the Environment's: lib/assistant/models/resolve.ts), a rate
    slot (before any reading), the body (bytes counted as they arrive), its shape, the
-   conversation (read from the server's own file: the browser never sends the history) and the
-   saved data (read here, never taken from the request). A conversation keeps the run it was
+   conversation (read from the server's own file: the browser never sends the history), the
+   saved data (read here, never taken from the request) and the passages of the TUI's /add-on
+   files relevant to the masked question (lib/assistant/knowledge: read-only, inside the same
+   untrusted fence, their file names in `meta`). A conversation keeps the run it was
    started about. The question is masked, then cut, by the store before it is saved or sent
    anywhere; the answer streams back as NDJSON frames (lib/assistant/protocol.ts): the cards the
    server built from the saved files, then the model's text. The conversation's id also goes in
@@ -13,9 +15,10 @@ import { buildContext } from "@/lib/assistant/context";
 import { cardNotes, pickCards } from "@/lib/assistant/cards";
 import { fail, NO_STORE, readJson, refuse } from "@/lib/assistant/access";
 import type { Conversation } from "@/lib/assistant/history-schema";
-import { addQuestion, HistoryError, readConversation } from "@/lib/assistant/history-store";
+import { addQuestion, HistoryError, keptQuestion, readConversation } from "@/lib/assistant/history-store";
 import { scopeOf } from "@/lib/assistant/insights";
 import { readIntent } from "@/lib/assistant/intent";
+import { searchKnowledge } from "@/lib/assistant/knowledge";
 import { activeModel } from "@/lib/assistant/models/resolve";
 import { fenceTag, systemPrompt } from "@/lib/assistant/prompt";
 import { NDJSON } from "@/lib/assistant/protocol";
@@ -58,7 +61,9 @@ export async function POST(request: Request) {
     if (conversationId && !existing) return fail(GONE, 404);
     const uid = existing ? existing.scope.uid : parsed.data.uid; // a conversation keeps its run
 
-    const context = buildContext(library.assessments, uid);
+    // the /add-on passages relevant to the question as it is kept (masked), read-only
+    const knowledge = await searchKnowledge(keptQuestion(question));
+    const context = buildContext(library.assessments, uid, knowledge.passages);
     if (!context) return fail("That assessment is not saved any more. Pick another one.", 404);
     const run = uid ? library.assessments.find((a) => a.uid === uid) : undefined;
 
@@ -73,13 +78,13 @@ export async function POST(request: Request) {
     const { conversation, asked } = saved;
 
     const cards = pickCards(library.assessments, uid, asked.content);
-    const notes = { cards: cardNotes(cards), planning: readIntent(asked.content).intents.includes("plan") };
+    const notes = { cards: cardNotes(cards), planning: readIntent(asked.content).intents.includes("plan"), knowledge: knowledge.passages.length > 0 };
     const turns = [
       { role: "system" as const, content: systemPrompt(context.scope, context.text, fenceTag(), notes) },
       ...earlierTurns(conversation.messages, asked.id),
       { role: "user" as const, content: asked.content },
     ];
-    const stream = replyStream({ config: setup.config, turns, conversation, asked, cards, signal: request.signal, release });
+    const stream = replyStream({ config: setup.config, turns, conversation, asked, cards, knowledge: knowledge.sources, signal: request.signal, release });
     streaming = true;
     return new Response(stream, {
       headers: { ...NO_STORE, "Content-Type": NDJSON, "X-Content-Type-Options": "nosniff", "X-Conversation-Id": conversation.id },
