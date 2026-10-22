@@ -1,9 +1,9 @@
-/* Access control: sign-in (no roles: signed in, everything opens), the terminal's own locks,
-   Host checks, headers. */
+/* Access control: sign-in (no roles: signed in, everything opens), Host checks, headers, and
+   the web terminal being gone. */
 import { expect, test } from "./fixtures";
 
 import { sessionValue } from "../src/lib/auth/session";
-import { LIVE_PORT, PORT, TOKEN } from "../playwright.config";
+import { PORT, TOKEN } from "../playwright.config";
 import { sample, signInFresh } from "./support";
 
 // every test here starts with no cookies at all (the others start signed in)
@@ -33,11 +33,17 @@ test("the combined report needs a session, and a session can read it", async ({ 
   expect((await context.request.get("/api/reports/combined?uids=20200101-000000-dead_NOPE-1&format=preview")).status()).toBe(404);
 });
 
-test("the terminal needs a session too", async ({ page, request }) => {
-  const res = await request.post("/api/terminal/ticket", { headers: { Origin: `http://127.0.0.1:${PORT}` } });
-  expect(res.status()).toBe(401);
-  await page.goto("/terminal");
-  await expect(page).toHaveURL(/\/login$/);
+test("there is no web terminal: its page and its ticket route are gone (404)", async ({ page }) => {
+  await signInFresh(page);
+  const origin = { Origin: `http://127.0.0.1:${PORT}` };
+  expect((await page.request.post("/api/terminal/ticket", { headers: origin })).status()).toBe(404);
+  expect((await page.request.get("/api/terminal/ticket")).status()).toBe(404);
+  const terminal = await page.goto("/terminal");
+  expect(terminal!.status()).toBe(404);
+  // an old ?view=terminal link opens the Overview
+  await page.goto("/?view=terminal");
+  await expect(page.getByRole("heading", { name: "Assessment Operations Center" })).toBeVisible();
+  await expect(page.locator('[data-view-pane="terminal"]')).toHaveCount(0);
 });
 
 test("an old role-prefixed cookie no longer signs you in", async ({ page, context }) => {
@@ -50,40 +56,13 @@ test("an old role-prefixed cookie no longer signs you in", async ({ page, contex
   }
 });
 
-test("signed in, the assistant, Security knowledge and the terminal ticket open", async ({ page }) => {
+test("signed in, the assistant and Security knowledge open", async ({ page }) => {
   await signInFresh(page);
-  const origin = { Origin: `http://127.0.0.1:${PORT}` };
   expect((await page.request.get("/api/assistant/models")).status()).toBe(200);
   expect((await page.request.get("/api/assistant/conversations")).status()).toBe(200);
   expect((await page.request.get("/api/knowledge")).status()).toBe(200);
-  const ticket = await page.request.post("/api/terminal/ticket", { headers: origin }); // the key cookie rides along
-  expect(ticket.status()).toBe(200);
-  expect(typeof (await ticket.json()).ticket).toBe("string");
   await page.goto("/?view=knowledge");
   await expect(page.getByRole("heading", { name: "Security knowledge", level: 1 })).toBeVisible();
-});
-
-test("a copied session cookie alone can't get a terminal ticket", async ({ page, context }) => {
-  await context.addCookies([{ name: "reconix_view", value: sessionValue(TOKEN), domain: "127.0.0.1", path: "/" }]);
-  await page.goto("/");
-  const res = await page.request.post("/api/terminal/ticket", { headers: { Origin: `http://127.0.0.1:${PORT}` } });
-  expect(res.status()).toBe(403);
-  expect((await res.json()).detail).toContain("terminal's key");
-});
-
-test("with the terminal off, the Terminal view says so and its routes stay shut", async ({ page, context }) => {
-  // the live-refresh dashboard runs with --no-terminal and the same launch token
-  const off = `http://127.0.0.1:${LIVE_PORT}`;
-  await context.addCookies([{ name: "reconix_view", value: sessionValue(TOKEN), domain: "127.0.0.1", path: "/" }]);
-  await page.goto(`${off}/?view=terminal`);
-  await expect(page.getByRole("heading", { name: "The terminal is off" })).toBeVisible();
-  await expect(page.locator(".xterm")).toHaveCount(0);
-  const res = await page.request.post(`${off}/api/terminal/ticket`, { headers: { Origin: off } });
-  expect(res.status()).toBe(403);
-  expect((await res.json()).detail).toContain("--no-terminal");
-  await page.goto(`${off}/terminal`);
-  await expect(page).toHaveURL(`${off}/`);
-  expect((await page.request.get(`${off}/api/knowledge`)).status()).toBe(200); // everything else stays open
 });
 
 test("a wrong token does not sign in", async ({ page }) => {
@@ -100,10 +79,8 @@ test("the token is removed from the address bar after sign-in", async ({ page })
   expect(cookie?.httpOnly).toBe(true);
   expect(cookie?.sameSite).toBe("Strict");
   expect(cookie?.value).toMatch(/^\d+\.[\w-]+$/); // "<issued>.<signature>": no role
-  const key = (await page.context().cookies()).find((c) => c.name === "reconix_term");
-  expect(key?.path).toBe("/api/terminal"); // never sent to other paths, servers or the socket
-  expect(key?.httpOnly).toBe(true);
-  expect(key?.sameSite).toBe("Strict");
+  // the session cookie is the only one: no terminal key any more
+  expect((await page.context().cookies()).map((c) => c.name)).toEqual(["reconix_view"]);
 });
 
 test("a forged cookie is refused", async ({ page, context }) => {

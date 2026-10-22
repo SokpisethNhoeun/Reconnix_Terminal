@@ -52,7 +52,7 @@ export const gettingStarted: GroupContent = {
               { key: "LLM layer", value: "Providers and the active model (/provider, /model). Keys are encrypted in ~/.reconix/llm.db; the model is called through LiteLLM and can only propose text." },
               { key: "Backend harness", value: "Optional (backend/). The AI agent behind /assess: plans, runs tools through a Kali MCP server, reports findings into the store." },
               { key: "Reports", value: "PDF, JSON and DOCX written to ./reports/." },
-              { key: "Web dashboard", value: "Optional (web/, started by /web). Read-only views of the saved runs, a Terminal page that runs this TUI in the browser, and an AI Assistant." },
+              { key: "Web dashboard", value: "Optional (web/, started by /web). Read-only views of the saved runs and an AI Assistant. Assessments run and are decided in this TUI only." },
             ]}
           />
         </DocSection>
@@ -100,9 +100,8 @@ export const gettingStarted: GroupContent = {
         <DocSection title="Required">
           <ul>
             <li>
-              <strong>Python 3.9 or later.</strong> The package depends on Textual, Rich, websockets, LiteLLM, cryptography
-              and python-dotenv; <Mono>pip install -e .</Mono> installs them. On Windows it also installs pywinpty (for the
-              dashboard&apos;s Terminal page).
+              <strong>Python 3.9 or later.</strong> The package depends on Textual, Rich, LiteLLM, cryptography and
+              python-dotenv; <Mono>pip install -e .</Mono> installs them.
             </li>
             <li>
               <strong>A terminal with a dark background</strong> and a font with box-drawing glyphs (JetBrains Mono or a

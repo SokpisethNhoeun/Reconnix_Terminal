@@ -4,15 +4,14 @@
    scripts/export_tokens.py; add or change a colour there, never here. Meanings (src/lib/status.ts):
    teal --primary for AI activity, interaction and progress; --success done; --warning waiting or
    to review; --danger errors and blocked; --info informational; --sev-* the TUI's severity
-   scale; --term-* is the browser terminal (the TUI's own colours). */
+   scale. */
 @import "../styles/tokens.css";
 /* The app's styles, one file per area: frame (page and scrolling, the docs' too), dashboard,
-   motion (sidebar, transition, breathing), terminal, assistant, ui (shared controls and the
+   motion (sidebar, transition, breathing), assistant, ui (shared controls and the
    shared row), findings, assessments, reports, knowledge and docs. Order matters for the cascade. */
 @import "../styles/frame.css";
 @import "../styles/dashboard.css";
 @import "../styles/motion.css";
-@import "../styles/terminal.css";
 @import "../styles/assistant.css";
 @import "../styles/ui.css";
 @import "../styles/findings.css";

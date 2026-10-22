@@ -3,8 +3,7 @@
    (derive-overall.ts), Findings lists them all, and Reports sums them up (derive-report.ts);
    `?uid=` opens one run (derive.ts). `?view=` is
    the open view, read by the client Viewer. There are no roles: signed in (src/proxy.ts and
-   loadLibrary check), every view renders; the terminal only while this dashboard hosts it
-   (lib/auth/guard.ts). The AI Assistant learns what it is about, which model answers
+   loadLibrary check), every view renders. The AI Assistant learns what it is about, which model answers
    (lib/assistant/models/resolve.ts) and what to suggest, from the data in scope
    (lib/assistant/prompts.ts). */
 import type { AssistantInfo } from "@/components/assistant/types";
@@ -19,12 +18,10 @@ import { ReportsView } from "@/components/dashboard/reports-view";
 import { TopBar } from "@/components/dashboard/top-bar";
 import { Viewer } from "@/components/dashboard/viewer";
 import { KnowledgeView } from "@/components/knowledge/knowledge-view";
-import { TerminalView } from "@/components/terminal/terminal-view";
 import { retentionDays } from "@/lib/assistant/history-store";
 import { activeModelSummary } from "@/lib/assistant/models/resolve";
 import { runRef, scopedViews, scopeOf } from "@/lib/assistant/insights";
 import { welcomePrompts } from "@/lib/assistant/prompts";
-import { terminalAccess } from "@/lib/auth/guard";
 import { assessmentView, libraryItem } from "@/lib/data/adapt";
 import { clock } from "@/lib/data/format";
 import { loadLibrary, shownDir, UID } from "@/lib/data/store";
@@ -33,7 +30,6 @@ type Props = { searchParams: Promise<Record<string, string | string[] | undefine
 
 export default async function Home({ searchParams }: Props) {
   const [params, library] = await Promise.all([searchParams, loadLibrary()]);
-  const access = terminalAccess();
   const wanted = typeof params.uid === "string" && UID.test(params.uid) ? params.uid : null;
   const views = library.assessments.map(assessmentView);
   const chosen = views.find((v) => v.uid === wanted) ?? null;
@@ -41,13 +37,11 @@ export default async function Home({ searchParams }: Props) {
   const overall = !chosen && views.length ? deriveOverall(views) : null;
   const items = library.assessments.map(libraryItem);
   const dir = shownDir(library.dir);
-  const terminal = access === "on";
   const model = await activeModelSummary(); // its summary only: no API key is read for a page
   const assistant: AssistantInfo = {
     scope: scopeOf(chosen),
     runs: scopedViews(views, null).map((v) => ({ ...runRef(v), status: v.status })),
     prompts: welcomePrompts(scopedViews(views, chosen?.uid ?? null)),
-    terminal,
     retentionDays: retentionDays(),
     model,
   };
@@ -65,7 +59,6 @@ export default async function Home({ searchParams }: Props) {
           dir={dir}
           renderedAt={clock(library.readAt)}
           skipped={library.problems}
-          terminal={terminal}
         />
       }
       overview={
@@ -88,8 +81,6 @@ export default async function Home({ searchParams }: Props) {
         )
       }
       reports={report ? <ReportsView key={chosen?.uid ?? "all"} data={report} /> : empty}
-      terminal={<TerminalView access={access} />}
-      terminalState={access}
       knowledge={<KnowledgeView />}
       assistant={assistant}
     />

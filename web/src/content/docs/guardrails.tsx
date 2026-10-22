@@ -138,8 +138,8 @@ export const guardrails: GroupContent = {
               redaction; reports never contain the test account.
             </li>
             <li>
-              The dashboard&apos;s Terminal page never logs what is typed, and the sign-in link is printed only to a
-              terminal, never to <Mono>~/.reconix/web.log</Mono>.
+              The dashboard&apos;s sign-in link is printed only to a terminal, never to{" "}
+              <Mono>~/.reconix/web.log</Mono>.
             </li>
           </ul>
         </DocSection>

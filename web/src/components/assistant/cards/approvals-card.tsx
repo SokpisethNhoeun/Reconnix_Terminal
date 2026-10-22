@@ -1,15 +1,13 @@
 /* Approvals from the saved data: each gated action with its recorded decision (Approved,
    Rejected, Waiting for approval or Not reached, as lib/status.ts names them) and its risk, the
    server's count of every decision by state, and runs paused on another input (a sign-in). Nothing can be approved here:
-   decisions are made in the TUI, with its double check. While the terminal is on there is a way
-   to the Terminal view. */
+   decisions are made in the TUI, with its double check. */
 import { Hand } from "lucide-react";
 import { APPROVAL_STATE, riskMeaning, RUN_STATUS } from "@/lib/status";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { STATE_ORDER } from "@/lib/assistant/cards";
 import type { CardOf } from "@/lib/assistant/protocol";
 import { CardShell, runName } from "./card-shell";
-import { TerminalButton } from "./links";
 
 export function ApprovalsCard({ card }: { card: CardOf<"approvals"> }) {
   const waiting = card.pending + card.waiting.length;
@@ -32,12 +30,7 @@ export function ApprovalsCard({ card }: { card: CardOf<"approvals"> }) {
           )}
         </>
       }
-      footer={
-        <>
-          <span>Decide in the TUI. Nothing can be approved from this chat.</span>
-          <TerminalButton />
-        </>
-      }
+      footer={<span>Decide in the TUI. Nothing can be approved from this chat.</span>}
     >
       {card.items.length === 0 && card.waiting.length === 0 ? (
         <p className="ai-card-empty">No gated actions in the saved data.</p>

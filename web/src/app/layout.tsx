@@ -4,7 +4,7 @@ import { SITE_NAME } from "@/lib/site";
 import "./globals.css";
 
 // Inter drives both display and body (the SOC dashboard uses one clean geometric sans);
-// JetBrains Mono stays for chips, ticks, timestamps and the terminal. Variable names are
+// JetBrains Mono stays for chips, ticks, timestamps and code. Variable names are
 // unchanged so the docs and the ui/ primitives keep resolving --font-display / --font-body /
 // --font-mono.
 const display = Inter({ subsets: ["latin"], variable: "--font-display" });
@@ -13,7 +13,7 @@ const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
   title: { default: `${SITE_NAME} analysis`, template: `%s · ${SITE_NAME} analysis` },
-  description: "The assessments the Reconix terminal app saved on this computer, and the TUI itself.",
+  description: "The assessments the Reconix terminal app saved on this computer.",
   robots: { index: false, follow: false },
 };
 

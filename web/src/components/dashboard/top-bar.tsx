@@ -1,10 +1,9 @@
 /* The top bar: the live-refresh pill, the Assessment switcher (every width), the Target /
-   Template / Status chips (wide screens; for the open run, or counts across every run), docs
-   search and the "needs you" bell. A server component: each client piece gets
+   Template / Status chips (wide screens; for the open run, or counts across every run) and docs
+   search. A server component: each client piece gets
    only the fields it shows (never the whole Dashboard or Overall, which would put every saved
    value into the page). */
 import { AssessmentSwitcher } from "@/components/dashboard/assessment-switcher";
-import { AttentionBell } from "@/components/dashboard/attention-bell";
 import type { Dashboard } from "@/components/dashboard/derive";
 import type { Overall } from "@/components/dashboard/derive-overall";
 import { DocsSearch } from "@/components/dashboard/docs-search";
@@ -38,7 +37,6 @@ export function TopBar({
   dir,
   renderedAt,
   skipped,
-  terminal,
 }: {
   dash: Dashboard | null; // the open run, if one is open
   overall: Overall | null; // every saved run, when none is open
@@ -46,7 +44,6 @@ export function TopBar({
   dir: string;
   renderedAt: string;
   skipped: SkippedFile[];
-  terminal: boolean;
 }) {
   const a = dash?.assessment ?? null;
   return (
@@ -64,7 +61,6 @@ export function TopBar({
 
       <div className="dash-reveal ml-auto flex shrink-0 items-center gap-2 xl:ml-3">
         <DocsSearch />
-        <AttentionBell gate={dash?.gate ?? null} currentUid={a?.uid ?? null} items={items} terminal={terminal} />
       </div>
     </header>
   );

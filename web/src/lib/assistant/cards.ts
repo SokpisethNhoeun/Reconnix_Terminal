@@ -32,12 +32,12 @@ export const NOTICES = {
     title: "Plan a new assessment in the TUI",
     body: "The assistant can't plan, create or start an assessment, and no plan has been made. Planning happens in the Reconix TUI, with your approval at each gate.",
     steps: [
-      "Open the Terminal view (or run python -m reconix).",
+      "Run python -m reconix in the reconix-tui folder.",
       "Enter the target and pick a template.",
       "Review and approve the Scope Manifest.",
       "Review the plan and run it; risky steps wait for your approval.",
     ],
-    action: "terminal",
+    action: null,
   },
   run: {
     kind: "notice",
@@ -45,7 +45,7 @@ export const NOTICES = {
     title: "Nothing runs from the dashboard",
     body: "Scans and tools run only in the Reconix TUI, inside the approved scope and after your approval. This chat reads saved results.",
     steps: [],
-    action: "terminal",
+    action: null,
   },
   act: {
     kind: "notice",
@@ -53,7 +53,7 @@ export const NOTICES = {
     title: "Approvals are given in the TUI only",
     body: "The assistant can't approve or reject an action. Decide in the TUI, where a HIGH-risk action needs a double check.",
     steps: [],
-    action: "terminal",
+    action: null,
   },
   empty: {
     kind: "notice",
@@ -61,7 +61,7 @@ export const NOTICES = {
     title: "No saved assessments yet",
     body: "Run an assessment in the Reconix TUI: it is saved here as it goes, and the assistant can then answer about it.",
     steps: [],
-    action: "terminal",
+    action: null,
   },
   // "the data doesn't contain that": the saved files hold no error log and no failed state
   errors: {

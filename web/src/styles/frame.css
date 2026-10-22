@@ -52,7 +52,7 @@
 .dash-sidebar { grid-column: 1; grid-row: 1 / span 2; flex-direction: column; border-right: var(--dash-line) solid var(--border); }
 .dash-topbar { grid-column: 2; grid-row: 1; }
 /* The content area holds whichever view is open. It never scrolls sideways: wide things
-   (tables, code, the terminal) scroll inside themselves. */
+   (tables, code) scroll inside themselves. */
 .dash-content {
   grid-column: 2;
   grid-row: 2;
@@ -124,7 +124,6 @@
     padding-inline: 8px;
   }
   .dash-sidebar::-webkit-scrollbar { display: none; }
-  .dash-sidebar > a { height: auto; width: auto; padding: 0 6px; }
   .dash-sidebar nav { flex: 1; flex-direction: row; padding: 6px 0; }
   .dash-sidebar > div { flex-direction: row; padding: 0; }
   .dash-content { grid-column: 1; grid-row: 3; }
