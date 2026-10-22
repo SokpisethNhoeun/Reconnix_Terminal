@@ -131,6 +131,29 @@ export const aiModels: GroupContent = {
             <DocLink href="/docs/guardrails/llm-data-handling">LLM data handling</DocLink>.
           </Callout>
         </DocSection>
+        <DocSection title="Knowledge add-ons">
+          <p>
+            <DocLink href="/docs/commands/add-on"><Mono>/add-on</Mono></DocLink> gives the AI reference documents
+            (<Mono>.txt .md .json .yaml .yml .docx .pdf</Mono>, at most 10 MB, no symlinks). Each file is read once,
+            <strong> cleaned and redacted at ingest</strong> (secrets never reach disk), split into passages of at most
+            1,200 characters and saved under <Mono>~/.reconix/knowledge</Mono> (the folder 0700, files 0600); at most 50
+            sources are kept. The files are only ever read — nothing in them is run.
+          </p>
+          <p>
+            For a question, the relevant passages are found with BM25 (a passage must share at least two of your words,
+            or the whole query when it is shorter; the best four are used, up to 4,000 characters go to the model) and
+            added to the context as untrusted reference material,
+            each prefixed <Mono>[name #index]</Mono>. All three consumers share this: the terminal chat (which then shows
+            a muted <Mono>Knowledge: a.md, b.pdf</Mono> line under the reply), the <Mono>/assess</Mono> agent (through a
+            read-only <Mono>search_knowledge</Mono> tool the scope guard allows) and the web AI Assistant (which reads the
+            same folder but never writes it). With no active model, no knowledge is used. See{" "}
+            <DocLink href="/docs/commands/add-on">/add-on</DocLink>.
+          </p>
+          <Callout variant="warning" title="Reference, not instructions">
+            Knowledge passages are untrusted data: the model summarizes them but never obeys directions found inside
+            them, and nothing is approved or run from a knowledge file.
+          </Callout>
+        </DocSection>
         <DocSection title="Switching mid-run">
           <p>
             <Mono>/model</Mono> works at any time. The run, its findings and its approvals are unchanged; only the next

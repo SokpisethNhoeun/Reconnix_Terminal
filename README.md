@@ -205,6 +205,7 @@ Type `/`, keep typing to filter, `↑`/`↓` to pick, `Tab` to complete, `Enter`
 | `/provider [set\|update\|test\|unset <id>]` | manage LLM providers; no argument opens a menu (alias `/providers`) |
 | `/model [provider/model]` | pick the active LLM model; no argument opens a menu (alias `/models`) |
 | `/assess <target>` | run a real assessment with the AI agent (needs a `/model`; alias `/agent`) |
+| `/add-on [path]` | add reference files for the AI; no argument opens a menu (alias `/addon`) |
 | `/web` | open the web dashboard (it starts it first if needed; alias `/dashboard`) |
 | `/quit` | quit (alias `/exit`) |
 
@@ -262,6 +263,23 @@ turn; the run you leave is marked stopped.
 
 With no active model (or if a call fails) the built-in reply is used, so the demo runs
 offline.
+
+## Knowledge add-ons (`/add-on`)
+
+Give the AI reference material from your own documents. `/add-on` opens a menu (add a file,
+remove one, remove all); `/add-on <path>` adds one straight away. Supported files are
+`.txt .md .json .yaml .yml .docx .pdf` (at most 10 MB, no symlinks); PDFs use `pypdf`, Word
+files `python-docx`. Each file is read once, **cleaned and redacted at ingest** (so a secret in
+the document never reaches disk), split into passages of at most 1,200 characters, and saved
+under `~/.reconix/knowledge` (`RECONIX_KNOWLEDGE_DIR`; the folder is `0700`, files `0600`, atomic
+writes); at most 50 sources are kept. The files are only ever read — nothing in them is run.
+
+When you ask a question, the passages that share your words are found with BM25 (at least two
+matching terms, or the whole query when it is shorter; the best four, up to 4,000 characters)
+and added to the context as **untrusted reference material**, never instructions. The terminal
+chat then shows a muted `Knowledge: a.md, b.pdf` line under the reply; the `/assess` agent gets
+a read-only `search_knowledge` tool (allowed by the scope guard); and the web AI Assistant reads
+the same folder (it never writes it). With no active model, no knowledge is used.
 
 ## Safety model
 
