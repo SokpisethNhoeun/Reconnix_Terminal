@@ -9,14 +9,15 @@
    has fewer than two) and scores above 0, so a small folder still answers (a fixed score
    threshold left one short file unused: its idf is low); the best 4 are used, ties by source
    name, then passage index; at most 4,000 characters of them go to a model (withinBudget).
-   Pure. */
+   There a character is a code point, as Python counts it, so a cut never splits a surrogate
+   pair and both sides send the same text. Pure. */
 
 export const K1 = 1.2;
 export const B = 0.75;
 export const MIN_MATCHED = 2; // distinct question tokens a passage must hold (fewer if the question has fewer)
 export const TOP_K = 4;
-export const BUDGET = 4_000; // characters of passages sent with one question
-const MIN_PIECE = 200; // a passage cut to fit the budget keeps at least this much, or is left out
+export const BUDGET = 4_000; // characters (code points) of passages sent with one question
+const MIN_PIECE = 200; // code points a cut passage keeps at least, or it is left out
 
 export const STOPWORDS: ReadonlySet<string> = new Set(
   (
@@ -120,19 +121,21 @@ export function rank(corpus: Corpus, question: string, top: number = TOP_K): Sco
     .slice(0, top);
 }
 
-/** The ranked passages that fit `budget` characters of text, in order: the first one that
-    doesn't fit is cut to what is left (or left out when that is under MIN_PIECE), and nothing
-    after it is sent. */
+/** The ranked passages that fit `budget` characters (code points) of text, in order: the first
+    one that doesn't fit is cut to `left - 1` code points, its trailing " \t\n\r" trimmed, plus
+    "…" (or left out when fewer than MIN_PIECE are left), and nothing after it is sent. Python's
+    `text[:left - 1].rstrip(" \t\n\r") + "…"`. */
 export function withinBudget<T extends Passage>(passages: T[], budget: number = BUDGET): T[] {
   const kept: T[] = [];
   let left = budget;
   for (const p of passages) {
-    if (p.text.length <= left) {
+    const points = [...p.text];
+    if (points.length <= left) {
       kept.push(p);
-      left -= p.text.length;
+      left -= points.length;
       continue;
     }
-    if (left >= MIN_PIECE) kept.push({ ...p, text: `${p.text.slice(0, left - 1).trimEnd()}…` });
+    if (left >= MIN_PIECE) kept.push({ ...p, text: `${points.slice(0, left - 1).join("").replace(/[ \t\n\r]+$/, "")}…` });
     break;
   }
   return kept;

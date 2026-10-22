@@ -156,8 +156,9 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   TUI's `/add-on` keeps in `~/.reconix/knowledge` (`RECONIX_KNOWLEDGE_DIR`; a folder or file that
   is a link, someone else's, writable by others or too big is skipped), ranks their passages
   against the masked question with the TUI's BM25 (`tests/knowledge-vectors.json` checks both),
-  and puts the relevant ones (score ≥ 1.5, the best 4, 4,000 characters, masked and cleaned again)
-  inside the fence as untrusted reference material, while `meta` names their files for the
+  and puts the relevant ones (each holds at least two of the question's distinct tokens, or all
+  when it has fewer, and scores above 0; the best 4, 4,000 characters counted in code points,
+  masked and cleaned again) inside the fence as untrusted reference material, while `meta` names their files for the
   muted "Knowledge used: a.md, b.pdf" under the answer (kept with the saved reply).
 - **Cards the server picks** (`lib/assistant/cards.ts`, `intent.ts`): findings, a finding,
   progress, approvals, policy blocks, tools used, report downloads and notices, built from the

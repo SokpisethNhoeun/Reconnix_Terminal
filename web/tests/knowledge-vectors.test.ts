@@ -3,17 +3,20 @@
    tokenize and rank alike: the tokens of each input, and for each query the relevant passages in
    order (at least two of the query's distinct tokens, or all when it has fewer; the best 4,
    ties by source name then index) with their scores to 4
-   decimals. The file arrives with the TUI's branch; until then this says so and skips. */
+   decimals; and, in the "budget" section, the texts withinBudget keeps of plain passages (cut on
+   code points, " \t\n\r" trimmed, then "…"). The file arrives with the TUI's branch; until then
+   this says so and skips, and so does the budget part while the file has no such section. */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { buildCorpus, rank, tokenize } from "@/lib/assistant/knowledge/rank";
+import { buildCorpus, rank, tokenize, withinBudget } from "@/lib/assistant/knowledge/rank";
 
 interface Vectors {
   tokens: { input: string; expected: string[] }[];
   corpus: { name: string; chunks: string[] }[]; // a source: its file name, as in index.json
   queries: { query: string; expected: { source: string; index: number; score: number }[] }[];
+  budget?: { budget: number; passages: string[]; expected: string[] }[]; // the texts kept, in order
 }
 
 const FILE = path.join(__dirname, "knowledge-vectors.json");
@@ -38,5 +41,19 @@ if (!vectors) {
       expect(got.map((p) => [p.source, p.index])).toEqual(q.expected.map((e) => [e.source, e.index]));
       got.forEach((p, i) => expect(Math.abs(p.score - q.expected[i].score), `${p.source} #${p.index}`).toBeLessThanOrEqual(HALF));
     });
+
+    const budget = vectors.budget;
+    if (!budget) {
+      it.skip('the vectors have no "budget" section yet (the TUI\'s /add-on branch adds it): the cut is not checked against Python', () => {});
+    } else {
+      it("has budget cases to check", () => {
+        expect(budget.length).toBeGreaterThan(0);
+      });
+      const label = (c: { budget: number; passages: string[] }) => `${c.budget} over ${c.passages.map((t) => [...t].length).join(", ")} code points`;
+      it.each(budget.map((c) => [label(c), c] as const))("fits the budget %s", (_, c) => {
+        const kept = withinBudget(c.passages.map((text, index) => ({ source: "v", index, text })), c.budget);
+        expect(kept.map((p) => p.text)).toEqual(c.expected);
+      });
+    }
   });
 }

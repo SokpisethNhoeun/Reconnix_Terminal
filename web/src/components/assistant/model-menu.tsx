@@ -44,7 +44,7 @@ function modelTitle(model: ModelSummary): string {
   const from = model.provider ? ` (${model.provider})` : "";
   return model.local
     ? `${model.name}${from}: a local endpoint on this machine`
-    : `${model.name}${from}: a remote model. Questions and the assessment data they need are sent to it.`;
+    : `${model.name}${from}: a remote model. Questions, the assessment data they need and relevant /add-on knowledge passages are sent to it.`;
 }
 
 export function ModelMenu() {
