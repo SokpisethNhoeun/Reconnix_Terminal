@@ -1,6 +1,6 @@
 /* The saved API keys' protection (server only): AES-256-GCM with a 32-byte key kept in
    models.key next to models.json (0600, made once with O_EXCL, read without following a link,
-   checked through its handle). Every value gets its own random 12-byte IV; the 16-byte tag is
+   checked through its handle, refused once other users may read it). Every value gets its own random 12-byte IV; the 16-byte tag is
    checked when it is opened, and the provider's id is bound in as associated data, so a sealed
    key copied to another provider in the file doesn't open. Nothing here logs a key, and errors
    are fixed messages. */
@@ -49,9 +49,11 @@ export function open(sealed: Sealed, key: Buffer, providerId: string): string {
 
 // --- the key file ------------------------------------------------------------------------------
 
-/** The key in the folder's models.key, or null when there is none yet. Anything but a regular
-    file of this user's holding exactly 32 bytes is refused (never replaced). */
-export async function readKey(f: Folder): Promise<Buffer | null> {
+/** The folder's models.key opened and checked through its handle (never following a link), or
+    null when there is none yet. Anything but a regular file of this user's holding exactly 32
+    bytes is refused, and so is one that other users may read or change: the keys it protected
+    are no longer only this user's, so it is never quietly tightened (or replaced). */
+async function openKeyFile(f: Folder): Promise<FileHandle | null> {
   let handle: FileHandle;
   try {
     handle = await openFile(/*turbopackIgnore: true*/ path.join(f.dir, KEY_FILE), READ_FLAGS);
@@ -59,20 +61,42 @@ export async function readKey(f: Folder): Promise<Buffer | null> {
     if (code(error) === "ENOENT") return null;
     throw new ModelsError(MODELS_FAIL.key);
   }
+  let fault: string | null;
   try {
     const info = await handle.stat();
     const uid = myUid();
-    if (!info.isFile() || info.size !== KEY_BYTES || (uid !== null && info.uid !== uid)) throw new ModelsError(MODELS_FAIL.key);
-    if ((info.mode & 0o077) !== 0 && myUid() !== null) await handle.chmod(0o600);
+    if (!info.isFile() || info.size !== KEY_BYTES || (uid !== null && info.uid !== uid)) fault = MODELS_FAIL.key;
+    else fault = uid !== null && (info.mode & 0o077) !== 0 ? MODELS_FAIL.keyShared : null;
+  } catch {
+    fault = MODELS_FAIL.key;
+  }
+  if (fault === null) return handle;
+  await handle.close().catch(() => {});
+  throw new ModelsError(fault);
+}
+
+/** The key in the folder's models.key, or null when there is none yet (refused as above). */
+export async function readKey(f: Folder): Promise<Buffer | null> {
+  const handle = await openKeyFile(f);
+  if (!handle) return null;
+  try {
     const key = Buffer.alloc(KEY_BYTES);
     const { bytesRead } = await handle.read(key, 0, KEY_BYTES, 0);
-    if (bytesRead !== KEY_BYTES) throw new ModelsError(MODELS_FAIL.key);
+    if (bytesRead !== KEY_BYTES) throw new Error("short read");
     return key;
   } catch {
     throw new ModelsError(MODELS_FAIL.key);
   } finally {
     await handle.close().catch(() => {});
   }
+}
+
+/** Whether there is a models.key that readKey would accept, checked the same way but without
+    reading the key (refused as above). For what only says which model answers. */
+export async function hasKey(f: Folder): Promise<boolean> {
+  const handle = await openKeyFile(f);
+  await handle?.close().catch(() => {});
+  return handle !== null;
 }
 
 /** The key, made first when there is none (32 random bytes, O_EXCL, 0600). */

@@ -3,7 +3,8 @@
 /* + Add model, or editing a saved provider, inside the Model menu: a preset (it fills in the
    base URL), a name, the OpenAI-compatible base URL, an API key (a password field, never filled
    in: editing, it says a key is saved, an empty field keeps it, and it can be removed), the
-   model names (model-names.tsx, with Fetch models), Test connection and Save. The server checks
+   model names (model-names.tsx, with Fetch models; a name typed but not added yet is saved
+   too, or stops the save when it can't be one), Test connection and Save. The server checks
    everything again; what it refuses stays in the form, said under it. Escape closes the form
    (the menu stays open). A test or a fetch of a saved provider whose address and key are as
    saved asks by its id, so the saved key goes only to its saved address; anything changed is
@@ -17,6 +18,7 @@ import { type PresetId, PRESETS, presetOf } from "@/lib/assistant/models/presets
 import type { AddProvider, Probe, UpdateProvider } from "@/lib/assistant/models/requests";
 import { MAX_NAME, MAX_URL } from "@/lib/assistant/models/schema";
 import type { ModelsView, ProviderView } from "@/lib/assistant/models/view";
+import { namesToSave } from "./model-name-rules";
 import { ModelNames } from "./model-names";
 
 export type SaveModels = { kind: "add"; body: AddProvider } | { kind: "update"; id: string; body: UpdateProvider };
@@ -48,6 +50,7 @@ export function ModelForm({ view, editing, saving, onSave, onDone }: Props) {
   const [apiKey, setApiKey] = useState("");
   const [removeKey, setRemoveKey] = useState(false);
   const [models, setModels] = useState<string[]>(editing?.models ?? []);
+  const [typedName, setTypedName] = useState(""); // a model name typed but not added yet
   const [activate, setActivate] = useState(true);
   const [fetched, setFetched] = useState<string[] | null>(null);
   const [probing, setProbing] = useState<"test" | "fetch" | null>(null);
@@ -77,10 +80,12 @@ export function ModelForm({ view, editing, saving, onSave, onDone }: Props) {
       : { baseUrl: baseUrl.trim(), ...(model ? { model } : {}), ...(typedKey ? { apiKey: typedKey } : {}) };
 
   const test = async () => {
-    if (!models.length) return setResult({ ok: false, detail: "Add a model name to test first." });
+    const names = namesToSave(models, typedName); // a name still in the field counts
+    if (!names.ok) return setResult({ ok: false, detail: names.problem });
+    if (!names.names.length) return setResult({ ok: false, detail: "Add a model name to test first." });
     setProbing("test");
     setResult(null);
-    const answer = await api.testModel(probe(models[0]));
+    const answer = await api.testModel(probe(names.names[0]));
     setProbing(null);
     setResult(answer.ok ? answer.result : { ok: false, detail: answer.detail });
   };
@@ -98,8 +103,15 @@ export function ModelForm({ view, editing, saving, onSave, onDone }: Props) {
     setError(null);
     if (!name.trim()) return setError("Give the provider a name.");
     if (!baseUrl.trim()) return setError("Give the base URL (it usually ends in /v1).");
-    if (!models.length) return setError("Add at least one model name.");
-    const common = { name: name.trim(), preset, baseUrl: baseUrl.trim(), models, ...(typedKey ? { apiKey: typedKey } : {}) };
+    // a name typed without Enter or Add is saved too (shown in the list first), never dropped
+    const names = namesToSave(models, typedName);
+    if (!names.ok) return setError(names.problem);
+    if (!names.names.length) return setError("Add at least one model name.");
+    if (names.names.length !== models.length) {
+      setModels(names.names);
+      setTypedName("");
+    }
+    const common = { name: name.trim(), preset, baseUrl: baseUrl.trim(), models: names.names, ...(typedKey ? { apiKey: typedKey } : {}) };
     const problem = editing
       ? await onSave({ kind: "update", id: editing.id, body: { ...common, ...(removeKey && !typedKey ? { removeKey: true as const } : {}) } })
       : await onSave({ kind: "add", body: { ...common, activate } });
@@ -204,7 +216,7 @@ export function ModelForm({ view, editing, saving, onSave, onDone }: Props) {
           {editing?.keySaved && <Checkbox label="Remove the saved key" checked={removeKey} onChange={(e) => setRemoveKey(e.target.checked)} />}
         </div>
 
-        <ModelNames value={models} onChange={setModels} fetched={fetched} />
+        <ModelNames value={models} onChange={setModels} typed={typedName} onTyped={setTypedName} fetched={fetched} />
 
         <div className="ai-model-probe">
           <button type="button" onClick={fetchList} disabled={busy || !baseUrl.trim()} className="ai-btn ai-btn-small ai-btn-outline">

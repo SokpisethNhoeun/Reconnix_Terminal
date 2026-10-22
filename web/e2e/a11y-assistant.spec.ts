@@ -33,7 +33,7 @@ test.describe("axe", () => {
     await show(page, "/?view=assistant");
     await page.getByRole("button", { name: /^Model:/ }).click();
     const menu = page.getByRole("dialog", { name: "Models" });
-    await expect(menu.getByRole("radio").first()).toBeVisible();
+    await expect(menu.getByRole("menuitemradio").first()).toBeVisible();
     await axe(page, "assistant model menu");
     await menu.getByRole("button", { name: "Add model" }).click();
     await expect(menu.getByRole("form", { name: "Add a model" })).toBeVisible();

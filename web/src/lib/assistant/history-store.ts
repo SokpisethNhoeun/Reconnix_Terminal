@@ -12,7 +12,8 @@
    write: after RECONIX_ASSISTANT_RETENTION_DAYS without use (default 30; 0 keeps them; an
    unreadable file of ours by its last change), beyond the newest MAX_CONVERSATIONS, and
    messages beyond the newest MAX_CONVERSATION_MESSAGES. Pruning and "Delete all" only touch
-   <uuid>.json and this store's temporary files. One queue (secure-fs.ts `serial`, shared by
+   <uuid>.json and this store's temporary files; pruning also clears the saved models' stale
+   temporary files (.models.<hex>.tmp: a write the process never finished). One queue (secure-fs.ts `serial`, shared by
    every route) serializes this process's changes. Errors carry fixed messages, never a path. */
 import "server-only";
 
@@ -38,6 +39,7 @@ import {
   summaryOf,
   type UserMessage,
 } from "./history-schema";
+import { MODELS_TEMP } from "./models/store";
 import { isConversationId, type ScopeRef } from "./protocol";
 import { redact } from "./redact";
 import { MAX_QUESTION } from "./request";
@@ -147,8 +149,9 @@ async function prune(f: Folder, now: number): Promise<Conversation[]> {
   const kept: Conversation[] = [];
   for (const name of await names(f)) {
     const full = path.join(f.dir, name);
-    if (TEMP.test(name)) {
-      // a write that never finished (the process died): gone after a while
+    if (TEMP.test(name) || MODELS_TEMP.test(name)) {
+      // a write that never finished (the process died), a conversation's or the saved models':
+      // gone after a while (a write in progress is far younger)
       const info = await lstat(full).catch(() => null);
       if (info && now - info.mtimeMs > TEMP_STALE_MS) await unlink(full).catch(() => {});
       continue;

@@ -2,22 +2,26 @@
 
 /* The model names of a provider in the Model menu's form: chips with a remove button, a field
    that adds one (Enter or Add), and, once "Fetch models" has asked the server, the names it
-   lists as checkboxes that add or remove them. The server checks every name again. */
+   lists as checkboxes that add or remove them. The field's text belongs to the form
+   (model-form.tsx), so Save also takes a name typed but not yet added (model-name-rules.ts).
+   The server checks every name again. */
 import { useId, useState } from "react";
 import { Plus, X } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { IconButton } from "@/components/ui/icon-button";
-import { MAX_MODELS, MODEL_NAME } from "@/lib/assistant/models/schema";
+import { MAX_MODELS } from "@/lib/assistant/models/schema";
+import { nameProblem } from "./model-name-rules";
 
 interface Props {
   value: string[];
   onChange: (names: string[]) => void;
+  typed: string; // the field's text: a name not added yet
+  onTyped: (text: string) => void;
   fetched: string[] | null; // what "Fetch models" found (null: not asked yet)
 }
 
-export function ModelNames({ value, onChange, fetched }: Props) {
-  const [typed, setTyped] = useState("");
+export function ModelNames({ value, onChange, typed, onTyped, fetched }: Props) {
   const [error, setError] = useState<string | null>(null);
   const labelId = useId();
   const errorId = useId();
@@ -25,11 +29,10 @@ export function ModelNames({ value, onChange, fetched }: Props) {
   const add = () => {
     const name = typed.trim();
     if (!name) return;
-    if (!MODEL_NAME.test(name)) return setError("A model name uses letters, digits and . _ : / @ + - only (at most 128).");
-    if (value.includes(name)) return setError("That model is listed already.");
-    if (value.length >= MAX_MODELS) return setError(`At most ${MAX_MODELS} models.`);
+    const problem = nameProblem(name, value);
+    if (problem) return setError(problem);
     onChange([...value, name]);
-    setTyped("");
+    onTyped("");
     setError(null);
   };
   const toggle = (name: string, on: boolean) => {
@@ -60,7 +63,7 @@ export function ModelNames({ value, onChange, fetched }: Props) {
         <input
           value={typed}
           onChange={(e) => {
-            setTyped(e.target.value);
+            onTyped(e.target.value);
             setError(null);
           }}
           onKeyDown={(e) => {

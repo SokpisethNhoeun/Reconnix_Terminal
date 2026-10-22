@@ -3,8 +3,9 @@
    server built from the sample data; conversations the dashboard's server keeps (they survive
    a reload and a new browser; open, rename, delete); Markdown with Copy; Stop and "New
    messages"; Retry; an answer with nothing in it; the Model menu (the Environment's model, + Add
-   model against the stand-in, switching, asking with the new model, editing, removing); what a
-   viewer can't do; and the routes' locks.
+   model against the stand-in, focus and the arrow keys, switching, asking with the new model,
+   editing, removing, a model name typed but not added, a provider removed in another tab); what
+   a viewer can't do; and the routes' locks.
    The chat panel holds still (text never moves), but the welcome's globe and the sidebar's icon
    breathe, so this project runs with reduced motion (playwright.config.ts; the motion itself is
    tested in motion.spec.ts) and clicks need no `force`. The
@@ -323,8 +324,9 @@ test.describe("the Model menu", () => {
     await modelButton(page).click();
     const menu = modelMenu(page);
     await expect(menu).toBeVisible();
-    const env = menu.getByRole("radiogroup", { name: /^Environment/ });
-    await expect(env.getByRole("radio", { name: "stub-model" })).toHaveAttribute("aria-checked", "true");
+    const env = menu.getByRole("menu", { name: /^Environment/ });
+    await expect(env.getByRole("menuitemradio", { name: "stub-model" })).toHaveAttribute("aria-checked", "true");
+    await expect(env.getByRole("menuitemradio", { name: "stub-model" })).toBeFocused(); // once the list loaded (not Close)
     await expect(menu).toContainText("read-only");
     await expect(menu.getByRole("button", { name: /^Edit Environment/ })).toHaveCount(0);
 
@@ -346,16 +348,34 @@ test.describe("the Model menu", () => {
     await expect(form.getByRole("status")).toHaveText("Connected: stub-model answered.");
     await form.getByRole("button", { name: "Save" }).click();
     await expect(form).toBeHidden();
-    const saved = menu.getByRole("radiogroup", { name: "Stand-in" });
-    await expect(saved.getByRole("radio")).toHaveCount(2);
+    const saved = menu.getByRole("menu", { name: "Stand-in" });
+    await expect(saved.getByRole("menuitemradio")).toHaveCount(2);
     await expect(menu).toContainText("key saved");
-    await expect(env.getByRole("radio")).toHaveAttribute("aria-checked", "true"); // not switched yet
+    await expect(env.getByRole("menuitemradio")).toHaveAttribute("aria-checked", "true"); // not switched yet
+
+    // the arrow keys, Home and End only move focus (one tab stop per provider); nothing is chosen
+    const first = saved.getByRole("menuitemradio", { name: "stub-model", exact: true });
+    const second = saved.getByRole("menuitemradio", { name: "stub-model-2" });
+    await first.focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(second).toBeFocused();
+    await expect(second).toHaveAttribute("tabindex", "0");
+    await expect(first).toHaveAttribute("tabindex", "-1");
+    await page.keyboard.press("ArrowDown"); // wraps
+    await expect(first).toBeFocused();
+    await page.keyboard.press("End");
+    await expect(second).toBeFocused();
+    await page.keyboard.press("Shift+Tab"); // out of the group, and back to where focus was
+    await page.keyboard.press("Tab");
+    await expect(second).toBeFocused();
+    await expect(second).toHaveAttribute("aria-checked", "false");
+    await expect(env.getByRole("menuitemradio")).toHaveAttribute("aria-checked", "true");
 
     // one click switches; the header follows without a reload
     await page.evaluate(() => ((window as unknown as { kept: number }).kept = 3));
-    await saved.getByRole("radio", { name: "stub-model-2" }).click();
-    await expect(saved.getByRole("radio", { name: "stub-model-2" })).toHaveAttribute("aria-checked", "true");
-    await expect(env.getByRole("radio")).toHaveAttribute("aria-checked", "false");
+    await saved.getByRole("menuitemradio", { name: "stub-model-2" }).click();
+    await expect(saved.getByRole("menuitemradio", { name: "stub-model-2" })).toHaveAttribute("aria-checked", "true");
+    await expect(env.getByRole("menuitemradio")).toHaveAttribute("aria-checked", "false");
     await expect(modelButton(page)).toHaveAccessibleName("Model: stub-model-2 · local");
     await page.keyboard.press("Escape");
     await expect(menu).toBeHidden();
@@ -387,16 +407,16 @@ test.describe("the Model menu", () => {
     await edit.getByRole("button", { name: "Remove stub-model-2 from the list" }).click();
     await edit.getByRole("button", { name: "Save" }).click();
     await expect(edit).toBeHidden();
-    const renamed = menu.getByRole("radiogroup", { name: "Stub server" });
-    await expect(renamed.getByRole("radio")).toHaveCount(1);
-    await expect(renamed.getByRole("radio", { name: "stub-model" })).toHaveAttribute("aria-checked", "true"); // the active one left: its first model
+    const renamed = menu.getByRole("menu", { name: "Stub server" });
+    await expect(renamed.getByRole("menuitemradio")).toHaveCount(1);
+    await expect(renamed.getByRole("menuitemradio", { name: "stub-model" })).toHaveAttribute("aria-checked", "true"); // the active one left: its first model
     await expect(modelButton(page)).toHaveAccessibleName("Model: stub-model · local");
 
     // remove, asked first: the Environment answers again
     await menu.getByRole("button", { name: "Remove Stub server" }).click();
     await menu.getByRole("button", { name: "Remove", exact: true }).click();
     await expect(renamed).toHaveCount(0);
-    await expect(env.getByRole("radio")).toHaveAttribute("aria-checked", "true");
+    await expect(env.getByRole("menuitemradio")).toHaveAttribute("aria-checked", "true");
   });
 
   test("what the server refuses stays in the form, said under it", async ({ page }) => {
@@ -413,7 +433,64 @@ test.describe("the Model menu", () => {
     await expect(form.getByRole("alert")).toContainText("not on this machine");
     await expect(form).toBeVisible();
     await form.getByRole("button", { name: "Cancel" }).click();
-    await expect(modelMenu(page).getByRole("radiogroup")).toHaveCount(1); // only the Environment
+    await expect(modelMenu(page).getByRole("menu")).toHaveCount(1); // only the Environment
+  });
+
+  test("a model name typed but not added is saved too, or stops the save with the reason", async ({ page }) => {
+    await page.goto("/?view=assistant");
+    await modelButton(page).click();
+    const menu = modelMenu(page);
+    await menu.getByRole("button", { name: "Add model" }).click();
+    const form = menu.getByRole("form", { name: "Add a model" });
+    await form.getByLabel("Provider", { exact: true }).selectOption("custom");
+    await form.getByLabel("Name", { exact: true }).fill("Typed");
+    await form.getByLabel("Base URL", { exact: true }).fill(`http://127.0.0.1:${LLM_PORT}/v1`);
+    await form.getByRole("checkbox", { name: "Use it for the next question" }).uncheck();
+    const field = form.getByLabel("A model name to add");
+    await field.fill("two words"); // can't be a model name: said, and nothing is saved
+    await form.getByRole("button", { name: "Save" }).click();
+    await expect(form.getByRole("alert")).toContainText("The model name you typed isn't in the list yet");
+    await expect(form).toBeVisible();
+    await field.fill("stub-model"); // typed, never added with Enter or Add
+    await form.getByRole("button", { name: "Save" }).click();
+    await expect(form).toBeHidden();
+    const typed = menu.getByRole("menu", { name: "Typed" });
+    await expect(typed.getByRole("menuitemradio")).toHaveText(["stub-model"]);
+
+    // editing: the same, after the names already there
+    await menu.getByRole("button", { name: "Edit Typed" }).click();
+    const edit = menu.getByRole("form", { name: "Edit Typed" });
+    await edit.getByLabel("A model name to add").fill("stub-model-2");
+    await edit.getByRole("button", { name: "Save" }).click();
+    await expect(edit).toBeHidden();
+    await expect(typed.getByRole("menuitemradio")).toHaveText(["stub-model", "stub-model-2"]);
+  });
+
+  test("a provider removed meanwhile (another tab) is never saved again from its edit form", async ({ page }) => {
+    await page.goto("/?view=assistant");
+    const made = await page.request.post("/api/assistant/models", {
+      headers: { Origin: ORIGIN },
+      data: { name: "Short-lived", preset: "custom", baseUrl: `http://127.0.0.1:${LLM_PORT}/v1`, models: ["stub-model"] },
+    });
+    expect(made.status()).toBe(201);
+    const { provider } = (await made.json()) as { provider: { id: string } };
+    await modelButton(page).click();
+    const menu = modelMenu(page);
+    await menu.getByRole("button", { name: "Edit Short-lived" }).click();
+    const edit = menu.getByRole("form", { name: "Edit Short-lived" });
+    await edit.getByLabel("Name", { exact: true }).fill("Renamed");
+    // another tab removes it
+    expect((await page.request.delete(`/api/assistant/models/${provider.id}`, { headers: { Origin: ORIGIN } })).status()).toBe(200);
+    await edit.getByRole("button", { name: "Save" }).click();
+    // the form gives way to the list, which says so (with focus, so it is read out)
+    await expect(edit).toBeHidden();
+    const notice = menu.getByRole("alert");
+    await expect(notice).toContainText("That provider was removed meanwhile");
+    await expect(notice).toBeFocused();
+    await expect(menu.getByRole("form")).toHaveCount(0);
+    await expect(menu.getByRole("menu")).toHaveCount(1); // only the Environment
+    const listed = (await (await page.request.get("/api/assistant/models")).json()) as { providers: unknown[] };
+    expect(listed.providers).toEqual([]); // nothing saved in its place
   });
 });
 

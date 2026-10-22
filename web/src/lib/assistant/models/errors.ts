@@ -19,7 +19,9 @@ export const MODELS_FAIL = {
   moved: "The assistant's folder changed while it was in use.",
   read: "The saved models could not be read. Remove models.json from the assistant's folder to start again.",
   save: "The models could not be saved.",
+  full: "Too many saved models: remove one first.",
   key: "The key that protects the saved API keys could not be used.",
+  keyShared: "models.key can be read or changed by other users. Remove it from the assistant's folder and enter the API keys again.",
   sealed: "A saved API key could not be read. Enter it again in the Model menu.",
 } as const;
 
