@@ -67,6 +67,8 @@ COMMANDS = (
             aliases=("activity", "log")),
     Command("assess", "Run a real assessment with the AI agent (needs a /model)",
             lambda app, target: app.start_agent_assessment(target), aliases=("agent",)),
+    Command("add-on", "Add reference files for the AI (knowledge add-ons)",
+            lambda app, path: app.add_on_command(path), aliases=("addon",), ask=False),
     Command("provider", "Manage LLM providers (set / test / use a model / unset)",
             lambda app, arg: app.provider_command(arg), aliases=("providers",)),
     Command("model", "Pick the active LLM model (provider/model)",

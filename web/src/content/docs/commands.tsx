@@ -313,6 +313,44 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
       { message: "Agent error: <the Python error>", meaning: "The harness failed; the run is marked finished and the terminal keeps working." },
     ],
   },
+  "add-on": {
+    purpose:
+      "Adds a reference document the AI may quote from: its text is read once, redacted and kept on this computer.",
+    when: (
+      <>
+        When a runbook, policy, API notes or a past report would help the AI answer about this
+        engagement. The add-ons are used by the terminal chat, the <Mono>/assess</Mono> agent and the web AI
+        Assistant alike; they are never run, and the web only reads them.
+      </>
+    ),
+    syntax: "/add-on [path]",
+    example: "/add-on ~/docs/runbook.md",
+    behaviour: (
+      <>
+        Without a path, a menu lists <strong>Add a file…</strong>, each saved source (
+        <Mono>name · kind · N passages</Mono>, picking one offers <strong>Remove</strong>) and
+        <strong>Remove all</strong> (both confirms default to No); when empty it explains what add-ons are.
+        <strong> Add a file…</strong> opens a form with one path field. With a path, the file is added straight
+        away and a notification gives the passage count. Supported: <Mono>.txt .md .json .yaml .yml .docx .pdf</Mono>,
+        at most 10 MB, a regular file (no symlink); at most 50 sources. The text is cleaned and
+        <strong> redacted at ingest</strong> (secrets never reach disk), split into passages (≤ 1,200 characters)
+        and saved under <Mono>~/.reconix/knowledge</Mono> (0700, files 0600). See{" "}
+        <DocLink href="/docs/ai-models/models">Models</DocLink>.
+      </>
+    ),
+    errors: [
+      { message: "Enter the path to a file to add.", meaning: "The field or argument is empty." },
+      { message: "That path is a symlink; add the real file instead.", meaning: "Symlinks are refused." },
+      { message: "No file at that path. / That isn't a regular file. / Couldn't read that file.", meaning: "The path doesn't exist, isn't a plain file, or can't be read." },
+      { message: "Unsupported file type. Use one of: .txt .md .json .yaml .yml .docx .pdf.", meaning: "The extension isn't supported." },
+      { message: "That file is too large (over 10 MB).", meaning: "Split or trim the file." },
+      { message: "That file isn't valid JSON. / That file isn't valid YAML.", meaning: "A .json/.yaml file didn't parse." },
+      { message: "Couldn't read that Word file. / Couldn't read that PDF. / That PDF is encrypted; add an unencrypted copy.", meaning: "The document couldn't be opened, or the PDF is encrypted." },
+      { message: "That file has no readable text to add.", meaning: "Nothing was left after extraction." },
+      { message: "The knowledge limit is 50 files. Remove one first.", meaning: "At most 50 sources are kept." },
+      { message: "The knowledge index is corrupt. Remove it with /add-on, then add files again.", meaning: "The saved index on disk is unreadable; Remove all and re-add." },
+    ],
+  },
   provider: {
     purpose: "Manages LLM providers: set one up, test it, use one of its models, or remove it.",
     when: "Before using a model for the first time, after changing a key, or to switch to another provider.",
@@ -402,6 +440,7 @@ const ARGUMENT: Record<string, string> = {
   finding: "a finding id; asked with a menu when left out",
   export: "a format id; asked with a menu when left out",
   assess: "a target, typed (required)",
+  "add-on": "an optional file path, typed",
   provider: "an optional verb and provider id, typed",
   model: "an optional provider/model, typed",
 };
