@@ -27,7 +27,7 @@ GROUPS = (
     ("start", "Start & navigate", ("help", "new", "template")),
     ("flow", "Flow", ("plan", "approval", "status")),
     ("findings", "Findings & reports", ("findings", "finding", "report", "export", "summary")),
-    ("data", "Assessments & data", ("assessments", "import", "audit")),
+    ("data", "Assessments & data", ("assessments", "audit")),
     ("ai", "AI models & agent", ("assess", "provider", "model")),
     ("dashboard", "Dashboard", ("web",)),
     ("session", "Session", ("quit",)),

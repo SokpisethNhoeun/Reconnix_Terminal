@@ -6,7 +6,7 @@ from ..models import Finding
 from . import lists
 from .errors import StoreValidationError
 
-SEVERITY_ORDER = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")
+SEVERITY_ORDER = ("CRITICAL", "HIGH", "MEDIUM", "LOW")
 
 # The triage lifecycle an analyst can move a finding through.
 TRIAGE_STATUS = ("open", "fixed", "accepted", "false-positive")
@@ -17,7 +17,8 @@ TRIAGE_LABELS = {"open": "Open", "fixed": "Fixed", "accepted": "Accepted risk",
 def list_findings() -> List[Finding]:
     """Revealed findings, most severe first (seed order breaks ties)."""
     revealed = set(lists.current().run.revealed)
-    rows = [f for f in lists.current().findings if f.fid in revealed]
+    rows = [f for f in lists.current().findings
+            if f.fid in revealed and f.severity in SEVERITY_ORDER]
     rows.sort(key=lambda f: SEVERITY_ORDER.index(f.severity))
     return rows
 
@@ -80,17 +81,16 @@ def triage_finding(fid: str, *, status: str = None, severity: str = None,
     return finding
 
 
-# --- importing real tool output ---------------------------------------------------------------
-MAX_IMPORT_BYTES = 5_000_000
-
-
-def ingest_external(findings, prefix: str = "IMP") -> int:
+# --- external findings (the AI agent) -----------------------------------------------------------
+def ingest_external(findings, prefix: str = "AI") -> int:
     """Add externally-produced findings to the current assessment, deduped and revealed.
 
     Each is given a `<prefix>-NNN` id and shown at once; duplicates (same severity/title/path)
-    are skipped. Shared by file import (`IMP-`) and the AI agent (`AI-`).
+    are skipped. Used by the AI agent (`AI-`). Only the four severities exist; any other
+    severity is skipped.
     """
     assessment = lists.current()
+    findings = [f for f in findings if f.severity in SEVERITY_ORDER]
     existing = {(f.severity, f.title, f.path) for f in assessment.findings}
     n = sum(1 for f in assessment.findings if f.fid.startswith(f"{prefix}-"))
     added = 0
@@ -105,37 +105,3 @@ def ingest_external(findings, prefix: str = "IMP") -> int:
         assessment.findings.append(f)
         assessment.run.revealed.append(f.fid)
     return added
-
-
-def import_findings(path_text: str):
-    """Read a nuclei/nmap/ZAP output file and add its findings to the current assessment.
-
-    The file is only read, never executed. Returns (tool, count). Imported findings are
-    shown immediately and marked with an IMP- id and the source tool.
-    """
-    from pathlib import Path
-
-    from .activity import log_event
-    from .importers import parse_auto
-    from .transcript import add_activity, add_chat
-
-    text = (path_text or "").strip()
-    if not text:
-        raise StoreValidationError("Enter the path to a tool output file.")
-    path = Path(text).expanduser()
-    if not path.is_file():
-        raise StoreValidationError("No file at that path.")
-    if path.stat().st_size > MAX_IMPORT_BYTES:
-        raise StoreValidationError("That file is too large to import (over 5 MB).")
-    try:
-        content = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        raise StoreValidationError("Couldn't read that file.") from None
-
-    tool, parsed = parse_auto(content)
-    added = ingest_external(parsed, prefix="IMP")
-    add_activity("USER", f"Imported {added} finding(s) from {tool} output", tone="ok")
-    add_chat("text", "reconix",
-             f"Imported {added} finding(s) from {tool} output ({path.name}).", tone="ok")
-    log_event("findings.imported", f"{tool} {added}")
-    return tool, added

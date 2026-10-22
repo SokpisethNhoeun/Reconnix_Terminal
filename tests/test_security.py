@@ -158,17 +158,6 @@ def test_encoded_control_chars_and_matrix_params_cannot_reach_an_excluded_path(t
     assert not store.check_request("GET", target).allowed
 
 
-def test_nmap_import_refuses_a_dtd_bomb(tmp_path):
-    bomb = ('<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY a "AAAAAAAAAA">'
-            '<!ENTITY b "&a;&a;&a;&a;&a;">]><nmaprun><host><address addr="10.0.0.1" '
-            'addrtype="ipv4"/><ports><port protocol="tcp" portid="80"><state state="open"/>'
-            '<service name="http"/></port></ports></host></nmaprun>')
-    path = tmp_path / "bomb.xml"
-    path.write_text(bomb)
-    with pytest.raises(store.StoreValidationError):
-        store.import_findings(str(path))
-
-
 def test_edit_scope_refuses_after_approval():
     run_to("account")                                  # scope already approved by now
     with pytest.raises(store.StoreValidationError):
@@ -180,13 +169,3 @@ def test_edit_scope_network_refuses_empty_ports():
     assert play_until_gate() == "scope"                # the range picked Network
     with pytest.raises(store.StoreValidationError):
         store.edit_scope(allowed_ports=[])
-
-
-def test_reimporting_the_same_file_does_not_duplicate(tmp_path):
-    import json
-    path = tmp_path / "n.jsonl"
-    path.write_text(json.dumps({"template-id": "t", "matched-at": "https://x.example/a",
-                                "info": {"name": "Dup issue", "severity": "low"}}))
-    _tool, first = store.import_findings(str(path))
-    _tool, second = store.import_findings(str(path))
-    assert (first, second) == (1, 0)

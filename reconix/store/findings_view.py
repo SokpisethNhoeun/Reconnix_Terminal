@@ -15,7 +15,6 @@ FINDING_FILTERS: Tuple[Tuple[str, str], ...] = (
     ("high_up", "Critical & High"),
     ("medium", "Medium"),
     ("low", "Low"),
-    ("info", "Info"),
     ("confirmed", "Confirmed"),
     ("needs_review", "Needs review"),
     ("open", "Open (not triaged)"),
@@ -23,9 +22,7 @@ FINDING_FILTERS: Tuple[Tuple[str, str], ...] = (
 )
 FINDING_SORTS: Tuple[Tuple[str, str], ...] = (
     ("severity", "severity"),
-    ("cvss", "CVSS ↓"),
     ("validation", "validation"),
-    ("id", "id"),
 )
 VALIDATION_ORDER = ("CONFIRMED", "UNCONFIRMED", "INCONCLUSIVE")
 
@@ -34,7 +31,7 @@ def _matches(filter_id: str, finding: Finding) -> bool:
     severity = finding.effective_severity
     if filter_id == "high_up":
         return severity in ("CRITICAL", "HIGH")
-    if filter_id in ("medium", "low", "info"):
+    if filter_id in ("medium", "low"):
         return severity == filter_id.upper()
     if filter_id == "confirmed":
         return not finding.needs_review
@@ -58,13 +55,9 @@ def find_findings(filter_id: str = "all", sort_id: str = "severity") -> List[Fin
     if sort_id not in dict(FINDING_SORTS):
         raise StoreValidationError(f"Unknown sort {sort_id}.")
     rows = [f for f in list_findings() if _matches(filter_id, f)]
-    if sort_id == "cvss":
-        rows.sort(key=lambda f: -f.cvss_score)
-    elif sort_id == "validation":
+    if sort_id == "validation":
         rows.sort(key=lambda f: VALIDATION_ORDER.index(f.validation)
                   if f.validation in VALIDATION_ORDER else len(VALIDATION_ORDER))
-    elif sort_id == "id":
-        rows.sort(key=lambda f: f.fid)
     else:
         rows.sort(key=_severity_rank)
     return rows

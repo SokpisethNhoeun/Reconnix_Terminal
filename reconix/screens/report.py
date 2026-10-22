@@ -1,4 +1,4 @@
-"""Frame 08 — Security assessment report: summary, severity, key findings, exports, web."""
+"""Frame 08 — Security assessment report: summary, severity, key findings, exports."""
 
 from typing import Iterable
 
@@ -45,7 +45,6 @@ class ReportScreen(ReconixScreen):
 
     BINDINGS = [
         *(Binding(key, f"export('{fid}')", f"export {label}") for fid, key, label in EXPORTS),
-        Binding("b", "web", "web dashboard"),
         Binding("c", "chat", "chat"),
         Binding("escape", "back", "back", show=False),
     ]
@@ -114,22 +113,14 @@ class ReportScreen(ReconixScreen):
             text = f"{key}  {label}" if available else f"{label} (not installed)"
             yield Button(text, id=fid, classes="primary" if i == 0 else "ghost-cyan",
                          disabled=not (ready and available))
-        yield Button("b  Web dashboard", id="web", classes="ghost-cyan")
 
     # --- actions ----------------------------------------------------------------------------
     def action_export(self, fmt: str) -> None:
         self.app.export_report(fmt)
-
-    def action_web(self) -> None:
-        self.app.open_web_dashboard()
 
     def action_back(self) -> None:
         self.app.go_prev()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         event.stop()
-        button = event.button.id
-        if button == "web":
-            self.action_web()
-        else:
-            self.action_export(button)
+        self.action_export(event.button.id)

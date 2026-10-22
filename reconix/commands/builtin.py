@@ -61,8 +61,6 @@ COMMANDS = (
     Command("summary", "Show the assessment summary", lambda app, arg: app.show_summary()),
     Command("assessments", "List and reopen assessments",
             lambda app, arg: app.open_assessments(), aliases=("list",)),
-    Command("import", "Import tool output (nuclei / nmap / ZAP)",
-            lambda app, arg: app.open_import()),
     Command("audit", "Activity log and audit trail", lambda app, arg: app.show_audit(),
             aliases=("activity", "log")),
     Command("assess", "Run a real assessment with the AI agent (needs a /model)",

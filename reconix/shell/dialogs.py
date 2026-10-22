@@ -11,7 +11,6 @@ from .. import browser, store, theme
 from ..models import Choice
 from ..screens import ChoiceScreen
 from ..screens.choice import details_body
-from ..screens.forms import ImportForm
 
 
 class DialogsMixin:
@@ -62,9 +61,6 @@ class DialogsMixin:
             self._warn(exc)
             return
         self.refresh_view()
-
-    def open_import(self) -> None:
-        self.open_dialog(ImportForm(), lambda _result: self.refresh_view())
 
     # --- report exports ------------------------------------------------------------------------
     def export_report(self, fmt: Optional[str]) -> None:

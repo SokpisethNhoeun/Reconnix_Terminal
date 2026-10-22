@@ -18,7 +18,7 @@ from .assessment import (
 from .errors import StoreValidationError
 from .findings import (
     SEVERITY_ORDER, TRIAGE_LABELS, TRIAGE_STATUS, confirmed_count, findings_line, get_finding,
-    import_findings, list_findings, review_count, triage_finding,
+    list_findings, review_count, triage_finding,
 )
 from .findings_view import (
     FINDING_FILTERS, FINDING_SORTS, filter_counts, filter_label, find_findings, key_findings,
@@ -87,7 +87,7 @@ __all__ = [
     "approvals_count", "can_edit", "edit_approval",
     # results
     "list_findings", "get_finding", "confirmed_count", "review_count",
-    "findings_line", "import_findings", "SEVERITY_ORDER",
+    "findings_line", "SEVERITY_ORDER",
     "triage_finding", "TRIAGE_STATUS", "TRIAGE_LABELS",
     "FINDING_FILTERS", "FINDING_SORTS", "find_findings", "filter_counts", "filter_label",
     "sort_label", "severity_counts", "key_findings",

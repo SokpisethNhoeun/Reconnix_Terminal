@@ -112,24 +112,28 @@ def test_filters_sorts_and_counts():
     assert ids(store.find_findings("low")) == ["003"]
     assert ids(store.find_findings("confirmed")) == ["001"]
     assert ids(store.find_findings("needs_review")) == ["002", "003"]
-    assert ids(store.find_findings("all", "cvss")) == ["001", "002", "003"]
     assert ids(store.find_findings("all", "validation")) == ["001", "002", "003"]
-    assert ids(store.find_findings("all", "id")) == ["001", "002", "003"]
-    assert store.severity_counts() == {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 2, "LOW": 1,
-                                       "INFO": 0}
+    assert [sid for sid, _ in store.FINDING_SORTS] == ["severity", "validation"]
+    assert "info" not in dict(store.FINDING_FILTERS)
+    assert store.severity_counts() == {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 2, "LOW": 1}
     assert store.filter_counts()["all"] == 3
     with pytest.raises(store.StoreValidationError):
         store.find_findings("nope")
     with pytest.raises(store.StoreValidationError):
         store.find_findings("all", "nope")
+    for removed in ("cvss", "id"):
+        with pytest.raises(store.StoreValidationError):
+            store.find_findings("all", removed)
 
 
 def test_triage_moves_findings_between_filters_and_override_counts():
     run_to(None)
-    store.triage_finding("003", status="false-positive", severity="INFO")
+    with pytest.raises(store.StoreValidationError):
+        store.triage_finding("003", severity="INFO")          # there is no Info severity
+    store.triage_finding("003", status="false-positive", severity="MEDIUM")
     assert [f.fid for f in store.find_findings("open")] == ["001", "002"]
     assert [f.fid for f in store.find_findings("triaged")] == ["003"]
-    assert [f.fid for f in store.find_findings("info")] == ["003"]   # the override counts
+    assert [f.fid for f in store.find_findings("medium")] == ["001", "002", "003"]  # override
     assert store.severity_counts()["LOW"] == 0
     assert [f.fid for f in store.key_findings(limit=2)] == ["001", "002"]
 

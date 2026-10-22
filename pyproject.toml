@@ -25,7 +25,7 @@ build-backend = "setuptools.build_meta"
 packages = [
     "reconix", "reconix.commands", "reconix.flow", "reconix.llm", "reconix.models",
     "reconix.screens", "reconix.screens.forms", "reconix.shell", "reconix.store",
-    "reconix.store.importers", "reconix.store.templates", "reconix.webterm", "reconix.widgets",
+    "reconix.store.templates", "reconix.webterm", "reconix.widgets",
 ]
 
 [tool.setuptools.package-data]

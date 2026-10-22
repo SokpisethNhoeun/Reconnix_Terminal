@@ -1,4 +1,4 @@
-"""Frame 06 — Findings list (filterable, sortable, arrow-key selectable; triage and import)."""
+"""Frame 06 — Findings list (filterable, sortable, arrow-key selectable; triage)."""
 
 from typing import Optional
 
@@ -34,7 +34,6 @@ class FindingsListScreen(ReconixScreen):
         Binding("f", "filter", "filter"),
         Binding("s", "sort", "sort"),
         Binding("t", "triage", "triage"),
-        Binding("i", "import", "import"),
         Binding("c", "chat", "chat"),
         Binding("escape", "back", "back", show=False),
     ]
@@ -52,7 +51,7 @@ class FindingsListScreen(ReconixScreen):
                           "VALIDATION", "STATUS")
         yield table
         yield Static(id="findings-empty", classes="panel-note")
-        yield Static(Text("↑/↓ select · ↵ open · f filter · s sort · t triage · i import · "
+        yield Static(Text("↑/↓ select · ↵ open · f filter · s sort · t triage · c chat · "
                           "→ report", style=theme.DIM), classes="muted")
 
     def on_mount(self) -> None:
@@ -97,8 +96,7 @@ class FindingsListScreen(ReconixScreen):
         empty.display = not rows
         if not findings:
             empty.update(Text.assemble(
-                ("No findings yet — they appear here as testing finds them. Press ", theme.MUTED),
-                ("i", f"bold {theme.TEXT}"), (" to import tool output.", theme.MUTED)))
+                ("No findings yet — they appear here as testing finds them.", theme.MUTED)))
         else:
             empty.update(Text.assemble(
                 ("No findings match this filter — press ", theme.MUTED),
@@ -166,9 +164,6 @@ class FindingsListScreen(ReconixScreen):
             self.notify("No finding selected.", severity="warning")
             return
         self.app.triage_finding(key)
-
-    def action_import(self) -> None:
-        self.app.open_import()
 
     def action_back(self) -> None:
         self.app.go_prev()
