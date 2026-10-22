@@ -41,5 +41,7 @@ describe("runHref", () => {
     expect(runHref("uid=run-1&view=findings&q=sql&page=2", null)).toBe("/?view=findings&q=sql");
     expect(runHref("", null)).toBe("/");
     expect(runHref("uid=run-1", "run-2")).toBe("/?uid=run-2");
+    expect(runHref("view=reports&tpage=2", "run-1")).toBe("/?view=reports&uid=run-1"); // the Report's targets page too
+    expect(runHref("uid=run-1&view=reports&tpage=2", null)).toBe("/?view=reports");
   });
 });

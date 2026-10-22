@@ -2,7 +2,7 @@
    a deep link that opens on its finding's page, filters that go back to the first page,
    Previous / Next finding across a page end, the notice for a finding that is hidden or unknown,
    the list pane that scrolls on its own on the fixed frame while the detail keeps its header,
-   and the phone's list → detail → Back (a history entry). The every-run list of the sample data
+   with its scrollbars hidden (the detail's and the page's kept), and the phone's list → detail → Back (a history entry). The every-run list of the sample data
    is the one with more than one page. */
 import { type Page } from "@playwright/test";
 
@@ -281,6 +281,50 @@ test.describe("on the fixed frame (1366×768)", () => {
     expect(Math.round(headAfter.y)).toBe(Math.round(headBefore.y));
     expect(await main.evaluate((el) => el.scrollTop)).toBe(0);
     expect(await page.evaluate(() => scrollY)).toBe(0);
+  });
+
+  test("the list pane hides its scrollbars, down the side and along the bottom, and still scrolls", async ({ page }) => {
+    await go(page, "/?view=findings");
+    await expect(rows(page)).toHaveCount(PER_PAGE);
+    const bars = () =>
+      page.evaluate(() => {
+        const of = (el: HTMLElement) => ({
+          width: getComputedStyle(el).scrollbarWidth,
+          webkit: getComputedStyle(el, "::-webkit-scrollbar").display,
+          side: el.offsetWidth - el.clientWidth, // what a vertical scrollbar takes
+          bottom: el.offsetHeight - el.clientHeight, // what a horizontal one takes
+        });
+        const q = (s: string) => document.querySelector<HTMLElement>(s)!;
+        return {
+          pane: of(q(".dash-findings .ui-split-list")),
+          rows: of(q('ul[aria-label="Findings"]')),
+          detail: of(q(".dash-findings .ui-split-detail")),
+          body: of(q(".dash-finding-body")),
+          main: of(q("main.dash-content")),
+        };
+      });
+    const b = await bars();
+    for (const [name, el] of [["the list pane", b.pane], ["the rows", b.rows]] as const) {
+      expect(el, `${name}: no scrollbar drawn, none takes room`).toEqual({ width: "none", webkit: "none", side: 0, bottom: 0 });
+    }
+    // only the list: the detail pane, its body and the page keep their scrollbars
+    for (const [name, el] of [["the detail pane", b.detail], ["the detail's body", b.body], ["the content area", b.main]] as const) {
+      expect(el.width, `${name} keeps its scrollbar`).not.toBe("none");
+      expect(el.webkit, `${name} keeps its scrollbar`).not.toBe("none");
+    }
+
+    // still scrolled by the wheel and the keys, with the rows still tab stops
+    const top = () => list(page).evaluate((el) => el.scrollTop);
+    const box = (await list(page).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, 400);
+    await expect.poll(top).toBeGreaterThan(100);
+    await row(page, 0).focus();
+    await page.keyboard.press("Home");
+    await expect.poll(top).toBe(0);
+    await page.keyboard.press("End");
+    await expect.poll(top).toBeGreaterThan(100);
+    for (let i = 0; i < PER_PAGE; i++) expect(await row(page, i).evaluate((el) => el.tabIndex)).toBe(0);
   });
 });
 

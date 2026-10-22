@@ -45,8 +45,7 @@
   .dash-findings-rows {
     flex: 1 1 auto;
     overflow-y: auto;
-    overscroll-behavior-y: contain;
-    scrollbar-width: thin;
+    overscroll-behavior-y: contain; /* its scrollbar is hidden (below) */
     /* room for the rows' focus ring and hover border inside the scroller's clip */
     padding: 2px;
     margin: -2px;
@@ -55,3 +54,14 @@
   .dash-finding { max-height: 100%; }
   .dash-finding-body { flex: 1 1 auto; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin; }
 }
+
+/* ---- The list pane's scrollbars, hidden ----
+   The list pane (ui.css .ui-split-list) and its rows scroll as before, by wheel, touch,
+   trackpad and the keys (the rows are buttons: focus one and the arrows, Page Up / Down, Home
+   and End move the list), with no scrollbar drawn, down the side or along the bottom. Only this
+   list: the detail pane and the page keep theirs. `scrollbar-width` for Firefox and Chromium,
+   the pseudo-element for Safari. */
+.dash-findings .ui-split-list,
+.dash-findings .dash-findings-rows { scrollbar-width: none; }
+.dash-findings .ui-split-list::-webkit-scrollbar,
+.dash-findings .dash-findings-rows::-webkit-scrollbar { display: none; }

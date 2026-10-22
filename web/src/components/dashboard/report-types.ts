@@ -63,7 +63,7 @@ export type ReportCards =
       stats: Stat[];
       details: DetailRow[];
       plan: PlanRow[];
-      findings: FindingsSlice;
+      findings: FindingsSlice; // the top list cut to the top 3 CVSS (REPORT_TOP_FINDINGS)
       rows: ReportFindingRow[];
     }
   | {
@@ -71,7 +71,7 @@ export type ReportCards =
       tag: string; // "All 27 runs"
       about: string;
       stats: Stat[];
-      findings: FindingsSlice;
-      targets: ReportTargetRow[];
+      findings: FindingsSlice; // the top list cut to the top 3 CVSS (REPORT_TOP_FINDINGS)
+      targets: ReportTargetRow[]; // every target, most findings first (the card shows 7 a page)
       runs: ReportRunRow[];
     };

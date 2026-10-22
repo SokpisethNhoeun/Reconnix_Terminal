@@ -30,9 +30,16 @@ the reports and the TUI.)
   rows a page with Previous / Next; the filters, the page and the open finding live in the
   address (`?sev=HIGH,LOW&val=review&q=sql&page=2&finding=F-001`), so a link opens on its
   finding's page. The finding's evidence and remediation sit beside the list; on the fixed
-  desktop frame the list scrolls on its own under the filters, and on a phone the list and the
-  detail take turns (Back returns to the list). Ten rows a page is `lib/paging.ts`, shared with
-  Assessments and the Report view's runs.
+  desktop frame the list scrolls on its own under the filters with no scrollbar drawn (wheel,
+  touch, trackpad and keys still move it; the detail and the page keep theirs), and on a phone
+  the list and the detail take turns (Back returns to the list). Ten rows a page is
+  `lib/paging.ts`, shared with Assessments and the Report view's runs.
+- **Reports:** the Overview's summary strip and Findings by Severity, its top list cut to the top
+  3 CVSS findings (`derive-report.ts` `REPORT_TOP_FINDINGS`; the Overview's card shows more).
+  With every run shown, the **Targets** card beside it lists every target, the most findings
+  first, 7 a page with Previous / Next (`?tpage=`, `report-targets-paging.ts`): the two cards are
+  the same height, and the list keeps room for a whole page, so a shorter last page moves neither
+  the card nor the pager at its foot.
 - **Drill-down:** the Findings card opens every finding, a severity row opens Findings filtered
   to it, a top finding opens itself.
 - **The bell** lists what the open run waits on and every other saved run that waits on a
@@ -204,8 +211,9 @@ npm run build && npm run e2e        # Playwright on sample-data (npx playwright 
 The e2e specs: `access` (roles, origin, headers), `pages` (views, switcher, downloads, the docs,
 the Terminal view with a stand-in program), `assessments` (ten a page, the pager, chips, search,
 the address), `findings` (paging, deep links, Previous / Next across a page end, the notice for
-a hidden finding, the list scroller, the phone's list → detail → Back), `reports` (combining
-runs: the selection, the preview frame, one real PDF and DOCX, the 500 / 501 / 413 paths),
+a hidden finding, the list scroller and its hidden scrollbars, the phone's list → detail →
+Back), `reports` (the top 3 CVSS, the targets 7 a page at the height of Findings by Severity;
+combining runs: the selection, the preview frame, one real PDF and DOCX, the 500 / 501 / 413 paths),
 `docs` (group pages with their pages in place, no link off the page, the rail without
 Configuration, Copy, the in-page search, the old addresses on their anchors, the phone menu), `dashboard-fit` (the
 Overview fits the fixed frame with nothing to scroll), `assistant` (with the stand-in model
