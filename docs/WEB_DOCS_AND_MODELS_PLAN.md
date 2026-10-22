@@ -33,6 +33,9 @@ back), and the rail's Configuration (Settings) item is gone.
 
 ## 2. AI Assistant: several providers and models
 
+Since replaced, on the same routes and storage, by the model chip and picker in the composer:
+see `WEB_COMPOSER_MODEL_PICKER_PLAN.md`.
+
 Status: done (2026-10-22, branch `next/assistant-models` off `feature/next`): a **Model** menu
 in the assistant's header switches the active model, and **+ Add model** adds a provider with its
 models. Built as below, plus: the presets also list Anthropic and DeepSeek; a saved key is kept

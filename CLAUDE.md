@@ -238,8 +238,10 @@ It also reads, never writes, the knowledge the TUI's `/add-on` keeps in `~/.reco
 (`lib/assistant/knowledge/`: no-follow, owner and size checks, the TUI's BM25), putting the
 passages relevant to the masked question inside the fence framed as untrusted reference material
 and naming their files in `meta` ("Knowledge used: …").
-The model comes from the assistant's **Model** menu (`components/assistant/model-menu.tsx`,
-`/api/assistant/models…`, `lib/assistant/models/`): providers and the active choice live in
+The model is chosen with the **model chip** in the assistant's composer (`model-chip.tsx` opens
+`model-picker.tsx` upward: choose a model → `<Provider>` · credentials → choose its model; the
+header has no model control; `/api/assistant/models…`, `lib/assistant/models/`; cloud presets
+stay disabled without `LLM_ALLOW_REMOTE=1`): providers and the active choice live in
 `models.json` beside the conversations, API keys AES-256-GCM-sealed with `models.key` (0600) and
 never sent to the browser; every model passes `config.ts`'s `checkModel`, and while nothing is
 chosen the `LLM_*` model (the read-only "Environment") is the default.
