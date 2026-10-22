@@ -166,15 +166,20 @@ class Database:
                 "WHERE s.target_id = ? ORDER BY f.id DESC",
                 (target_id,),
             ).fetchall()
-        findings = [self._row_to_finding(r) for r in rows]
-        return [f for f in findings if f.severity is not None]   # old Info rows are hidden
+        findings = (self._row_to_finding(r) for r in rows)
+        return [f for f in findings if f is not None]   # old Info rows are hidden
 
     @staticmethod
-    def _row_to_finding(row: sqlite3.Row) -> Finding:
+    def _row_to_finding(row: sqlite3.Row) -> Finding | None:
+        """The row as a Finding, or None when its severity isn't reportable (an old Info row,
+        an unknown value), so a returned Finding's severity is always a real `Severity`."""
+        severity = Severity.coerce(row["severity"])
+        if severity is None:
+            return None
         return Finding(
             id=row["id"],
             scan_id=row["scan_id"],
-            severity=Severity.coerce(row["severity"]),
+            severity=severity,
             title=row["title"],
             description=row["description"],
             evidence=row["evidence"],
