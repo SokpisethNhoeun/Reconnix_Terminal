@@ -178,7 +178,7 @@ export function ModelForm({ view, editing, saving, onSave, onDone }: Props) {
           <p id={ids.urlHint} className="ai-hint" data-tone={remote && !view.allowRemote ? "warning" : undefined}>
             {remote
               ? view.allowRemote
-                ? "Off this machine: your questions and the assessment data they need are sent there."
+                ? "Off this machine: your questions, the assessment data they need and relevant /add-on knowledge passages are sent there."
                 : "Off this machine: the dashboard uses it only when started with LLM_ALLOW_REMOTE=1."
               : "An OpenAI-compatible address, usually ending in /v1."}
           </p>

@@ -105,7 +105,7 @@ export const AssistantView = forwardRef<HTMLTextAreaElement, { onMinimize: () =>
           ) : model.configured && !model.local ? (
             <Reason>
               {model.name}
-              {model.provider ? ` (${model.provider})` : ""} is not on this machine: your questions and the assessment data they need are sent to it. Switch in the Model menu
+              {model.provider ? ` (${model.provider})` : ""} is not on this machine: your questions, the assessment data they need and relevant /add-on knowledge passages are sent to it. Switch in the Model menu
               above.
             </Reason>
           ) : elsewhere ? (
