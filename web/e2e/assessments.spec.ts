@@ -31,7 +31,7 @@ async function open(page: Page, query = "") {
 
 test("lists every saved run newest first, at most ten a page, with the pager", async ({ page }) => {
   await open(page);
-  // the Scope and Report views (hidden) carry the same tag: look only in the open view
+  // the Report view (hidden) carries the same tag: look only in the open view
   await expect(page.locator("main > :not([hidden])").getByText(`All ${all.length} ${all.length === 1 ? "run" : "runs"}`)).toBeVisible();
   await expect(rows(page)).toHaveCount(Math.min(all.length, PER_PAGE));
   await expect(rows(page).first()).toContainText(newest().label);
@@ -117,6 +117,9 @@ test("a row opens that run's Overview: its uid in the address, no view", async (
   await expect(page).not.toHaveURL(/view=/);
   await expect(page.getByRole("heading", { name: "Assessment Operations Center" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Choose an assessment" })).toContainText(a.label);
+  // the switcher now starts with that run's name, a link back to this same Overview
+  await page.getByRole("button", { name: "Choose an assessment" }).click();
+  await expect(page.getByRole("link", { name: /^Open the overview of / })).toHaveAttribute("href", `/?uid=${a.uid}`);
 });
 
 /** How far the page and the content area scroll sideways (both must be 0). */

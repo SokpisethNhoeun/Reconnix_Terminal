@@ -1,9 +1,8 @@
 /* Findings by Severity: a stacked bar of the severity mix, one row per severity (badge, count,
-   share; a row opens Findings filtered to it), the review state, and the top CVSS findings (each
-   opens itself in Findings). HIGH, MEDIUM and LOW always have a row; CRITICAL and INFO only when
-   a finding has that level (derive.ts decides: `hidden`), and the bar, the total and the bar's
-   accessible name still count every level. Severity uses the TUI's scale (lib/status.ts
-   SEVERITY_META). */
+   share; a row with findings opens Findings filtered to it), the review state, and the top CVSS
+   findings (each opens itself in Findings). Always four rows, Critical, High, Medium, Low, each
+   even at 0; INFO is never on the card (derive.ts CARD_LEVELS), so the bar, its accessible name
+   and the total count those four. Severity uses the TUI's scale (lib/status.ts SEVERITY_META). */
 import { DashCard } from "@/components/dashboard/dash-card";
 import { plural } from "@/components/dashboard/derive-shared";
 import type { FindingsSlice } from "@/components/dashboard/overview-types";
@@ -43,7 +42,7 @@ export function FindingsCard({ data, id = "findings-card" }: { data: FindingsSli
       </div>
 
       <ul aria-label="Findings per severity" className="flex flex-col">
-        {data.severity.filter((s) => !s.hidden).map((s) => (
+        {data.severity.map((s) => (
           <li key={s.level} className="dash-sev-row">
             <SeverityBadge level={s.level} className="justify-self-start" />
             <span className="dash-meter" aria-hidden>

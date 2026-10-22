@@ -6,7 +6,7 @@
  * The Activity Timeline counts the runs started per day (per week past MAX_DAYS days), stacked
  * by run status; the Execution Timeline lists the newest runs.
  */
-import { duration, longDuration, minutesLimit, shortDay } from "@/lib/data/format";
+import { longDuration, shortDay } from "@/lib/data/format";
 import { STATUSES } from "@/lib/data/schema";
 import { localDay } from "@/lib/data/stats";
 import type { AssessmentView, Status } from "@/lib/data/view-types";
@@ -50,7 +50,7 @@ export interface Overall {
   runs: number;
   waiting: number;
   completed: number;
-  findingTotal: number;
+  findingTotal: number; // every finding, INFO too (false positives left out)
   operator: string; // the newest run's operator
   operators: string[];
   targets: CountRow[];
@@ -170,7 +170,7 @@ export function deriveOverall(views: AssessmentView[]): Overall {
     .sort((a, b) => b.count - a.count);
 
   const summary: SummaryStrip = {
-    findings: findingsSummary(findingCards),
+    findings: findingsSummary(findings),
     progress: {
       pct: Math.round((completed / n) * 100),
       caption: `${completed} of ${plural(n, "run")} completed`,
@@ -187,7 +187,6 @@ export function deriveOverall(views: AssessmentView[]): Overall {
     duration: {
       value: longDuration(totalSec),
       countup: totalSec < 3600,
-      caption: `in total · longest ${duration(longest.durationSec)}${longest.scope ? ` of ${minutesLimit(longest.scope.windowMinutes)}` : ""}`,
       meter:
         longest.scope && longest.scope.windowMinutes > 0
           ? { frac: Math.min(1, longest.durationSec / (longest.scope.windowMinutes * 60)), over: longest.durationSec > longest.scope.windowMinutes * 60 }
@@ -206,7 +205,7 @@ export function deriveOverall(views: AssessmentView[]): Overall {
     runs: n,
     waiting,
     completed,
-    findingTotal: findingCards.total,
+    findingTotal: summary.findings.total,
     operator,
     operators,
     targets,
@@ -228,7 +227,7 @@ export function deriveOverall(views: AssessmentView[]): Overall {
           waiting,
           blocked: views.some((v) => v.checks.blocked > 0),
           severe,
-          review: findingCards.review.needsReview,
+          review: summary.findings.needsReview,
         }),
       },
       activity: activityDays(views),

@@ -1,7 +1,7 @@
 /* The Local Assessment Viewer at `/`, rendered per request from the assessments the Reconix
    TUI saved (src/lib/data/store.ts). With no `?uid=` the Overview totals every saved run
-   (derive-overall.ts), Findings lists them all, and Scope and Report sum them up
-   (derive-scope.ts, derive-report.ts); `?uid=` opens one run (derive.ts). `?view=` is
+   (derive-overall.ts), Findings lists them all, and Reports sums them up (derive-report.ts);
+   `?uid=` opens one run (derive.ts). `?view=` is
    the open view, read by the client Viewer. The terminal is rendered only when the server says
    this browser may use it (lib/auth/guard.ts); the AI Assistant learns what it is about, whether
    this browser may ask (operator role), which model answers (lib/assistant/config.ts) and what
@@ -10,13 +10,11 @@ import type { AssistantInfo } from "@/components/assistant/types";
 import { deriveDashboard } from "@/components/dashboard/derive";
 import { deriveOverall } from "@/components/dashboard/derive-overall";
 import { assessmentsCards, overallReportCards, reportCards, runRow } from "@/components/dashboard/derive-report";
-import { overallScopeCards, scopeCards } from "@/components/dashboard/derive-scope";
 import { AssessmentsView } from "@/components/dashboard/assessments-view";
 import { EmptyView } from "@/components/dashboard/empty-view";
 import { FindingsView } from "@/components/dashboard/findings-view";
 import { OverviewView } from "@/components/dashboard/overview-view";
 import { ReportsView } from "@/components/dashboard/reports-view";
-import { ScopeView } from "@/components/dashboard/scope-view";
 import { TopBar } from "@/components/dashboard/top-bar";
 import { Viewer } from "@/components/dashboard/viewer";
 import { TerminalView } from "@/components/terminal/terminal-view";
@@ -54,7 +52,6 @@ export default async function Home({ searchParams }: Props) {
   };
   const empty = <EmptyView dir={dir} problems={library.problems} compact />;
   const runs = views.map(runRow); // once: the Assessments view and the all-runs Report share it
-  const scope = chosen ? scopeCards(chosen) : overall ? overallScopeCards(views) : null;
   const report = chosen && dash ? reportCards(chosen, dash.findings, dash.cards.findings) : overall ? overallReportCards(views, overall.cards.findings, runs) : null;
 
   return (
@@ -90,7 +87,6 @@ export default async function Home({ searchParams }: Props) {
         )
       }
       reports={report ? <ReportsView key={chosen?.uid ?? "all"} data={report} /> : empty}
-      scope={scope ? <ScopeView data={scope} /> : empty}
       terminal={<TerminalView access={access} />}
       terminalState={access}
       assistant={assistant}

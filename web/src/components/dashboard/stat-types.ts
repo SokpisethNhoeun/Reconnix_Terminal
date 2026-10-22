@@ -1,10 +1,10 @@
-/* A card of a view's summary strip (the Scope and Report views; the Overview's own strip is
+/* A card of a view's summary strip (the Report view; the Overview's own strip is
    SummaryStrip): a label, one big number, its context as badges and words (never colour alone),
    an optional meter and an optional drill-down. Types only, so client components may import it.
    Every value is computed by the derive modules. */
 import type { DrillDown, EventBadge } from "./overview-types";
 
-export type StatIcon = "target" | "excluded" | "approvals" | "clock" | "findings" | "steps" | "requests" | "masked" | "runs" | "scopes";
+export type StatIcon = "findings" | "steps" | "requests" | "masked" | "runs";
 
 export interface Stat {
   label: string;
@@ -17,13 +17,6 @@ export interface Stat {
   meter: { frac: number; over: boolean; label: string } | null;
   note: string;
   link: DrillDown | null; // the whole card opens this
-}
-
-/** A chip: a name, and in how many runs it appears (null for one run). */
-export interface Chip {
-  label: string;
-  count: number | null;
-  title: string;
 }
 
 /** A link to one saved run (it opens the view it sits in, for that run). */

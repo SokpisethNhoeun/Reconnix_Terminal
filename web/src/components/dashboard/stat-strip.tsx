@@ -1,8 +1,8 @@
-/* A view's summary strip (Scope, Report) in the Overview's card style, drawn from the Stat list
+/* A view's summary strip (the Report view's) in the Overview's card style, drawn from the Stat list
    its derive module made (stat-types.ts): the big number, its badges (each a toggletip with what
    it means), an optional meter and note; a card with a drill-down opens it. No data-motion: only
    the Overview takes part in the AI Assistant's transition. */
-import { Ban, Bug, Clock, Crosshair, EyeOff, FileCheck2, Layers, ListChecks, Send, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Bug, EyeOff, Layers, ListChecks, Send, type LucideIcon } from "lucide-react";
 
 import { badgeText, EventBadge } from "@/components/dashboard/event-badge";
 import { Hint } from "@/components/dashboard/hint";
@@ -13,16 +13,11 @@ import { ViewLink } from "@/components/dashboard/view-link";
 import { SEVERITY_META } from "@/lib/status";
 
 const ICONS: Record<StatIcon, LucideIcon> = {
-  target: Crosshair,
-  excluded: Ban,
-  approvals: ShieldCheck,
-  clock: Clock,
   findings: Bug,
   steps: ListChecks,
   requests: Send,
   masked: EyeOff,
   runs: Layers,
-  scopes: FileCheck2,
 };
 
 const hintOf = (b: Badge) =>

@@ -5,8 +5,9 @@
 import { useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 
-// (no "audit": the Audit log view was removed; old ?view=audit links open the Overview)
-export const VIEWS = ["overview", "assessments", "findings", "reports", "scope", "terminal", "assistant"] as const;
+// (no "audit" or "scope": the Audit log and Scope views were removed; old ?view=audit and
+// ?view=scope links open the Overview)
+export const VIEWS = ["overview", "assessments", "findings", "reports", "terminal", "assistant"] as const;
 export type View = (typeof VIEWS)[number];
 
 /** The Assessments view's own address parameters (its filters, its page). */

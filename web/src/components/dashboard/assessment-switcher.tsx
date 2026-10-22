@@ -1,27 +1,27 @@
 "use client";
 
-/* The Assessment chip: "All assessments" (the default, the Overview totals every saved run) or
-   the open run's details, a search over every saved run, and the files that were skipped (so a
-   broken file is never silently missing). Opening another run keeps the current view but drops
-   the selected finding (it belongs to the old run). */
+/* The Assessment chip: just the list. With a run open the panel starts with its name, a link to
+   that run's Overview; then a search over every saved run (past six), "All assessments" (the
+   default, the Overview totals every saved run), one row per run, and the files that were
+   skipped (a warning, so a broken file is never silently missing). Opening another run keeps the
+   current view but drops the selected finding (it belongs to the old run). */
 import { useState } from "react";
 import Link from "next/link";
 import { Check, ChevronDown, Layers, TriangleAlert } from "lucide-react";
 import type { Dashboard } from "@/components/dashboard/derive";
-import type { Overall } from "@/components/dashboard/derive-overall";
 import { SearchField } from "@/components/dashboard/filter-bar";
 import { Popover } from "@/components/dashboard/popover";
 import { runMatches } from "@/components/dashboard/filters";
 import { RunRow } from "@/components/dashboard/run-row";
-import { useRunHref } from "@/components/dashboard/view-url";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { runOverviewHref, useRunHref } from "@/components/dashboard/view-url";
 import type { LibraryItem, SkippedFile } from "@/lib/data/view-types";
-import { RUN_STATUS } from "@/lib/status";
 
 export const CHIP =
   "flex h-[34px] items-center gap-1.5 rounded-[10px] border border-border bg-card px-3 text-xs transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-expanded:border-primary/50";
 
 const ROW = "flex items-center gap-2 rounded-md px-1.5 py-1.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+const SEARCH_AFTER = 6; // more saved runs than this: the list gets a search
 
 export function ChipTrigger({ label, value }: { label: string; value: string }) {
   return (
@@ -42,19 +42,16 @@ export function Row({ k, v }: { k: string; v: React.ReactNode }) {
   );
 }
 
-export type AllSummary = Pick<Overall, "runs" | "waiting" | "completed" | "findingTotal">;
+/** The open run, as much as the switcher shows of it. */
+export type SwitcherRun = Pick<Dashboard["assessment"], "uid" | "id" | "name">;
 
 export function AssessmentSwitcher({
   current,
-  all,
   items,
-  dir,
   skipped,
 }: {
-  current: Dashboard["assessment"] | null; // null: every saved run
-  all: AllSummary | null;
+  current: SwitcherRun | null; // null: every saved run
   items: LibraryItem[];
-  dir: string;
   skipped: SkippedFile[];
 }) {
   const href = useRunHref();
@@ -71,44 +68,24 @@ export function AssessmentSwitcher({
     >
       {(close) => (
         <>
-          {current ? (
-            <>
-              <p className="px-1.5 pb-1.5 pt-1 text-[13px] font-medium text-foreground [overflow-wrap:anywhere]">{current.name}</p>
-              <div className="space-y-1 px-1.5 pb-2">
-                <Row
-                  k="Status"
-                  v={
-                    <>
-                      <StatusBadge meaning={RUN_STATUS[current.status]} />
-                      {current.progress}%
-                    </>
-                  }
-                />
-                <Row k="Started" v={current.startedAt} />
-                <Row k="Duration" v={current.duration} />
-                <Row k="Operator" v={current.operator} />
-              </div>
-            </>
-          ) : (
-            all && (
-              <>
-                <p className="px-1.5 pb-1.5 pt-1 text-[13px] font-medium text-foreground">Every saved assessment</p>
-                <div className="space-y-1 px-1.5 pb-2">
-                  <Row k="Assessments" v={String(all.runs)} />
-                  <Row k="Completed" v={String(all.completed)} />
-                  <Row k="Waiting on you" v={String(all.waiting)} />
-                  <Row k="Findings" v={String(all.findingTotal)} />
-                </div>
-              </>
-            )
+          {current && (
+            <div className="border-b border-border px-1.5 pb-2 pt-1">
+              <Link
+                href={runOverviewHref(current.uid)}
+                onClick={close}
+                aria-label={`Open the overview of ${current.name}`}
+                className="rounded-sm text-[13px] font-medium text-primary underline-offset-2 [overflow-wrap:anywhere] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {current.name}
+              </Link>
+            </div>
           )}
-          <div className="border-t border-border px-1.5 pb-1.5 pt-2">
-            <p className="mb-1.5 text-muted-foreground">
-              Saved assessments · <span className="font-mono text-[10px]">{dir}</span>
-            </p>
-            {items.length > 6 && <SearchField label="Search saved assessments" placeholder="ID, template, target, status…" value={query} onChange={setQuery} />}
-          </div>
-          <ul className="max-h-[260px] overflow-y-auto">
+          {items.length > SEARCH_AFTER && (
+            <div className="px-1.5 pb-1.5 pt-2">
+              <SearchField label="Search saved assessments" placeholder="ID, template, target, status…" value={query} onChange={setQuery} />
+            </div>
+          )}
+          <ul className="max-h-[260px] overflow-y-auto pt-1">
             {!q && (
               <li>
                 <Link href={href(null)} onClick={close} aria-current={current ? undefined : "true"} className={ROW}>
@@ -133,9 +110,6 @@ export function AssessmentSwitcher({
             })}
             {shown.length === 0 && <li className="px-1.5 py-2 text-muted-foreground">No saved assessment matches.</li>}
           </ul>
-          <p className="px-1.5 pt-1.5 text-muted-foreground">
-            {q ? `${shown.length} of ${items.length} shown` : `${items.length} saved ${items.length === 1 ? "assessment" : "assessments"}`}
-          </p>
           {skipped.length > 0 && (
             <details className="mx-1.5 mt-2 rounded-md border border-border p-2">
               <summary className="flex cursor-pointer items-center gap-1.5 text-warning">

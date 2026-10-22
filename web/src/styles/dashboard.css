@@ -459,11 +459,12 @@
 
 .dash-askbar { position: relative; z-index: 2; width: min(760px, 100%); align-self: center; margin-bottom: 4px; }
 
-/* ---- Viewer views (Findings / Reports / Scope) ---- */
+/* ---- Viewer views (Assessments / Findings / Reports) ---- */
 .dash-view { padding: 20px 16px 28px 8px; }
 
-/* ---- Scope and Report: the Overview's look in a view: the header, the summary strip, then
-   panels two to a row (≥1024 wide; one column below), wide ones across the row ---- */
+/* ---- Report: the Overview's look in a view: the header, the summary strip, then panels two
+   to a row (≥1024 wide; one column below), wide ones across the row. Assessments shares the
+   column (.dash-sheet) ---- */
 .dash-sheet { display: flex; flex-direction: column; gap: 12px; }
 .dash-panels { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 1024px) { .dash-panels { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
@@ -479,7 +480,7 @@
   color: var(--muted-foreground);
 }
 
-/* Tables in a panel (targets, findings, runs): they scroll sideways inside the card when narrow. */
+/* Tables in a panel (findings, runs): they scroll sideways inside the card when narrow. */
 .dash-table-scroll { min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
 .dash-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
 .dash-table thead th {
@@ -496,18 +497,6 @@
 .dash-table :is(th, td):last-child { padding-right: 0; }
 .dash-table tbody tr { transition: background-color 0.2s ease; }
 .dash-table tbody tr:hover { background: color-mix(in oklab, var(--foreground) 3%, transparent); }
-
-/* An approval request: what and where, then its risk and state. */
-.dash-approval {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 4px 12px;
-  padding: 7px 0;
-  border-top: 1px solid var(--border);
-}
-.dash-approval:first-child { border-top: 0; padding-top: 0; }
-@container (max-width: 380px) { .dash-approval { grid-template-columns: minmax(0, 1fr); } .dash-approval > :last-child { justify-content: flex-start; } }
 
 /* A plan step in the report: name, state, how far it got. */
 .dash-plan-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(60px, 0.8fr) 36px; align-items: center; gap: 10px; }

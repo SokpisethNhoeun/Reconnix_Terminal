@@ -108,7 +108,7 @@ export const troubleshooting: GroupContent = {
             or port not allowed), and it was never sent; once the scope&apos;s time limit is reached the run stops
             altogether. The reasons are listed in{" "}
             <DocLink href="/docs/assessment-guide/policy-checks">Policy checks</DocLink>; the verdicts are in{" "}
-            <Mono>/audit</Mono>, the report and the dashboard&apos;s Scope view. If the block was wrong, the scope was: start
+            <Mono>/audit</Mono>, the report and the saved copy the dashboard reads. If the block was wrong, the scope was: start
             a new assessment and edit the manifest before approving it.
           </p>
         </DocSection>

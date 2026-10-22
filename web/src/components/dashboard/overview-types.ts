@@ -50,10 +50,10 @@ export interface SummaryStrip {
     caption: string;
   };
   duration: {
-    value: string; // "6m 24s", or "1h 32m" in total
+    value: string; // one run's "6m 24s", or every run's "1h 32m" in total
     countup: boolean; // the intro may count it up ("Xm YYs" only)
-    caption: string; // "of 30 min limit", "longest 14m 05s of 30 min"
-    meter: { frac: number; over: boolean } | null; // elapsed / limit (capped at 1), and past it
+    // elapsed / limit (capped at 1), and past it; with every run shown, the longest run's
+    meter: { frac: number; over: boolean } | null;
     over: number; // runs past their time limit
   };
 }
@@ -182,16 +182,17 @@ export type ExecutionCard =
 
 // --- findings by severity --------------------------------------------------------------
 
-/** One severity's count and share. `hidden`: the row stays out of the card's list (an optional
-    level with no findings); it still counts in the bar, the total and the accessible name. */
-export type SeverityCount = { level: Severity; count: number; share: number; frac: number; hidden: boolean };
+/** One severity's count and its share of the card's total. */
+export type SeverityCount = { level: Severity; count: number; share: number; frac: number };
 export type TopFinding = { key: string; id: string; title: string; severity: Severity; score: number; run: string | null };
 
+/** Findings by Severity: CRITICAL, HIGH, MEDIUM and LOW only (derive.ts CARD_LEVELS); INFO is
+    never on the card, though the summary strip and the Findings view count it. */
 export interface FindingsSlice {
-  total: number;
-  severity: SeverityCount[]; // every level, in the TUI's order (CRITICAL first)
-  words: string; // "0 critical, 3 high, …" (the bar's accessible name; every level)
-  review: { confirmed: number; needsReview: number; closed: number };
+  total: number; // findings at the four levels (the card's count, the bar's whole)
+  severity: SeverityCount[]; // CRITICAL, HIGH, MEDIUM, LOW in that order, each even at 0
+  words: string; // "0 critical, 3 high, 2 medium, 1 low" (the bar's accessible name)
+  review: { confirmed: number; needsReview: number; closed: number }; // of those findings
   top: TopFinding[];
 }
 

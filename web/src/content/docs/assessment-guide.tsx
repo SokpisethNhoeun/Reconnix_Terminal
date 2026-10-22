@@ -243,7 +243,7 @@ export const assessmentGuide: GroupContent = {
             An allowed request is recorded as &quot;Within approved scope&quot; and runs; a blocked one shows as a red
             line in the live output with a banner, is counted in the executive summary (&quot;out-of-scope requests were
             blocked by the policy engine&quot;), listed in the report&apos;s blocked requests, written to the audit trail
-            (<Mono>policy.blocked</Mono>) and shown in the dashboard&apos;s Scope view.
+            (<Mono>policy.blocked</Mono>) and kept in the saved copy the dashboard reads.
           </p>
         </DocSection>
         <DocSection title="Where else the policy runs">
@@ -322,9 +322,9 @@ export const assessmentGuide: GroupContent = {
         <DocSection title="What is recorded">
           <p>
             Each decision (approved or rejected, the operator, the request hash, the time) goes into the assessment, the
-            activity log, the audit trail, the report&apos;s approvals list and the saved copy. The dashboard&apos;s Scope
-            view shows each request as Approved, Rejected, Waiting for approval or Not reached; decisions are only ever
-            made in the terminal.
+            activity log, the audit trail, the report&apos;s approvals list and the saved copy. The dashboard shows a
+            request that waits on you in its bell and on the Overview&apos;s Execution Timeline; decisions are only
+            ever made in the terminal.
           </p>
         </DocSection>
       </>

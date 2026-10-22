@@ -1,7 +1,7 @@
 "use client";
 
-/* A link to one saved run that keeps the open view (Scope stays Scope, Report stays Report):
-   the rows of the Scope and Report views use it. */
+/* A link to one saved run that keeps the open view (Report stays Report): the Report view's
+   rows use it. */
 import Link from "next/link";
 import { useRunHref } from "@/components/dashboard/view-url";
 import { cn } from "@/lib/utils";

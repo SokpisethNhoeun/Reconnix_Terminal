@@ -188,7 +188,7 @@ Next.js 16 / React 19 with GSAP and a three.js globe (the UI came from
 the reconix-web-ui site, see `docs/WEB_GLOBE_UI_PLAN.md`; the v2 redesign in
 `docs/WEB_REDESIGN_V2_PLAN.md`; v3 — Assessments, paging, the combined report, the docs — in
 `docs/WEB_REDESIGN_V3_PLAN.md`, §5 its status). `/` is one viewer page whose views (Overview,
-Assessments, Findings, Reports, Scope, Terminal, AI Assistant) switch in-page via `?view=` (no
+Assessments, Findings, Reports, Terminal, AI Assistant) switch in-page via `?view=` (no
 Audit log view: the audit data stays in the saved files and the TUI); each view's own address
 keys and every run link live in `components/dashboard/view-url.ts` (`VIEW_FILTERS`, `runHref`),
 and `viewer.tsx` marks each pane `data-view-pane` and sets `html[data-hydrated]` once interactive

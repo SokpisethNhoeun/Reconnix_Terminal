@@ -3,7 +3,7 @@
    search and the "needs you" bell. A server component: each client piece gets
    only the fields it shows (never the whole Dashboard or Overall, which would put every saved
    value into the page). */
-import { type AllSummary, AssessmentSwitcher } from "@/components/dashboard/assessment-switcher";
+import { AssessmentSwitcher } from "@/components/dashboard/assessment-switcher";
 import { AttentionBell } from "@/components/dashboard/attention-bell";
 import type { Dashboard } from "@/components/dashboard/derive";
 import type { Overall } from "@/components/dashboard/derive-overall";
@@ -31,8 +31,6 @@ const overallChips = (o: Overall): OverallChipsData => ({
   statuses: o.statuses,
 });
 
-const allSummary = (o: Overall): AllSummary => ({ runs: o.runs, waiting: o.waiting, completed: o.completed, findingTotal: o.findingTotal });
-
 export function TopBar({
   dash,
   overall,
@@ -56,7 +54,7 @@ export function TopBar({
       <LiveRefresh renderedAt={renderedAt} dir={dir} everyMs={liveRefreshMs()} />
       {(dash || overall) && (
         <div className="dash-reveal flex min-w-0 items-center gap-2 xl:ml-auto">
-          <AssessmentSwitcher current={a} all={overall && allSummary(overall)} items={items} dir={dir} skipped={skipped} />
+          <AssessmentSwitcher current={a && { uid: a.uid, id: a.id, name: a.name }} items={items} skipped={skipped} />
           {/* the chips need ≥1280 px; the Template chip ≥1440 (run-chips / overall-chips) */}
           <div className="hidden min-w-0 items-center gap-2 xl:flex">
             {dash ? <RunChips dash={runChips(dash)} /> : overall && <OverallChips overall={overallChips(overall)} />}

@@ -9,7 +9,7 @@
  */
 import { redact } from "@/lib/assistant/redact";
 import { duration, hourMinute, minutesLimit, shortDay } from "@/lib/data/format";
-import type { AssessmentView, LibraryItem, Severity } from "@/lib/data/view-types";
+import type { AssessmentView, FindingView, LibraryItem, Severity } from "@/lib/data/view-types";
 import { FINDING_REVIEW, RUN_STATUS, scopeMeaning, SEVERITY_META, STEP_STATUS } from "@/lib/status";
 
 import type { FindingRow } from "./derive";
@@ -30,9 +30,10 @@ export function worstOf(levels: Severity[]): Severity | null {
   return order.find((s) => levels.includes(s)) ?? null;
 }
 
-/** The Findings card of the strip: the total, the worst severity and what needs review. */
-function findingsStat(slice: FindingsSlice): Stat {
-  const s = findingsSummary(slice);
+/** The Findings card of the strip: the total (INFO too, like the Overview's strip), the worst
+    severity and what needs review. */
+function findingsStat(rows: FindingView[]): Stat {
+  const s = findingsSummary(rows);
   const badges: EventBadge[] = [];
   if (s.worst) badges.push({ type: "severity", level: s.worst.level });
   if (s.needsReview) badges.push(statusBadge(FINDING_REVIEW.review, `${s.needsReview} need review`));
@@ -82,7 +83,7 @@ export function reportCards(v: AssessmentView, findings: FindingRow[], slice: Fi
     tag: `${v.id} · ${redact(v.target)}`,
     about: `The summary of ${v.id} from its saved copy. Download the full report in the format you need.`,
     stats: [
-      findingsStat(slice),
+      findingsStat(findings),
       {
         label: "Plan steps",
         icon: "steps",
@@ -170,8 +171,8 @@ export function assessmentsCards(rows: ReportRunRow[]): AssessmentsCards {
     tag: `All ${plural(rows.length, "run")}`,
     about:
       rows.length === 1
-        ? "The one run the TUI saved: open it for its overview, findings, scope and report."
-        : "Every run the TUI saved, newest first: search or filter them, and open one for its overview, findings, scope and report.",
+        ? "The one run the TUI saved: open it for its overview, findings and report."
+        : "Every run the TUI saved, newest first: search or filter them, and open one for its overview, findings and report.",
     rows,
   };
 }
@@ -203,7 +204,7 @@ export function overallReportCards(views: AssessmentView[], slice: FindingsSlice
         note: `${plural(targets.length, "target")} · ${plural(templates, "template")}`,
         link: null,
       },
-      findingsStat(slice),
+      findingsStat(views.flatMap((v) => v.findings)),
       {
         label: "Requests sent",
         icon: "requests",
