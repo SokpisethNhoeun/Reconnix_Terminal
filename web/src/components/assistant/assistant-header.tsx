@@ -1,24 +1,19 @@
 "use client";
 
 /* The assistant's header: its name, what the open conversation is about (a run, or every run)
-   with that scope's status, the model that answers (local or remote), History, New chat and
-   minimize (back to the dashboard). */
+   with that scope's status, the Model menu (the model that answers, local or remote; switch or
+   add one), History, New chat and minimize (back to the dashboard). */
 import { Crosshair, Minimize2, SquarePen } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { AssistantOrb } from "./assistant-orb";
 import { useAssistant } from "./assistant-provider";
 import { ConversationMenu } from "./conversation-menu";
+import { ModelMenu } from "./model-menu";
 import { ScopeBadge } from "./scope-badge";
 
 export function AssistantHeader({ onMinimize }: { onMinimize: () => void }) {
   const { info, conversation, messages, newChat, busy } = useAssistant();
-  const { model } = info;
   const empty = !conversation.id && messages.length === 0;
-  const modelTitle = model.configured
-    ? model.local
-      ? `${model.name}: a local endpoint (LLM_BASE_URL on this machine)`
-      : `${model.name}: a remote model. Questions and the assessment data they need are sent to it.`
-    : model.reason;
 
   return (
     <header data-assistant-piece className="ai-header">
@@ -34,12 +29,7 @@ export function AssistantHeader({ onMinimize }: { onMinimize: () => void }) {
         <ScopeBadge scope={conversation.scope} runs={info.runs} />
       </div>
       <div className="ai-tools">
-        <span className="hidden md:inline-flex">
-          <span className="ai-chip" title={modelTitle}>
-            <span className="ai-dot" data-tone={model.configured ? "success" : "warning"} aria-hidden />
-            <span>{model.configured ? `${model.name} · ${model.local ? "local" : "remote"}` : "No model set up"}</span>
-          </span>
-        </span>
+        <ModelMenu />
         <ConversationMenu />
         <button type="button" onClick={newChat} disabled={empty && !busy} className="ai-btn" title={empty ? "This is a new chat already" : "Start a new chat (this one stays in History)"}>
           <SquarePen className="size-4" aria-hidden />

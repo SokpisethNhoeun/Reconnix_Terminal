@@ -3,8 +3,11 @@
 /* The AI Assistant's state, shared by the Overview's Ask bar and the assistant screen: the open
    conversation and its messages (use-open-conversation), asking, streaming, Stop and Retry
    (use-asking), the saved conversations for History and changes to them (use-history-list,
-   use-conversation-changes), and what this tab remembers (use-tab-memory). The Viewer mounts it
-   once, so switching views, the live refresh and the open/close animation never touch it.
+   use-conversation-changes), what this tab remembers (use-tab-memory), and the model that
+   answers next: the page says which (info.model), and the Model menu replaces it after a switch
+   without a reload (until the page renders again with the server's word for it). The Viewer
+   mounts it once, so switching views, the live refresh and the open/close animation never touch
+   it.
 
    Conversations are kept by the dashboard's server (lib/assistant/history-store.ts): a
    question carries only the open conversation's id and the question, never the conversation
@@ -13,18 +16,21 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 
 import { MAX_QUESTION } from "@/lib/assistant/request";
 import { createSlot } from "./slot";
-import type { AssistantInfo, ChatMessage } from "./types";
+import type { AssistantInfo, ChatMessage, ModelSummary } from "./types";
 import { useAsking } from "./use-asking";
 import { useConversationChanges } from "./use-conversation-changes";
 import { type HistoryState, useHistoryList } from "./use-history-list";
+import { useLatest } from "./use-latest";
 import { type OpenConversation, useOpenConversation } from "./use-open-conversation";
 import { useTabMemory } from "./use-tab-memory";
 
 export type { HistoryState, OpenConversation };
 
 interface Assistant {
-  info: AssistantInfo;
+  info: AssistantInfo; // info.model: the model that answers next, as last switched
   canAsk: boolean;
+  /** After the Model menu changed something: the model that answers next now. */
+  setModel: (model: ModelSummary) => void;
   messages: ChatMessage[];
   draft: string;
   busy: boolean;
@@ -55,17 +61,25 @@ export function useAssistant(): Assistant {
   return value;
 }
 
-export function AssistantProvider({ info, children }: { info: AssistantInfo; children: React.ReactNode }) {
+export function AssistantProvider({ info: page, children }: { info: AssistantInfo; children: React.ReactNode }) {
+  // the Model menu's latest word on the model, kept while the page's own info is the one it
+  // replaced (a new render of the page brings the server's word, which already knows the switch)
+  const [switched, setSwitched] = useState<{ from: ModelSummary; model: ModelSummary } | null>(null);
+  const latestPage = useLatest(page);
+  const setModel = useCallback((model: ModelSummary) => setSwitched({ from: latestPage.current.model, model }), [latestPage]);
+  const model = switched && switched.from === page.model ? switched.model : page.model;
+  const info = useMemo(() => (model === page.model ? page : { ...page, model }), [page, model]);
+
   const [draft, setDraftState] = useState("");
   const setDraft = useCallback((text: string) => setDraftState(text.slice(0, MAX_QUESTION)), []);
   const clearDraft = useCallback(() => setDraftState(""), []);
   const [stream] = useState(() => createSlot<AbortController>()); // the reply being streamed
 
   const list = useHistoryList(info.operator);
-  const open = useOpenConversation(info, stream, list.forget);
+  const open = useOpenConversation(page, stream, list.forget);
   const asking = useAsking({ info, open, stream, draft, clearDraft, refreshHistory: list.refreshHistory });
   const changes = useConversationChanges(list, open);
-  useTabMemory(info, open, draft, setDraft);
+  useTabMemory(page, open, draft, setDraft);
 
   const canAsk = info.operator && info.model.configured;
   const { messages, conversation, opening, notice, newChat, openConversation } = open;
@@ -78,6 +92,7 @@ export function AssistantProvider({ info, children }: { info: AssistantInfo; chi
     () => ({
       info,
       canAsk,
+      setModel,
       messages,
       draft,
       busy,
@@ -96,7 +111,7 @@ export function AssistantProvider({ info, children }: { info: AssistantInfo; chi
       deleteConversation,
       deleteAllConversations,
     }),
-    [info, canAsk, messages, draft, busy, setDraft, ask, stop, retry, conversation, opening, notice, newChat, openSaved, history, loadHistory, renameConversation, deleteConversation, deleteAllConversations],
+    [info, canAsk, setModel, messages, draft, busy, setDraft, ask, stop, retry, conversation, opening, notice, newChat, openSaved, history, loadHistory, renameConversation, deleteConversation, deleteAllConversations],
   );
   return <AssistantContext.Provider value={value}>{children}</AssistantContext.Provider>;
 }

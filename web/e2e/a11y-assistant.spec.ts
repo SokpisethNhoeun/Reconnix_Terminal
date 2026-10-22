@@ -1,6 +1,7 @@
 /* Accessibility of the AI Assistant's states that write a conversation (one sent, and the
-   History list): they share the assistant's conversation folder with e2e/assistant.spec.ts, so
-   they run in the serial-assistant project (playwright.config.ts), never beside another writer. */
+   History list) or read the saved models (the Model menu and its form): they share the
+   assistant's folder with e2e/assistant.spec.ts, so they run in the serial-assistant project
+   (playwright.config.ts), never beside another writer. */
 import { expect, test } from "./fixtures";
 
 import { axe, show } from "./axe";
@@ -26,5 +27,16 @@ test.describe("axe", () => {
     await page.getByRole("button", { name: /^History/ }).click();
     await expect(page.getByRole("dialog", { name: "Conversation history" })).toBeVisible();
     await axe(page, "assistant history");
+  });
+
+  test("the Model menu and its + Add model form have no violations", async ({ page }) => {
+    await show(page, "/?view=assistant");
+    await page.getByRole("button", { name: /^Model:/ }).click();
+    const menu = page.getByRole("dialog", { name: "Models" });
+    await expect(menu.getByRole("radio").first()).toBeVisible();
+    await axe(page, "assistant model menu");
+    await menu.getByRole("button", { name: "Add model" }).click();
+    await expect(menu.getByRole("form", { name: "Add a model" })).toBeVisible();
+    await axe(page, "assistant model form");
   });
 });

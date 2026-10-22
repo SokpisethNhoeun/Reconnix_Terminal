@@ -1,0 +1,275 @@
+/* The Model menu's routes called directly (e2e/access.spec.ts and e2e/assistant.spec.ts go
+   through the proxy too): the operator role and the page's Origin on every change, strict
+   bodies within a byte cap, remote addresses only when the server allows them, an API key that
+   never comes back in any answer, "Test connection" and "Fetch models" against a stand-in model
+   server (and a redirect, which is refused), and a switch that the next question uses. The
+   saved models go to a temporary folder. */
+import { mkdtempSync, rmSync } from "node:fs";
+import { createServer, type IncomingMessage, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { COOKIE, sessionValue } from "@/lib/auth/session";
+
+const TOKEN = "models-route-test-token-0123456789";
+const SECRET = "sk-route-secret-0123456789abcdef";
+let cookie = "";
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: (name: string) => (name === COOKIE && cookie ? { value: cookie } : undefined) }) }));
+vi.mock("next/server", async (load) => ({ ...(await load<typeof import("next/server")>()), connection: async () => undefined }));
+vi.mock("@/lib/auth/guard", () => ({ requireViewer: async () => undefined }));
+
+const models = await import("@/app/api/assistant/models/route");
+const one = await import("@/app/api/assistant/models/[id]/route");
+const active = await import("@/app/api/assistant/models/active/route");
+const probe = await import("@/app/api/assistant/models/test/route");
+const fetchRoute = await import("@/app/api/assistant/models/fetch/route");
+const question = await import("@/app/api/assistant/route");
+
+// --- a stand-in model server: it records what it was sent ------------------------------------------
+type Seen = { method: string; url: string; auth: string; model?: string };
+let seen: Seen[] = [];
+let server: Server;
+let base = "";
+beforeAll(async () => {
+  server = createServer((req: IncomingMessage, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      const url = req.url ?? "";
+      const model = body ? (JSON.parse(body) as { model?: string }).model : undefined;
+      seen.push({ method: req.method ?? "", url, auth: String(req.headers.authorization ?? ""), model });
+      if (url.startsWith("/moved/")) return res.writeHead(302, { Location: `${base}/models` }).end();
+      if (url.startsWith("/locked/") && req.headers.authorization !== `Bearer ${SECRET}`) return res.writeHead(401).end("{}");
+      if (url.endsWith("/models") && req.method === "GET") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ object: "list", data: [{ id: "stub-b" }, { id: "stub-a" }, { id: "bad name" }, { id: 7 }, { id: "stub-a" }] }));
+      }
+      if (url.endsWith("/chat/completions") && req.method === "POST") {
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: `Answered by ${model}.` } }] })}\n\n`);
+        return res.end("data: [DONE]\n\n");
+      }
+      res.writeHead(404).end();
+    });
+  });
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+});
+afterAll(() => new Promise<void>((done) => server.close(() => done())));
+
+const saved = { ...process.env };
+let dir = "";
+let clock = Date.now();
+const bodies: string[] = []; // every answer, to look for the key in
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime((clock += 120_000)); // a new minute for the rate limits
+  dir = mkdtempSync(path.join(tmpdir(), "reconix-models-route-"));
+  process.env = { ...saved, RECONIX_WEB_TOKEN: TOKEN, RECONIX_DATA_DIR: "sample-data", RECONIX_STALE_AFTER_HOURS: "0", RECONIX_ASSISTANT_DIR: dir };
+  process.env.LLM_BASE_URL = `${base}/v1`;
+  process.env.LLM_MODEL = "env-model";
+  delete process.env.LLM_API_KEY;
+  delete process.env.LLM_ALLOW_REMOTE;
+  cookie = sessionValue("operator", TOKEN);
+  seen = [];
+});
+afterEach(() => {
+  vi.useRealTimers();
+  process.env = { ...saved };
+  rmSync(dir, { recursive: true, force: true });
+});
+afterAll(() => {
+  // the key went in, and never came back out of any route
+  expect(bodies.length).toBeGreaterThan(20);
+  for (const text of bodies) expect(text).not.toContain(SECRET);
+});
+
+const ORIGIN = "http://127.0.0.1:3100";
+const request = (url: string, init: RequestInit & { origin?: string | null } = {}) => {
+  const headers: Record<string, string> = { host: "127.0.0.1:3100", "content-type": "application/json" };
+  if (init.origin !== null) headers.origin = init.origin ?? ORIGIN;
+  return new Request(`http://127.0.0.1:3100${url}`, { ...init, headers });
+};
+const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
+async function read(res: Response | Promise<Response>) {
+  const r = await res;
+  const text = await r.text();
+  bodies.push(text);
+  return { status: r.status, body: JSON.parse(text || "null") as Record<string, unknown> & { detail?: string } };
+}
+const json = (method: string, url: string, body: unknown, origin?: string) => request(url, { method, body: JSON.stringify(body), origin });
+
+const list = () => read(models.GET(request("/api/assistant/models", { origin: null })));
+const add = (body: unknown, origin?: string) => read(models.POST(json("POST", "/api/assistant/models", body, origin)));
+const patch = (id: string, body: unknown, origin?: string) => read(one.PATCH(json("PATCH", `/api/assistant/models/${id}`, body, origin), ctx(id)));
+const remove = (id: string, origin?: string) => read(one.DELETE(request(`/api/assistant/models/${id}`, { method: "DELETE", origin }), ctx(id)));
+const choose = (body: unknown, origin?: string) => read(active.PUT(json("PUT", "/api/assistant/models/active", body, origin)));
+const test = (body: unknown, origin?: string) => read(probe.POST(json("POST", "/api/assistant/models/test", body, origin)));
+const fetchNames = (body: unknown, origin?: string) => read(fetchRoute.POST(json("POST", "/api/assistant/models/fetch", body, origin)));
+
+const provider = (over: Record<string, unknown> = {}) => ({ name: "Stand-in", preset: "custom", baseUrl: `${base}/v1`, models: ["stub-a", "stub-b"], apiKey: SECRET, ...over });
+const ID = "0b0e2d55-1c5a-4b1e-9b8c-2f1d3c4b5a69";
+
+describe("the locks", () => {
+  it("refuse a viewer and a missing session, on reads and changes", async () => {
+    for (const who of [sessionValue("viewer", TOKEN), ""]) {
+      cookie = who;
+      expect((await list()).status).toBe(403);
+      expect((await add(provider())).status).toBe(403);
+      expect((await choose({ providerId: "environment", model: "env-model" })).status).toBe(403);
+      expect((await test({ providerId: "environment" })).status).toBe(403);
+    }
+  });
+  it("want the page's own Origin on every change", async () => {
+    const evil = "http://evil.example";
+    expect((await add(provider(), evil)).status).toBe(403);
+    expect((await patch(ID, { name: "x" }, evil)).status).toBe(403);
+    expect((await remove(ID, evil)).status).toBe(403);
+    expect((await choose({ providerId: "environment", model: "env-model" }, evil)).status).toBe(403);
+    expect((await test({ providerId: "environment" }, evil)).status).toBe(403);
+    expect((await fetchNames({ providerId: "environment" }, evil)).status).toBe(403);
+    expect(seen).toHaveLength(0);
+    expect((await list()).status).toBe(200); // a read needs none
+  });
+  it("check the body before anything is read or sent", async () => {
+    expect((await add({ ...provider(), extra: 1 })).status).toBe(400);
+    expect((await add(provider({ models: ["bad name"] }))).status).toBe(400);
+    expect((await add(provider({ models: [] }))).status).toBe(400);
+    expect((await add(provider({ models: ["a", "a"] }))).status).toBe(400);
+    expect((await add(provider({ preset: "skynet" }))).status).toBe(400);
+    expect((await add(provider({ apiKey: "two words" }))).status).toBe(400);
+    expect((await add(provider({ apiKey: "line\r\nX-Injected: 1" }))).status).toBe(400);
+    expect((await add({ ...provider(), pad: "y".repeat(30_000) })).status).toBe(413);
+    expect((await patch("not-an-id", { name: "x" })).status).toBe(400);
+    expect((await patch("environment", { name: "x" })).body.detail).toContain("web/.env.local");
+    expect((await patch(ID, { apiKey: "k", removeKey: true })).status).toBe(400);
+    expect((await remove("../models.key")).status).toBe(400);
+    expect((await choose({ providerId: "environment", model: "other" })).status).toBe(400);
+    expect((await choose({ providerId: ID, model: "m", more: 1 })).status).toBe(400);
+    expect((await test({ baseUrl: `${base}/v1` })).body.detail).toBe("Name a model to test.");
+    expect((await test({ providerId: ID, baseUrl: base })).status).toBe(400);
+    expect(seen).toHaveLength(0);
+  });
+});
+
+describe("the providers", () => {
+  it("list the Environment first, read-only and active, before anything is saved", async () => {
+    const { status, body } = await list();
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      providers: [],
+      environment: { name: "Environment", model: "env-model", local: true, reason: "" },
+      active: { providerId: "environment", model: "env-model" },
+      summary: { configured: true, name: "env-model", provider: "Environment" },
+      allowRemote: false,
+    });
+    expect(JSON.stringify(body)).not.toContain(base); // the environment's address stays on the server
+    expect((body.presets as { id: string }[]).map((p) => p.id)).toEqual(["ollama", "lmstudio", "openai", "openrouter", "groq", "anthropic", "deepseek", "custom"]);
+  });
+  it("add, change and remove one, the key never coming back", async () => {
+    const added = await add(provider({ activate: true }));
+    expect(added.status).toBe(201);
+    const p = added.body.provider as { id: string; keySaved: boolean };
+    expect(p.keySaved).toBe(true);
+    expect(added.body.active).toEqual({ providerId: p.id, model: "stub-a" });
+    expect(added.body.summary).toMatchObject({ configured: true, name: "stub-a", provider: "Stand-in" });
+
+    const renamed = await patch(p.id, { name: "Renamed", models: ["stub-b"] });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.provider).toMatchObject({ name: "Renamed", models: ["stub-b"], keySaved: true });
+    expect(renamed.body.active).toEqual({ providerId: p.id, model: "stub-b" }); // its first model now
+    expect((await patch(p.id, { removeKey: true })).body.provider).toMatchObject({ keySaved: false });
+
+    const gone = await remove(p.id);
+    expect(gone.status).toBe(200);
+    expect(gone.body.providers).toEqual([]);
+    expect(gone.body.active).toEqual({ providerId: "environment", model: "env-model" });
+    expect((await remove(p.id)).status).toBe(404);
+    expect((await patch(p.id, { name: "x" })).status).toBe(404);
+  });
+  it("refuse an address off this machine unless the server allows it", async () => {
+    const refused = await add(provider({ baseUrl: "https://api.openai.com/v1", preset: "openai" }));
+    expect(refused.status).toBe(400);
+    expect(refused.body.detail).toContain("LLM_ALLOW_REMOTE=1");
+    expect((await test({ baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", apiKey: SECRET })).status).toBe(400);
+    expect((await fetchNames({ baseUrl: "https://api.openai.com/v1" })).status).toBe(400);
+    process.env.LLM_ALLOW_REMOTE = "1";
+    expect((await add(provider({ baseUrl: "http://api.openai.com/v1", preset: "openai" }))).body.detail).toContain("only sent over https");
+    expect((await add(provider({ baseUrl: "https://api.openai.com/v1", preset: "openai" }))).status).toBe(201);
+    expect(seen).toHaveLength(0); // nothing was sent anywhere
+  });
+});
+
+describe("test and fetch", () => {
+  it("test a saved provider (its key to its own address) and unsaved values", async () => {
+    const p = (await add(provider({ baseUrl: `${base}/locked/v1` }))).body.provider as { id: string };
+    const ok = await test({ providerId: p.id, model: "stub-b" });
+    expect(ok.body).toEqual({ ok: true, detail: "Connected: stub-b answered." });
+    expect(seen.at(-1)).toMatchObject({ method: "POST", url: "/locked/v1/chat/completions", auth: `Bearer ${SECRET}`, model: "stub-b" });
+    const unsaved = await test({ baseUrl: `${base}/locked/v1`, model: "stub-a" }); // no key typed: none sent
+    expect(unsaved.body).toMatchObject({ ok: false });
+    expect(unsaved.body.detail).toContain("HTTP 401: check the API key");
+    expect(seen.at(-1)?.auth).toBe("");
+    const down = await test({ baseUrl: "http://127.0.0.1:9/v1", model: "m" });
+    expect(down.body).toEqual({ ok: false, detail: "Could not reach the address. Is the model's server running?" });
+    expect(JSON.stringify(down.body)).not.toContain("127.0.0.1:9");
+    expect((await test({ providerId: "environment" })).body).toEqual({ ok: true, detail: "Connected: env-model answered." });
+  });
+  it("fetch the model names: sorted, once each, only names a model may have", async () => {
+    const names = await fetchNames({ baseUrl: `${base}/v1` });
+    expect(names).toEqual({ status: 200, body: { models: ["stub-a", "stub-b"] } });
+    expect(seen.at(-1)).toMatchObject({ method: "GET", url: "/v1/models" });
+    const p = (await add(provider({ baseUrl: `${base}/locked/v1` }))).body.provider as { id: string };
+    expect((await fetchNames({ providerId: p.id })).body).toEqual({ models: ["stub-a", "stub-b"] });
+    expect((await fetchNames({ baseUrl: `${base}/locked/v1` })).status).toBe(502);
+    expect((await fetchNames({ baseUrl: "http://127.0.0.1:9/v1" })).status).toBe(502);
+  });
+  it("never follow a redirect", async () => {
+    const moved = await fetchNames({ baseUrl: `${base}/moved/v1` });
+    expect(moved.status).toBe(502);
+    expect(moved.body.detail).toContain("redirect");
+    expect(seen.map((s) => s.url)).toEqual(["/moved/v1/models"]); // the target was never asked
+    const test2 = await test({ baseUrl: `${base}/moved/v1`, model: "m" });
+    expect(test2.body).toMatchObject({ ok: false });
+    expect(test2.body.detail).toContain("redirect");
+  });
+});
+
+describe("switching", () => {
+  it("the next question is asked with the model just chosen", async () => {
+    const p = (await add(provider())).body.provider as { id: string };
+    const ask = async () => {
+      const res = await question.POST(json("POST", "/api/assistant", { uid: null, question: "Which model are you?" }));
+      expect(res.status).toBe(200);
+      const text = await res.text();
+      bodies.push(text);
+      return text;
+    };
+    expect(await ask()).toContain("Answered by env-model.");
+    expect(seen.at(-1)).toMatchObject({ url: "/v1/chat/completions", model: "env-model", auth: "" });
+
+    const switched = await choose({ providerId: p.id, model: "stub-b" });
+    expect(switched.status).toBe(200);
+    expect(switched.body.summary).toMatchObject({ configured: true, name: "stub-b", provider: "Stand-in" });
+    expect(await ask()).toContain("Answered by stub-b.");
+    expect(seen.at(-1)).toMatchObject({ model: "stub-b", auth: `Bearer ${SECRET}` });
+
+    expect((await choose({ providerId: p.id, model: "not-listed" })).status).toBe(400);
+    expect((await choose({ providerId: ID, model: "stub-a" })).status).toBe(404);
+    expect((await choose({ providerId: "environment", model: "env-model" })).body.active).toEqual({ providerId: "environment", model: "env-model" });
+    expect(await ask()).toContain("Answered by env-model.");
+  });
+  it("a chosen model that can't be used any more is reported, not replaced", async () => {
+    process.env.LLM_ALLOW_REMOTE = "1";
+    const p = (await add(provider({ baseUrl: "https://llm.example.com/v1", activate: true }))).body.provider as { id: string };
+    expect(p).toBeTruthy();
+    delete process.env.LLM_ALLOW_REMOTE;
+    const res = await question.POST(json("POST", "/api/assistant", { uid: null, question: "hi" }));
+    expect(res.status).toBe(503);
+    const body = (await res.json()) as { detail: string };
+    expect(body.detail).toMatch(/^Stand-in: The base URL is not on this machine/);
+    expect(seen).toHaveLength(0);
+  });
+});

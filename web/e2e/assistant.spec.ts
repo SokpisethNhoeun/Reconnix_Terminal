@@ -2,18 +2,24 @@
    the shared draft; answers streamed by the stand-in model (e2e/llm-stub.mjs) with the cards the
    server built from the sample data; conversations the dashboard's server keeps (they survive
    a reload and a new browser; open, rename, delete); Markdown with Copy; Stop and "New
-   messages"; Retry; an answer with nothing in it; what a viewer can't do; and the routes' locks.
+   messages"; Retry; an answer with nothing in it; the Model menu (the Environment's model, + Add
+   model against the stand-in, switching, asking with the new model, editing, removing); what a
+   viewer can't do; and the routes' locks.
    The chat panel holds still (text never moves), but the welcome's globe and the sidebar's icon
    breathe, so this project runs with reduced motion (playwright.config.ts; the motion itself is
    tested in motion.spec.ts) and clicks need no `force`. The
    stand-in model changes its answer only for explicit [stub:…] tokens. Conversations go to a
    test folder, and the e2e server allows more questions a minute (playwright.config.ts). */
+import { rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
 import { type BrowserContext, type Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
 
 import { sessionValue } from "../src/lib/auth/session";
-import { PORT, TOKEN } from "../playwright.config";
+import { LLM_PORT, PORT, TOKEN } from "../playwright.config";
 import { counted, newest, runsWithFindings, sample, signIn, signInFresh } from "./support";
 
 const ORIGIN = `http://127.0.0.1:${PORT}`;
@@ -38,6 +44,14 @@ const forgetAll = async (page: Page) => {
   const res = await page.request.delete("/api/assistant/conversations", { headers: { Origin: ORIGIN } });
   expect(res.status()).toBe(200);
 };
+/** Starts from no saved models (the e2e server's assistant folder, playwright.config.ts): the
+    Environment's stub-model answers. Deleting the conversations never touches these files. */
+const forgetModels = () => {
+  const dir = path.join(tmpdir(), `reconix-e2e-assistant-${PORT}`);
+  for (const name of ["models.json", "models.key"]) rmSync(path.join(dir, name), { force: true });
+};
+const modelButton = (page: Page) => page.getByRole("button", { name: /^Model:/ });
+const modelMenu = (page: Page) => page.getByRole("dialog", { name: "Models" });
 
 test("the Ask bar and the sidebar open the same assistant in place, and Back returns", async ({ page }) => {
   await signIn(page);
@@ -298,6 +312,111 @@ test.describe("when the model fails", () => {
   });
 });
 
+test.describe("the Model menu", () => {
+  test.use({ reducedMotion: "reduce" });
+  test.beforeEach(forgetModels);
+  test.afterEach(forgetModels); // the other specs ask the Environment's stub-model
+
+  test("lists the Environment, adds a model, switches in one click, asks with it, edits and removes it", async ({ page }) => {
+    await page.goto("/?view=assistant");
+    await expect(modelButton(page)).toHaveAccessibleName("Model: stub-model · local");
+    await modelButton(page).click();
+    const menu = modelMenu(page);
+    await expect(menu).toBeVisible();
+    const env = menu.getByRole("radiogroup", { name: /^Environment/ });
+    await expect(env.getByRole("radio", { name: "stub-model" })).toHaveAttribute("aria-checked", "true");
+    await expect(menu).toContainText("read-only");
+    await expect(menu.getByRole("button", { name: /^Edit Environment/ })).toHaveCount(0);
+
+    // + Add model: Custom, pointing at the stand-in; Fetch models picks from its list
+    await menu.getByRole("button", { name: "Add model" }).click();
+    const form = menu.getByRole("form", { name: "Add a model" });
+    await expect(form.getByLabel("Provider", { exact: true })).toBeFocused();
+    await form.getByLabel("Provider", { exact: true }).selectOption("custom");
+    await form.getByLabel("Name", { exact: true }).fill("Stand-in");
+    await form.getByLabel("Base URL", { exact: true }).fill(`http://127.0.0.1:${LLM_PORT}/v1`);
+    await form.getByLabel("API key", { exact: true }).fill("stub-secret-key-0123");
+    await form.getByRole("button", { name: "Fetch models" }).click();
+    await expect(form).toContainText("The server lists 2 models");
+    await form.getByRole("checkbox", { name: "stub-model", exact: true }).check();
+    await form.getByRole("checkbox", { name: "stub-model-2", exact: true }).check();
+    await expect(form.getByRole("list", { name: "Models of this provider" }).getByRole("listitem")).toHaveCount(2);
+    await form.getByRole("checkbox", { name: "Use it for the next question" }).uncheck();
+    await form.getByRole("button", { name: "Test connection" }).click();
+    await expect(form.getByRole("status")).toHaveText("Connected: stub-model answered.");
+    await form.getByRole("button", { name: "Save" }).click();
+    await expect(form).toBeHidden();
+    const saved = menu.getByRole("radiogroup", { name: "Stand-in" });
+    await expect(saved.getByRole("radio")).toHaveCount(2);
+    await expect(menu).toContainText("key saved");
+    await expect(env.getByRole("radio")).toHaveAttribute("aria-checked", "true"); // not switched yet
+
+    // one click switches; the header follows without a reload
+    await page.evaluate(() => ((window as unknown as { kept: number }).kept = 3));
+    await saved.getByRole("radio", { name: "stub-model-2" }).click();
+    await expect(saved.getByRole("radio", { name: "stub-model-2" })).toHaveAttribute("aria-checked", "true");
+    await expect(env.getByRole("radio")).toHaveAttribute("aria-checked", "false");
+    await expect(modelButton(page)).toHaveAccessibleName("Model: stub-model-2 · local");
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await expect(modelButton(page)).toBeFocused();
+
+    // the next question goes to it (the stand-in names any model but stub-model)
+    await ask(page, "Which model answers?");
+    await expect(log(page)).toContainText("You asked: Which model answers? Model: stub-model-2.");
+    expect(await page.evaluate(() => (window as unknown as { kept?: number }).kept)).toBe(3); // never reloaded
+    const listed = await page.request.get("/api/assistant/models");
+    expect(listed.status()).toBe(200);
+    expect(await listed.text()).not.toContain("stub-secret-key-0123"); // the key never comes back
+
+    // a reload keeps the choice (the server's file)
+    await page.reload();
+    await expect(modelButton(page)).toHaveAccessibleName("Model: stub-model-2 · local");
+
+    // edit: Escape leaves the form first; the key field is never filled in
+    await modelButton(page).click();
+    await menu.getByRole("button", { name: "Edit Stand-in" }).click();
+    const edit = menu.getByRole("form", { name: "Edit Stand-in" });
+    await expect(edit.getByLabel("API key", { exact: true })).toHaveValue("");
+    await expect(edit).toContainText("A key is saved");
+    await edit.getByLabel("Name", { exact: true }).press("Escape");
+    await expect(edit).toBeHidden();
+    await expect(menu).toBeVisible();
+    await menu.getByRole("button", { name: "Edit Stand-in" }).click();
+    await edit.getByLabel("Name", { exact: true }).fill("Stub server");
+    await edit.getByRole("button", { name: "Remove stub-model-2 from the list" }).click();
+    await edit.getByRole("button", { name: "Save" }).click();
+    await expect(edit).toBeHidden();
+    const renamed = menu.getByRole("radiogroup", { name: "Stub server" });
+    await expect(renamed.getByRole("radio")).toHaveCount(1);
+    await expect(renamed.getByRole("radio", { name: "stub-model" })).toHaveAttribute("aria-checked", "true"); // the active one left: its first model
+    await expect(modelButton(page)).toHaveAccessibleName("Model: stub-model · local");
+
+    // remove, asked first: the Environment answers again
+    await menu.getByRole("button", { name: "Remove Stub server" }).click();
+    await menu.getByRole("button", { name: "Remove", exact: true }).click();
+    await expect(renamed).toHaveCount(0);
+    await expect(env.getByRole("radio")).toHaveAttribute("aria-checked", "true");
+  });
+
+  test("what the server refuses stays in the form, said under it", async ({ page }) => {
+    await page.goto("/?view=assistant");
+    await modelButton(page).click();
+    await modelMenu(page).getByRole("button", { name: "Add model" }).click();
+    const form = modelMenu(page).getByRole("form", { name: "Add a model" });
+    await form.getByLabel("Provider", { exact: true }).selectOption("openai");
+    await expect(form.getByLabel("Base URL", { exact: true })).toHaveValue("https://api.openai.com/v1");
+    await expect(form).toContainText("LLM_ALLOW_REMOTE=1"); // the hint, before anything is sent
+    await form.getByLabel("A model name to add").fill("gpt-4o-mini");
+    await form.getByLabel("A model name to add").press("Enter");
+    await form.getByRole("button", { name: "Save" }).click();
+    await expect(form.getByRole("alert")).toContainText("not on this machine");
+    await expect(form).toBeVisible();
+    await form.getByRole("button", { name: "Cancel" }).click();
+    await expect(modelMenu(page).getByRole("radiogroup")).toHaveCount(1); // only the Environment
+  });
+});
+
 test("a viewer sees the assistant but can't ask or read conversations", async ({ page, context }) => {
   await context.addCookies([{ name: "reconix_view", value: sessionValue("viewer", TOKEN), domain: "127.0.0.1", path: "/" }]);
   await page.goto("/?view=assistant");
@@ -305,10 +424,13 @@ test("a viewer sees the assistant but can't ask or read conversations", async ({
   await expect(page.getByText(/needs the operator role/).first()).toBeVisible();
   await expect(composer(page)).toBeDisabled();
   await expect(page.getByRole("button", { name: /^History/ })).toBeDisabled();
+  await expect(modelButton(page)).toBeDisabled();
   await expect(page.getByRole("list", { name: "Suggested questions" }).getByRole("button").first()).toBeDisabled();
   const post = await page.request.post("/api/assistant", { headers: { Origin: ORIGIN }, data: { uid: null, question: "hi" } });
   expect(post.status()).toBe(403);
   expect((await page.request.get("/api/assistant/conversations")).status()).toBe(403);
+  expect((await page.request.get("/api/assistant/models")).status()).toBe(403);
+  expect((await page.request.put("/api/assistant/models/active", { headers: { Origin: ORIGIN }, data: { providerId: "environment", model: "stub-model" } })).status()).toBe(403);
   expect((await page.request.get("/api/assistant/conversations/0b0e2d55-1c5a-4b1e-9b8c-2f1d3c4b5a69")).status()).toBe(403);
 });
 
@@ -318,6 +440,8 @@ test("the routes want a signed-in operator, the page's origin and a valid reques
   const anonymous = await playwright.request.newContext({ baseURL: ORIGIN, storageState: { cookies: [], origins: [] } });
   expect((await anonymous.post("/api/assistant", { data: body })).status()).toBe(401);
   expect((await anonymous.get("/api/assistant/conversations")).status()).toBe(401);
+  expect((await anonymous.get("/api/assistant/models")).status()).toBe(401);
+  expect((await anonymous.post("/api/assistant/models/test", { data: { providerId: "environment" } })).status()).toBe(401);
   await anonymous.dispose();
   await signIn(page);
   const post = (data: unknown, origin = ORIGIN) => page.request.post("/api/assistant", { headers: { Origin: origin }, data });
@@ -338,4 +462,14 @@ test("the routes want a signed-in operator, the page's origin and a valid reques
   expect((await page.request.patch(`/api/assistant/conversations/${id}`, { headers: { Origin: "http://evil.example" }, data: { title: "x" } })).status()).toBe(403);
   expect((await page.request.delete(`/api/assistant/conversations/${id}`, { headers: { Origin: "http://evil.example" } })).status()).toBe(403);
   expect((await page.request.delete(`/api/assistant/conversations/${id}`, { headers: { Origin: ORIGIN } })).status()).toBe(200);
+
+  // the Model menu's routes: changes need the page's origin and a strict body
+  const provider = { name: "x", preset: "custom", baseUrl: "http://127.0.0.1:1/v1", models: ["m"] };
+  expect((await page.request.post("/api/assistant/models", { headers: { Origin: "http://evil.example" }, data: provider })).status()).toBe(403);
+  expect((await page.request.put("/api/assistant/models/active", { headers: { Origin: "http://evil.example" }, data: { providerId: "environment", model: "stub-model" } })).status()).toBe(403);
+  expect((await page.request.post("/api/assistant/models", { headers: { Origin: ORIGIN }, data: { ...provider, extra: 1 } })).status()).toBe(400);
+  expect((await page.request.delete("/api/assistant/models/not-an-id", { headers: { Origin: ORIGIN } })).status()).toBe(400);
+  const models = await page.request.get("/api/assistant/models");
+  expect(models.status()).toBe(200);
+  expect(models.headers()["cache-control"]).toContain("no-store");
 });

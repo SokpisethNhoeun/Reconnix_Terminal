@@ -29,8 +29,17 @@ scroll at 360 px.
 
 ## 2. AI Assistant: several providers and models
 
-Status: in progress (2026-10-22, branch `feature/next`): a **Model** menu in the assistant's
-header switches the active model, and **+ Add model** adds a provider with its models.
+Status: done (2026-10-22, branch `next/assistant-models` off `feature/next`): a **Model** menu
+in the assistant's header switches the active model, and **+ Add model** adds a provider with its
+models. Built as below, plus: the presets also list Anthropic and DeepSeek; a saved key is kept
+on an edit only while the address stays on the same host (another host needs the key again); a
+sealed key is bound to its provider's id (GCM associated data); a chosen model that can't be used
+any more (for example remote without `LLM_ALLOW_REMOTE=1`) is reported with its reason, never
+replaced by another; test and fetch of a saved provider send its key only to its saved address.
+Code: `lib/assistant/models/`, `lib/assistant/secure-fs.ts`, `app/api/assistant/models/`,
+`components/assistant/model-*.tsx`; tests `tests/models-store.test.ts`,
+`tests/models-route.test.ts`, the Model menu in `e2e/assistant.spec.ts` and
+`e2e/a11y-assistant.spec.ts`.
 
 Today one model comes from `web/.env.local` (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`).
 

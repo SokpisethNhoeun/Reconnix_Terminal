@@ -195,9 +195,67 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
             <DocLink href="/docs/assessment-guide/ai-agent">The AI agent</DocLink>.
           </p>
           <Callout>
-            The web dashboard&apos;s AI Assistant is configured separately, in <Mono>web/.env.local</Mono>: it has its own{" "}
-            <Mono>LLM_BASE_URL</Mono> and <Mono>LLM_MODEL</Mono>, and reaches a model off this machine only with{" "}
-            <Mono>LLM_ALLOW_REMOTE=1</Mono>. The terminal&apos;s providers are never shared with it.
+            The web dashboard&apos;s AI Assistant has its own models, chosen in its <strong>Model</strong> menu (below). The
+            terminal&apos;s providers and <Mono>llm.db</Mono> are never shared with it, and it never reads them.
+          </Callout>
+        </DocSection>
+        <DocSection title="The web assistant's Model menu">
+          <p>
+            In the dashboard&apos;s AI Assistant, the <strong>Model</strong> button in the header names the model that
+            answers your next question (<Mono>name · local</Mono> or <Mono>· remote</Mono>; an icon on a phone). Its menu
+            lists:
+          </p>
+          <ul>
+            <li>
+              <strong>Environment</strong>, read-only: the model from <Mono>web/.env.local</Mono> (<Mono>LLM_BASE_URL</Mono>,{" "}
+              <Mono>LLM_MODEL</Mono>, optional <Mono>LLM_API_KEY</Mono>). It answers while nothing else is chosen, so a
+              setup made before the menu existed keeps working. Change it in that file and restart <Mono>/web</Mono>.
+            </li>
+            <li>
+              Every provider you added, with its models. One click (or Enter) on a model switches to it; the checked one
+              answers next. The pencil edits a provider, the bin removes it (asked first); removing the active one hands
+              the answers back to the Environment.
+            </li>
+          </ul>
+          <Steps>
+            <li>
+              <strong>+ Add model</strong>. Pick a preset (Ollama, LM Studio, OpenAI, OpenRouter, Groq, Anthropic,
+              DeepSeek or Custom): it fills in the OpenAI-compatible base URL, which you can change.
+            </li>
+            <li>
+              Give it a name, and an API key if the provider needs one (a password field, never filled in again).
+            </li>
+            <li>
+              Add the model names: type one and press Enter, or <strong>Fetch models</strong> to ask the server
+              (<Mono>GET &lt;base URL&gt;/models</Mono>) and tick the ones you want.
+            </li>
+            <li>
+              <strong>Test connection</strong> sends one tiny chat completion and says &quot;Connected&quot; or why not
+              (the HTTP status only). <strong>Save</strong>; with &quot;Use it for the next question&quot; ticked it is
+              switched to at once. A refusal stays in the form, said under it.
+            </li>
+          </Steps>
+          <DocTable
+            caption="Where the web assistant keeps its models"
+            head={["File", "Contents"]}
+            rows={[
+              { key: "~/.reconix/assistant/models.json", value: <>The providers (name, preset, base URL, model names, the sealed key) and the chosen model; 0600 in a 0700 folder, written atomically. Moves with <Mono>RECONIX_ASSISTANT_DIR</Mono>, next to the saved conversations.</> },
+              { key: "~/.reconix/assistant/models.key", value: "The 32-byte key that seals the API keys (AES-256-GCM, a new random IV for each), made once, 0600. Lose it and the saved keys cannot be opened: enter them again." },
+            ]}
+          />
+          <p>
+            A key never goes back to the browser (the menu only says &quot;key saved&quot;) and is never logged. Editing a
+            provider without typing a key keeps the saved one, as long as the address stays on the same host; another host
+            needs the key again, or <strong>Remove the saved key</strong>. Test and Fetch send a saved key only to its
+            saved address.
+          </p>
+          <Callout variant="warning" title="The same rules as the environment">
+            Every model, saved or from the environment, must use http(s) with no user or password in the address and a
+            plain model name; a key goes only over https to a model off this machine; and an address off this machine is
+            used only when the dashboard was started with <Mono>LLM_ALLOW_REMOTE=1</Mono> (the browser can&apos;t turn it
+            on). The rules are checked again on every question: a chosen model that no longer passes says why in the
+            assistant, and nothing else answers in its place. Remote models receive your questions and the assessment data
+            they need; see <DocLink href="/docs/guardrails/llm-data-handling">LLM data handling</DocLink>.
           </Callout>
         </DocSection>
       </>

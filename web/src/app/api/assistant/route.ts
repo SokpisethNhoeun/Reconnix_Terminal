@@ -1,5 +1,6 @@
 /* The AI Assistant's question route (operators only; src/proxy.ts checks the role too). In
-   order: the launch token, the page's origin, the operator role, a configured model, a rate
+   order: the launch token, the page's origin, the operator role, a usable model (the one chosen
+   in the Model menu, else the Environment's: lib/assistant/models/resolve.ts), a rate
    slot (before any reading), the body (bytes counted as they arrive), its shape, the
    conversation (read from the server's own file: the browser never sends the history) and the
    saved data (read here, never taken from the request). A conversation keeps the run it was
@@ -8,7 +9,6 @@
    server built from the saved files, then the model's text. The conversation's id also goes in
    the X-Conversation-Id header, so a page that stops before the first frame still knows it.
    Nothing is logged, and errors never name a path. */
-import { modelSetup } from "@/lib/assistant/config";
 import { buildContext } from "@/lib/assistant/context";
 import { cardNotes, pickCards } from "@/lib/assistant/cards";
 import { fail, NO_STORE, readJson, refuse } from "@/lib/assistant/access";
@@ -16,6 +16,7 @@ import type { Conversation } from "@/lib/assistant/history-schema";
 import { addQuestion, HistoryError, readConversation } from "@/lib/assistant/history-store";
 import { scopeOf } from "@/lib/assistant/insights";
 import { readIntent } from "@/lib/assistant/intent";
+import { activeModel } from "@/lib/assistant/models/resolve";
 import { fenceTag, systemPrompt } from "@/lib/assistant/prompt";
 import { NDJSON } from "@/lib/assistant/protocol";
 import { createLimiter, limitsFromEnv } from "@/lib/assistant/rate";
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   const refused = await refuse(request, { change: true });
   if (refused) return refused;
 
-  const setup = modelSetup();
+  const setup = await activeModel();
   if (!setup.ok) return fail(setup.reason, 503);
 
   const release = limiter.take();

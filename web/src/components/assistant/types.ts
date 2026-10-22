@@ -4,8 +4,9 @@ import type { Status } from "@/lib/data/schema";
 import type { ChatMessage } from "@/lib/assistant/client";
 import type { Card, ScopeRef } from "@/lib/assistant/protocol";
 import type { WelcomePrompt } from "@/lib/assistant/prompts";
+import type { ModelSummary } from "@/lib/assistant/models/view";
 
-export type { Card, ChatMessage, ScopeRef, WelcomePrompt };
+export type { Card, ChatMessage, ModelSummary, ScopeRef, WelcomePrompt };
 
 /** A saved run, for the scope's status badge and the report card's links. */
 export interface RunSummary {
@@ -23,5 +24,6 @@ export interface AssistantInfo {
   operator: boolean; // this browser may ask the model and read the saved conversations
   terminal: boolean; // this browser may open the Terminal view
   retentionDays: number; // how long a conversation is kept without use (0: until deleted)
-  model: { configured: boolean; name: string; local: boolean; reason: string };
+  /** The model that answers next (lib/assistant/models/resolve.ts); the Model menu updates it. */
+  model: ModelSummary;
 }

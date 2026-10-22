@@ -226,6 +226,11 @@ vectors in `web/tests/redact-vectors.json` check both), streams NDJSON frames wi
 server builds from the saved data (`lib/assistant/cards.ts`; the model never supplies numbers,
 and nothing is run or approved from the chat), and keeps conversations on disk
 (`lib/assistant/history-store.ts`, `~/.reconix/assistant`, 0700/0600, 30-day retention).
+The model comes from the assistant's **Model** menu (`components/assistant/model-menu.tsx`,
+`/api/assistant/models…`, `lib/assistant/models/`): providers and the active choice live in
+`models.json` beside the conversations, API keys AES-256-GCM-sealed with `models.key` (0600) and
+never sent to the browser; every model passes `config.ts`'s `checkModel`, and while nothing is
+chosen the `LLM_*` model (the read-only "Environment") is the default.
 `webterm` drops `LLM_*` from the TUI's env. Exports: a report is saved as PDF, JSON or DOCX,
 in the TUI and the web alike (the report HTML is only the PDF's source and the combined preview,
 never a download): `GET /api/assessments/<uid>/export?format=pdf|json|docx`
@@ -234,7 +239,7 @@ never a download): `GET /api/assessments/<uid>/export?format=pdf|json|docx`
 the query validated first; the preview inline, the PDF printed by the same headless Chrome as the
 single export, 501 with the DOCX link without one; the Word files come from `lib/report/docx/`).
 **Read-only for assessments**: no route writes or deletes anything the TUI reads; the only
-writes are the assistant's own conversation files, and the only things started are the Terminal
+writes are the assistant's own conversation and model files, and the only things started are the Terminal
 page's TUI (the ticket route hands out a ticket; `reconix/webterm`, started by
 `web/scripts/serve.mjs`, runs the TUI, so its gates are the store's gates) and, for both PDF
 routes, a headless Chrome that prints a temp file the server wrote (`lib/report/pdf.ts`,

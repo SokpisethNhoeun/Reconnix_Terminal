@@ -128,6 +128,22 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   An endpoint off this machine also needs `LLM_ALLOW_REMOTE=1` (assessment data goes there; the
   screen says so) and takes `LLM_API_KEY` over https only. The key stays in the Next.js
   process: the terminal helper and the TUI it runs never get `LLM_*`. Unset, the screen says how.
+- **Model menu** (`components/assistant/model-menu.tsx`, `lib/assistant/models/`): the header's
+  Model button names the model that answers next; its panel lists the `LLM_*` model as the
+  read-only **Environment** (the default while nothing is chosen) and every saved provider with
+  its models, switched in one click. **+ Add model** takes a preset (Ollama, LM Studio, OpenAI,
+  OpenRouter, Groq, Anthropic, DeepSeek or Custom: it fills the base URL), a name, an optional
+  API key and the model names (typed, or picked after **Fetch models**, `GET {base}/models`), with
+  **Test connection** (one tiny completion). Saved providers can be edited (no key typed keeps
+  the saved one while the address stays on its host; "Remove the saved key") and removed. They
+  live in `models.json` in the assistant's folder (0600, atomic), the keys AES-256-GCM-sealed with
+  `models.key` (32 bytes, 0600, made once): never sent to the browser or logged. Every model
+  passes the same rules as the environment's (`config.ts` `checkModel`: http(s), no credentials
+  in the URL, the model name pattern, a key only over https to a remote host, remote only with
+  `LLM_ALLOW_REMOTE=1`), again on every use: a chosen model that can't be used says why instead
+  of falling back. Outbound tests and fetches refuse redirects, stop after 10 s and never cache.
+  Routes: `GET|POST /api/assistant/models`, `PATCH|DELETE …/models/<id>`, `PUT …/models/active`,
+  `POST …/models/test` and `…/models/fetch` (operators; changes need the page's origin).
 - **Route:** `POST /api/assistant` takes `{ conversationId?, uid, question, retry? }`: operators
   only (proxy and handler), same origin, zod-checked, a byte cap, 12 questions a minute and 2
   replies at once (`RECONIX_ASSISTANT_RATE_PER_MINUTE`, `RECONIX_ASSISTANT_RATE_RUNNING`). The
@@ -201,7 +217,8 @@ src/
 │   ├── login/               # sign-in (token from the link's #fragment) → the Overview
 │   └── api/                 # session (sign-in), assessments/[uid] (JSON), assessments/[uid]/export,
 │                            #   reports/combined (1–5 runs as one PDF / DOCX; viewer), terminal/ticket,
-│                            #   assistant and assistant/conversations (operators)
+│                            #   assistant, assistant/conversations and assistant/models (+ [id], active,
+│                            #   test, fetch: the Model menu) (operators)
 ├── lib/
 │   ├── data/                # schema.ts (zod), store.ts (server-only reader), stats.ts (pure),
 │   │                        #   adapt.ts (a saved run → the viewer's terms), view-types.ts, format.ts
@@ -213,11 +230,16 @@ src/
 │   │                        #   (+ terminalAccess), origin.ts (same-origin check), ticket.ts (terminal tickets)
 │   ├── terminal/            # config.ts (on/off, helper port), paths.ts, protocol.ts (frames, close codes),
 │   │                        #   screen-text.ts (what Copy output copies)
-│   ├── assistant/           # config.ts (the model), request.ts (zod), context.ts (what the model sees),
+│   ├── assistant/           # config.ts (the rules every model passes, the Environment model), request.ts
+│   │                        #   (zod), context.ts (what the model sees),
 │   │                        #   prompt.ts, llm.ts + stream.ts + reply.ts (the streamed reply), protocol.ts
 │   │                        #   (NDJSON frames), intent.ts + cards.ts + insights.ts + prompts.ts (cards and
 │   │                        #   prompts from saved data), history-store.ts + history-schema.ts (saved
-│   │                        #   conversations), redact.ts, markdown.ts, rate.ts, access.ts, client.ts
+│   │                        #   conversations), secure-fs.ts (the folder's safe file handling), redact.ts,
+│   │                        #   markdown.ts, rate.ts, access.ts, client.ts;
+│   │                        #   models/ (the Model menu: presets.ts, schema.ts, requests.ts, view.ts, crypto.ts
+│   │                        #   (AES-256-GCM keys), store.ts (models.json), resolve.ts (which model answers),
+│   │                        #   remote.ts (test, fetch), respond.ts, errors.ts)
 │   ├── scroll/              # stick-rules.ts + stick-controller.ts (the conversation follows its end)
 │   ├── scroll.ts            # scrolling a row into view by hand (never scrollIntoView, which moves the page)
 │   ├── paging.ts            # ten rows a page: the page clamped from the address, the label
@@ -239,7 +261,8 @@ src/
 │   ├── assistant/           # AssistantProvider (+ use-* hooks: open, asking, history, tab memory),
 │   │                        #   AssistantStage + motion*.ts + use-globe*.ts (the transition and the globe),
 │   │                        #   AssistantView, header, welcome, prompt cards, messages, cards/, composer,
-│   │                        #   conversation menu, breath.ts, use-stick-to-bottom.ts + scroll-to-bottom.tsx
+│   │                        #   conversation menu, breath.ts, use-stick-to-bottom.ts + scroll-to-bottom.tsx,
+│   │                        #   the Model menu (model-menu/-list/-form/-names.tsx, use-models.ts, use-fit-below.ts)
 │   ├── terminal/            # TerminalView, TerminalPanel, TerminalToolbar, RestartButton, TerminalNotice,
 │   │                        #   ScrollToLatest, useXterm, useTerminalSession, useTerminalView, useLeaveWarning
 │   ├── ui/                  # Button, Badge, StatusBadge / SeverityBadge, IconButton, Checkbox, CopyButton,
@@ -279,9 +302,10 @@ once, with each run as an occurrence; what a run lacks is listed under Limitatio
 - **Read-only for assessments.** No route writes, deletes or starts anything the TUI reads;
   decisions belong in the TUI. Two exceptions: the Terminal page runs the TUI itself (its
   ticket route only hands out a ticket; the helper starts the session), and the AI Assistant
-  writes **its own conversation files** in `~/.reconix/assistant` (and nothing else). The
-  assistant's route is also the one place saved data leaves the machine, and only to the model
-  the operator configured. The PDF exports (single and combined) start a headless Chrome on a
+  writes **its own conversation files** and its saved models (`models.json`, `models.key`) in
+  `~/.reconix/assistant` (and nothing else). The assistant's route is also the one place saved
+  data leaves the machine, and only to the model the operator chose (the Model menu's test and
+  fetch send no assessment data). The PDF exports (single and combined) start a headless Chrome on a
   temp file the server wrote (`lib/report/pdf.ts`), never on anything the request said.
 - **One data source.** Pages read through `lib/data/store.ts` only; it accepts regular files
   named `<YYYYMMDD-HHMMSS-xxxx>_<id>.json` up to 5 MB that pass `AssessmentSchema`.

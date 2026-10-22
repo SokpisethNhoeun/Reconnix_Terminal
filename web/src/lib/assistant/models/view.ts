@@ -1,0 +1,60 @@
+/* What the Model menu's routes answer (and the page tells the assistant): the saved providers
+   without their keys (only whether one is saved), the read-only Environment model, the active
+   choice and a summary of the model that answers next. Never an API key. Pure: browser and
+   server (the browser checks every answer against these before it uses it). */
+import { z } from "zod";
+
+import { ENVIRONMENT, MAX_MODELS, MAX_NAME, MAX_PROVIDERS, MAX_URL, ModelNameSchema, PresetSchema, ProviderIdSchema } from "./schema";
+
+/** The model that answers next, in words the page can show. `name` is the chosen model even
+    when it can't be used (`configured` false, `reason` says why); empty when nothing is chosen. */
+export const ModelSummarySchema = z
+  .object({
+    configured: z.boolean(),
+    name: z.string().max(128),
+    provider: z.string().max(MAX_NAME),
+    local: z.boolean(),
+    reason: z.string().max(600),
+  })
+  .strict();
+export type ModelSummary = z.infer<typeof ModelSummarySchema>;
+
+export const ProviderViewSchema = z
+  .object({
+    id: ProviderIdSchema,
+    name: z.string().max(MAX_NAME),
+    preset: PresetSchema,
+    baseUrl: z.string().max(MAX_URL),
+    models: z.array(ModelNameSchema).max(MAX_MODELS),
+    keySaved: z.boolean(),
+    local: z.boolean(),
+  })
+  .strict();
+export type ProviderView = z.infer<typeof ProviderViewSchema>;
+
+/** The Environment provider (LLM_BASE_URL / LLM_MODEL): its address is never sent. */
+export const EnvironmentViewSchema = z
+  .object({ name: z.string().max(MAX_NAME), model: z.string().max(400), local: z.boolean(), reason: z.string().max(600) })
+  .strict();
+export type EnvironmentView = z.infer<typeof EnvironmentViewSchema>;
+
+export const ActiveViewSchema = z.object({ providerId: z.union([ProviderIdSchema, z.literal(ENVIRONMENT)]), model: z.string().max(400) }).strict();
+export type ActiveView = z.infer<typeof ActiveViewSchema>;
+
+export const ModelsViewSchema = z
+  .object({
+    providers: z.array(ProviderViewSchema).max(MAX_PROVIDERS),
+    environment: EnvironmentViewSchema.nullable(),
+    active: ActiveViewSchema.nullable(),
+    summary: ModelSummarySchema,
+    allowRemote: z.boolean(), // the server sends data off this machine (LLM_ALLOW_REMOTE=1)
+  })
+  .strict();
+export type ModelsView = z.infer<typeof ModelsViewSchema>;
+
+/** The answer of "Test connection". */
+export const ProbeResultSchema = z.object({ ok: z.boolean(), detail: z.string().max(400) }).strict();
+export type ProbeResult = z.infer<typeof ProbeResultSchema>;
+
+/** The answer of "Fetch models" (the server keeps at most 200 names). */
+export const FetchResultSchema = z.object({ models: z.array(ModelNameSchema).max(200) }).strict();
