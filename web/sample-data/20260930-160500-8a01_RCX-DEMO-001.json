@@ -12,12 +12,26 @@
     "name": "API",
     "confirmed": true
   },
+  "api_spec": {
+    "title": "Orders API",
+    "version": "1.2.0",
+    "spec_version": "3.0.3",
+    "endpoints": 4,
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "servers": [
+      "https://api.example.com/v1"
+    ]
+  },
   "operator": "analyst",
   "client": "Example",
   "mode": "Grey-box, Authorized",
   "methodology": [
     "OWASP API Security Top 10 (2023)",
-    "OWASP WSTG"
+    "OWASP WSTG",
+    "Operator-supplied OpenAPI spec: Orders API 1.2.0 (OpenAPI 3.0.3, 4 endpoints)"
   ],
   "report_version": "1.0",
   "created_at": "2026-09-30T16:05:16+00:00",
@@ -29,8 +43,8 @@
   "session_closed": true,
   "run": {
     "phase": "completed",
-    "started_at": "2026-09-30T16:06:12+00:00",
-    "finished_at": "2026-09-30T16:18:11+00:00",
+    "started_at": "2026-09-30T16:06:28+00:00",
+    "finished_at": "2026-09-30T16:18:30+00:00",
     "completed": true,
     "requests": 541,
     "progress": {
@@ -54,7 +68,7 @@
     },
     {
       "key": "scanning",
-      "label": "Scan endpoints",
+      "label": "Test 4 endpoints from Orders API 1.2.0",
       "status": "done"
     },
     {
@@ -105,35 +119,35 @@
       "path": "/internal/metrics",
       "allowed": false,
       "reason": "Path outside approved scope",
-      "at": "2026-09-30T16:09:26+00:00"
+      "at": "2026-09-30T16:09:42+00:00"
     },
     {
       "method": "GET",
       "path": "/v1/orders/8842",
       "allowed": true,
       "reason": "Within approved scope",
-      "at": "2026-09-30T16:12:48+00:00"
+      "at": "2026-09-30T16:13:02+00:00"
     },
     {
       "method": "GET",
       "path": "/v1/orders/8842",
       "allowed": true,
       "reason": "Within approved scope",
-      "at": "2026-09-30T16:12:58+00:00"
+      "at": "2026-09-30T16:13:12+00:00"
     },
     {
       "method": "GET",
       "path": "/v1/orders/8843",
       "allowed": true,
       "reason": "Within approved scope",
-      "at": "2026-09-30T16:14:15+00:00"
+      "at": "2026-09-30T16:14:31+00:00"
     },
     {
       "method": "GET",
       "path": "/v1/orders/8843",
       "allowed": true,
       "reason": "Within approved scope",
-      "at": "2026-09-30T16:14:35+00:00"
+      "at": "2026-09-30T16:14:54+00:00"
     }
   ],
   "approvals": [
@@ -169,7 +183,7 @@
       "operator": "analyst",
       "reason": "",
       "command_hash": "sha256:4723aee4350ac7d692b0b272ce09716c2bd003eeffa26f3d897da9778f7da1ea",
-      "at": "2026-09-30T16:13:02+00:00"
+      "at": "2026-09-30T16:13:18+00:00"
     },
     {
       "request_id": "approval-002",
@@ -177,7 +191,7 @@
       "operator": "analyst",
       "reason": "",
       "command_hash": "sha256:bc8caa3aae5f115e2f6acd18806eb90b30da0599a722323e54c318adf8f88214",
-      "at": "2026-09-30T16:14:40+00:00"
+      "at": "2026-09-30T16:14:58+00:00"
     }
   ],
   "findings": [
@@ -375,7 +389,27 @@
     },
     {
       "seq": 10,
+      "at": "2026-09-30T16:06:12+00:00",
+      "type": "activity",
+      "who": "USER",
+      "kind": "line",
+      "text": "OpenAPI spec attached: Orders API 1.2.0 · 4 endpoints",
+      "tone": "ok",
+      "rows": []
+    },
+    {
+      "seq": 11,
       "at": "2026-09-30T16:06:19+00:00",
+      "type": "chat",
+      "who": "reconix",
+      "kind": "text",
+      "text": "OpenAPI spec attached: Orders API 1.2.0 · 4 endpoints.",
+      "tone": "ok",
+      "rows": []
+    },
+    {
+      "seq": 12,
+      "at": "2026-09-30T16:06:34+00:00",
       "type": "activity",
       "who": "USER",
       "kind": "line",
@@ -384,8 +418,8 @@
       "rows": []
     },
     {
-      "seq": 11,
-      "at": "2026-09-30T16:06:25+00:00",
+      "seq": 13,
+      "at": "2026-09-30T16:06:36+00:00",
       "type": "activity",
       "who": "SYS",
       "kind": "line",
@@ -394,8 +428,8 @@
       "rows": []
     },
     {
-      "seq": 12,
-      "at": "2026-09-30T16:06:42+00:00",
+      "seq": 14,
+      "at": "2026-09-30T16:07:03+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -404,8 +438,8 @@
       "rows": []
     },
     {
-      "seq": 13,
-      "at": "2026-09-30T16:06:57+00:00",
+      "seq": 15,
+      "at": "2026-09-30T16:07:11+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -414,8 +448,8 @@
       "rows": []
     },
     {
-      "seq": 14,
-      "at": "2026-09-30T16:07:07+00:00",
+      "seq": 16,
+      "at": "2026-09-30T16:07:22+00:00",
       "type": "activity",
       "who": "USER",
       "kind": "line",
@@ -424,8 +458,8 @@
       "rows": []
     },
     {
-      "seq": 15,
-      "at": "2026-09-30T16:07:27+00:00",
+      "seq": 17,
+      "at": "2026-09-30T16:07:42+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -434,8 +468,8 @@
       "rows": []
     },
     {
-      "seq": 16,
-      "at": "2026-09-30T16:07:42+00:00",
+      "seq": 18,
+      "at": "2026-09-30T16:08:04+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -444,8 +478,8 @@
       "rows": []
     },
     {
-      "seq": 17,
-      "at": "2026-09-30T16:07:57+00:00",
+      "seq": 19,
+      "at": "2026-09-30T16:08:18+00:00",
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
@@ -454,8 +488,8 @@
       "rows": []
     },
     {
-      "seq": 18,
-      "at": "2026-09-30T16:08:11+00:00",
+      "seq": 20,
+      "at": "2026-09-30T16:08:28+00:00",
       "type": "activity",
       "who": "TOOL",
       "kind": "line",
@@ -464,8 +498,8 @@
       "rows": []
     },
     {
-      "seq": 19,
-      "at": "2026-09-30T16:08:41+00:00",
+      "seq": 21,
+      "at": "2026-09-30T16:08:51+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "card",
@@ -474,7 +508,7 @@
       "rows": [
         [
           "Endpoints",
-          "24"
+          "4"
         ],
         [
           "Auth scheme",
@@ -487,8 +521,8 @@
       ]
     },
     {
-      "seq": 20,
-      "at": "2026-09-30T16:08:47+00:00",
+      "seq": 22,
+      "at": "2026-09-30T16:09:05+00:00",
       "type": "activity",
       "who": "TOOL",
       "kind": "line",
@@ -497,8 +531,8 @@
       "rows": []
     },
     {
-      "seq": 21,
-      "at": "2026-09-30T16:09:10+00:00",
+      "seq": 23,
+      "at": "2026-09-30T16:09:34+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -507,8 +541,8 @@
       "rows": []
     },
     {
-      "seq": 22,
-      "at": "2026-09-30T16:09:38+00:00",
+      "seq": 24,
+      "at": "2026-09-30T16:09:49+00:00",
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
@@ -517,8 +551,8 @@
       "rows": []
     },
     {
-      "seq": 23,
-      "at": "2026-09-30T16:09:42+00:00",
+      "seq": 25,
+      "at": "2026-09-30T16:09:53+00:00",
       "type": "chat",
       "who": "policy",
       "kind": "banner",
@@ -527,8 +561,8 @@
       "rows": []
     },
     {
-      "seq": 24,
-      "at": "2026-09-30T16:09:49+00:00",
+      "seq": 26,
+      "at": "2026-09-30T16:10:06+00:00",
       "type": "activity",
       "who": "TOOL",
       "kind": "line",
@@ -537,8 +571,8 @@
       "rows": []
     },
     {
-      "seq": 25,
-      "at": "2026-09-30T16:10:13+00:00",
+      "seq": 27,
+      "at": "2026-09-30T16:10:31+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "card",
@@ -556,8 +590,8 @@
       ]
     },
     {
-      "seq": 26,
-      "at": "2026-09-30T16:10:25+00:00",
+      "seq": 28,
+      "at": "2026-09-30T16:10:41+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -566,8 +600,8 @@
       "rows": []
     },
     {
-      "seq": 27,
-      "at": "2026-09-30T16:10:34+00:00",
+      "seq": 29,
+      "at": "2026-09-30T16:10:55+00:00",
       "type": "chat",
       "who": "policy",
       "kind": "banner",
@@ -576,8 +610,8 @@
       "rows": []
     },
     {
-      "seq": 28,
-      "at": "2026-09-30T16:10:55+00:00",
+      "seq": 30,
+      "at": "2026-09-30T16:11:10+00:00",
       "type": "activity",
       "who": "USER",
       "kind": "line",
@@ -586,8 +620,8 @@
       "rows": []
     },
     {
-      "seq": 29,
-      "at": "2026-09-30T16:11:17+00:00",
+      "seq": 31,
+      "at": "2026-09-30T16:11:36+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -596,8 +630,8 @@
       "rows": []
     },
     {
-      "seq": 30,
-      "at": "2026-09-30T16:11:28+00:00",
+      "seq": 32,
+      "at": "2026-09-30T16:11:45+00:00",
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
@@ -606,8 +640,8 @@
       "rows": []
     },
     {
-      "seq": 31,
-      "at": "2026-09-30T16:12:00+00:00",
+      "seq": 33,
+      "at": "2026-09-30T16:12:10+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -616,8 +650,8 @@
       "rows": []
     },
     {
-      "seq": 32,
-      "at": "2026-09-30T16:12:06+00:00",
+      "seq": 34,
+      "at": "2026-09-30T16:12:24+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -626,8 +660,8 @@
       "rows": []
     },
     {
-      "seq": 33,
-      "at": "2026-09-30T16:12:27+00:00",
+      "seq": 35,
+      "at": "2026-09-30T16:12:48+00:00",
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
@@ -636,8 +670,8 @@
       "rows": []
     },
     {
-      "seq": 34,
-      "at": "2026-09-30T16:13:04+00:00",
+      "seq": 36,
+      "at": "2026-09-30T16:13:23+00:00",
       "type": "activity",
       "who": "USER",
       "kind": "line",
@@ -646,8 +680,8 @@
       "rows": []
     },
     {
-      "seq": 35,
-      "at": "2026-09-30T16:13:31+00:00",
+      "seq": 37,
+      "at": "2026-09-30T16:13:50+00:00",
       "type": "chat",
       "who": "policy",
       "kind": "banner",
@@ -656,8 +690,8 @@
       "rows": []
     },
     {
-      "seq": 36,
-      "at": "2026-09-30T16:13:43+00:00",
+      "seq": 38,
+      "at": "2026-09-30T16:13:58+00:00",
       "type": "activity",
       "who": "TOOL",
       "kind": "line",
@@ -666,8 +700,8 @@
       "rows": []
     },
     {
-      "seq": 37,
-      "at": "2026-09-30T16:14:02+00:00",
+      "seq": 39,
+      "at": "2026-09-30T16:14:15+00:00",
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
@@ -676,8 +710,8 @@
       "rows": []
     },
     {
-      "seq": 38,
-      "at": "2026-09-30T16:14:46+00:00",
+      "seq": 40,
+      "at": "2026-09-30T16:15:06+00:00",
       "type": "activity",
       "who": "USER",
       "kind": "line",
@@ -686,8 +720,8 @@
       "rows": []
     },
     {
-      "seq": 39,
-      "at": "2026-09-30T16:15:11+00:00",
+      "seq": 41,
+      "at": "2026-09-30T16:15:25+00:00",
       "type": "chat",
       "who": "policy",
       "kind": "banner",
@@ -696,8 +730,8 @@
       "rows": []
     },
     {
-      "seq": 40,
-      "at": "2026-09-30T16:15:22+00:00",
+      "seq": 42,
+      "at": "2026-09-30T16:15:33+00:00",
       "type": "activity",
       "who": "TOOL",
       "kind": "line",
@@ -706,8 +740,8 @@
       "rows": []
     },
     {
-      "seq": 41,
-      "at": "2026-09-30T16:15:36+00:00",
+      "seq": 43,
+      "at": "2026-09-30T16:15:51+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -716,8 +750,8 @@
       "rows": []
     },
     {
-      "seq": 42,
-      "at": "2026-09-30T16:15:46+00:00",
+      "seq": 44,
+      "at": "2026-09-30T16:16:03+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -726,8 +760,8 @@
       "rows": []
     },
     {
-      "seq": 43,
-      "at": "2026-09-30T16:16:03+00:00",
+      "seq": 45,
+      "at": "2026-09-30T16:16:18+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "check",
@@ -736,8 +770,8 @@
       "rows": []
     },
     {
-      "seq": 44,
-      "at": "2026-09-30T16:16:18+00:00",
+      "seq": 46,
+      "at": "2026-09-30T16:16:34+00:00",
       "type": "chat",
       "who": "",
       "kind": "check",
@@ -746,8 +780,8 @@
       "rows": []
     },
     {
-      "seq": 45,
-      "at": "2026-09-30T16:16:34+00:00",
+      "seq": 47,
+      "at": "2026-09-30T16:16:48+00:00",
       "type": "chat",
       "who": "",
       "kind": "check",
@@ -756,8 +790,8 @@
       "rows": []
     },
     {
-      "seq": 46,
-      "at": "2026-09-30T16:16:48+00:00",
+      "seq": 48,
+      "at": "2026-09-30T16:17:06+00:00",
       "type": "chat",
       "who": "",
       "kind": "check",
@@ -766,8 +800,8 @@
       "rows": []
     },
     {
-      "seq": 47,
-      "at": "2026-09-30T16:17:18+00:00",
+      "seq": 49,
+      "at": "2026-09-30T16:17:35+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -776,8 +810,8 @@
       "rows": []
     },
     {
-      "seq": 48,
-      "at": "2026-09-30T16:17:35+00:00",
+      "seq": 50,
+      "at": "2026-09-30T16:17:52+00:00",
       "type": "activity",
       "who": "SYS",
       "kind": "line",
@@ -786,8 +820,8 @@
       "rows": []
     },
     {
-      "seq": 49,
-      "at": "2026-09-30T16:17:46+00:00",
+      "seq": 51,
+      "at": "2026-09-30T16:18:04+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -796,8 +830,8 @@
       "rows": []
     },
     {
-      "seq": 50,
-      "at": "2026-09-30T16:17:57+00:00",
+      "seq": 52,
+      "at": "2026-09-30T16:18:18+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -806,8 +840,8 @@
       "rows": []
     },
     {
-      "seq": 51,
-      "at": "2026-09-30T16:18:30+00:00",
+      "seq": 53,
+      "at": "2026-09-30T16:18:50+00:00",
       "type": "activity",
       "who": "USER",
       "kind": "line",
@@ -816,8 +850,8 @@
       "rows": []
     },
     {
-      "seq": 52,
-      "at": "2026-09-30T16:18:35+00:00",
+      "seq": 54,
+      "at": "2026-09-30T16:18:53+00:00",
       "type": "activity",
       "who": "SYS",
       "kind": "line",
@@ -826,8 +860,8 @@
       "rows": []
     },
     {
-      "seq": 53,
-      "at": "2026-09-30T16:18:43+00:00",
+      "seq": 55,
+      "at": "2026-09-30T16:18:56+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -842,5 +876,5 @@
       "at": "2026-09-30T16:05:19+00:00"
     }
   ],
-  "saved_at": "2026-09-30T16:18:53+00:00"
+  "saved_at": "2026-09-30T16:19:04+00:00"
 }

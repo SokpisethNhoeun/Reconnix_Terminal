@@ -12,6 +12,7 @@
     "name": "Source Code",
     "confirmed": true
   },
+  "api_spec": null,
   "operator": "analyst",
   "client": "Example",
   "mode": "Grey-box, Authorized",
@@ -20,7 +21,7 @@
     "CWE Top 25"
   ],
   "report_version": "1.0",
-  "created_at": "2026-10-05T14:23:22+00:00",
+  "created_at": "2026-10-05T14:23:25+00:00",
   "status": "Awaiting input",
   "waiting_gate": "approval:approval-002",
   "waiting_request_id": "approval-002",
@@ -29,7 +30,7 @@
   "session_closed": false,
   "run": {
     "phase": "validating",
-    "started_at": "2026-10-05T14:24:29+00:00",
+    "started_at": "2026-10-05T14:24:34+00:00",
     "finished_at": null,
     "completed": false,
     "requests": 1,
@@ -106,28 +107,28 @@
       "path": ".git/config",
       "allowed": false,
       "reason": "Path excluded from the review",
-      "at": "2026-10-05T14:27:16+00:00"
+      "at": "2026-10-05T14:27:17+00:00"
     },
     {
       "method": "READ",
       "path": "app/config/settings.py",
       "allowed": true,
       "reason": "Within approved scope",
-      "at": "2026-10-05T14:28:59+00:00"
+      "at": "2026-10-05T14:29:05+00:00"
     },
     {
       "method": "READ",
       "path": "app/config/settings.py",
       "allowed": true,
       "reason": "Within approved scope",
-      "at": "2026-10-05T14:29:13+00:00"
+      "at": "2026-10-05T14:29:16+00:00"
     },
     {
       "method": "READ",
       "path": "app/config/settings.py",
       "allowed": true,
       "reason": "Within approved scope",
-      "at": "2026-10-05T14:30:34+00:00"
+      "at": "2026-10-05T14:30:36+00:00"
     }
   ],
   "approvals": [
@@ -163,7 +164,7 @@
       "operator": "analyst",
       "reason": "",
       "command_hash": "sha256:cab21c3bf9b00a7d496b3cb84c2744f48606b6e3941f4b9c167f6bb626434828",
-      "at": "2026-10-05T14:29:17+00:00"
+      "at": "2026-10-05T14:29:20+00:00"
     }
   ],
   "findings": [
@@ -204,7 +205,7 @@
   "timeline": [
     {
       "seq": 57,
-      "at": "2026-10-05T14:23:10+00:00",
+      "at": "2026-10-05T14:23:17+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -214,7 +215,7 @@
     },
     {
       "seq": 58,
-      "at": "2026-10-05T14:23:18+00:00",
+      "at": "2026-10-05T14:23:21+00:00",
       "type": "activity",
       "who": "SYS",
       "kind": "line",
@@ -224,7 +225,7 @@
     },
     {
       "seq": 59,
-      "at": "2026-10-05T14:23:43+00:00",
+      "at": "2026-10-05T14:23:48+00:00",
       "type": "chat",
       "who": "you",
       "kind": "text",
@@ -244,7 +245,7 @@
     },
     {
       "seq": 61,
-      "at": "2026-10-05T14:24:04+00:00",
+      "at": "2026-10-05T14:24:07+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -254,7 +255,7 @@
     },
     {
       "seq": 62,
-      "at": "2026-10-05T14:24:07+00:00",
+      "at": "2026-10-05T14:24:14+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -264,7 +265,7 @@
     },
     {
       "seq": 63,
-      "at": "2026-10-05T14:24:12+00:00",
+      "at": "2026-10-05T14:24:18+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -274,7 +275,7 @@
     },
     {
       "seq": 64,
-      "at": "2026-10-05T14:24:18+00:00",
+      "at": "2026-10-05T14:24:22+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -294,7 +295,7 @@
     },
     {
       "seq": 66,
-      "at": "2026-10-05T14:24:34+00:00",
+      "at": "2026-10-05T14:24:37+00:00",
       "type": "activity",
       "who": "USER",
       "kind": "line",
@@ -304,7 +305,7 @@
     },
     {
       "seq": 67,
-      "at": "2026-10-05T14:24:38+00:00",
+      "at": "2026-10-05T14:24:40+00:00",
       "type": "activity",
       "who": "SYS",
       "kind": "line",
@@ -314,7 +315,7 @@
     },
     {
       "seq": 68,
-      "at": "2026-10-05T14:24:55+00:00",
+      "at": "2026-10-05T14:25:02+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -324,7 +325,7 @@
     },
     {
       "seq": 69,
-      "at": "2026-10-05T14:25:07+00:00",
+      "at": "2026-10-05T14:25:17+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -334,7 +335,7 @@
     },
     {
       "seq": 70,
-      "at": "2026-10-05T14:25:21+00:00",
+      "at": "2026-10-05T14:25:29+00:00",
       "type": "activity",
       "who": "USER",
       "kind": "line",
@@ -344,7 +345,7 @@
     },
     {
       "seq": 71,
-      "at": "2026-10-05T14:25:44+00:00",
+      "at": "2026-10-05T14:25:49+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -354,7 +355,7 @@
     },
     {
       "seq": 72,
-      "at": "2026-10-05T14:26:01+00:00",
+      "at": "2026-10-05T14:26:04+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -374,7 +375,7 @@
     },
     {
       "seq": 74,
-      "at": "2026-10-05T14:26:21+00:00",
+      "at": "2026-10-05T14:26:19+00:00",
       "type": "activity",
       "who": "TOOL",
       "kind": "line",
@@ -384,7 +385,7 @@
     },
     {
       "seq": 75,
-      "at": "2026-10-05T14:26:35+00:00",
+      "at": "2026-10-05T14:26:42+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "card",
@@ -407,7 +408,7 @@
     },
     {
       "seq": 76,
-      "at": "2026-10-05T14:26:46+00:00",
+      "at": "2026-10-05T14:26:50+00:00",
       "type": "activity",
       "who": "TOOL",
       "kind": "line",
@@ -417,7 +418,7 @@
     },
     {
       "seq": 77,
-      "at": "2026-10-05T14:27:02+00:00",
+      "at": "2026-10-05T14:27:09+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -427,7 +428,7 @@
     },
     {
       "seq": 78,
-      "at": "2026-10-05T14:27:23+00:00",
+      "at": "2026-10-05T14:27:29+00:00",
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
@@ -437,7 +438,7 @@
     },
     {
       "seq": 79,
-      "at": "2026-10-05T14:27:29+00:00",
+      "at": "2026-10-05T14:27:32+00:00",
       "type": "chat",
       "who": "policy",
       "kind": "banner",
@@ -447,7 +448,7 @@
     },
     {
       "seq": 80,
-      "at": "2026-10-05T14:27:41+00:00",
+      "at": "2026-10-05T14:27:44+00:00",
       "type": "activity",
       "who": "TOOL",
       "kind": "line",
@@ -457,7 +458,7 @@
     },
     {
       "seq": 81,
-      "at": "2026-10-05T14:27:56+00:00",
+      "at": "2026-10-05T14:27:59+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "card",
@@ -476,7 +477,7 @@
     },
     {
       "seq": 82,
-      "at": "2026-10-05T14:28:17+00:00",
+      "at": "2026-10-05T14:28:14+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -486,7 +487,7 @@
     },
     {
       "seq": 83,
-      "at": "2026-10-05T14:28:23+00:00",
+      "at": "2026-10-05T14:28:25+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -496,7 +497,7 @@
     },
     {
       "seq": 84,
-      "at": "2026-10-05T14:28:44+00:00",
+      "at": "2026-10-05T14:28:48+00:00",
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
@@ -506,7 +507,7 @@
     },
     {
       "seq": 85,
-      "at": "2026-10-05T14:29:23+00:00",
+      "at": "2026-10-05T14:29:22+00:00",
       "type": "activity",
       "who": "USER",
       "kind": "line",
@@ -516,7 +517,7 @@
     },
     {
       "seq": 86,
-      "at": "2026-10-05T14:29:41+00:00",
+      "at": "2026-10-05T14:29:50+00:00",
       "type": "chat",
       "who": "policy",
       "kind": "banner",
@@ -526,7 +527,7 @@
     },
     {
       "seq": 87,
-      "at": "2026-10-05T14:29:54+00:00",
+      "at": "2026-10-05T14:29:57+00:00",
       "type": "activity",
       "who": "TOOL",
       "kind": "line",
@@ -536,7 +537,7 @@
     },
     {
       "seq": 88,
-      "at": "2026-10-05T14:30:14+00:00",
+      "at": "2026-10-05T14:30:22+00:00",
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
@@ -548,8 +549,8 @@
   "requests": [
     {
       "text": "Review the source repository git@git.example.com:shop/storefront.git for security issues.",
-      "at": "2026-10-05T14:23:33+00:00"
+      "at": "2026-10-05T14:23:35+00:00"
     }
   ],
-  "saved_at": "2026-10-05T14:30:43+00:00"
+  "saved_at": "2026-10-05T14:30:47+00:00"
 }

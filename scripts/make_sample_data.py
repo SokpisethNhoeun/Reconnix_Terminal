@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 ROOT = Path(__file__).resolve().parents[1]
+SPEC = ROOT / "scripts" / "sample" / "openapi-demo.yaml"   # the API run's attached spec
 sys.path.insert(0, str(ROOT))
 
 from reconix import store  # noqa: E402
@@ -121,11 +122,13 @@ base.datetime = FakeClock      # every store timestamp comes from base.utc_now()
 
 
 # --- playing a run -------------------------------------------------------------------------------
-def decide(gate: str, *, high: str) -> bool:
+def decide(gate: str, *, high: str, spec: str = "") -> bool:
     """Decide `gate`. Returns False to leave the run waiting there."""
     if gate == "template":
         store.select_template(store.get_assessment().template_id)
     elif gate == "scope":
+        if spec:                              # the operator attaches the API's OpenAPI spec
+            store.attach_api_spec(spec)
         store.approve_scope()
     elif gate == "plan":
         store.run_plan()
@@ -152,13 +155,14 @@ def decide(gate: str, *, high: str) -> bool:
 
 def play(text: str, *, high: str = "approve", fmt: str = "", rows: str = "",
          stop_at: str = "", running_steps: int = 0, no_findings: bool = False,
-         after: Optional[Callable[[], None]] = None) -> None:
+         after: Optional[Callable[[], None]] = None, spec: str = "") -> None:
     """Play one run from `text`.
 
     `stop_at`: "scope" stops the run at the template/scope gate (nothing approved);
     `running_steps`: leave the run Running after that many played steps once the plan runs;
     `no_findings`: drop every finding (a completed run that found nothing);
-    `after`: a callable run last (triage a finding, for instance).
+    `after`: a callable run last (triage a finding, for instance);
+    `spec`: an OpenAPI file attached to the draft scope before it is approved (API runs).
     """
     if store.get_run().started:
         store.new_assessment()
@@ -172,7 +176,7 @@ def play(text: str, *, high: str = "approve", fmt: str = "", rows: str = "",
             if stop_at == "scope" and step.name in ("template", "scope"):
                 store.stop_run()
                 break
-            if not decide(step.name, high=high):
+            if not decide(step.name, high=high, spec=spec):
                 break
         elif running_steps and store.get_run().plan_started:
             played += 1
@@ -228,7 +232,7 @@ def main() -> None:
     ])
     snapshots += session(datetime(2026, 9, 30, 16, 5, tzinfo=utc), [
         dict(text="Test the REST API at https://api.example.com/v1 for security issues.",
-             fmt="docx"),
+             fmt="docx", spec=str(SPEC)),
     ])
     snapshots += session(datetime(2026, 10, 3, 10, 15, tzinfo=utc), [
         dict(text="Scan the network host 192.0.2.10 for exposed services.", fmt="json"),

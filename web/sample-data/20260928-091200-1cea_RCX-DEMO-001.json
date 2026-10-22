@@ -12,6 +12,7 @@
     "name": "Source Code",
     "confirmed": true
   },
+  "api_spec": null,
   "operator": "analyst",
   "client": "Example",
   "mode": "Grey-box, Authorized",

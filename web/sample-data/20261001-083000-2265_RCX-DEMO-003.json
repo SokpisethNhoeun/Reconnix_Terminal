@@ -12,12 +12,13 @@
     "name": "Web URL",
     "confirmed": false
   },
+  "api_spec": null,
   "operator": "analyst",
   "client": "Example",
   "mode": "Grey-box, Authorized",
   "methodology": [],
   "report_version": "1.0",
-  "created_at": "2026-10-01T09:09:50+00:00",
+  "created_at": "2026-10-01T09:09:52+00:00",
   "status": "Stopped",
   "waiting_gate": "",
   "waiting_request_id": "",
@@ -27,7 +28,7 @@
   "run": {
     "phase": "stopped",
     "started_at": null,
-    "finished_at": "2026-10-01T09:10:35+00:00",
+    "finished_at": "2026-10-01T09:10:36+00:00",
     "completed": false,
     "requests": 0,
     "progress": {
@@ -62,7 +63,7 @@
     },
     {
       "seq": 108,
-      "at": "2026-10-01T09:09:44+00:00",
+      "at": "2026-10-01T09:09:47+00:00",
       "type": "activity",
       "who": "SYS",
       "kind": "line",
@@ -72,7 +73,7 @@
     },
     {
       "seq": 109,
-      "at": "2026-10-01T09:10:12+00:00",
+      "at": "2026-10-01T09:10:11+00:00",
       "type": "chat",
       "who": "you",
       "kind": "text",
@@ -92,7 +93,7 @@
     },
     {
       "seq": 111,
-      "at": "2026-10-01T09:10:24+00:00",
+      "at": "2026-10-01T09:10:22+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -142,7 +143,7 @@
     },
     {
       "seq": 116,
-      "at": "2026-10-01T09:10:49+00:00",
+      "at": "2026-10-01T09:10:51+00:00",
       "type": "activity",
       "who": "SYS",
       "kind": "line",
@@ -154,8 +155,8 @@
   "requests": [
     {
       "text": "Check portal.example.net",
-      "at": "2026-10-01T09:10:00+00:00"
+      "at": "2026-10-01T09:10:03+00:00"
     }
   ],
-  "saved_at": "2026-10-01T09:11:10+00:00"
+  "saved_at": "2026-10-01T09:11:15+00:00"
 }
