@@ -80,7 +80,7 @@ class TemplateScreen(ReconixScreen):
         return "busy"
 
     def view_state(self) -> object:
-        # the review menu offers "Replace" once a spec is attached
+        # the review menu offers "Replace" and "Remove" once a spec is attached
         return (self.state(), store.get_api_spec() is not None)
 
     # --- layout ------------------------------------------------------------------------------
@@ -154,8 +154,12 @@ class TemplateScreen(ReconixScreen):
         if not store.can_attach_api_spec():
             return []
         attached = store.get_api_spec() is not None
-        return [Choice("spec", "Replace OpenAPI spec" if attached else "Attach OpenAPI spec",
-                       "a .json or .yaml OpenAPI 3 / Swagger 2 file; read, never run")]
+        choices = [Choice("spec", "Replace OpenAPI spec" if attached else "Attach OpenAPI spec",
+                          "a .json or .yaml OpenAPI 3 / Swagger 2 file; read, never run")]
+        if attached:
+            choices.append(Choice("unspec", "Remove OpenAPI spec",
+                                  "go back to the template's endpoints and methods"))
+        return choices
 
     def _compose_approved(self) -> ComposeResult:
         yield from _request_message()
@@ -209,6 +213,7 @@ class TemplateScreen(ReconixScreen):
             self.app.choose_template(choice)
         elif state == "review":
             {"approve": self.app.approve_scope, "spec": self.app.attach_api_spec,
+             "unspec": self.app.remove_api_spec,
              "edit": self.app.edit_scope, "reject": self.app.reject_scope}[choice]()
         elif state == "approved":
             self.app.goto("plan")

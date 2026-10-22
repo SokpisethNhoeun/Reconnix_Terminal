@@ -25,7 +25,8 @@ from .findings_view import (
     severity_counts, sort_label,
 )
 from .openapi import (
-    api_spec_handoff, attach_api_spec, can_attach_api_spec, get_api_spec, remove_api_spec,
+    api_spec_handoff, api_spec_methods_outside, attach_api_spec, can_attach_api_spec,
+    get_api_spec, remove_api_spec,
 )
 from .history import add_history, list_history
 from . import knowledge
@@ -96,7 +97,7 @@ __all__ = [
     "list_findings", "get_finding", "confirmed_count", "review_count",
     "findings_line",
     "attach_api_spec", "remove_api_spec", "get_api_spec", "can_attach_api_spec",
-    "api_spec_handoff", "SEVERITY_ORDER",
+    "api_spec_handoff", "api_spec_methods_outside", "SEVERITY_ORDER",
     "triage_finding", "TRIAGE_STATUS", "TRIAGE_LABELS",
     "FINDING_FILTERS", "FINDING_SORTS", "find_findings", "filter_counts", "filter_label",
     "sort_label", "severity_counts", "key_findings",

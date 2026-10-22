@@ -78,6 +78,7 @@ reconix/
 │   ├── providers.py / llm_chat.py    # the LLM seam: configure/test/pick a model (providers.py);
 │   │                                 #   turn a chat line into a model reply (llm_chat.py)
 │   ├── agent_run.py  # the harness seam: drive backend/ Agent.chat; switch_model keeps history
+│   ├── openapi.py    # an OpenAPI file attached to the API scope draft (read, never widens it)
 │   ├── plan.py / progress.py / findings_view.py          # what the classic screens show
 │   └── report*.py / snapshot.py / persist.py             # exports; saved copies for web/
 ├── theme.py          # color tokens; CSS_TOKENS feed the stylesheet's $variables

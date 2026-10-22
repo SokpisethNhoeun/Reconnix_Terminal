@@ -28,6 +28,10 @@ def manifest_text(scope: ScopeManifest) -> Text:
         text.append("\n\nAPI spec  ", style=f"bold {theme.TEXT}")
         text.append(f"{spec.label} · {spec.total} endpoints · {', '.join(spec.methods)}",
                     style=theme.MUTED)
+        outside = store.api_spec_methods_outside()
+        if outside:
+            text.append("\nIn spec, not allowed  ", style=f"bold {theme.TEXT}")
+            text.append(", ".join(outside), style=theme.MEDIUM)
         if spec.out_of_scope_servers:
             text.append("\nOut of scope  ", style=f"bold {theme.TEXT}")
             text.append(", ".join(spec.out_of_scope_servers), style=theme.MEDIUM)

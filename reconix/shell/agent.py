@@ -79,7 +79,7 @@ class AgentMixin:
             f"Assess {target}. The operator has approved the scope and authorized this "
             "engagement — treat the target as authorized and do NOT ask for authorization or "
             "confirmation. Begin immediately: run reconnaissance, then adapt and test based on "
-            "what you find, and report findings as you go." + (f" {spec}" if spec else ""))
+            "what you find, and report findings as you go." + (f"\n\n{spec}" if spec else ""))
 
     def _send_to_agent(self, text: str) -> None:
         """Record the operator line and run one agent turn in a worker.

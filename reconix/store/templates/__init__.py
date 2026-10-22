@@ -103,7 +103,7 @@ def align_to_scope(assessment) -> None:
     The operator may have named or edited tools and ports before approving, and nothing has
     been revealed yet. Each template finding names an approved tool, and a template with its
     own `align_to_scope` (network: the approved ports) rebuilds its findings and approvals,
-    command hashes included, before any is shown. Imported findings keep their source tool.
+    command hashes included, before any is shown.
     Demo data only: a backend reports what its tools actually found.
     """
     module = MODULES.get(assessment.selected_template)
@@ -111,8 +111,7 @@ def align_to_scope(assessment) -> None:
     if rebuild is not None:
         rebuild(assessment)
     for finding in assessment.findings:
-        if not finding.fid.startswith("IMP-"):
-            finding.tool = approved_tool(finding.tool, assessment.scope.tools)
+        finding.tool = approved_tool(finding.tool, assessment.scope.tools)
 
 
 def _with_intent(assessment, script: List[RunStep]) -> List[RunStep]:
