@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional
 
+from .api_spec import ApiSpec
 from .approval import ApprovalDecision, ApprovalRequest, Confirmation
 from .base import utc_now
 from .finding import Finding
@@ -53,6 +54,7 @@ class Assessment:
     template_auto: bool = False     # matched from an unambiguous target, not picked
     requested_ports: List[int] = field(default_factory=list)   # intent from the prompt
     requested_tools: List[str] = field(default_factory=list)   # intent from the prompt
+    api_spec: Optional[ApiSpec] = None   # an OpenAPI file attached to an API scope draft
     login_2fa: bool = False         # the target asks for a one-time code after the password
     approvals: List[ApprovalRequest] = field(default_factory=list)
     decisions: List[ApprovalDecision] = field(default_factory=list)

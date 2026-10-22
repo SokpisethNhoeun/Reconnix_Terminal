@@ -59,15 +59,22 @@ def _findings(url: str) -> list:
     ]
 
 
+def _plain(text: str) -> str:
+    """Spec text for plan and report lines: no square brackets (those are markup)."""
+    return text.replace("[", "(").replace("]", ")")
+
+
 def build_run(assessment) -> RunBundle:
     url, host = assessment.target_url, assessment.target
+    spec = getattr(assessment, "api_spec", None)
     scope = build_scope(ParsedTarget("api", host, url, "API service", "api", True))
     findings = _findings(url)
     profile = RunProfile(
         target_kind="API service", tools=scope.tools,
         discovery_tool="ZAP API scan",
         discovery_card=("Discovery · API",
-                        (("Endpoints", "24"), ("Auth scheme", "Bearer"), ("GraphQL", "no"))),
+                        (("Endpoints", str(spec.total) if spec else "24"),
+                         ("Auth scheme", "Bearer"), ("GraphQL", "no"))),
         discovery_requests=(96, 142),
         blocked=("GET", "/internal/metrics"),
         scan_card=("Scan · $tools",
@@ -96,11 +103,14 @@ def build_run(assessment) -> RunBundle:
                         "Correlating duplicate findings", "Masking sensitive evidence"),
         scan_tool="Nuclei",
         plan=(("discovery", "Map API surface"),
-              ("scanning", "Scan endpoints"),
+              ("scanning", f"Test {spec.total} endpoints from {_plain(spec.label)}"
+                           if spec else "Scan endpoints"),
               ("validation", "Validate authz & inputs"),
               ("analysis", "Correlate & dedupe findings"),
               ("report", "Generate report")),
-        methodology=("OWASP API Security Top 10 (2023)", "OWASP WSTG"),
+        methodology=("OWASP API Security Top 10 (2023)", "OWASP WSTG")
+        + ((f"Operator-supplied OpenAPI spec: {_plain(spec.label)} "
+            f"(OpenAPI {spec.spec_version}, {spec.total} endpoints)",) if spec else ()),
     )
     return RunBundle(scope=scope, script=build_rest(profile),
                      approvals=[profile.medium, profile.high], findings=findings,
