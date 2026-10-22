@@ -4,22 +4,34 @@
    (`name · local|remote`, or "Add a model"); its panel lists every model (the Environment's
    from web/.env.local first, read-only, then the saved providers) and switches in one click,
    edits and removes a saved provider, and + Add model opens the form in the same panel.
+   Opening it focuses the active model once the list has loaded (the first open waits for it).
    Escape or a click outside closes it and focus goes back to its button (Escape inside the form
-   only closes the form). Operators only: a viewer sees the button disabled with the reason.
-   Its own panel, like History (conversation-menu.tsx): the form's Escape must stay inside. */
-import { useEffect, useId, useRef, useState } from "react";
+   only closes the form). A provider removed meanwhile (another tab) is never edited: its form
+   gives way to the list, which says so. Operators only: a viewer sees the button disabled with
+   the reason. Its own panel, like History (conversation-menu.tsx): the form's Escape must stay
+   inside. */
+import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, Cpu, Plus, X } from "lucide-react";
 
 import { IconButton } from "@/components/ui/icon-button";
 import { MAX_PROVIDERS } from "@/lib/assistant/models/schema";
 import { useAssistant } from "./assistant-provider";
 import { ModelForm } from "./model-form";
-import { ModelList } from "./model-list";
+import { ACTIVE_ITEM, ModelList, TAB_STOP_ITEM } from "./model-list";
 import type { ModelSummary } from "./types";
 import { useFitBelow } from "./use-fit-below";
 import { useModels } from "./use-models";
 
 type Mode = { kind: "list" } | { kind: "add" } | { kind: "edit"; id: string };
+
+/** Focuses the first of `selectors` (in that order) found in `root`, once it has rendered. */
+const focusIn = (root: RefObject<HTMLElement | null>, ...selectors: string[]) =>
+  requestAnimationFrame(() => {
+    for (const selector of selectors) {
+      const el = root.current?.querySelector<HTMLElement>(selector);
+      if (el) return el.focus({ preventScroll: true });
+    }
+  });
 
 /** What the button says: the model and where it runs, or that there is none yet. */
 export function modelLabel(model: ModelSummary): string {
@@ -42,20 +54,32 @@ export function ModelMenu() {
   const [mode, setMode] = useState<Mode>({ kind: "list" });
   const button = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
+  const opening = useRef(false); // just opened: focus goes into the list once it is there
   const id = useId();
   const { model } = info;
   const label = modelLabel(model);
   const tone = model.configured ? "success" : "warning";
+  const status = models.state.status;
+  const view = models.state.view;
+  const editing = mode.kind === "edit" ? (view?.providers.find((p) => p.id === mode.id) ?? null) : null;
+  const removed = mode.kind === "edit" && view !== null && editing === null; // gone meanwhile
   useFitBelow(panel, open, mode.kind);
 
-  /** Focuses the first of `selectors` (in that order) found in the panel, once it has rendered. */
-  const focusIn = (...selectors: string[]) =>
-    requestAnimationFrame(() => {
-      for (const selector of selectors) {
-        const el = panel.current?.querySelector<HTMLElement>(selector);
-        if (el) return el.focus({ preventScroll: true });
-      }
-    });
+  // the models arrive after the panel opens (the first time, the list is only "Loading…"): once
+  // they are there, focus goes to the active model (or the tab stop; "Try again" when they
+  // couldn't load), unless it was moved meanwhile
+  useEffect(() => {
+    if (!open || !opening.current || mode.kind !== "list" || (status !== "ready" && status !== "error")) return;
+    opening.current = false;
+    const at = document.activeElement;
+    if (at && at !== document.body && at !== button.current) return;
+    focusIn(panel, ACTIVE_ITEM, TAB_STOP_ITEM, ".ai-menu-list button", "button");
+  }, [open, status, mode.kind]);
+
+  // the provider being edited was removed (another tab): its form is gone, the notice takes focus
+  useEffect(() => {
+    if (removed) focusIn(panel, ".ai-model-removed");
+  }, [removed]);
 
   const close = (refocus = true) => {
     setOpen(false);
@@ -92,13 +116,13 @@ export function ModelMenu() {
     if (open) return close();
     setMode({ kind: "list" });
     setOpen(true);
+    opening.current = true;
     models.load();
-    focusIn('[role="radio"][aria-checked="true"]', '[role="radio"][tabindex="0"]', "button");
   };
 
   const showList = (focus: string) => {
     setMode({ kind: "list" });
-    focusIn(focus);
+    focusIn(panel, focus);
   };
 
   if (!info.operator) {
@@ -111,8 +135,6 @@ export function ModelMenu() {
     );
   }
 
-  const view = models.state.view;
-  const editing = mode.kind === "edit" ? (view?.providers.find((p) => p.id === mode.id) ?? null) : null;
   const full = (view?.providers.length ?? 0) >= MAX_PROVIDERS;
 
   return (
@@ -141,9 +163,9 @@ export function ModelMenu() {
               <X aria-hidden />
             </IconButton>
           </div>
-          {mode.kind !== "list" && view ? (
+          {view && (mode.kind === "add" || editing) ? (
             <ModelForm
-              key={mode.kind === "edit" ? mode.id : "add"}
+              key={editing ? editing.id : "add"}
               view={view}
               editing={editing}
               saving={models.pending === "save"}
@@ -152,11 +174,16 @@ export function ModelMenu() {
             />
           ) : (
             <>
+              {removed && (
+                <p className="ai-model-reason ai-model-removed" role="alert" tabIndex={-1}>
+                  That provider was removed meanwhile (in another tab or window), so nothing was saved.
+                </p>
+              )}
               <ModelList
                 models={models}
                 onEdit={(providerId) => {
                   setMode({ kind: "edit", id: providerId });
-                  focusIn("select, input");
+                  focusIn(panel, "select, input");
                 }}
               />
               <div className="ai-menu-foot">
@@ -165,7 +192,7 @@ export function ModelMenu() {
                   type="button"
                   onClick={() => {
                     setMode({ kind: "add" });
-                    focusIn("select, input");
+                    focusIn(panel, "select, input");
                   }}
                   disabled={!view || full}
                   title={full ? `At most ${MAX_PROVIDERS} providers can be saved. Remove one first.` : undefined}

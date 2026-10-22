@@ -2,9 +2,11 @@
 
 /* The Model menu's list: every provider with its models as choices, the Environment (from
    web/.env.local, read-only) first. One click (or Enter / Space) on a model makes it the one
-   that answers next; the active one is checked. Each provider's models are a radio group with
-   one tab stop (the arrow keys move between its models; choosing is a deliberate Enter, Space
-   or click, since it saves). A saved provider can be edited or removed (asked first). A model
+   that answers next; the active one is checked. Each provider's models are a menu of radio items
+   (menuitemradio, aria-checked) with one tab stop, kept in React state (roving tabindex): the
+   arrow keys, Home and End only move focus between its models, and choosing is a deliberate
+   Enter, Space or click, since it saves (a radio group's arrows would choose, and switch the
+   model on every key press). A saved provider can be edited or removed (asked first). A model
    that can't be used now is disabled with the reason. */
 import { useId, useState } from "react";
 import { Check, Loader, Pencil, Trash2 } from "lucide-react";
@@ -13,9 +15,14 @@ import { Badge } from "@/components/ui/badge";
 import { IconButton } from "@/components/ui/icon-button";
 import { ENVIRONMENT } from "@/lib/assistant/models/schema";
 import type { ModelsView, ProviderView } from "@/lib/assistant/models/view";
+import { rovingIndex } from "./roving";
 import { choiceKey, type Models } from "./use-models";
 
 const REMOTE_OFF = "This address is off this machine: the dashboard must be started with LLM_ALLOW_REMOTE=1 to use it.";
+/** A model in the list, and the active one (model-menu.tsx focuses these when the list shows). */
+export const MODEL_ITEM = '[role="menuitemradio"]';
+export const ACTIVE_ITEM = '[role="menuitemradio"][aria-checked="true"]';
+export const TAB_STOP_ITEM = '[role="menuitemradio"][tabindex="0"]';
 
 const hostOf = (url: string) => {
   try {
@@ -24,19 +31,6 @@ const hostOf = (url: string) => {
     return url;
   }
 };
-
-/** Up/Down/Left/Right, Home and End move focus between a group's models (they don't choose). */
-function moveFocus(e: React.KeyboardEvent<HTMLDivElement>) {
-  const keys = ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"];
-  if (!keys.includes(e.key)) return;
-  const radios = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
-  const at = radios.indexOf(document.activeElement as HTMLButtonElement);
-  if (at < 0 || !radios.length) return;
-  e.preventDefault();
-  const next = e.key === "Home" ? 0 : e.key === "End" ? radios.length - 1 : (at + (e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : -1) + radios.length) % radios.length;
-  radios.forEach((r, i) => (r.tabIndex = i === next ? 0 : -1));
-  radios[next].focus();
-}
 
 interface GroupProps {
   providerId: string;
@@ -54,9 +48,22 @@ function ProviderGroup({ providerId, name, meta, names, view, models, disabled, 
   const headingId = useId();
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [focused, setFocused] = useState<string | null>(null); // the model focus last moved to
   const { pending } = models;
   const chosen = view.active?.providerId === providerId ? view.active.model : null;
-  const focusable = chosen && names.includes(chosen) ? chosen : names[0];
+  // the group's one tab stop: the model last focused while it is still listed, else the
+  // active one, else the first
+  const tabStop = focused !== null && names.includes(focused) ? focused : chosen && names.includes(chosen) ? chosen : names[0];
+
+  /** Up/Down/Left/Right, Home and End move focus between the group's models (they don't choose). */
+  const moveFocus = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const items = [...e.currentTarget.querySelectorAll<HTMLButtonElement>(MODEL_ITEM)];
+    const next = rovingIndex(e.key, items.indexOf(document.activeElement as HTMLButtonElement), items.length);
+    if (next === null) return;
+    e.preventDefault();
+    setFocused(names[next]);
+    items[next].focus();
+  };
 
   const pick = async (model: string) => {
     if (disabled || pending || model === chosen) return;
@@ -119,7 +126,14 @@ function ProviderGroup({ providerId, name, meta, names, view, models, disabled, 
         </div>
       ) : (
         <>
-          <div role="radiogroup" aria-labelledby={headingId} aria-describedby={disabled ? `${headingId}-off` : undefined} onKeyDown={moveFocus} className="ai-model-options">
+          <div
+            role="menu"
+            aria-orientation="vertical"
+            aria-labelledby={headingId}
+            aria-describedby={disabled ? `${headingId}-off` : undefined}
+            onKeyDown={moveFocus}
+            className="ai-model-options"
+          >
             {names.map((model) => {
               const checked = model === chosen;
               const busy = pending === choiceKey(providerId, model);
@@ -127,10 +141,11 @@ function ProviderGroup({ providerId, name, meta, names, view, models, disabled, 
                 <button
                   key={model}
                   type="button"
-                  role="radio"
+                  role="menuitemradio"
                   aria-checked={checked}
                   aria-disabled={disabled ? true : undefined}
-                  tabIndex={model === focusable ? 0 : -1}
+                  tabIndex={model === tabStop ? 0 : -1}
+                  onFocus={() => setFocused(model)}
                   onClick={() => void pick(model)}
                   title={disabled ?? (checked ? "Answers your next question" : `Use ${model}`)}
                   className="ai-model-option"

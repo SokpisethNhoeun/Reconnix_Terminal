@@ -43,7 +43,8 @@ export function useModels(operator: boolean, setModel: (model: ModelSummary) => 
     });
   }, [operator, take]);
 
-  /** Runs one change; resolves to null when it worked, or what went wrong. */
+  /** Runs one change; resolves to null when it worked, or what went wrong. A provider that is
+      gone (404: removed in another tab) reloads the list, so the menu stops offering it. */
   const run = useCallback(
     async (label: string, call: () => Promise<api.ModelsAnswer>): Promise<string | null> => {
       if (busy.current) return "Another change is still being saved.";
@@ -51,7 +52,10 @@ export function useModels(operator: boolean, setModel: (model: ModelSummary) => 
       setPending(label);
       try {
         const result = await call();
-        if (!result.ok) return result.detail;
+        if (!result.ok) {
+          if (result.status === 404) load();
+          return result.detail;
+        }
         take(result.view);
         return null;
       } finally {
@@ -59,7 +63,7 @@ export function useModels(operator: boolean, setModel: (model: ModelSummary) => 
         setPending(null);
       }
     },
-    [take],
+    [take, load],
   );
 
   const choose = useCallback((providerId: string, model: string) => run(choiceKey(providerId, model), () => api.switchModel({ providerId, model })), [run]);
