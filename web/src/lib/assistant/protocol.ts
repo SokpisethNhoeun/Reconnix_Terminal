@@ -1,13 +1,17 @@
 /* The AI Assistant's reply stream, shared by POST /api/assistant and the page: one JSON object
-   per line (NDJSON). A reply is `meta` (which conversation it went into), then the cards the
-   server picked and built from the saved data (lib/assistant/cards.ts), then the model's text
-   in pieces, an `error` if something went wrong, and `done`. Cards are facts taken from the
-   saved files; the model only writes the text around them, so it can never invent a finding,
-   a count or a state. Every card is plain data: the page renders it as React text and builds
-   its links itself (internal addresses from a checked uid only). Pure: browser and server. */
+   per line (NDJSON). A reply is `meta` (which conversation it went into, and the names of the
+   /add-on files whose passages went to the model with the question, when any did), then the
+   cards the server picked and built from the saved data (lib/assistant/cards.ts), then the
+   model's text in pieces, an `error` if something went wrong, and `done`. Cards are facts taken
+   from the saved files; the model only writes the text around them, so it can never invent a
+   finding, a count or a state (knowledge never makes a card). Every card is plain data: the
+   page renders it as React text and builds its links itself (internal addresses from a checked
+   uid only). Pure: browser and server. */
 import { z } from "zod";
 
 import { SEVERITIES, STATUSES } from "../data/schema";
+import { TOP_K } from "./knowledge/rank";
+import { MAX_NAME } from "./knowledge/schema";
 
 /** A saved run's uid, as lib/data/store.ts names the files. */
 export const RUN_UID = /^\d{8}-\d{6}-[0-9a-f]{4}_[A-Za-z0-9-]{1,64}$/;
@@ -23,6 +27,9 @@ const count = z.number().int().min(0).max(1_000_000);
 /** The run a card row is about. */
 export const RunRefSchema = z.object({ uid: z.string().regex(RUN_UID), label: short, when: short }).strict();
 export type RunRef = z.infer<typeof RunRefSchema>;
+
+/** The /add-on files a reply used (their names, each once; at most one per passage sent). */
+export const KnowledgeNamesSchema = z.array(z.string().min(1).max(MAX_NAME)).min(1).max(TOP_K);
 
 /** What a conversation is about: one saved run, or every run (uid null). */
 export const ScopeRefSchema = z.object({ uid: z.string().regex(RUN_UID).nullable(), label: short }).strict();
@@ -170,7 +177,15 @@ export const MAX_CARDS = 4; // in one reply
 // --- frames ------------------------------------------------------------------------------
 
 export const FrameSchema = z.discriminatedUnion("t", [
-  z.object({ t: z.literal("meta"), conversationId: z.string().regex(CONVERSATION_ID), title: z.string().max(80), scope: ScopeRefSchema }).strict(),
+  z
+    .object({
+      t: z.literal("meta"),
+      conversationId: z.string().regex(CONVERSATION_ID),
+      title: z.string().max(80),
+      scope: ScopeRefSchema,
+      knowledge: KnowledgeNamesSchema.optional(),
+    })
+    .strict(),
   z.object({ t: z.literal("card"), card: CardSchema }).strict(),
   z.object({ t: z.literal("text"), delta: z.string().max(20_000) }).strict(),
   z.object({ t: z.literal("error"), detail: z.string().max(400) }).strict(),

@@ -2,7 +2,8 @@
 
 /* Asking: the question goes to /api/assistant with only the open conversation's id (the server
    reads the history from its own file) and comes back as NDJSON frames that fill in the reply:
-   its conversation (header, then `meta`), the verified cards, the text, an error. Stop aborts
+   its conversation (header, then `meta`, which also names the /add-on files the model was
+   given), the verified cards, the text, an error. Stop aborts
    it (the server keeps what had arrived, marked stopped). Retry asks a failed question again,
    never while an answer is being written. Questions are masked, then cut to the limit. */
 import { useCallback, useState } from "react";
@@ -61,8 +62,11 @@ export function useAsking({
             { conversationId: opened?.id ?? undefined, uid: now.scope.uid, question, retry },
             controller.signal,
             (frame) => {
-              if (frame.t === "meta") setOpened({ id: frame.conversationId, title: frame.title, scope: frame.scope });
-              else if (frame.t === "card") patch(reply.id, (m) => ({ ...m, cards: [...(m.cards ?? []), frame.card].slice(0, MAX_CARDS) }));
+              if (frame.t === "meta") {
+                setOpened({ id: frame.conversationId, title: frame.title, scope: frame.scope });
+                const used = frame.knowledge;
+                if (used?.length) patch(reply.id, (m) => ({ ...m, knowledge: used }));
+              } else if (frame.t === "card") patch(reply.id, (m) => ({ ...m, cards: [...(m.cards ?? []), frame.card].slice(0, MAX_CARDS) }));
               else if (frame.t === "text") patch(reply.id, (m) => ({ ...m, content: (m.content + frame.delta).slice(0, MAX_SHOWN) }));
               else if (frame.t === "error") patch(reply.id, (m) => ({ ...m, state: "error", detail: frame.detail }));
             },

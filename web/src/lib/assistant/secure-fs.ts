@@ -138,6 +138,19 @@ export async function inFolder<T>(dir: string, fail: Faults, task: (f: Folder) =
 
 // --- the files ---------------------------------------------------------------------------------
 
+/** The bytes of an open file whose size was `size` when checked, or null when it holds more
+    than that now (it is changing). */
+export async function readAll(handle: FileHandle, size: number): Promise<Buffer | null> {
+  const buffer = Buffer.alloc(size + 1);
+  let filled = 0;
+  while (filled < buffer.length) {
+    const { bytesRead } = await handle.read(buffer, filled, buffer.length - filled, filled);
+    if (!bytesRead) break;
+    filled += bytesRead;
+  }
+  return filled > size ? null : buffer.subarray(0, filled);
+}
+
 /** A file's bytes through one handle that never follows a link, or null (missing, a link, not a
     regular file, over `max` bytes, changing, unreadable). */
 export async function readBytes(full: string, max: number): Promise<Buffer | null> {
@@ -150,14 +163,7 @@ export async function readBytes(full: string, max: number): Promise<Buffer | nul
   try {
     const info = await handle.stat();
     if (!info.isFile() || info.size > max) return null;
-    const buffer = Buffer.alloc(info.size + 1);
-    let filled = 0;
-    while (filled < buffer.length) {
-      const { bytesRead } = await handle.read(buffer, filled, buffer.length - filled, filled);
-      if (!bytesRead) break;
-      filled += bytesRead;
-    }
-    return filled > info.size ? null : buffer.subarray(0, filled);
+    return await readAll(handle, info.size);
   } catch {
     return null;
   } finally {

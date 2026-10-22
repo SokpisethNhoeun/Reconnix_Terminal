@@ -2,7 +2,8 @@
 
 /* One message of the conversation. The operator's: a bubble on the right. The assistant's:
    beside the orb, full width, the verified cards first (built by the server from the saved
-   data), then the model's text as Markdown, then Copy; "Stopped" after Stop, an error card with
+   data), then the model's text as Markdown, "Knowledge used: …" when /add-on files were given
+   to the model, then Copy; "Stopped" after Stop, an error card with
    Retry when it failed, and a friendlier card (with Retry too) when the model returned nothing. */
 import { CircleStop } from "lucide-react";
 import type { CardOf } from "@/lib/assistant/protocol";
@@ -10,6 +11,7 @@ import { AssistantOrb } from "./assistant-orb";
 import { CardView, NoticeCard } from "./cards";
 import { CopyButton } from "@/components/ui/copy-button";
 import { EMPTY_REPLY, isEmptyReply, NO_EXPLANATION } from "./empty-reply";
+import { KnowledgeUsed } from "./knowledge-used";
 import { MessageText } from "./message-text";
 import type { ChatMessage } from "./types";
 
@@ -40,6 +42,7 @@ export function Message({ m, onRetry }: { m: ChatMessage; onRetry?: () => void }
         <span className="sr-only">Reconix AI:</span>
         {m.cards?.map((card, i) => <CardView key={i} card={card} />)}
         {m.content ? <MessageText text={m.content} /> : null}
+        {m.content.trim() ? <KnowledgeUsed names={m.knowledge} /> : null}
         {waiting && (
           <span className="ai-typing" role="status" aria-label="The assistant is answering">
             <span />

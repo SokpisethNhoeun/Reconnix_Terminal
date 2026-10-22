@@ -10,7 +10,9 @@
 //                    (so Retry can succeed)
 //   [stub:empty]     a well-formed stream with no text at all (the model "answered" nothing)
 // A model other than stub-model adds " Model: <name>." to the default answer (the Model menu's
-// switch is visible), and GET /v1/models lists stub-model and stub-model-2 ("Fetch models").
+// switch is visible), passages of /add-on knowledge in the system prompt add " Knowledge
+// passages: <n>." (the route sent them), and GET /v1/models lists stub-model and stub-model-2
+// ("Fetch models").
 import { createServer } from "node:http";
 
 const port = Number(process.env.LLM_STUB_PORT || 3195);
@@ -50,6 +52,8 @@ createServer((req, res) => {
     const runs = system.match(/ALL SAVED ASSESSMENTS: (\d+)/)?.[1] ?? (system.includes("ASSESSMENT ") ? "1" : "0");
     const question = messages.at(-1)?.content ?? "";
     const earlier = messages.filter((m) => m.role !== "system").length - 1;
+    const knowledge = system.split("Internal knowledge (from /add-on files")[1] ?? "";
+    const passages = (knowledge.match(/^\[[^\]\n]+ #\d+\] /gm) ?? []).length;
     if (question.includes("[stub:fail]") && !failed.has(question)) {
       failed.add(question);
       return res.writeHead(500, { "Content-Type": "application/json" }).end('{"error":"stub failure"}');
@@ -61,7 +65,15 @@ createServer((req, res) => {
         ? LONG
         : question.includes("[stub:empty]")
           ? []
-          : ["Stub answer:", ` I saw ${runs} runs.`, ` Earlier turns: ${earlier}.`, " You asked:", ` ${question}`, ...(model === "stub-model" ? [] : [` Model: ${model}.`])];
+          : [
+              "Stub answer:",
+              ` I saw ${runs} runs.`,
+              ` Earlier turns: ${earlier}.`,
+              " You asked:",
+              ` ${question}`,
+              ...(model === "stub-model" ? [] : [` Model: ${model}.`]),
+              ...(passages ? [` Knowledge passages: ${passages}.`] : []),
+            ];
     res.writeHead(200, { "Content-Type": "text/event-stream" });
     let i = 0;
     const next = () => {
