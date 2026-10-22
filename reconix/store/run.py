@@ -144,6 +144,12 @@ def say_operator_line(text: str) -> str:
         raise StoreValidationError("Reconix is waiting for the target login. Press Enter on "
                                    "the Execution screen to open the secure input; never "
                                    "paste credentials into the chat.")
+    if get_run().stopped_at_gate in (GATE_ACCOUNT, GATE_CODE):
+        # Stopped at the login: the next line may still be the password. Never echo, record
+        # or send it to a model.
+        raise StoreValidationError("This run stopped at the target login. Use /new to start "
+                                   "another assessment; never paste credentials into the "
+                                   "chat.")
     request = add_request(text)
     add_chat("text", "you", request.text)
     return request.text
@@ -400,6 +406,8 @@ def _stop(reason: str, banner: str) -> None:
     run = get_run()
     run.stopped = reason
     run.phase = "stopped"
+    at_login = run.waiting_gate in (GATE_ACCOUNT, GATE_CODE)
+    run.stopped_at_gate = run.waiting_gate if at_login else ""
     run.waiting_gate = ""
     run.finished_at = utc_now()
     add_chat("banner", "policy", banner, tone="block")

@@ -18,8 +18,8 @@ START = ("Type a target to start — a URL, an IPv4 address or range, or a git r
          "path — or /template to pick a template.")
 RUNNING = ("I can't take new instructions in this demo while an assessment runs. Use "
            "/status, /findings, /audit and /report, or /new to start over.")
-AFTER_RUN = ("The assessment is finished. Ask me about its findings, or use /findings, "
-             "/report, or /new to start another.")
+AFTER_RUN = ("The assessment is finished. With a model set (/model) you can ask about its "
+             "findings; otherwise use /findings, /report, or /new to start another.")
 
 _GREETING = re.compile(r"^\W*(?:hi|hello|hey|hiya|howdy|yo|greetings|"
                        r"good (?:morning|afternoon|evening))\b", re.IGNORECASE)
@@ -60,6 +60,6 @@ def reply_after_run(text: str) -> str:
     if _THANKS.search(text):
         return "You're welcome. /findings and /report have everything from this assessment."
     if _GREETING.search(text):
-        return ("Hi! This assessment is finished. Ask me about its findings, or use /findings "
-                "and /report.")
+        return ("Hi! This assessment is finished. Use /findings and /report, or set a model "
+                "(/model) to ask about its findings.")
     return AFTER_RUN

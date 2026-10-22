@@ -218,3 +218,36 @@ async def test_agent_chat_continues_with_the_same_agent_after_finish(
         assert "summarise the engagement" in convo      # its history is intact
         assert "noted 1." in convo
         assert "which finding is worst?" in convo
+
+
+# --- stopped at the login: a pasted password never reaches the chat or a model ----------------
+@pytest.mark.parametrize("gate", ["account", "code"])
+async def test_password_pasted_after_a_stop_at_the_login_is_refused(
+        app, model_active, model_calls, monkeypatch, gate):
+    from reconix.store import lists, persist
+
+    from .support import TEST_PASSWORD, screen_text
+
+    warnings = []
+    monkeypatch.setattr(app, "notify", lambda msg, **kw: warnings.append(str(msg)))
+    async with app.run_test(size=SIZE) as pilot:
+        await run_ui_to(app, pilot, gate)
+        store.stop_run()
+        assert store.get_run().stopped and store.get_run().stopped_at_gate == gate
+        chat_before = len(store.list_chat())
+        app.goto("start")
+        await settle(pilot)
+        await type_request(pilot, TEST_PASSWORD)
+        await settle(pilot)
+
+        assert model_calls == []                                  # no model was asked
+        assert any("stopped at the target login" in w for w in warnings)
+        assert len(store.list_chat()) == chat_before
+        assert TEST_PASSWORD not in repr(store.list_chat())
+        assert TEST_PASSWORD not in repr(store.list_history())
+        assert TEST_PASSWORD not in repr(store.list_events())
+        assert TEST_PASSWORD not in repr(lists.current().requests)
+        assert TEST_PASSWORD not in screen_text(app.screen)
+        assert not any(TEST_PASSWORD in warning for warning in warnings)
+        for path in persist.DATA_DIR.glob("*.json"):
+            assert TEST_PASSWORD not in path.read_text(encoding="utf-8")

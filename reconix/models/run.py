@@ -95,6 +95,7 @@ class RunState:
     target_known: bool = False
     waiting_gate: str = ""              # gate the run is stopped at, "" when moving
     stopped: str = ""                   # why the run stopped early, "" otherwise
+    stopped_at_gate: str = ""           # the login / code gate a stopped run was waiting at
     completed: bool = False
     plan_started: bool = False           # the operator ran the reviewed plan
     started_at: Optional[datetime] = None    # when testing began (scope approved)
