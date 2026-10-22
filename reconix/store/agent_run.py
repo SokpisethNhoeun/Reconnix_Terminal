@@ -81,11 +81,13 @@ def _knowledge_search(query: str) -> list:
     """The store's knowledge search, as the harness tool expects it: a list of plain dicts.
 
     Passages are already cleaned and redacted at ingest; the score is dropped (the model only
-    needs the text). The harness never imports Reconix, so this mapping lives here.
+    needs the text). The same 4,000-character budget as the chat applies (`fit_budget`), so
+    one tool call never hands the model more than that. The harness never imports Reconix, so
+    this mapping lives here.
     """
     from . import knowledge
     return [{"source": p.source, "index": p.index, "text": p.text}
-            for p in knowledge.search(query)]
+            for p in knowledge.fit_budget(knowledge.search(query))]
 
 
 def _lookup_target(agent, ref: str) -> Optional[tuple]:
@@ -289,13 +291,36 @@ def record_event(ev: Dict[str, Any]) -> None:
     elif kind == "policy":
         _record_policy(ev)
     elif kind == "tool_start":
+        if ev.get("name") == KNOWLEDGE_TOOL:      # its query is never logged (see below)
+            return
         add_activity("TOOL", f"{ev.get('name')}({_short(mask_secrets(ev.get('args')))})")
     elif kind == "tool_progress":
         add_activity("TOOL", redact(str(ev.get("text", "")))[:300])
     elif kind == "tool_end":
+        if ev.get("name") == KNOWLEDGE_TOOL:
+            add_activity("TOOL", _knowledge_summary(ev.get("result")))
+            return
         add_activity("TOOL", f"{ev.get('name')}: {_short(mask_secrets(ev.get('result')))}")
         if ev.get("name") in ("run_scan", "http_poc"):   # scanners and ad-hoc PoC proofs
             ingest_scan_findings(ev.get("result"))
+
+
+# The agent's /add-on lookup. Its query and passages stay out of the activity log: the log is
+# saved in the snapshot's timeline (the web and the JSON export show it), and the passages come
+# from the operator's private reference files. The log says only how many, from how many files.
+KNOWLEDGE_TOOL = "search_knowledge"
+
+
+def _knowledge_summary(result: Any) -> str:
+    """`search_knowledge: N passages from M files` (or that it failed): no query, no text."""
+    if not isinstance(result, dict) or result.get("error"):
+        return f"{KNOWLEDGE_TOOL}: the knowledge search failed"
+    rows = result.get("passages")
+    rows = rows if isinstance(rows, list) else []
+    sources = {str(row.get("source")) for row in rows if isinstance(row, dict)}
+    passages = "passage" if len(rows) == 1 else "passages"
+    files = "file" if len(sources) == 1 else "files"
+    return f"{KNOWLEDGE_TOOL}: {len(rows)} {passages} from {len(sources)} {files}"
 
 
 # Keys whose values never go to the activity log: credentials, session material, request
