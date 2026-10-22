@@ -3,7 +3,9 @@
 Before a run, a line that names no target does not start one: Reconix answers in one or
 two sentences and says what to type. A keyword without a target ("scan my network") gets
 what that template needs. During a run, a greeting or thanks gets a friendly line and
-anything else the usual pointer to the keys. With the LLM backend these become the agent's
+anything else the usual pointer to the keys. After the run (completed or stopped) the chat
+goes on about the same assessment: thanks and greetings get a friendly line, anything else a
+pointer to the findings, the report and /new. With the LLM backend these become the agent's
 chat replies; the store function names stay.
 """
 
@@ -16,6 +18,8 @@ START = ("Type a target to start — a URL, an IPv4 address or range, or a git r
          "path — or /template to pick a template.")
 RUNNING = ("I can't take new instructions in this demo while an assessment runs. Use "
            "/status, /findings, /audit and /report, or /new to start over.")
+AFTER_RUN = ("The assessment is finished. Ask me about its findings, or use /findings, "
+             "/report, or /new to start another.")
 
 _GREETING = re.compile(r"^\W*(?:hi|hello|hey|hiya|howdy|yo|greetings|"
                        r"good (?:morning|afternoon|evening))\b", re.IGNORECASE)
@@ -49,3 +53,13 @@ def reply_while_running(text: str) -> str:
         return ("Hi! The assessment is running. /status shows the live run; /findings, /audit "
                 "and /report the rest.")
     return RUNNING
+
+
+def reply_after_run(text: str) -> str:
+    """The answer to a line typed after the assessment finished (completed or stopped)."""
+    if _THANKS.search(text):
+        return "You're welcome. /findings and /report have everything from this assessment."
+    if _GREETING.search(text):
+        return ("Hi! This assessment is finished. Ask me about its findings, or use /findings "
+                "and /report.")
+    return AFTER_RUN

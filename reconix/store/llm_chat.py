@@ -63,7 +63,7 @@ def _history() -> List[Tuple[str, str]]:
 def _context() -> str:
     """A short description of the assessment state, built from store getters."""
     from .findings import list_findings
-    from .run import display_phase, waiting_gate
+    from .run import display_phase, get_run, is_finished, waiting_gate
     from .scope import get_scope
     from .templates import selected_template
 
@@ -79,6 +79,10 @@ def _context() -> str:
         f"- phase: {display_phase()}",
         f"- waiting gate: {waiting_gate() or 'none'}",
     ]
+    if is_finished():
+        state = "stopped" if get_run().stopped else "completed"
+        lines.append(f"- run state: finished ({state}); nothing more will run. The operator "
+                     "may keep asking about this assessment's findings and decisions.")
     findings = list_findings()
     if findings:
         lines.append("- findings:")

@@ -46,6 +46,7 @@ class ReportScreen(ReconixScreen):
     BINDINGS = [
         *(Binding(key, f"export('{fid}')", f"export {label}") for fid, key, label in EXPORTS),
         Binding("b", "web", "web dashboard"),
+        Binding("c", "chat", "chat"),
         Binding("escape", "back", "back", show=False),
     ]
 

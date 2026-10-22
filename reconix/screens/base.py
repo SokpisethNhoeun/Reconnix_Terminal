@@ -102,9 +102,14 @@ class ReconixScreen(Screen):
         """What \"Chat about this\" is about; screens with a Question override it."""
         return self.mode_name.lower()
 
-    def chat_about(self) -> None:
+    def chat_about(self, draft: Optional[str] = None) -> None:
+        """Continue in the chat prompt on Start; `draft` pre-fills it (default: the topic)."""
         store.log_event(f"{self.flow_name}.chat")
-        self.app.open_chat(f"About {self.chat_topic()}: ")
+        self.app.open_chat(f"About {self.chat_topic()}: " if draft is None else draft)
+
+    def action_chat(self) -> None:
+        """`c` on the screens that offer it: chat about this assessment (empty draft)."""
+        self.chat_about("")
 
     def on_choice_menu_typed(self, event: ChoiceMenu.Typed) -> None:
         event.stop()

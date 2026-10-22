@@ -175,6 +175,7 @@ command suggestions, and `?` shows the keys for the screen you are on.
 | `Ctrl+C` | stop the run (on Execution, after a confirmation) |
 | `f` / `s` / `t` / `i` | Findings: filter / cycle the sort / triage / import tool output |
 | `[` / `]` | previous / next finding on Finding Detail (same filter and sort) |
+| `c` | Findings / Finding Detail / Report: chat about this assessment (opens the Start prompt) |
 | `p` `j` `w` | Report: export PDF / JSON / DOCX |
 | `b` | Report: open the web dashboard |
 | `?` | shortcuts for the current screen (on Start: when the prompt is empty) |
