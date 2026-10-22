@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { deriveDashboard } from "@/components/dashboard/derive";
 import { deriveOverall } from "@/components/dashboard/derive-overall";
-import { overallReportCards, REPORT_TOP_FINDINGS, reportCards, worstOf } from "@/components/dashboard/derive-report";
+import { overallReportCards, REPORT_TOP_FINDINGS, reportCards, runRow, worstOf } from "@/components/dashboard/derive-report";
 import { TARGETS_PER_PAGE, targetsPage, targetsPagePatch } from "@/components/dashboard/report-targets-paging";
 import type { Stat } from "@/components/dashboard/stat-types";
 import { REPORT_KEYS, runHref, VIEW_FILTERS, viewSearch } from "@/components/dashboard/view-url";
@@ -182,5 +182,14 @@ describe("the Report's targets, 7 a page", () => {
     expect(params(viewSearch("view=reports&tpage=2", "findings"))).toEqual({ view: "findings" });
     expect(params(viewSearch("view=findings&page=2", "reports"))).toEqual({ view: "reports" });
     expect(runHref("view=reports&tpage=2", "run-1")).toBe("/?view=reports&uid=run-1");
+  });
+});
+
+describe("the runs table's RUN column", () => {
+  it("always names the run: its id, else its label, else its uid", () => {
+    const a = samples[0];
+    expect(runRow(assessmentView(a)).id).toBe(a.assessment_id || a.label);
+    expect(runRow(assessmentView({ ...a, assessment_id: "", label: "Lab run" })).id).toBe("Lab run");
+    expect(runRow(assessmentView({ ...a, assessment_id: "", label: "" })).id).toBe(a.uid);
   });
 });

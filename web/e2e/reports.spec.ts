@@ -29,7 +29,7 @@ const tickRun = (page: Page, uid: string) =>
 const preview = (page: Page) => page.getByRole("button", { name: /^(Preview report|Loading preview…)$/ });
 const generate = (page: Page) => page.getByRole("button", { name: /^(Generate PDF|Generating PDF…)$/ });
 const generateDocx = (page: Page) => page.getByRole("button", { name: /^(Generate DOCX|Generating DOCX…)$/ });
-const fileStatus = (page: Page) => page.locator("[data-file]");
+const fileStatus = (page: Page) => page.getByRole("region", { name: "Combine runs" }).locator("[data-file]");
 const frame = (page: Page) => page.frameLocator('iframe[title="Combined report preview"]');
 
 async function openReports(page: Page) {
@@ -106,7 +106,7 @@ test("two runs preview as one combined report and generate one PDF", async ({ pa
   await expect(page.getByRole("checkbox", { name: "Include the appendix" })).not.toBeChecked();
   await expect(generate(page)).toBeDisabled();
   await expect(generateDocx(page)).toBeDisabled();
-  await expect(page.getByText(/changed since this preview/)).toBeVisible();
+  await expect(page.getByText("The selection or the options changed since this preview. Preview again before generating the PDF or the DOCX.")).toBeVisible();
 });
 
 test("a failed preview offers Retry, and a PDF without a printer offers the Word document", async ({ page }) => {
@@ -131,7 +131,7 @@ test("a failed preview offers Retry, and a PDF without a printer offers the Word
   await expect(frame(page).getByRole("heading", { name: "Combined security assessment report" })).toBeVisible({ timeout: 20_000 });
   await expect(generate(page)).toBeEnabled();
   await generate(page).click();
-  const status = page.locator(".rep-status");
+  const status = fileStatus(page);
   await expect(status).toContainText("No browser to print with (stub).");
   const docx = status.getByRole("link", { name: "Download DOCX" });
   await expect(docx).toBeVisible();
@@ -159,11 +159,38 @@ test("every run's row downloads its report as PDF, JSON and DOCX", async ({ page
   await openReports(page);
   const run = sample().find((a) => a.uid === SHARED[0])!;
   const row = page.locator("tr").filter({ has: page.locator(`a[href*="uid=${run.uid}"]`) });
-  const links = row.getByRole("link", { name: /^Download the / });
-  await expect(links).toHaveText(["PDF", "JSON", "DOCX"]);
-  for (const [i, format] of (["pdf", "json", "docx"] as const).entries()) {
-    expect(await links.nth(i).getAttribute("href")).toBe(`/api/assessments/${run.uid}/export?format=${format}`);
-  }
+  const buttons = row.getByRole("button", { name: /^Download the / });
+  await expect(buttons).toHaveText(["PDF", "JSON", "DOCX"]);
+  // each is fetched, then saved under the run's name
+  const saved = page.waitForEvent("download");
+  await buttons.nth(1).click();
+  expect((await saved).suggestedFilename()).toBe(`${run.uid}.json`);
+  const status = page.getByRole("region", { name: "Runs", exact: true }).locator("[data-file]");
+  await expect(status).toHaveText(`Downloaded ${run.uid}.json.`);
+});
+
+test("a run's PDF that can't be printed (501) offers its Word document; a failure (500) offers Retry", async ({ page }) => {
+  await openReports(page);
+  const run = sample().find((a) => a.uid === SHARED[0])!;
+  let calls = 0;
+  await page.route(`**/api/assessments/${run.uid}/export?format=pdf`, (route) => {
+    calls += 1;
+    return calls === 1
+      ? route.fulfill({ status: 501, contentType: "application/json", body: JSON.stringify({ detail: "No browser to print with (stub)." }) })
+      : route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "Stubbed print failure" }) });
+  });
+  const row = page.locator("tr").filter({ has: page.locator(`a[href*="uid=${run.uid}"]`) });
+  const status = page.getByRole("region", { name: "Runs", exact: true }).locator("[data-file]");
+  await row.getByRole("button", { name: /^Download the PDF report of / }).click();
+  await expect(status).toHaveAttribute("data-file", "unsupported");
+  await expect(status).toContainText("No browser to print with (stub).");
+  await expect(status.getByRole("link", { name: "Download DOCX" })).toHaveAttribute("href", `/api/assessments/${run.uid}/export?format=docx`);
+  await row.getByRole("button", { name: /^Download the PDF report of / }).click();
+  await expect(status).toHaveAttribute("data-file", "failed");
+  await expect(status).toContainText(`The PDF of ${run.label} (`);
+  await expect(status).toContainText("could not be generated: Stubbed print failure.");
+  await status.getByRole("button", { name: "Retry" }).click();
+  await expect.poll(() => calls).toBe(3);
 });
 
 test("the sixth run is disabled with a reason, and Clear empties the selection", async ({ page }) => {

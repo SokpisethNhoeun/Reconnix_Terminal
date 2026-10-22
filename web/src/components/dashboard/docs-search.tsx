@@ -5,7 +5,8 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 import { DOCS_ENTRIES } from "@/lib/docs-nav";
 
-/** Top-bar search: filters the docs entries by title + description, keyboard-navigable. */
+/** Top-bar search: filters the docs entries by title + description, keyboard-navigable; a query
+    that matches nothing says so. */
 export function DocsSearch() {
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -76,6 +77,11 @@ export function DocsSearch() {
             </li>
           ))}
         </ul>
+      )}
+      {open && q.trim() && results.length === 0 && (
+        <p role="status" className="dash-pop absolute right-0 top-[calc(100%+8px)] z-50 w-[300px] px-3 py-2 text-xs text-muted-foreground [overflow-wrap:anywhere]">
+          No docs page matches “{q.trim()}”.
+        </p>
       )}
     </div>
   );

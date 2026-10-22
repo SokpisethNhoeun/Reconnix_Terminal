@@ -14,7 +14,7 @@
    blob. A 501 on the PDF (no browser to print with) offers the Word document instead; a 413 on
    the DOCX (DOCX_TOO_LARGE) says why. One request at a time: a change to the selection or the
    options aborts whatever is in flight, and answers to an older request are dropped. */
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Eye, X } from "lucide-react";
 
 import { DashCard } from "@/components/dashboard/dash-card";
@@ -22,6 +22,7 @@ import { COMBINED_FILES, FileStatus, type FileState, GenerateButton } from "@/co
 import { ReportPreview, type PreviewState } from "@/components/dashboard/report-preview";
 import { ReportRuns } from "@/components/dashboard/report-runs";
 import type { ReportRunRow } from "@/components/dashboard/report-types";
+import { describe, fetchFile, fetchWithin, useOneRequest } from "@/components/dashboard/use-file-download";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DOCS } from "@/lib/docs-nav";
@@ -34,71 +35,18 @@ import {
   combinedHref,
   DEFAULT_COMBINE_OPTIONS,
 } from "@/lib/report/combined/options";
-import { DOCX_TOO_LARGE, NO_PRINTER } from "@/lib/report/formats";
+import type { ExportFormat } from "@/lib/report/formats";
 
 const FETCH_TIMEOUT_MS = 15_000; // the HTML is built in milliseconds
-
-/** A refused response's JSON `detail`, when it has one. */
-async function detailOf(res: Response): Promise<string | null> {
-  try {
-    const body = (await res.json()) as { detail?: unknown };
-    if (typeof body.detail === "string" && body.detail) return body.detail;
-  } catch {
-    /* not JSON */
-  }
-  return null;
-}
-
-/** Why a response was refused, from its JSON `detail` when it has one. */
-async function describe(res: Response): Promise<string> {
-  return (await detailOf(res)) ?? `The dashboard answered ${res.status}.`;
-}
-
-/** Save a fetched file under `name` (one click on a temporary link to the blob). */
-function saveBlob(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-}
-
-const fileNameOf = (disposition: string | null) => disposition?.match(/filename="([A-Za-z0-9._-]+)"/)?.[1] ?? null;
-
-/** A fetch that gives up after `ms` (and when `signal` aborts). */
-function fetchWithin(href: string, ms: number, signal: AbortSignal, accept: string): Promise<Response> {
-  const timeout = AbortSignal.timeout(ms);
-  return fetch(href, { credentials: "same-origin", headers: { accept }, signal: AbortSignal.any([signal, timeout]) });
-}
 
 export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [options, setOptions] = useState<CombineOptions>(DEFAULT_COMBINE_OPTIONS);
   const [preview, setPreview] = useState<PreviewState>({ kind: "idle" });
   const [file, setFile] = useState<FileState>({ kind: "idle" });
-  const inflight = useRef<AbortController | null>(null); // the one request allowed at a time
-  const serial = useRef(0); // its number: answers to an older one are dropped
+  const { begin, abort: abortInflight } = useOneRequest(); // the one request allowed at a time
   const hintId = useId();
   const whyId = useId(); // why Preview / Generate can't act yet (each button's description)
-
-  const abortInflight = useCallback(() => {
-    inflight.current?.abort();
-    inflight.current = null;
-    serial.current += 1;
-  }, []);
-  useEffect(() => abortInflight, [abortInflight]); // unmount
-
-  /** A fresh request; `mine()` says whether it is still the current one. */
-  const begin = () => {
-    abortInflight();
-    const controller = new AbortController();
-    inflight.current = controller;
-    const id = serial.current;
-    return { signal: controller.signal, mine: () => serial.current === id && !controller.signal.aborted };
-  };
 
   const chosen = useMemo(() => new Set(selected), [selected]);
   const uids = useMemo(() => [...selected].sort(), [selected]); // a,b and b,a are the same report
@@ -127,7 +75,7 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
   };
 
   const showPreview = async () => {
-    const { signal, mine } = begin();
+    const { signal, mine, done } = begin();
     setPreview({ kind: "loading", href });
     try {
       const res = await fetchWithin(href, FETCH_TIMEOUT_MS, signal, "text/html");
@@ -144,42 +92,19 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
       const timedOut = error instanceof DOMException && error.name === "TimeoutError";
       setPreview({ kind: "failed", href, message: timedOut ? "The dashboard took too long to build the report." : "The dashboard could not be reached." });
     } finally {
-      if (mine()) inflight.current = null;
+      done();
     }
   };
 
-  const generate = async (format: CombinedFile) => {
-    const { signal, mine } = begin();
-    const spec = COMBINED_FILES[format];
-    setFile({ kind: "generating", format });
-    try {
-      const res = await fetchWithin(combinedHref(uids, format, options), spec.timeoutMs, signal, spec.accept);
-      if (!mine()) return;
-      if (res.status === 501 || res.status === 413) {
-        // the message comes from the route (the fixed one when it has none); the DOCX link is ours
-        const detail = await detailOf(res);
-        if (!mine()) return;
-        if (res.status === 501) setFile({ kind: "unsupported", format, message: detail ?? NO_PRINTER, docx: combinedHref(uids, "docx", options) });
-        else setFile({ kind: "refused", format, message: detail ?? DOCX_TOO_LARGE });
-        return;
-      }
-      if (!res.ok) {
-        const message = await describe(res);
-        if (mine()) setFile({ kind: "failed", format, message });
-        return;
-      }
-      const blob = await res.blob();
-      if (!mine()) return;
-      const name = fileNameOf(res.headers.get("content-disposition")) ?? combinedFileName(uids.length, format, new Date());
-      saveBlob(blob, name);
-      setFile({ kind: "done", format, name });
-    } catch (error) {
-      if (!mine()) return;
-      const timedOut = error instanceof DOMException && error.name === "TimeoutError";
-      setFile({ kind: "failed", format, message: timedOut ? (format === "pdf" ? "the printer took too long" : "the dashboard took too long") : "the dashboard could not be reached" });
-    } finally {
-      if (mine()) inflight.current = null;
-    }
+  const generate = (format: ExportFormat) => {
+    if (format === "json") return; // the combined report is a PDF or a Word document
+    const request = {
+      format,
+      href: combinedHref(uids, format, options),
+      docx: combinedHref(uids, "docx", options),
+      name: combinedFileName(uids.length, format, new Date()),
+    };
+    void fetchFile(request, begin(), setFile);
   };
 
   const none = selected.length === 0;

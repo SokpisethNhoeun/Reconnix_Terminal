@@ -2,7 +2,8 @@
 
 /* Every saved run as a row of the Report view (newest first): the shared cells (run-cells.tsx;
    the run's name opens that run's report) and its report to download in every export format
-   (PDF, JSON and DOCX: EXPORT_FORMATS, the same three the TUI saves). A search
+   (PDF, JSON and DOCX: EXPORT_FORMATS, the same three the TUI saves), fetched then saved, with
+   one status line under the table naming the run (report-downloads.tsx). A search
    narrows the rows by ID, template, target or status; ten rows show at a time. With a
    `selection`, each row gets a checkbox to put the run in the combined report
    (report-selection.tsx owns which are chosen); once the most are chosen, the others are
@@ -12,6 +13,8 @@ import { useState } from "react";
 import { DashCard } from "@/components/dashboard/dash-card";
 import { SearchField } from "@/components/dashboard/filter-bar";
 import { runMatches } from "@/components/dashboard/filters";
+import { ExportButtons, exportRequest } from "@/components/dashboard/report-downloads";
+import { FileStatus } from "@/components/dashboard/report-file";
 import type { ReportRunRow } from "@/components/dashboard/report-types";
 import { RUN_COLUMNS, RUN_SEARCH, RunCells, type RunCellProps, runTitle } from "@/components/dashboard/run-cells";
 import { RunLinkTo } from "@/components/dashboard/run-link";
@@ -20,7 +23,7 @@ import { EmptyNote } from "@/components/ui/empty-note";
 import { Pagination } from "@/components/ui/pagination";
 import { DOCS } from "@/lib/docs-nav";
 import { paginate, slicePage } from "@/lib/paging";
-import { downloadHref, EXPORT_FORMATS } from "@/lib/report/formats";
+import { useFileDownload } from "@/components/dashboard/use-file-download";
 
 const SEARCH_FROM = 7; // runs before a search field is worth it
 // status is positioned: its sr-only "waiting on" text then overflows the table's scroller, not the page
@@ -45,6 +48,7 @@ export interface RunSelection {
 export function ReportRuns({ runs, selection }: { runs: ReportRunRow[]; selection?: RunSelection }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const { file, download, retry } = useFileDownload();
   const q = query.trim().toLowerCase();
   const shown = runs.filter((r) => runMatches(r, q));
   const paging = paginate(shown.length, page);
@@ -119,18 +123,13 @@ export function ReportRuns({ runs, selection }: { runs: ReportRunRow[]; selectio
                     after={
                       <td>
                         <span className="flex gap-1.5">
-                          {EXPORT_FORMATS.map((f) => (
-                            <a
-                              key={f.id}
-                              href={downloadHref(r.uid, f.id)}
-                              download
-                              aria-label={`Download the ${f.title} of ${r.id} (${r.when})`}
-                              title={f.blurb}
-                              className="dash-chip h-[24px] border border-border px-2 text-[11px] text-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            >
-                              {f.label}
-                            </a>
-                          ))}
+                          <ExportButtons
+                            uid={r.uid}
+                            busy={file.kind === "generating" && file.of === runTitle(r) ? file.format : null}
+                            onDownload={(uid, format) => download(exportRequest(uid, format, runTitle(r)))}
+                            label={(title) => `Download the ${title} of ${r.id} (${r.when})`}
+                            className="h-[24px] px-2 text-[11px]"
+                          />
                         </span>
                       </td>
                     }
@@ -141,6 +140,7 @@ export function ReportRuns({ runs, selection }: { runs: ReportRunRow[]; selectio
           </tbody>
         </table>
       </div>
+      <FileStatus state={file} onRetry={retry} />
       {shown.length === 0 && <EmptyNote>No saved assessment matches.</EmptyNote>}
       <Pagination paging={paging} onPage={setPage} label="Saved assessment pages" />
     </DashCard>

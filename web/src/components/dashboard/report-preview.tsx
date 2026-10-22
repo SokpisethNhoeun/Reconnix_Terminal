@@ -61,7 +61,7 @@ export function ReportPreview({ state, runs, stale, onRetry }: { state: Exclude<
         )}
         {stale && state.kind !== "failed" && (
           <p className="rep-note" role="status">
-            The selection or the options changed since this preview. Preview again before generating the PDF.
+            The selection or the options changed since this preview. Preview again before generating the PDF or the DOCX.
           </p>
         )}
     </DashCard>
