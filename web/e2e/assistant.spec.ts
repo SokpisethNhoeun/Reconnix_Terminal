@@ -4,8 +4,8 @@
    a reload and a new browser; open, rename, delete); Markdown with Copy; Stop and "New
    messages"; Retry; an answer with nothing in it; the Model menu (the Environment's model, + Add
    model against the stand-in, focus and the arrow keys, switching, asking with the new model,
-   editing, removing, a provider removed in another tab); what a viewer can't do; and the
-   routes' locks.
+   editing, removing, a model name typed but not added, a provider removed in another tab); what
+   a viewer can't do; and the routes' locks.
    The chat panel holds still (text never moves), but the welcome's globe and the sidebar's icon
    breathe, so this project runs with reduced motion (playwright.config.ts; the motion itself is
    tested in motion.spec.ts) and clicks need no `force`. The
@@ -434,6 +434,36 @@ test.describe("the Model menu", () => {
     await expect(form).toBeVisible();
     await form.getByRole("button", { name: "Cancel" }).click();
     await expect(modelMenu(page).getByRole("menu")).toHaveCount(1); // only the Environment
+  });
+
+  test("a model name typed but not added is saved too, or stops the save with the reason", async ({ page }) => {
+    await page.goto("/?view=assistant");
+    await modelButton(page).click();
+    const menu = modelMenu(page);
+    await menu.getByRole("button", { name: "Add model" }).click();
+    const form = menu.getByRole("form", { name: "Add a model" });
+    await form.getByLabel("Provider", { exact: true }).selectOption("custom");
+    await form.getByLabel("Name", { exact: true }).fill("Typed");
+    await form.getByLabel("Base URL", { exact: true }).fill(`http://127.0.0.1:${LLM_PORT}/v1`);
+    await form.getByRole("checkbox", { name: "Use it for the next question" }).uncheck();
+    const field = form.getByLabel("A model name to add");
+    await field.fill("two words"); // can't be a model name: said, and nothing is saved
+    await form.getByRole("button", { name: "Save" }).click();
+    await expect(form.getByRole("alert")).toContainText("The model name you typed isn't in the list yet");
+    await expect(form).toBeVisible();
+    await field.fill("stub-model"); // typed, never added with Enter or Add
+    await form.getByRole("button", { name: "Save" }).click();
+    await expect(form).toBeHidden();
+    const typed = menu.getByRole("menu", { name: "Typed" });
+    await expect(typed.getByRole("menuitemradio")).toHaveText(["stub-model"]);
+
+    // editing: the same, after the names already there
+    await menu.getByRole("button", { name: "Edit Typed" }).click();
+    const edit = menu.getByRole("form", { name: "Edit Typed" });
+    await edit.getByLabel("A model name to add").fill("stub-model-2");
+    await edit.getByRole("button", { name: "Save" }).click();
+    await expect(edit).toBeHidden();
+    await expect(typed.getByRole("menuitemradio")).toHaveText(["stub-model", "stub-model-2"]);
   });
 
   test("a provider removed meanwhile (another tab) is never saved again from its edit form", async ({ page }) => {
