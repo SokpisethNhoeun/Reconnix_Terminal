@@ -20,7 +20,10 @@ import { sideways } from "./support";
 
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 
-test.describe.configure({ mode: "serial" });
+// the real CLI starts a Python with Reconix's imports for every change (seconds each, more on a
+// busy machine): waits on its answers allow its own 60 s limit
+const CLI = { timeout: 60_000 };
+test.describe.configure({ mode: "serial", timeout: 180_000 });
 test.beforeAll(() => rmSync(KNOWLEDGE_DIR, { recursive: true, force: true }));
 test.afterAll(() => rmSync(KNOWLEDGE_DIR, { recursive: true, force: true }));
 
@@ -60,7 +63,7 @@ async function upload(page: Page, file: { name: string; mimeType: string; buffer
   await expect(dialog(page)).toBeVisible();
   await dialog(page).getByLabel("File").setInputFiles(file);
   await dialog(page).getByRole("button", { name: "Upload", exact: true }).click();
-  await expect(dialog(page)).toBeHidden();
+  await expect(dialog(page)).toBeHidden(CLI);
   await expect(pane(page).getByText(`Added “${file.name}”`)).toBeVisible();
 }
 
@@ -155,7 +158,7 @@ test("Remove asks first (No is the default), then the file is gone", async ({ pa
 
   await pane(page).getByRole("button", { name: `Remove ${RUNBOOK.name}` }).click();
   await question.getByRole("button", { name: "Yes, remove" }).click();
-  await expect(row(page, RUNBOOK.name)).toHaveCount(0);
+  await expect(row(page, RUNBOOK.name)).toHaveCount(0, CLI);
   await expect(pane(page).getByText(`Removed “${RUNBOOK.name}”`)).toBeVisible();
   await expect(table(page).getByRole("rowheader")).toHaveText([POLICY.name]);
 });
@@ -172,11 +175,12 @@ test("the dialog refuses a .doc before sending, and keeps the server's refusal i
   await expect(d.getByRole("alert")).toHaveText("A .doc file can't be read. Save it as .docx first.");
   await expect(d.getByRole("button", { name: "Upload", exact: true })).toBeDisabled();
 
-  // the server's own refusal (the stand-in refuses this name): the dialog stays open and says why
-  await d.getByLabel("File").setInputFiles({ name: "[stub:refuse].md", mimeType: "text/markdown", buffer: Buffer.from("text") });
+  // the server's own refusal (a file with no text, refused by the CLI as /add-on refuses it): the
+  // dialog stays open and says why
+  await d.getByLabel("File").setInputFiles({ name: "blank.md", mimeType: "text/markdown", buffer: Buffer.from("   \n\n  ") });
   await expect(d.getByRole("alert")).toHaveCount(0);
   await d.getByRole("button", { name: "Upload", exact: true }).click();
-  await expect(d.getByRole("alert")).toHaveText("The stand-in refused this file.");
+  await expect(d.getByRole("alert")).toHaveText("That file has no readable text to add.", CLI);
   await expect(d).toBeVisible();
   await axe(page, "knowledge upload dialog with a refusal");
 
