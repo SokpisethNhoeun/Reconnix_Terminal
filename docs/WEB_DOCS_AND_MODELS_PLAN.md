@@ -29,6 +29,9 @@ scroll at 360 px.
 
 ## 2. AI Assistant: several providers and models
 
+Status: in progress (2026-10-22, branch `feature/next`): a **Model** menu in the assistant's
+header switches the active model, and **+ Add model** adds a provider with its models.
+
 Today one model comes from `web/.env.local` (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`).
 
 - **Providers**: a name, an OpenAI-compatible base URL (presets: Ollama, LM Studio, OpenAI,

@@ -37,3 +37,6 @@ htmlcov/
 # working / reference docs (not part of the branch)
 /Copy of Reconix*.md
 
+
+# agent worktrees (Claude Code subagents work here; never commit them)
+.claude/worktrees/
