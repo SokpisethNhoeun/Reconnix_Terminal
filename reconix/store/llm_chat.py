@@ -118,7 +118,23 @@ def _context_with_knowledge(text: str) -> Tuple[str, List[str]]:
     """
     base = _context()
     block, used = _knowledge_block(text)
-    return (f"{base}\n\n{block}" if block else base), used
+    if block:
+        base = f"{base}\n\n{block}"
+    schema = _api_schema_block(text)       # the API endpoints relevant to this question
+    if schema:
+        base = f"{base}\n\n{schema}"
+    return base, used
+
+
+def _api_schema_block(text: str) -> str:
+    """The attached OpenAPI schema's endpoints relevant to `text`, fenced and framed as data
+    ("" when no spec is attached or nothing matches). See `openapi.api_schema_chat_block`."""
+    from .openapi import api_schema_chat_block
+
+    try:
+        return api_schema_chat_block(text)
+    except StoreValidationError:
+        return ""
 
 
 def _knowledge_block(text: str) -> Tuple[str, List[str]]:

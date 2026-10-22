@@ -93,7 +93,8 @@ export const assessmentGuide: GroupContent = {
               authorizes the AI agent to start.
             </li>
             <li>
-              <strong>Attach OpenAPI spec</strong> (API template only; <strong>Replace OpenAPI spec</strong> once one is
+              <strong>Attach OpenAPI spec</strong> (API template only; the form opens on its own once the scope is
+              drafted, and Cancel skips it; <strong>Replace OpenAPI spec</strong> once one is
               attached, with <strong>Remove OpenAPI spec</strong> to go back to the template&apos;s endpoints and methods) reads a <Mono>.json</Mono>, <Mono>.yaml</Mono> or <Mono>.yml</Mono> OpenAPI 3 or Swagger 2 file of
               at most 5 MB. The file is only read, never run, and a symbolic link is refused. The manifest then shows the
               spec&apos;s title, version, endpoint count and methods; the discovery step and the plan use the real

@@ -23,6 +23,9 @@ SPEC = {
 async def to_api_review(app, pilot) -> None:
     await type_request(pilot, API_REQUEST)
     await settle(pilot, 8)
+    if isinstance(app.screen, OpenApiForm):     # the API template auto-offers the spec form
+        await pilot.press("escape")             # Cancel = skip; the Scope menu still offers it
+        await settle(pilot)
     assert isinstance(app.screen, TemplateScreen) and app.screen.state() == "review"
 
 
@@ -67,6 +70,39 @@ async def test_a_bad_file_shows_the_store_error_and_keeps_the_form(app, tmp_path
         assert isinstance(app.screen, OpenApiForm)
         assert "OpenAPI" in str(app.screen.query_one("#form-error", Static).render())
         assert store.get_api_spec() is None
+
+
+async def test_api_template_auto_opens_the_spec_form(app, tmp_path):
+    path = tmp_path / "openapi.json"
+    path.write_text(json.dumps(SPEC), encoding="utf-8")
+    async with app.run_test(size=SIZE) as pilot:
+        await type_request(pilot, API_REQUEST)
+        await settle(pilot, 8)
+        assert isinstance(app.screen, OpenApiForm)       # it opens on its own at the API scope
+        field = app.screen.query_one("#path", Input)
+        field.value = str(path)
+        app.screen.query_one("#submit").press()
+        await settle(pilot, 8)
+        assert isinstance(app.screen, TemplateScreen)
+        assert store.get_api_spec().total == 3
+
+
+async def test_api_template_auto_form_cancel_skips_and_does_not_reopen(app):
+    async with app.run_test(size=SIZE) as pilot:
+        await type_request(pilot, API_REQUEST)
+        await settle(pilot, 8)
+        assert isinstance(app.screen, OpenApiForm)
+        await pilot.press("escape")                      # Cancel = skip
+        await settle(pilot, 4)
+        assert isinstance(app.screen, TemplateScreen)    # it does not reopen
+        assert store.get_api_spec() is None
+        assert "Attach OpenAPI spec" in choice_labels(app)   # still offered in the menu
+
+
+async def test_other_templates_do_not_auto_open_the_form(app):
+    async with app.run_test(size=SIZE) as pilot:
+        await start_demo(pilot)                          # the demo URL is a Web URL
+        assert isinstance(app.screen, TemplateScreen)
 
 
 async def test_other_templates_do_not_offer_the_choice(app):

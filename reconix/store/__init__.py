@@ -30,8 +30,9 @@ from .knowledge import add_source, list_sources, remove_source
 from .knowledge import clear as clear_knowledge
 from .knowledge import search as search_knowledge
 from .openapi import (
-    api_spec_handoff, api_spec_methods_outside, attach_api_spec, can_attach_api_spec,
-    get_api_spec, remove_api_spec,
+    api_schema_chat_block, api_schema_endpoint, api_schema_handoff, api_spec_handoff,
+    api_spec_methods_outside, attach_api_spec, can_attach_api_spec, get_api_spec,
+    remove_api_spec,
 )
 from .persist import autosave, close_session, web_dashboard_url
 from .plan import gated_count, plan_overview
@@ -114,6 +115,7 @@ __all__ = [
     # the API template's OpenAPI spec
     "attach_api_spec", "remove_api_spec", "get_api_spec", "can_attach_api_spec",
     "api_spec_handoff", "api_spec_methods_outside",
+    "api_schema_handoff", "api_schema_chat_block", "api_schema_endpoint",
     # knowledge add-ons (/add-on): reference files for the AI
     "knowledge", "add_source", "list_sources", "remove_source",
     "clear_knowledge", "search_knowledge",

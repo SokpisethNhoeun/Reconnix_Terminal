@@ -32,7 +32,7 @@ export const terminalGuide: GroupContent = {
             (Network, API, Source Code, Web URL) and asks for the target; a target typed on Start picks its template by
             its shape, and asks only when a bare hostname could be several. The manifest lists what will be tested, what
             may be done, what is excluded, the tools and the time limit; the menu offers Approve scope, Edit manifest and
-            Reject, and on the API template Attach OpenAPI spec (a .json or .yaml file, read and never run; it cannot add a method to the scope) and, once one is attached, Remove OpenAPI spec. Once approved the manifest is locked and the screen points to the plan. See{" "}
+            Reject, and on the API template Attach OpenAPI spec (a .json or .yaml file, read and never run; it cannot add a method to the scope) and, once one is attached, Replace or Remove OpenAPI spec. On the API template the Attach form opens on its own once the scope is drafted; Cancel skips it. Once approved the manifest is locked and the screen points to the plan. See{" "}
             <DocRef>Scope manifest</DocRef>.
           </p>
         </DocSection>
