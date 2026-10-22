@@ -1,8 +1,12 @@
-/* The Model menu's two questions to a model's address (server only): "Test connection" sends a
-   tiny chat completion, "Fetch models" reads GET {base}/models. Both refuse redirects, give up
+/* The model picker's two questions to a model's address (server only): the test sends a tiny
+   chat completion, the fetch reads GET {base}/models. Both refuse redirects, give up
    after ten seconds, never cache, read at most 1 MB, and answer in fixed words: never the
-   address, the key or what the server said (only its HTTP status). The address was checked
-   first (resolve.ts `probeTarget`). */
+   address, the key or what the server said (only its HTTP status). A fetch that fails says
+   whether the model's server answered without a list it could read (`unlisted`: no such route,
+   an error status other than a refused key or a limit, not JSON, another shape), which the
+   picker may get round by testing a model; never reached, a redirect, a refused key (401, 402,
+   403), a limit (429) or a list too large is a plain failure. The address was checked first
+   (resolve.ts `probeTarget`). */
 import "server-only";
 
 import { z } from "zod";
@@ -80,32 +84,43 @@ export async function testConnection(config: ModelConfig): Promise<ProbeOutcome>
 
 const ListSchema = z.object({ data: z.array(z.object({ id: z.unknown() }).passthrough()) }).passthrough();
 
+/** A fetch that got no names: `unlisted`, the model's server answered, but without a list. */
+export type FetchOutcome = { ok: true; models: string[] } | { ok: false; detail: string; unlisted: boolean };
+
+/** Statuses that say the request may not have an answer (the key, the credit, a limit): plain
+    failures, never "no list". */
+const REFUSED = new Set([401, 402, 403, 429]);
+
+const failed = (detail: string): FetchOutcome => ({ ok: false, detail, unlisted: false });
+const unlisted = (detail: string): FetchOutcome => ({ ok: false, detail, unlisted: true });
+
 /** The model names the server lists (GET {base}/models), those a model name may be, sorted. */
-export async function fetchModels(config: ModelConfig): Promise<{ ok: true; models: string[] } | { ok: false; detail: string }> {
+export async function fetchModels(config: ModelConfig): Promise<FetchOutcome> {
   let response: Response;
   try {
     response = await call(`${config.baseUrl}/models`, { method: "GET", headers: headersFor(config, "application/json") });
   } catch (error) {
-    return { ok: false, detail: unreachable(error) };
+    return failed(unreachable(error));
   }
   if (!response.ok) {
     await response.body?.cancel().catch(() => {});
-    return { ok: false, detail: refusedWith(response.status) };
+    const detail = refusedWith(response.status);
+    return REFUSED.has(response.status) ? failed(detail) : unlisted(detail);
   }
   let text: string | null;
   try {
     text = await boundedText(response);
   } catch {
-    return { ok: false, detail: "The model list broke off." };
+    return failed("The model list broke off.");
   }
-  if (text === null) return { ok: false, detail: "The model list is too large." };
+  if (text === null) return failed("The model list is too large.");
   let parsed;
   try {
     parsed = ListSchema.safeParse(JSON.parse(text));
   } catch {
     parsed = null;
   }
-  if (!parsed?.success) return { ok: false, detail: "The address did not answer with a model list ({ data: [{ id }] })." };
+  if (!parsed?.success) return unlisted("The address did not answer with a model list ({ data: [{ id }] }).");
   const names = parsed.data.data.map((m) => m.id).filter((id): id is string => typeof id === "string" && MODEL_NAME.test(id));
   return { ok: true, models: [...new Set(names)].sort((a, b) => a.localeCompare(b)).slice(0, MAX_FETCHED) };
 }

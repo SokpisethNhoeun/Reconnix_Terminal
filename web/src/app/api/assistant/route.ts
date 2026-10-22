@@ -1,6 +1,6 @@
-/* The AI Assistant's question route (operators only; src/proxy.ts checks the role too). In
-   order: the launch token, the page's origin, the operator role, a usable model (the one chosen
-   in the Model menu, else the Environment's: lib/assistant/models/resolve.ts), a rate
+/* The AI Assistant's question route (signed in; src/proxy.ts checks the session too). In
+   order: the launch token, the page's origin, a session, a usable model (the one chosen
+   in the model picker: lib/assistant/models/resolve.ts; none from the environment), a rate
    slot (before any reading), the body (bytes counted as they arrive), its shape, the
    conversation (read from the server's own file: the browser never sends the history), the
    saved data (read here, never taken from the request) and the passages of the TUI's /add-on

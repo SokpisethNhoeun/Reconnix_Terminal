@@ -1,34 +1,32 @@
-/* The locks every AI Assistant route checks itself (src/proxy.ts checks the role too): the
-   launch token, a signed-in operator, and for anything that changes something the page's own
-   Origin. Server only. */
+/* The locks every AI Assistant route checks itself (src/proxy.ts checks the session too): the
+   launch token, a session, and for anything that changes something the page's own Origin.
+   Server only. */
 import "server-only";
 
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { isSameOrigin } from "../auth/origin";
-import { COOKIE, hasRole, launchToken, readRole } from "../auth/session";
+import { COOKIE, launchToken, readSession } from "../auth/session";
 
 export const NO_STORE = { "Cache-Control": "no-store" };
 
 export const fail = (detail: string, status: number) => NextResponse.json({ detail }, { status, headers: NO_STORE });
-
-export const OPERATOR_ONLY = "The AI Assistant needs the operator role. Sign in with the link /web prints.";
 
 /** A refusal, or null when the request may go on. `change`: it writes or deletes something. */
 export async function refuse(request: Request, { change }: { change: boolean }): Promise<NextResponse | null> {
   const token = launchToken();
   if (!token) return fail("The dashboard was not started with npm start.", 503);
   if (change && !isSameOrigin(request)) return fail("Ask from the dashboard page.", 403);
-  const role = readRole((await cookies()).get(COOKIE)?.value, token);
-  if (!hasRole(role, "operator")) return fail(OPERATOR_ONLY, 403);
+  if (!readSession((await cookies()).get(COOKIE)?.value, token)) return fail("Sign in first.", 401);
   return null;
 }
 
-/** The body as text, or null once it passes `max` bytes (a missing Content-Length can't hide it). */
-export async function readBody(request: Request, max: number): Promise<string | null> {
+/** The body's bytes, or null once they pass `max` (a missing Content-Length can't hide it: the
+    stream is counted as it is read, and dropped at the first byte too many). */
+export async function readBytes(request: Request, max: number): Promise<Buffer | null> {
   if (Number(request.headers.get("content-length") ?? 0) > max) return null;
-  if (!request.body) return "";
+  if (!request.body) return Buffer.alloc(0);
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -42,7 +40,13 @@ export async function readBody(request: Request, max: number): Promise<string | 
     }
     chunks.push(value);
   }
-  return Buffer.concat(chunks).toString("utf8");
+  return Buffer.concat(chunks);
+}
+
+/** The body as text, or null once it passes `max` bytes (readBytes). */
+export async function readBody(request: Request, max: number): Promise<string | null> {
+  const bytes = await readBytes(request, max);
+  return bytes === null ? null : bytes.toString("utf8");
 }
 
 /** The body as JSON, or a refusal (too big: 413, not JSON: 400). */

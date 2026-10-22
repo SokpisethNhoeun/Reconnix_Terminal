@@ -67,6 +67,16 @@ describe("resolveFindingsPage", () => {
     expect(unknown).toMatchObject({ explicit: false, missing: "unknown", index: 10 });
   });
 
+  it("says a named false positive is hidden as one while false positives are not listed", () => {
+    const fp = { ...many[4], falsePositive: true };
+    const all = many.map((f, i) => (i === 4 ? fp : f));
+    const listed = all.filter((f) => !f.falsePositive);
+    expect(resolveFindingsPage(listed, all, fp.key, "", false)).toMatchObject({ explicit: false, missing: "false-positive", current: listed[0] });
+    // shown, but hidden by another filter: the usual "hidden by the filters"
+    expect(resolveFindingsPage(listed, all, fp.key, "", true)).toMatchObject({ missing: "filtered" });
+    expect(resolveFindingsPage(all, all, fp.key, "", true)).toMatchObject({ explicit: true, missing: "", current: fp });
+  });
+
   it("has nothing selected only when the list is empty", () => {
     const page = resolveFindingsPage([], many, key(0), "4");
     expect(page.current).toBeNull();
@@ -106,8 +116,13 @@ describe("filterPatch", () => {
 
 describe("parseFindingFilter", () => {
   it("drops unknown severities and validation buckets from the address", () => {
-    expect(parseFindingFilter({ sev: "HIGH,<script>,LOW", val: "review", q: " x " })).toEqual({ sev: ["HIGH", "LOW"], val: "review", q: " x " });
-    expect(parseFindingFilter({ sev: "", val: "nope", q: "" })).toEqual({ sev: [], val: "", q: "" });
+    expect(parseFindingFilter({ sev: "HIGH,<script>,LOW", val: "review", q: " x " })).toEqual({ sev: ["HIGH", "LOW"], val: "review", q: " x ", fp: false });
+    expect(parseFindingFilter({ sev: "", val: "nope", q: "" })).toEqual({ sev: [], val: "", q: "", fp: false });
+  });
+  it("lists the false positives only for fp=1", () => {
+    expect(parseFindingFilter({ sev: "", val: "", q: "", fp: "1" }).fp).toBe(true);
+    for (const fp of ["", "0", "true", "yes", "<script>"]) expect(parseFindingFilter({ sev: "", val: "", q: "", fp }).fp).toBe(false);
+    expect(filterActive(parseFindingFilter({ sev: "", val: "", q: "", fp: "1" }))).toBe(true); // Clear filters hides them again
   });
   it("knows when a filter is on", () => {
     expect(filterActive(parseFindingFilter({ sev: "", val: "", q: "  " }))).toBe(false);
@@ -133,6 +148,10 @@ describe("findingsHeadline", () => {
     expect(findingsHeadline(3, null)).toBe("3 findings · select one to see its evidence and remediation.");
     expect(findingsHeadline(0, null)).toBe("No findings in this assessment yet.");
     expect(findingsHeadline(0, 4)).toBe("No findings in any saved assessment yet.");
+    // false positives are never in the count
+    expect(findingsHeadline(3, null, 1)).toBe("3 findings · select one to see its evidence and remediation.");
+    expect(findingsHeadline(0, null, 1)).toBe("No findings in this assessment, only 1 false positive.");
+    expect(findingsHeadline(0, 2, 2)).toBe("No findings in any saved assessment, only 2 false positives.");
   });
 });
 

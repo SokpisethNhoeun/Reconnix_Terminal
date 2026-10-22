@@ -3,7 +3,8 @@
 A local dashboard for what the Reconix terminal app did, opened from the TUI with `/web`. It
 reads the assessments the TUI saves to `~/.reconix/assessments/` and shows them as the
 **Assessment Operations Center** (the globe UI from the reconix-web-ui site), with Assessments,
-Findings, Reports, Terminal and AI Assistant views, all switched in-page (`?view=`; each view's
+Findings, Reports, Terminal, AI Assistant and Security knowledge views, all
+switched in-page (`?view=`; each view's
 own address keys and every run link live in `components/dashboard/view-url.ts`). By default the
 Overview totals **every saved run** (`derive-overall.ts`) and Findings lists them all, each
 naming its run; the Assessment switcher in the top bar opens one run instead (`?uid=`) and
@@ -30,9 +31,20 @@ the reports and the TUI.)
   rows a page with Previous / Next; the filters, the page and the open finding live in the
   address (`?sev=HIGH,LOW&val=review&q=sql&page=2&finding=F-001`), so a link opens on its
   finding's page. The finding's evidence and remediation sit beside the list; on the fixed
-  desktop frame the list scrolls on its own under the filters, and on a phone the list and the
-  detail take turns (Back returns to the list). Ten rows a page is `lib/paging.ts`, shared with
-  Assessments and the Report view's runs.
+  desktop frame the list scrolls on its own under the filters with no scrollbar drawn (wheel,
+  touch, trackpad and keys still move it; the detail and the page keep theirs), and on a phone
+  the list and the detail take turns (Back returns to the list). Ten rows a page is
+  `lib/paging.ts`, shared with Assessments and the Report view's runs. False positives are left
+  out of the list as they are out of every count (so its headline and chips are the Overview's
+  numbers); the **False positives · Show** chip (`?fp=1`) lists them, beside the total
+  ("Showing 41 of 40 findings + 1 false positive"), and a link naming one while they are hidden
+  says so, with **Show it**.
+- **Reports:** the Overview's summary strip and Findings by Severity, its top list cut to the top
+  3 CVSS findings (`derive-report.ts` `REPORT_TOP_FINDINGS`; the Overview's card shows more).
+  With every run shown, the **Targets** card beside it lists every target, the most findings
+  first, 7 a page with Previous / Next (`?tpage=`, `report-targets-paging.ts`): the two cards are
+  the same height, and the list keeps room for a whole page, so a shorter last page moves neither
+  the card nor the pager at its foot.
 - **Drill-down:** the Findings card opens every finding, a severity row opens Findings filtered
   to it, a top finding opens itself.
 - **The bell** lists what the open run waits on and every other saved run that waits on a
@@ -64,7 +76,7 @@ npm run build
 npm start                          # http://127.0.0.1:3100, prints and opens the sign-in link
 RECONIX_DATA_DIR=sample-data npm start   # the sample assessments instead of your own
 npm start -- --no-open             # don't open a browser
-npm start -- --no-terminal         # no Terminal page; the sign-in grants viewer only
+npm start -- --no-terminal         # no Terminal page (the Terminal view says it is off)
 ```
 
 | Variable | Default | Meaning |
@@ -75,7 +87,9 @@ npm start -- --no-terminal         # no Terminal page; the sign-in grants viewer
 | `RECONIX_CHROME` | the usual names on PATH, then the common install paths | the Chrome/Chromium that prints the PDF exports; without one the PDF routes answer 501 |
 | `RECONIX_WEB_PORT` | `3100` | port on 127.0.0.1 |
 | `RECONIX_TERM_PORT` | `3101` | the terminal helper's port on 127.0.0.1 |
-| `RECONIX_PYTHON` | repo `.venv`, else `python3` (`python` on Windows) | the Python that runs the terminal helper and the TUI |
+| `RECONIX_PYTHON` | repo `.venv`, else `python3` (`python` on Windows) | the Python that runs the terminal helper, the TUI and the knowledge CLI |
+| `RECONIX_KNOWLEDGE_DIR` | `~/.reconix/knowledge` | the knowledge folder (the TUI's `/add-on` and the Security knowledge page) |
+| `RECONIX_KNOWLEDGE_KEY_FILE` | `~/.reconix/knowledge.key` | the key the knowledge CLI encrypts the kept originals with (passed on to it) |
 | `RECONIX_WEB_TOKEN` | random per start | only for tests; normally `scripts/serve.mjs` makes one |
 
 ## Terminal page
@@ -84,9 +98,10 @@ npm start -- --no-terminal         # no Terminal page; the sign-in grants viewer
 The page asks `POST /api/terminal/ticket` for a single-use ticket valid for 60 s, then opens
 `ws://127.0.0.1:3101/?ticket=…`.
 
-- **Ticket route:** same origin, the operator session cookie **and** the terminal key
-  cookie (`reconix_term`, `Path=/api/terminal`, signed differently, so a session cookie
-  seen by another server on 127.0.0.1 can't mint tickets). It returns the ticket, the
+- **Ticket route:** same origin, the session cookie, the terminal on **and** the terminal key
+  cookie (`reconix_term`, `Path=/api/terminal`, signed differently and set at sign-in only
+  while the terminal is on, so a session cookie seen by another server on 127.0.0.1 can't mint
+  tickets). It returns the ticket, the
   socket URL and the `proof` the real helper will send.
 - **Helper:** checks the `Host` (loopback), the `Origin` (this dashboard) and the ticket
   (signed with the launch token, used once). Its first frame is `{"type":"hello","proof"}`;
@@ -104,7 +119,7 @@ The page asks `POST /api/terminal/ticket` for a single-use ticket valid for 60 s
   a same-size resize message has the TUI repaint it), restart (asks first while a session
   is live), expand (fills the browser window, so Esc still reaches the TUI), and "↓ Latest"
   while scrolled up. None of them sends keystrokes.
-- **The sign-in link** grants operator control, so `serve.mjs` prints it only to a
+- **The sign-in link** grants full control (there are no roles), so `serve.mjs` prints it only to a
   terminal; started by the TUI, it is only in `~/.reconix/web.url` (0600).
 
 ## AI Assistant
@@ -131,30 +146,54 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   static once messages exist (scaled text vibrates while reading); reduced motion shows a still
   halo (and a still glow) instead.
 
-- **Model:** any OpenAI-compatible endpoint, as the product docs' "Model switching": set
-  `LLM_BASE_URL` and `LLM_MODEL` in the environment `/web` starts from or in `web/.env.local`
-  (git-ignored). A local Ollama: `LLM_BASE_URL=http://127.0.0.1:11434/v1`, `LLM_MODEL=llama3.2`.
-  An endpoint off this machine also needs `LLM_ALLOW_REMOTE=1` (assessment data goes there; the
-  screen says so) and takes `LLM_API_KEY` over https only. The key stays in the Next.js
-  process: the terminal helper and the TUI it runs never get `LLM_*`. Unset, the screen says how.
-- **Model menu** (`components/assistant/model-menu.tsx`, `lib/assistant/models/`): the header's
-  Model button names the model that answers next; its panel lists the `LLM_*` model as the
-  read-only **Environment** (the default while nothing is chosen) and every saved provider with
-  its models, switched in one click. **+ Add model** takes a preset (Ollama, LM Studio, OpenAI,
-  OpenRouter, Groq, Anthropic, DeepSeek or Custom: it fills the base URL), a name, an optional
-  API key and the model names (typed, or picked after **Fetch models**, `GET {base}/models`), with
-  **Test connection** (one tiny completion). Saved providers can be edited (no key typed keeps
-  the saved one while the address stays on its host; "Remove the saved key") and removed. They
-  live in `models.json` in the assistant's folder (0600, atomic), the keys AES-256-GCM-sealed with
-  `models.key` (32 bytes, 0600, made once): never sent to the browser or logged. Every model
-  passes the same rules as the environment's (`config.ts` `checkModel`: http(s), no credentials
-  in the URL, the model name pattern, a key only over https to a remote host, remote only with
-  `LLM_ALLOW_REMOTE=1`), again on every use: a chosen model that can't be used says why instead
+- **Model:** any OpenAI-compatible endpoint, as the product docs' "Model switching", added with
+  the composer's **+ Model** and saved by the dashboard. The web reads no model from its
+  environment (`LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` are not used); until one is added
+  the screen says "No AI model is set up yet. Add one with the model chip under the message box
+  (+ Model)." Cloud providers and any address off this machine work by default
+  (the owner's decision, 2026-10-22; no server switch): assessment data goes there, and the
+  picker says so when one is chosen, the chip's tooltip while it answers. A remote endpoint
+  takes an API key over https only. The terminal helper and the TUI it runs never get `LLM_*`.
+- **The composer** (`composer.tsx`): a rounded box (radius 16) with the text area on top and a
+  row under it: the model chip on the left; on the right "Enter to send · Shift+Enter for new
+  line" (hidden on a phone) and the round 32 px send button (Stop while a reply is written).
+  Under the box: "Answers use your saved assessment data. Scans and approvals stay in the
+  terminal." The header has no model control.
+- **Choosing a model** (`model-chip.tsx`, `model-picker.tsx` with `model-list.tsx` and
+  `model-provider-form.tsx` (+ `model-key-field.tsx`, `model-name-field.tsx`), the rules in
+  `model-picker-rules.ts`, `lib/assistant/models/`): the chip says `● <model> ▾` (green) or
+  `● Choose a model ▾` (amber, the reason in its tooltip). It opens a picker upward (a sheet over the composer on a
+  phone), a dialog named after its step; Escape goes back to the list, then closes; focus goes to
+  each step's first control and back to the chip. **Model**: only your saved models (✓ on the
+  active one, the name in mono, "`<provider>` · local|remote"; one click switches, roving
+  focus), each with a bin and an inline confirm "Remove `<model>`
+  (`<provider>`)? …" (No by default; the provider's last model DELETEs the provider, else its
+  list is PATCHed); "No model yet." when empty; **+ Model** at the bottom. **Set the provider**
+  (Back, or Cancel, returns to the list): Provider (a native select of OpenAI, Anthropic,
+  DeepSeek, OpenRouter, Groq, Ollama (local), LM Studio (local), Custom (OpenAI-compatible), all
+  usable, starting on Ollama; a cloud one says "`<Provider>` runs at `<host>`: your questions, the
+  assessment data they need and relevant /add-on knowledge passages are sent there." and a
+  remote Base URL "Off this machine: …" the same), Base URL (Custom and the local ones only, from the
+  preset), API key (uncontrolled, never filled in or kept, emptied with another provider; "Key
+  saved: leave empty to keep it" and Remove key for a saved one), Model (a select filled by
+  **Fetch models**, `…/models/fetch` = `GET {base}/models`, also fetched once the provider,
+  address and key are set; or "Type a model name…"; when the server lists none,
+  `…/models/test` for a model the saved provider is known to have). **Add model** tests a typed
+  model (or one not from the list fetched for those values), then POSTs a new provider (named
+  after its preset, `activate: true`) or, for the same preset at the same address, PATCHes the
+  saved one with the model added and PUTs it active; the chip follows without a reload. A
+  refusal stays on the form. A saved key goes only to its saved address (the saved provider is
+  asked by its id). Providers live in `models.json` in the assistant's folder (0600, atomic), the
+  keys AES-256-GCM-sealed with `models.key` (32 bytes, 0600, made once): never sent to the
+  browser or logged. `GET /api/assistant/models` also lists the presets in the picker's order
+  with their kind. Every model passes the same rules (`config.ts` `checkModel`: http(s), no
+  credentials in the URL, the model name pattern, a key only over https to a remote host, a
+  cloud preset only at its own address), again on every use: a chosen model that can't be used says why instead
   of falling back. Outbound tests and fetches refuse redirects, stop after 10 s and never cache.
   Routes: `GET|POST /api/assistant/models`, `PATCH|DELETE …/models/<id>`, `PUT …/models/active`,
-  `POST …/models/test` and `…/models/fetch` (operators; changes need the page's origin).
-- **Route:** `POST /api/assistant` takes `{ conversationId?, uid, question, retry? }`: operators
-  only (proxy and handler), same origin, zod-checked, a byte cap, 12 questions a minute and 2
+  `POST …/models/test` and `…/models/fetch` (signed in; changes need the page's origin).
+- **Route:** `POST /api/assistant` takes `{ conversationId?, uid, question, retry? }`: a
+  session (proxy and handler), same origin, zod-checked, a byte cap, 12 questions a minute and 2
   replies at once (`RECONIX_ASSISTANT_RATE_PER_MINUTE`, `RECONIX_ASSISTANT_RATE_RUNNING`). The
   browser never sends history: the server reads it from the conversation file. It builds the
   model's context from the saved files itself (no evidence lines; every value one line with no
@@ -172,19 +211,65 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
 - **Cards the server picks** (`lib/assistant/cards.ts`, `intent.ts`): findings, a finding,
   progress, approvals, policy blocks, tools used, report downloads and notices, built from the
   saved data only; the model writes the explanation and never the numbers. Nothing can be run
-  or approved from the chat: approvals say "Decide in the TUI", with Open Terminal for
-  operators. Questions are masked with the TUI's secret patterns (`lib/assistant/redact.ts`,
+  or approved from the chat: approvals say "Decide in the TUI", with Open Terminal
+  while the terminal is on. Questions are masked with the TUI's secret patterns (`lib/assistant/redact.ts`,
   vectors shared with `reconix/store/redact.py` in `tests/redact-vectors.json`).
 - **Saved conversations** (`lib/assistant/history-store.ts`): one `<uuid>.json` per
   conversation in `~/.reconix/assistant/` (`RECONIX_ASSISTANT_DIR`; the folder `0700`, files
   `0600`, the parent not writable by others), written atomically, read like the saved
   assessments. A conversation keeps the run it began with; its title is the first question.
   History, rename, delete and "Delete all" through `/api/assistant/conversations[/<id>]`
-  (operators; changes need the page's origin). Kept 30 days after last use
+  (signed in; changes need the page's origin). Kept 30 days after last use
   (`RECONIX_ASSISTANT_RETENTION_DAYS`, `0` keeps them), at most 100 conversations and 200
   messages each. The tab keeps only the open conversation's id and the masked unsent draft.
   Plans: `docs/WEB_AI_ASSISTANT_PLAN.md`, `docs/WEB_REDESIGN_V2_PLAN.md` (the transition and
   the breathing), `docs/WEB_REDESIGN_V3_PLAN.md` (the v3 polish and its status).
+
+## Security knowledge
+
+The AI Assistant's header has a **Security knowledge** button (a book with a lock; just the icon
+on a phone) that opens `?view=knowledge` (`components/knowledge/`; no sidebar item).
+"← AI Assistant" goes back.
+
+- **Header:** the title, a search over the names, **Table / Grid** (remembered per browser in
+  `localStorage`, wrapped in try/catch; with nothing chosen a phone starts on the grid) and
+  **Upload**.
+- **The files**, newest first, ten a page (`lib/paging.ts`): Name (with its type's icon), Source
+  ("Web upload" or "Terminal (/add-on)", with the type and size: "Web upload · PDF · 1.2 MB"; never
+  a path), Uploaded (local date and time) and the actions. The grid shows the same as cards. On a
+  phone the table's rows stack into blocks; nothing scrolls sideways at 360 px.
+- **Upload** (`upload-dialog.tsx`, a native modal `<dialog>`): one `.docx .pdf .txt .md .json .yaml
+  .yml` file up to 10 MB, checked in the page first (a `.doc`: "Save it as .docx first"), sent
+  with its progress shown, then "Reading the file and masking secrets…"; a refusal keeps the dialog
+  open with the server's message.
+- **Open** is `/api/knowledge/<id>/original`: PDF, text, Markdown, JSON and YAML in a new tab, a
+  Word file downloaded. A file added before originals were kept has Open unavailable, with why.
+- **Remove** asks in place ("Remove this file?", No focused, Escape is No).
+
+Routes (a session in `proxy.ts` and again in each handler, `lib/knowledge/access.ts`; changes
+need the page's Origin):
+
+| Route | Does |
+|---|---|
+| `GET /api/knowledge` | the list, read from the index as the assistant reads it (`lib/knowledge/list.ts` over `lib/assistant/knowledge/read.ts`); no path ever |
+| `POST /api/knowledge` | one multipart file, counted while it is read (413 past 10 MB), the extension allow-list (`lib/knowledge/rules.ts`); copied to a private temp file (0600 in a 0700 folder, a random name, deleted afterwards whatever happened) and added by the CLI; 201 with the file, 400 with the CLI's refusal, 500 with a fixed message; one at a time (429) and ten a minute |
+| `GET /api/knowledge/<id>/original` | the CLI decrypts the kept original; its type by kind, `Content-Disposition` inline (attachment for DOCX) with the name sanitised (RFC 5987), `nosniff`, `no-store` and its own policy, `sandbox; default-src 'none'` for what opens inline (the proxy leaves the page's policy off this route) |
+| `DELETE /api/knowledge/<id>` | the CLI removes the file, its passages and its original |
+
+**The process:** every change goes through the same Python code as the TUI's `/add-on`,
+`python -m reconix.knowledge add --file <tmp> --name <base name> --source web | original <id> |
+remove <id>` (`lib/knowledge/cli.ts`; the contract: `../docs/WEB_KNOWLEDGE_PAGE_AND_MODELS_PLAN.md`).
+It runs with the dashboard's Python (`RECONIX_PYTHON`, else the repo's `.venv`, else
+`python3`/`python`, as `scripts/serve.mjs` finds it) from the repo root, with fixed arguments, no
+shell, an environment of `PATH`, `HOME` and the knowledge folder and key file only (never `LLM_*`
+or the launch token), a 60 s limit and a cap on its output; what it prints is never logged. Exit 0
+is done, 2 a refusal shown to the operator, anything else a fixed message. Adds and removals run
+one after another (`lib/knowledge/gate.ts`). The text is masked and split exactly as in the
+terminal, the original is kept encrypted, and the AI still only ever sees the masked passages.
+Tests only: with `RECONIX_TERM_TEST=1`, `RECONIX_KNOWLEDGE_CLI` names a stand-in that keeps the same
+contract over a temp folder (`e2e/knowledge-cli-stub.mjs`; it also refuses an environment holding
+anything else and an upload copy that isn't private). The e2e server uses it; remove that line
+from `playwright.config.ts` to run the e2e against the real CLI.
 
 ## Develop
 
@@ -201,17 +286,25 @@ npm run build && npm run e2e        # Playwright on sample-data (npx playwright 
                                     #   ports (default 3199, plus 3198 and 3195)
 ```
 
-The e2e specs: `access` (roles, origin, headers), `pages` (views, switcher, downloads, the docs,
+The e2e specs: `access` (sign-in, no roles, an old role cookie refused, the terminal's locks,
+origin, headers), `pages` (views, switcher, downloads, the docs,
 the Terminal view with a stand-in program), `assessments` (ten a page, the pager, chips, search,
 the address), `findings` (paging, deep links, Previous / Next across a page end, the notice for
-a hidden finding, the list scroller, the phone's list → detail → Back), `reports` (combining
-runs: the selection, the preview frame, one real PDF and DOCX, the 500 / 501 / 413 paths),
+a hidden finding, the list scroller and its hidden scrollbars, the phone's list → detail →
+Back), `reports` (the top 3 CVSS, the targets 7 a page at the height of Findings by Severity;
+combining runs: the selection, the preview frame, one real PDF and DOCX, the 500 / 501 / 413 paths),
 `docs` (group pages with their pages in place, no link off the page, the rail without
 Configuration, Copy, the in-page search, the old addresses on their anchors, the phone menu), `dashboard-fit` (the
 Overview fits the fixed frame with nothing to scroll), `assistant` (with the stand-in model
-`e2e/llm-stub.mjs`; `[stub:markdown]`, `[stub:long]` and `[stub:fail]` pick its answers),
+`e2e/llm-stub.mjs`, saved as the provider "Stub" by `e2e/global-setup.ts` through the models
+route, `e2e/models.ts`: the web reads no model from its environment; `[stub:markdown]`,
+`[stub:long]` and `[stub:fail]` pick its answers; the composer's model picker against its
+`GET /v1/models`), `a11y-assistant` (axe on the picker's list, its remove confirm, Set the
+provider with a refusal and a fetched list, and the phone's sheet),
 `assistant-knowledge` (an `/add-on` folder written as the TUI does: "Knowledge used" under the
-answer, kept after a reload), `motion` (directions,
+answer, kept after a reload), `knowledge` (the Security knowledge page with the CLI's stand-in: the
+assistant's button and back, uploads, the table and the grid, search, Open, Remove, a refused
+`.doc`, signed out kept out, a phone, axe), `motion` (directions,
 timing, the globe, history), `scroll` (the wheel and keys at six sizes, no sideways scroll) and
 `a11y` (axe via `@axe-core/playwright`, focus order). Known faults are listed in the specs as
 expected failures that fail with "remove this entry" once fixed. The specs wait for
@@ -227,19 +320,21 @@ counts from it (`e2e/support.ts`), never from literals.
 
 ```
 src/
-├── proxy.ts                 # Host allowlist, viewer role on every route, operator for the terminal, nonce CSP
+├── proxy.ts                 # Host allowlist, a session on every route (no roles), the terminal only
+│                            #   while it is on, nonce CSP
 ├── app/
 │   ├── layout.tsx           # fonts (Inter, JetBrains Mono), metadata (no smooth-scroll library: everything scrolls natively)
 │   ├── page.tsx             # the viewer: loads the saved runs, every run or ?uid=, derives the dashboard
-│   ├── docs/                # documentation in the dashboard frame (layout checks the viewer role): /docs and
+│   ├── docs/                # documentation in the dashboard frame (layout checks the session): /docs and
 │   │                        #   /docs/[group], one page per group (content in src/content/docs/)
-│   ├── terminal/            # /terminal → /?view=terminal (operators)
+│   ├── terminal/            # /terminal → /?view=terminal (while the terminal is on)
 │   ├── assistant/           # /assistant → /?view=assistant
 │   ├── login/               # sign-in (token from the link's #fragment) → the Overview
 │   └── api/                 # session (sign-in), assessments/[uid] (JSON), assessments/[uid]/export,
-│                            #   reports/combined (1–5 runs as one PDF / DOCX; viewer), terminal/ticket,
+│                            #   reports/combined (1–5 runs as one PDF / DOCX), terminal/ticket,
 │                            #   assistant, assistant/conversations and assistant/models (+ [id], active,
-│                            #   test, fetch: the Model menu) (operators)
+│                            #   test, fetch: the model picker), knowledge (+ [id], [id]/original: the
+│                            #   Security knowledge page)
 ├── lib/
 │   ├── data/                # schema.ts (zod), store.ts (server-only reader), stats.ts (pure),
 │   │                        #   adapt.ts (a saved run → the viewer's terms), view-types.ts, format.ts
@@ -247,22 +342,25 @@ src/
 │   │                        #   combined/ (query.ts validates ?uids=&format=&evidence=&low=&appendix=,
 │   │                        #   select.ts merges the runs, html.ts renders, options.ts names the file),
 │   │                        #   docx/ (zip.ts, ooxml.ts, report.ts and combined.ts: the Word documents)
-│   ├── auth/                # session.ts (launch token, signed cookie, roles, hosts), csp.ts, guard.ts
+│   ├── auth/                # session.ts (launch token, signed cookie, hosts), csp.ts, guard.ts
 │   │                        #   (+ terminalAccess), origin.ts (same-origin check), ticket.ts (terminal tickets)
 │   ├── terminal/            # config.ts (on/off, helper port), paths.ts, protocol.ts (frames, close codes),
 │   │                        #   screen-text.ts (what Copy output copies)
-│   ├── assistant/           # config.ts (the rules every model passes, the Environment model), request.ts
+│   ├── assistant/           # config.ts (the rules every model passes), request.ts
 │   │                        #   (zod), context.ts (what the model sees),
 │   │                        #   prompt.ts, llm.ts + stream.ts + reply.ts (the streamed reply), protocol.ts
 │   │                        #   (NDJSON frames), intent.ts + cards.ts + insights.ts + prompts.ts (cards and
 │   │                        #   prompts from saved data), history-store.ts + history-schema.ts (saved
 │   │                        #   conversations), secure-fs.ts (the folder's safe file handling), redact.ts,
 │   │                        #   markdown.ts, rate.ts, access.ts, client.ts;
-│   │                        #   models/ (the Model menu: presets.ts, schema.ts, requests.ts, view.ts, crypto.ts
+│   │                        #   models/ (the model picker: presets.ts, schema.ts, requests.ts, view.ts, crypto.ts
 │   │                        #   (AES-256-GCM keys), store.ts (models.json), resolve.ts (which model answers),
 │   │                        #   remote.ts (test, fetch), respond.ts, errors.ts);
 │   │                        #   knowledge/ (the TUI's /add-on files, read-only: paths.ts, schema.ts,
 │   │                        #   read.ts, rank.ts (BM25), index.ts searchKnowledge)
+│   ├── knowledge/           # the Security knowledge page: paths.ts, rules.ts (what an upload may be),
+│   │                        #   format.ts, types.ts, client.ts (browser); access.ts, list.ts, upload.ts,
+│   │                        #   cli.ts (the Python CLI) + commands.ts, gate.ts, original.ts (server)
 │   ├── scroll/              # stick-rules.ts + stick-controller.ts (the conversation follows its end)
 │   ├── scroll.ts            # scrolling a row into view by hand (never scrollIntoView, which moves the page)
 │   ├── paging.ts            # ten rows a page: the page clamped from the address, the label
@@ -280,14 +378,20 @@ src/
 │   │                        #   view-url.ts (?view=, each view's keys, run links), live-refresh.tsx,
 │   │                        #   intro.tsx (GSAP, by data-motion); the Assessments view (assessments-*.ts(x)),
 │   │                        #   Findings (findings-view/-list.tsx, finding-detail.tsx, filters.ts, filter-bar.tsx),
-│   │                        #   Reports (reports-view.tsx, report-selection/-runs/-preview.tsx, derive-report.ts),
+│   │                        #   Reports (reports-view.tsx, report-selection/-runs/-preview/-downloads/-file.tsx,
+│   │                        #   use-file-download.ts: fetch then save, with a status line; derive-report.ts),
 │   │                        #   run-cells.tsx (the one run row of Assessments and Reports), view-header.tsx,
 │   │                        #   view-link.tsx and run-link.tsx (drill-downs), docs-search.tsx
 │   ├── assistant/           # AssistantProvider (+ use-* hooks: open, asking, history, tab memory),
 │   │                        #   AssistantStage + motion*.ts + use-globe*.ts (the transition and the globe),
 │   │                        #   AssistantView, header, welcome, prompt cards, messages, cards/, composer,
 │   │                        #   conversation menu, breath.ts, use-stick-to-bottom.ts + scroll-to-bottom.tsx,
-│   │                        #   the Model menu (model-menu/-list/-form/-names.tsx, use-models.ts, use-fit-below.ts)
+│   │                        #   the composer's model chip and picker (model-chip.tsx, model-picker.tsx, the
+│   │                        #   steps model-pick/-your-models/-providers/-credentials/-choose.tsx, the rules
+│   │                        #   model-picker-rules.ts + model-name-rules.ts, use-models.ts, use-roving.ts,
+│   │                        #   use-fit-above.ts)
+│   ├── knowledge/           # KnowledgeView, FileTable / FileGrid, FileActions (Open, Remove), LayoutSwitch,
+│   │                        #   UploadDialog, KindIcon, use-knowledge.ts, use-layout.ts
 │   ├── terminal/            # TerminalView, TerminalPanel, TerminalToolbar, RestartButton, TerminalNotice,
 │   │                        #   ScrollToLatest, useXterm, useTerminalSession, useTerminalView, useLeaveWarning
 │   ├── ui/                  # Button, Badge, StatusBadge / SeverityBadge, IconButton, Checkbox, CopyButton,
@@ -300,14 +404,18 @@ src/
 └── styles/                  # tokens.css (GENERATED from reconix/theme.py by scripts/export_tokens.py), then one
                              #   file per area, imported in this order from app/globals.css: frame (page and
                              #   scrolling), dashboard, motion, terminal, site, assistant, ui (shared controls),
-                             #   findings, assessments, reports, docs
+                             #   findings, assessments, reports, knowledge, docs
 public/globe/land.bin        # the globe's land dots (scripts/build-globe-points.mjs)
 ```
 
 ## Exports
 
 The Reports view's **Download** row offers PDF, JSON and DOCX (the same three the TUI saves),
-straight from `/api/assessments/<uid>/export?format=…`. The PDF is printed by a Chrome/Chromium
+from `/api/assessments/<uid>/export?format=…`, and so does each row of the runs table. Each
+button fetches the whole file, then saves it (`use-file-download.ts`, shared with the combined
+report), so a refusal is shown, never saved as a file: the status line under the buttons (under
+the table, naming the run) says "Downloaded …", offers **Retry** on a failure, and offers
+**Download DOCX** when the PDF can't be printed. The PDF is printed by a Chrome/Chromium
 on the dashboard machine (`RECONIX_CHROME` names one); without a browser the route says so and
 links the Word document. Every format is a download, and no route may be framed. The DOCX is
 written by `lib/report/docx/` (no dependency: a stored ZIP of the document and its styles, every
@@ -329,18 +437,20 @@ once, with each run as an occurrence; what a run lacks is listed under Limitatio
   decisions belong in the TUI. Two exceptions: the Terminal page runs the TUI itself (its
   ticket route only hands out a ticket; the helper starts the session), and the AI Assistant
   writes **its own conversation files** and its saved models (`models.json`, `models.key`) in
-  `~/.reconix/assistant` (and nothing else). The assistant's route is also the one place saved
-  data leaves the machine, and only to the model the operator chose (the Model menu's test and
+  `~/.reconix/assistant` (and nothing else). The Security knowledge page adds and removes
+  knowledge files, never itself: it starts the Python knowledge CLI (the same code as `/add-on`)
+  for each change and for each original it opens (the knowledge folder is not assessment data). The assistant's route is also the one place saved
+  data leaves the machine, and only to the model you chose (the model picker's test and
   fetch send no assessment data). The PDF exports (single and combined) start a headless Chrome on a
   temp file the server wrote (`lib/report/pdf.ts`), never on anything the request said.
 - **One data source.** Pages read through `lib/data/store.ts` only; it accepts regular files
   named `<YYYYMMDD-HHMMSS-xxxx>_<id>.json` up to 5 MB that pass `AssessmentSchema`.
   Change `schema.ts` together with `reconix/store/snapshot.py`.
-- **Access.** Every page and route needs the `viewer` role, and `/terminal`,
-  `/api/terminal/*` and `/api/assistant` (with everything under it) need `operator` (`proxy.ts`, and pages / handlers check again; the
-  page renders the Terminal view only for operators). The
-  sign-in link grants `operator` while the terminal is on (`--no-terminal`: `viewer`). The
-  dashboard binds to 127.0.0.1 and refuses other Host headers; so does the terminal helper.
+- **Access.** No roles: one local user. Every page and route but the sign-in page and route
+  needs a session (the cookie `<issued>.<signature>`, 12 h; an old role-prefixed one no longer
+  reads), and signed in everything is open. `/terminal` and `/api/terminal/*` also need the
+  dashboard to host the terminal, and a ticket the terminal key cookie too (`proxy.ts`, and pages
+  / handlers check again). Every change checks the page's Origin. The dashboard binds to 127.0.0.1 and refuses other Host headers; so does the terminal helper.
 - **Text is text.** Saved values (targets, evidence, chat) and the model's replies are
   rendered by React as text (`MessageText` turns a small markdown subset into elements);
   never use `dangerouslySetInnerHTML`.

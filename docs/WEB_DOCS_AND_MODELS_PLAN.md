@@ -33,6 +33,13 @@ back), and the rail's Configuration (Settings) item is gone.
 
 ## 2. AI Assistant: several providers and models
 
+Since replaced, on the same routes and storage, by the model chip and picker in the composer:
+see `WEB_COMPOSER_MODEL_PICKER_PLAN.md`, then (2026-10-22, branch `r6/picker-v2`)
+`WEB_KNOWLEDGE_PAGE_AND_MODELS_PLAN.md`: **the Environment provider is gone**. The web no longer
+reads `LLM_BASE_URL`, `LLM_MODEL` or `LLM_API_KEY`; every model is added with the composer's
+**+ Model**; `LLM_ALLOW_REMOTE` stays the server's cloud switch. The "Environment provider" and
+"Today one model comes from `web/.env.local`" below are history.
+
 Status: done (2026-10-22, branch `next/assistant-models` off `feature/next`): a **Model** menu
 in the assistant's header switches the active model, and **+ Add model** adds a provider with its
 models. Built as below, plus: the presets also list Anthropic and DeepSeek; a saved key is kept

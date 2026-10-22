@@ -6,20 +6,25 @@ import { useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 
 // (no "audit" or "scope": the Audit log and Scope views were removed; old ?view=audit and
-// ?view=scope links open the Overview)
-export const VIEWS = ["overview", "assessments", "findings", "reports", "terminal", "assistant"] as const;
+// ?view=scope links open the Overview). "knowledge" is the Security knowledge page, opened from
+// the AI Assistant's header (no sidebar item).
+export const VIEWS = ["overview", "assessments", "findings", "reports", "terminal", "assistant", "knowledge"] as const;
 export type View = (typeof VIEWS)[number];
 
 /** The Assessments view's own address parameters (its filters, its page). */
 export const ASSESSMENT_KEYS = ["q", "status", "template", "page"] as const;
 /** The Findings view's own address parameters (its filters, the selected finding, its page). */
-export const FINDINGS_KEYS = ["sev", "val", "q", "finding", "page"] as const;
+export const FINDINGS_KEYS = ["sev", "val", "q", "fp", "finding", "page"] as const;
+/** The Report view's own address parameters: the every-run Targets card's page (`tpage`, a key
+    of its own, so it never meets a `page`; the runs table keeps its page in state). */
+export const REPORT_KEYS = ["tpage"] as const;
 
 /** Each view's own filter parameters (cleared when a link opens that view with new ones). The
     one list per view: the views read their parameters from these same constants. */
 export const VIEW_FILTERS: Partial<Record<View, readonly string[]>> = {
   assessments: ASSESSMENT_KEYS,
   findings: FINDINGS_KEYS,
+  reports: REPORT_KEYS,
 };
 
 export type ViewParams = Record<string, string | undefined>;
@@ -117,14 +122,16 @@ export function useQueryParams<K extends string>(keys: readonly K[]): [Record<K,
 }
 
 /** The link that opens one saved run (`uid`), or every run (`null`), from the address `search`
-    (pure): the open view and its filters stay, but not the selected finding or the page (they
-    belong to the run left behind: another run has other findings and fewer or more pages). */
+    (pure): the open view and its filters stay, but not the selected finding or a page (they
+    belong to what was left behind: another run has other findings and fewer or more pages, and
+    the Report's targets are paged only while every run is shown). */
 export function runHref(search: string, uid: string | null): string {
   const next = new URLSearchParams(search);
   if (uid) next.set("uid", uid);
   else next.delete("uid");
   next.delete("finding");
   next.delete("page");
+  next.delete("tpage");
   const query = next.toString();
   return query ? `/?${query}` : "/";
 }

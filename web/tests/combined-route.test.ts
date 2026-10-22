@@ -1,5 +1,5 @@
-/* GET /api/reports/combined called directly (the e2e tests go through the proxy too): the
-   viewer role, the query checked before anything is read (1–5 distinct uids, the format, the
+/* GET /api/reports/combined called directly (the e2e tests go through the proxy too): a
+   session, the query checked before anything is read (1–5 distinct uids, the format, the
    flags), 404 for a run that is not saved, the preview HTML inline, the PDF and the DOCX as
    downloads, 501 with the DOCX link when no browser can print. Every answer is no-store. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,7 +26,7 @@ beforeEach(() => {
   process.env.RECONIX_DATA_DIR = "sample-data";
   process.env.RECONIX_STALE_AFTER_HOURS = "0";
   delete process.env.RECONIX_CHROME;
-  cookie = sessionValue("viewer", TOKEN);
+  cookie = sessionValue(TOKEN);
 });
 afterEach(() => {
   process.env = { ...saved };
@@ -69,12 +69,14 @@ describe("the query", () => {
 });
 
 describe("GET /api/reports/combined", () => {
-  it("needs the viewer role", async () => {
+  it("needs a session (an old role-prefixed cookie is none)", async () => {
     cookie = "";
     const res = await get(`uids=${uids[0]}`);
     expect(res.status).toBe(401);
     expect(res.headers.get("cache-control")).toBe("no-store");
     cookie = "viewer.forged";
+    expect((await get(`uids=${uids[0]}`)).status).toBe(401);
+    cookie = `viewer.${sessionValue(TOKEN)}`;
     expect((await get(`uids=${uids[0]}`)).status).toBe(401);
   });
 

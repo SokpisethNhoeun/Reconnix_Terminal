@@ -67,6 +67,7 @@ reconix/
 │   ├── agent.py      # agent mode: /assess drives the backend harness, streams events
 │   └── web.py        # /web: open the dashboard, starting it in the background if needed
 ├── flow/             # RunController (plays store steps), gates.py (gate → screen), phases
+├── knowledge/        # `python -m reconix.knowledge` (add/list/original/remove): the web's /add-on
 ├── llm/              # flexible LLM (no UI, no store.lists): config, crypto (Fernet),
 │                     #   db (sqlite3), catalog (6 providers), client (LiteLLM), guardrail
 ├── commands/         # registry.py (Command: choices, ask, empty) + builtin.py (COMMANDS)
@@ -224,52 +225,76 @@ Overview by `data-motion` (`top|hero|fade|right|bottom`), never by class names. 
 and the docs scroll natively: on the fixed desktop frame `.dash-content` is the one scroller, elsewhere the
 window. The **AI Assistant** (`?view=assistant`, `components/assistant/`) opens from the Ask bar
 and its sidebar tab with a ≈1.6 s GSAP transition (`MOTION` in `motion.ts`) that carries the one
-WebGL globe (never mount a second) behind the welcome; `POST /api/assistant` (operators) asks
-the OpenAI-compatible model named by `LLM_BASE_URL` / `LLM_MODEL` (`web/.env.local`; off this
-machine only with
-`LLM_ALLOW_REMOTE=1`), with a context the server builds from the saved files
+WebGL globe (never mount a second) behind the welcome; `POST /api/assistant` (signed in) asks
+the OpenAI-compatible model chosen with the composer's model chip (only models added there with
+**+ Model**, saved in `models.json`/`models.key` in its folder: the web reads no `LLM_BASE_URL` /
+`LLM_MODEL` / `LLM_API_KEY`; cloud and remote addresses work by default, the picker and the
+chip saying the data goes there; the e2e seeds its stand-in as a saved provider,
+`e2e/models.ts`), with a context the server builds from the saved files
 (`lib/assistant/context.ts`: no evidence, every value cleaned, framed as untrusted data) and
 questions masked by `lib/assistant/redact.ts` (a port of `store/redact.py`: change both, the
 vectors in `web/tests/redact-vectors.json` check both), streams NDJSON frames with cards the
 server builds from the saved data (`lib/assistant/cards.ts`; the model never supplies numbers,
 and nothing is run or approved from the chat), and keeps conversations on disk
 (`lib/assistant/history-store.ts`, `~/.reconix/assistant`, 0700/0600, 30-day retention).
-It also reads, never writes, the knowledge the TUI's `/add-on` keeps in `~/.reconix/knowledge`
-(`lib/assistant/knowledge/`: no-follow, owner and size checks, the TUI's BM25), putting the
+It also reads, never writes, the knowledge index and passages the TUI's `/add-on` keeps in `~/.reconix/knowledge`
+(originals are kept encrypted as `<id>.orig` with `~/.reconix/knowledge.key`; uploads, opens and
+removals go through `python -m reconix.knowledge`, `reconix/knowledge/`; `lib/assistant/knowledge/`: no-follow, owner and size checks, the TUI's BM25), putting the
 passages relevant to the masked question inside the fence framed as untrusted reference material
 and naming their files in `meta` ("Knowledge used: …").
-The model comes from the assistant's **Model** menu (`components/assistant/model-menu.tsx`,
-`/api/assistant/models…`, `lib/assistant/models/`): providers and the active choice live in
-`models.json` beside the conversations, API keys AES-256-GCM-sealed with `models.key` (0600) and
-never sent to the browser; every model passes `config.ts`'s `checkModel`, and while nothing is
-chosen the `LLM_*` model (the read-only "Environment") is the default.
+The model is chosen with the **model chip** in the assistant's composer (`model-chip.tsx` opens
+`model-picker.tsx` upward: "Model", your saved models with **+ Model** (`model-list.tsx`), and
+"Set the provider" (`model-provider-form.tsx`: provider, base URL, API key, fetched or typed
+model, Add model); the header has no model control; `/api/assistant/models…`,
+`lib/assistant/models/`; every preset usable, cloud included): providers and
+the active choice live in `models.json` beside the conversations, API keys AES-256-GCM-sealed
+with `models.key` (0600) and never sent to the browser; every model passes `config.ts`'s
+`checkModel`, and while nothing is chosen no model answers (there is no Environment model).
 `webterm` drops `LLM_*` from the TUI's env. Exports: a report is saved as PDF, JSON or DOCX,
 in the TUI and the web alike (the report HTML is only the PDF's source and the combined preview,
 never a download): `GET /api/assessments/<uid>/export?format=pdf|json|docx`
-(`lib/report/formats.ts`) and `GET /api/reports/combined?uids=a,b&format=preview|pdf|docx` (viewer;
+(`lib/report/formats.ts`) and `GET /api/reports/combined?uids=a,b&format=preview|pdf|docx` (signed in;
 1–5 saved runs combined in memory from the saved, already-redacted files, `lib/report/combined/`,
 the query validated first; the preview inline, the PDF printed by the same headless Chrome as the
 single export, 501 with the DOCX link without one; the Word files come from `lib/report/docx/`).
+**Security knowledge** (`?view=knowledge`, `components/knowledge/`) opens from the assistant
+header's Security knowledge button (no sidebar item; "← AI Assistant" goes back): the knowledge
+files as a table or a grid (remembered per browser), a search over names, Upload (one
+`.docx .pdf .txt .md .json .yaml .yml` file ≤ 10 MB; a `.doc` is told to become a `.docx`), Open
+(the kept original: inline in a `sandbox; default-src 'none'` policy for PDF and text, a download
+for DOCX) and Remove (asked first). `GET /api/knowledge` reads the index itself
+(`lib/assistant/knowledge/read.ts`, never a path); every change goes through the same Python code
+as `/add-on`: `lib/knowledge/cli.ts` runs `python -m reconix.knowledge add|original|remove`
+(the dashboard's Python, as `serve.mjs` finds it; fixed arguments, no shell, a minimal env with
+no `LLM_*`, 60 s), an upload first copied to a private temp file (0600 in a 0700 folder) that is
+always deleted, one upload at a time and ten a minute (`docs/WEB_KNOWLEDGE_PAGE_AND_MODELS_PLAN.md`).
 **Read-only for assessments**: no route writes or deletes anything the TUI reads; the only
-writes are the assistant's own conversation and model files, and the only things started are the Terminal
+writes are the assistant's own conversation and model files and the knowledge files the Security
+knowledge page adds or removes (through that CLI only; the knowledge folder is not assessment
+data), and the only things started are the Terminal
 page's TUI (the ticket route hands out a ticket; `reconix/webterm`, started by
-`web/scripts/serve.mjs`, runs the TUI, so its gates are the store's gates) and, for both PDF
-routes, a headless Chrome that prints a temp file the server wrote (`lib/report/pdf.ts`,
-`RECONIX_CHROME`; never anything the request said). Minting a ticket needs the operator session
-cookie **and** the terminal key cookie (`Path=/api/terminal`, signed differently); the helper
+`web/scripts/serve.mjs`, runs the TUI, so its gates are the store's gates), the knowledge CLI and,
+for both PDF routes, a headless Chrome that prints a temp file the server wrote
+(`lib/report/pdf.ts`, `RECONIX_CHROME`; never anything the request said). Minting a ticket needs the session
+cookie, the terminal on **and** the terminal key cookie (`Path=/api/terminal`, signed differently,
+set at sign-in only while the terminal is on); a ticket is single use; the helper
 proves itself with a hello before the page sends anything; the TUI's pty is its controlling
 terminal, so
 it dies with the helper (on Windows the TUI runs in a ConPTY console the helper owns, see
-`docs/WEB_WINDOWS_PLAN.md`; keep both backends behind `webterm/session.py`'s `spawn()`). A stand-in command needs `RECONIX_TERM_TEST=1` (tests only).
+`docs/WEB_WINDOWS_PLAN.md`; keep both backends behind `webterm/session.py`'s `spawn()`). A stand-in command needs `RECONIX_TERM_TEST=1` (tests only),
+and so does the knowledge CLI's stand-in (`RECONIX_KNOWLEDGE_CLI`, `web/e2e/knowledge-cli-stub.mjs`:
+the same contract over a temp folder).
 Read `web/CLAUDE.md` and `web/README.md` (Rules) before changing it. This Next.js version
 differs from older ones, so check `web/node_modules/next/dist/docs/` before writing code.
-Every page and route needs the `viewer` role; `/terminal`, `/api/terminal/*` and
-`/api/assistant` (and everything under it) need `operator` (`proxy.ts`, and the pages / handlers check again; the Terminal view is rendered
-only for operators, and guarded pages read the cookies first so none is prerendered). The ticket format lives in
+There are no roles (one local user, `docs/WEB_NO_ROLES_AND_WORKFLOW_PARITY_PLAN.md` §1): every
+page and route but the sign-in page and route needs a session (`<issued>.<signature>`; an old
+role-prefixed cookie no longer reads), and signed in everything is open; `/terminal` and
+`/api/terminal/*` also need the dashboard to host the terminal (`proxy.ts`, and the pages /
+handlers check again; guarded pages read the cookies first so none is prerendered). The ticket format lives in
 both `web/src/lib/auth/ticket.ts` and `reconix/webterm/ticket.py` (shared test vector), and
 the frame protocol in `web/src/lib/terminal/protocol.ts` and `reconix/webterm/protocol.py`:
 change each pair together. The helper never logs terminal data (`TEST_PASSWORD` test), and
-the sign-in link (operator control) is printed only to a TTY, never to `~/.reconix/web.log`.
+the sign-in link (full control) is printed only to a TTY, never to `~/.reconix/web.log`.
 
 ## Project rules (applied to this TUI)
 

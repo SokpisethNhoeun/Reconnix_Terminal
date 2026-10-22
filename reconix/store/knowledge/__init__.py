@@ -17,7 +17,7 @@ from typing import List, Tuple
 from ..activity import log_event
 from ..errors import StoreValidationError
 from ..redact import redact
-from . import files, paths
+from . import files, original, paths
 from .chunk import split
 from .extract import extract
 from .files import MAX_SOURCES, Source
@@ -29,12 +29,20 @@ from .rank import rank as _bm25
 __all__ = [
     "Source", "Passage", "add_source", "list_sources", "remove_source", "clear", "search",
     "MAX_SOURCES",
+    "read_original", "ORIGINS",
 ]
 
 
-def add_source(path_text: str) -> Source:
-    """Read a file, redact it, chunk it and save it as a new source. Returns the `Source`,
-    whose `cut` says when a cap cut the file short ("" when it was read whole).
+ORIGINS = ("terminal", "web")
+
+
+def add_source(path_text: str, name: str = "", origin: str = "terminal") -> Source:
+    """Read a file, redact it, chunk it and save it as a new source, keeping the original
+    (as read, never redacted) encrypted beside it. Returns the `Source`, whose `cut` says when
+    a cap cut the file short ("" when it was read whole).
+
+    `name` (optional) is the display name, whose base name is used (never a path); `origin` is
+    "terminal" or "web".
 
     Raises `StoreValidationError` on any refusal (bad path, unsupported type, too large, a
     corrupt index, the 50-source limit, a folder that can't be written) and leaves nothing new
@@ -44,29 +52,42 @@ def add_source(path_text: str) -> Source:
     if len(existing) >= MAX_SOURCES:
         raise StoreValidationError(f"The knowledge limit is {MAX_SOURCES} files. Remove one first.")
 
-    extracted = extract(path_text)
+    if origin not in ORIGINS:
+        raise StoreValidationError("Unknown source.")
+    extracted = extract(path_text, name)
     # Redact the whole text BEFORE chunking/storing, so no secret reaches disk.
     passages, passages_cut = split(redact(extracted.text))
     if not passages:
         raise StoreValidationError("That file has no readable text to add.")
 
     source = Source(id=_new_id(existing), name=extracted.name, kind=extracted.kind,
-                    bytes=extracted.bytes, chunks=len(passages), added_at=_now())
-    _save(source, passages, existing)
+                    bytes=extracted.bytes, chunks=len(passages), added_at=_now(), source=origin,
+                    original=True)
+    _save(source, passages, existing, extracted.data)
     log_event("knowledge.added", f"{source.name} ({source.kind}, {source.chunks} passages)")
     cut = f"cut to the first {len(passages):,} passages" if passages_cut else extracted.cut
     return dataclasses.replace(source, cut=cut)
 
 
-def _save(source: Source, passages: List[str], existing: List[Source]) -> None:
+def _save(source: Source, passages: List[str], existing: List[Source],
+          data: bytes) -> None:
     """Write the source's file, then the index; on a failure remove the new file again."""
     try:
+        original.write_original(source.id, data)
         files.write_source(source.id, source.name, passages)
         files.write_index(existing + [source])
+    except StoreValidationError:
+        _discard(source.id)
+        raise
     except OSError:
-        files.delete_source_file(source.id)     # never leave a file the index doesn't list
+        _discard(source.id)                     # never leave a file the index doesn't list
         raise StoreValidationError(f"Couldn't save the knowledge file; check that "
                                    f"{paths.knowledge_dir()} is yours and writable.") from None
+
+
+def _discard(source_id: str) -> None:
+    files.delete_source_file(source_id)
+    original.delete_original(source_id)
 
 
 def list_sources() -> List[Source]:
@@ -89,9 +110,20 @@ def remove_source(source_id: str) -> Source:
         files.write_index(remaining)
     except OSError:
         raise StoreValidationError("Couldn't update the knowledge index.") from None
-    files.delete_source_file(source_id)
+    _discard(source_id)
     log_event("knowledge.removed", removed.name)
     return removed
+
+
+def read_original(source_id: str) -> bytes:
+    """The decrypted original of a source. Raises `StoreValidationError` for an unknown id or
+    a source with no original (an older one)."""
+    source = files.get(source_id) if files.valid_id(source_id) else None
+    if source is None:
+        raise StoreValidationError("Unknown add-on.")
+    if not source.original:
+        raise StoreValidationError("No original was kept for that file.")
+    return original.read_original(source_id)
 
 
 def clear() -> int:

@@ -28,9 +28,6 @@ export const MAX_PROVIDER_BYTES = 36 + 6 * MAX_NAME + 16 + 6 * MAX_URL + MAX_MOD
 export const MAX_FILE_BYTES = MAX_PROVIDERS * MAX_PROVIDER_BYTES + 16_384;
 /** A provider's id: a random (v4) UUID, lower case. */
 export const PROVIDER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-/** The read-only provider made from LLM_BASE_URL / LLM_MODEL (never saved in the file). */
-export const ENVIRONMENT = "environment";
-export const ENVIRONMENT_NAME = "Environment";
 /** An API key: printable ASCII without spaces (it goes into an Authorization header). */
 export const API_KEY = /^[\x21-\x7e]{1,4096}$/;
 

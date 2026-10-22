@@ -1,7 +1,9 @@
 /* The Report view, for one run or every saved run (ReportCards, derive-report.ts), in the
-   Overview's style. One run: the summary strip, its details and plan, Findings by Severity and
+   Overview's style. Findings by Severity lists the top 3 CVSS findings here (the Overview's card
+   shows more). One run: the summary strip, its details and plan, Findings by Severity and
    the findings table, with every export format to download. Every run: the strip, Findings by
-   Severity, the targets, and the runs with their reports — plus the Selection panel and preview
+   Severity beside the targets (7 a page, the same height), and the runs with their reports —
+   plus the Selection panel and preview
    that combine up to five of them into one report (ReportCombine). Server component. */
 import { FindingsCard } from "@/components/dashboard/findings-card";
 import { ReportDetails } from "@/components/dashboard/report-details";

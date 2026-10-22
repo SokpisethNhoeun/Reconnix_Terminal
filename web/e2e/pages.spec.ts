@@ -6,6 +6,7 @@ import { type Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 
 import { PER_PAGE } from "../src/lib/paging";
+import { NO_PRINTER } from "../src/lib/report/formats";
 import { counted, hydrated, newest, sample, signIn, toolSteps } from "./support";
 
 const view = (name: string) => `nav[aria-label="Views"] button[aria-label^="${name}"]`;
@@ -44,7 +45,11 @@ test("the overview totals every saved file by default", async ({ page }) => {
   await expect(cards).toHaveCount(4);
   expect(await cards.evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).toEqual(["Findings", "Assessment progress", "Tool execution", "Duration"]);
   await page.click(view("Findings"));
-  await expect(findingRows(page)).toHaveCount(Math.min(PER_PAGE, all.reduce((n, a) => n + a.findings.length, 0))); // ten a page
+  // the Findings view counts what the Overview counts (false positives left out, listed on request)
+  const total = all.reduce((n, a) => n + counted(a).length, 0);
+  await expect(findingRows(page)).toHaveCount(Math.min(PER_PAGE, total)); // ten a page
+  await expect(page.getByText(new RegExp(`^${total} findings across ${all.length} assessments`))).toBeVisible();
+  await expect(page.getByText(`Showing ${total} of ${total} findings`)).toBeVisible();
   // Reports sums up every run too (no run picker): a row per run
   await page.click(view("Reports"));
   // every run is a row, ten to a page
@@ -242,14 +247,15 @@ test("the report links every export format and each one downloads the newest run
   const run = newest();
   await page.goto(`/?uid=${run.uid}`);
   await page.click(view("Reports"));
-  const links = page.getByRole("navigation", { name: "Download the report" }).getByRole("link");
-  await expect(links).toHaveText(["PDF", "JSON", "DOCX"]);
+  const buttons = page.getByRole("navigation", { name: "Download the report" }).getByRole("button");
+  await expect(buttons).toHaveText(["PDF", "JSON", "DOCX"]);
   const media = { pdf: "application/pdf", json: "application/json", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
   for (const [i, format] of (["pdf", "json", "docx"] as const).entries()) {
-    const href = (await links.nth(i).getAttribute("href"))!;
-    const url = new URL(href, page.url());
-    expect(url.pathname, format).toBe(`/api/assessments/${run.uid}/export`);
-    expect(url.searchParams.get("format"), format).toBe(format);
+    // the button fetches the file, then saves it under the run's name
+    const saved = page.waitForEvent("download", { timeout: 60_000 });
+    await buttons.nth(i).click();
+    expect((await saved).suggestedFilename(), format).toBe(`${run.uid}.${format}`);
+    const href = `/api/assessments/${run.uid}/export?format=${format}`;
     const res = await page.request.get(href);
     expect(res.status(), format).toBe(200);
     expect(res.headers()["content-type"], format).toContain(media[format]);
@@ -260,6 +266,40 @@ test("the report links every export format and each one downloads the newest run
     expect(body.length, `${format} is not empty`).toBeGreaterThan(100);
     if (format === "json") expect((JSON.parse(body.toString()) as { uid: string }).uid).toBe(run.uid);
   }
+});
+
+test("the top bar's docs search lists matching pages, and says when none matches", async ({ page }) => {
+  await signIn(page);
+  const search = page.getByRole("combobox", { name: "Search docs" });
+  await search.fill("terminal");
+  await expect(page.getByRole("listbox").getByRole("option").first()).toBeVisible();
+  await search.fill("zzqx-no-such-page");
+  await expect(page.getByRole("listbox")).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: "No docs page matches" })).toHaveText("No docs page matches “zzqx-no-such-page”.");
+});
+
+test("one run's PDF that fails shows why and offers Retry, and one that can't be printed offers the DOCX", async ({ page }) => {
+  const run = newest();
+  let calls = 0;
+  await page.route(`**/api/assessments/${run.uid}/export?format=pdf`, (route) => {
+    calls += 1;
+    return calls === 1
+      ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "Stubbed print failure" }) })
+      : route.fulfill({ status: 501, contentType: "application/json", body: JSON.stringify({ detail: NO_PRINTER }) });
+  });
+  await page.goto(`/?uid=${run.uid}&view=reports`);
+  await hydrated(page);
+  const pane = page.locator('[data-view-pane="reports"]');
+  const status = pane.locator("[data-file]");
+  await expect(status).toHaveAttribute("data-file", "idle");
+  await page.getByRole("navigation", { name: "Download the report" }).getByRole("button", { name: "PDF" }).click();
+  await expect(status).toHaveAttribute("data-file", "failed");
+  await expect(status).toContainText("The PDF could not be generated: Stubbed print failure.");
+  await status.getByRole("button", { name: "Retry" }).click();
+  await expect(status).toHaveAttribute("data-file", "unsupported");
+  await expect(status).toContainText(NO_PRINTER);
+  await expect(status.getByRole("link", { name: "Download DOCX" })).toHaveAttribute("href", `/api/assessments/${run.uid}/export?format=docx`);
+  expect(calls).toBe(2);
 });
 
 test("a card opens its documentation", async ({ page }) => {

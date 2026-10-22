@@ -22,6 +22,13 @@ import type { EventBadge, FindingsSlice } from "./overview-types";
 import type { AssessmentsCards, ReportCards, ReportFindingRow, ReportRunRow, ReportTargetRow } from "./report-types";
 import type { Stat } from "./stat-types";
 
+/** The Report view's Findings by Severity lists the top 3 CVSS findings (one run and every run
+    alike); the Overview's card keeps its own longer list (derive.ts). */
+export const REPORT_TOP_FINDINGS = 3;
+
+/** The Overview's Findings by Severity with the top list cut to the Report view's length. */
+export const reportSlice = (slice: FindingsSlice): FindingsSlice => ({ ...slice, top: slice.top.slice(0, REPORT_TOP_FINDINGS) });
+
 const masked = (v: AssessmentView) => v.log.filter((l) => l.kind === "mask").length;
 const counted = (v: AssessmentView) => v.findings.filter((f) => !f.falsePositive);
 
@@ -64,7 +71,16 @@ function findingRows(rows: FindingRow[]): ReportFindingRow[] {
     tool: f.tool,
     cwe: f.cwe,
     rating: f.rating,
+    falsePositive: f.falsePositive,
   }));
+}
+
+/** The findings table's count: the findings (false positives left out, so it is the strip's
+    number), with the false positives it lists beside it ("7 findings + 1 false positive"). */
+export function reportFindingsMeta(rows: Pick<ReportFindingRow, "falsePositive">[]): string {
+  const fp = rows.filter((r) => r.falsePositive).length;
+  const counted = plural(rows.length - fp, "finding");
+  return fp ? `${counted} + ${plural(fp, "false positive")}` : counted;
 }
 
 // --- one run -------------------------------------------------------------------------------
@@ -126,7 +142,7 @@ export function reportCards(v: AssessmentView, findings: FindingRow[], slice: Fi
       },
     ],
     plan: v.phases.map((p) => ({ key: p.key, label: p.label, state: STEP_STATUS[p.status], pct: p.pct })),
-    findings: slice,
+    findings: reportSlice(slice),
     rows: findingRows(findings),
   };
 }
@@ -224,7 +240,7 @@ export function overallReportCards(views: AssessmentView[], slice: FindingsSlice
         "times the runs masked sensitive values before saving",
       ),
     ],
-    findings: slice,
+    findings: reportSlice(slice),
     targets,
     runs,
   };

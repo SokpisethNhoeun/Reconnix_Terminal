@@ -1,189 +1,98 @@
 "use client";
 
-/* The Model menu's list: every provider with its models as choices, the Environment (from
-   web/.env.local, read-only) first. One click (or Enter / Space) on a model makes it the one
-   that answers next; the active one is checked. Each provider's models are a menu of radio items
-   (menuitemradio, aria-checked) with one tab stop, kept in React state (roving tabindex): the
-   arrow keys, Home and End only move focus between its models, and choosing is a deliberate
-   Enter, Space or click, since it saves (a radio group's arrows would choose, and switch the
-   model on every key press). A saved provider can be edited or removed (asked first). A model
-   that can't be used now is disabled with the reason. */
-import { useId, useState } from "react";
-import { Check, Loader, Pencil, Trash2 } from "lucide-react";
+/* The model picker's list, "Model": every saved model (model-picker-rules.ts `modelRows`), ✓ on
+   the one that answers next, each with its provider and where it runs ("Stub · local"). One
+   click, Enter or Space uses a model and closes the picker (the ✓ one just closes it), a remote
+   one as much as a local one. Each row has a bin: an inline confirm ("Remove <model>
+   (<provider>)? …"), focused on No; Escape there keeps it. Removing a provider's last model
+   removes the provider (and its saved key). One tab stop for the rows and their bins
+   (use-roving.ts). + Model, at the bottom, opens Set the provider. The first time it opens the models are on their way ("Loading the models…"); once
+   they are there, focus goes to the model that answers next (else the first, else + Model), or
+   to + Model when it comes back from the form. */
+import { useEffect, useRef, useState } from "react";
+import { Check, Loader, Plus, Trash2 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { IconButton } from "@/components/ui/icon-button";
-import { ENVIRONMENT } from "@/lib/assistant/models/schema";
-import type { ModelsView, ProviderView } from "@/lib/assistant/models/view";
-import { rovingIndex } from "./roving";
+import { type ModelRow, modelRows, removeQuestion, removeRequest } from "./model-picker-rules";
 import { choiceKey, type Models } from "./use-models";
+import { useRoving } from "./use-roving";
 
-const REMOTE_OFF = "This address is off this machine: the dashboard must be started with LLM_ALLOW_REMOTE=1 to use it.";
-/** A model in the list, and the active one (model-menu.tsx focuses these when the list shows). */
-export const MODEL_ITEM = '[role="menuitemradio"]';
-export const ACTIVE_ITEM = '[role="menuitemradio"][aria-checked="true"]';
-export const TAB_STOP_ITEM = '[role="menuitemradio"][tabindex="0"]';
+const rowKey = (key: string) => `row:${key}`;
+const binKey = (key: string) => `remove:${key}`;
+const ADD = '[data-focus="add"]';
 
-const hostOf = (url: string) => {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url;
-  }
-};
-
-interface GroupProps {
-  providerId: string;
-  name: string;
-  meta: string;
-  names: string[];
-  view: ModelsView;
+interface Props {
   models: Models;
-  disabled: string | null; // why its models can't be chosen now
-  provider?: ProviderView; // a saved one (editable)
-  onEdit?: () => void;
+  /** Back from Set the provider: focus goes to + Model. */
+  fromForm: boolean;
+  onChosen: () => void;
+  onAdd: () => void;
 }
 
-function ProviderGroup({ providerId, name, meta, names, view, models, disabled, provider, onEdit }: GroupProps) {
-  const headingId = useId();
-  const [confirm, setConfirm] = useState(false);
+export function ModelList({ models, fromForm, onChosen, onAdd }: Props) {
+  const root = useRef<HTMLDivElement>(null);
+  const focused = useRef(false);
+  const focusNext = useRef<string | null>(null); // a roving key (or ADD) to focus once drawn
+  const [confirm, setConfirm] = useState<string | null>(null); // the row asked about
   const [error, setError] = useState<string | null>(null);
-  const [focused, setFocused] = useState<string | null>(null); // the model focus last moved to
-  const { pending } = models;
-  const chosen = view.active?.providerId === providerId ? view.active.model : null;
-  // the group's one tab stop: the model last focused while it is still listed, else the
-  // active one, else the first
-  const tabStop = focused !== null && names.includes(focused) ? focused : chosen && names.includes(chosen) ? chosen : names[0];
-
-  /** Up/Down/Left/Right, Home and End move focus between the group's models (they don't choose). */
-  const moveFocus = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    const items = [...e.currentTarget.querySelectorAll<HTMLButtonElement>(MODEL_ITEM)];
-    const next = rovingIndex(e.key, items.indexOf(document.activeElement as HTMLButtonElement), items.length);
-    if (next === null) return;
-    e.preventDefault();
-    setFocused(names[next]);
-    items[next].focus();
-  };
-
-  const pick = async (model: string) => {
-    if (disabled || pending || model === chosen) return;
-    setError(null);
-    const problem = await models.choose(providerId, model);
-    if (problem) setError(problem);
-  };
-  const remove = async () => {
-    setError(null);
-    const problem = await models.remove(providerId);
-    if (problem) setError(problem);
-  };
-
-  return (
-    <section className="ai-model-group" aria-labelledby={headingId} data-provider={providerId}>
-      <div className="ai-model-group-head">
-        <div className="min-w-0">
-          <p id={headingId} className="ai-model-name">
-            {name}
-            {!provider && (
-              <Badge variant="muted" className="ml-2 align-middle">
-                read-only
-              </Badge>
-            )}
-          </p>
-          <p className="ai-model-meta">{meta}</p>
-        </div>
-        {provider && onEdit && (
-          <span className="ai-model-actions">
-            <IconButton label={`Edit ${name}`} onClick={onEdit} data-edit={providerId} className="size-7 [&_svg]:size-3.5">
-              <Pencil aria-hidden />
-            </IconButton>
-            <IconButton
-              label={`Remove ${name}`}
-              onClick={() => {
-                setError(null);
-                setConfirm(true);
-              }}
-              className="size-7 hover:text-danger [&_svg]:size-3.5"
-            >
-              <Trash2 aria-hidden />
-            </IconButton>
-          </span>
-        )}
-      </div>
-      {confirm ? (
-        <div className="ai-menu-confirm" role="group" aria-label={`Remove ${name}?`}>
-          <p className="text-foreground">
-            Remove <span className="font-medium">“{name}”</span>{provider?.keySaved ? " and its saved API key" : ""}? This can&apos;t be undone.
-          </p>
-          {error && <p className="ai-error-text mt-1" role="alert">{error}</p>}
-          <div className="mt-2 flex justify-end gap-1.5">
-            <button type="button" autoFocus onClick={() => setConfirm(false)} className="ai-btn ai-btn-small ai-btn-outline">
-              Cancel
-            </button>
-            <button type="button" onClick={remove} disabled={pending !== null} className="ai-btn ai-btn-small ai-btn-danger-solid">
-              Remove
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div
-            role="menu"
-            aria-orientation="vertical"
-            aria-labelledby={headingId}
-            aria-describedby={disabled ? `${headingId}-off` : undefined}
-            onKeyDown={moveFocus}
-            className="ai-model-options"
-          >
-            {names.map((model) => {
-              const checked = model === chosen;
-              const busy = pending === choiceKey(providerId, model);
-              return (
-                <button
-                  key={model}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={checked}
-                  aria-disabled={disabled ? true : undefined}
-                  tabIndex={model === tabStop ? 0 : -1}
-                  onFocus={() => setFocused(model)}
-                  onClick={() => void pick(model)}
-                  title={disabled ?? (checked ? "Answers your next question" : `Use ${model}`)}
-                  className="ai-model-option"
-                >
-                  <span className="ai-model-check" aria-hidden>
-                    {busy ? <Loader className="size-3.5 animate-spin" /> : checked ? <Check className="size-3.5" /> : null}
-                  </span>
-                  <span className="ai-model-option-name">{model}</span>
-                </button>
-              );
-            })}
-          </div>
-          {disabled && (
-            <p id={`${headingId}-off`} className="ai-model-reason">
-              {disabled}
-            </p>
-          )}
-          {error && (
-            <p className="ai-error-text px-2 pt-1" role="alert">
-              {error}
-            </p>
-          )}
-        </>
-      )}
-    </section>
+  const { view, status, error: loadError } = models.state;
+  const rows = view ? modelRows(view) : [];
+  const checked = rows.find((r) => r.checked);
+  const roving = useRoving(
+    rows.filter((r) => r.key !== confirm).flatMap((r) => [rowKey(r.key), binKey(r.key)]),
+    checked ? rowKey(checked.key) : null,
   );
-}
+  const ready = view !== null || status === "error";
 
-export function ModelList({ models, onEdit }: { models: Models; onEdit: (providerId: string) => void }) {
-  const { state, pending } = models;
-  const view = state.view;
+  useEffect(() => {
+    if (focused.current || !ready) return;
+    focused.current = true;
+    const at = (selector: string) => root.current?.querySelector<HTMLElement>(selector);
+    const el = (fromForm && at(ADD)) || at('[data-rove][tabindex="0"]') || at(ADD) || at("button");
+    el?.focus({ preventScroll: true });
+  }, [ready, fromForm]);
+
+  // after a confirm closes, focus goes back to its bin (or, removed, to the row that took its
+  // place, else + Model)
+  useEffect(() => {
+    const key = focusNext.current;
+    if (!key) return;
+    focusNext.current = null;
+    const el = key === ADD ? root.current?.querySelector<HTMLElement>(ADD) : root.current?.querySelector<HTMLElement>(`[data-rove="${key}"]`);
+    el?.focus({ preventScroll: true });
+  });
+
+  const pick = async (row: ModelRow) => {
+    if (models.pending) return;
+    if (row.checked) return onChosen();
+    setError(null);
+    const problem = await models.choose(row.providerId, row.model);
+    if (problem) setError(problem);
+    else onChosen();
+  };
+  const keep = (row: ModelRow) => {
+    setConfirm(null);
+    setError(null);
+    focusNext.current = binKey(row.key);
+  };
+  const remove = async (row: ModelRow) => {
+    const request = view && removeRequest(view, row);
+    if (!request) return keep(row);
+    setError(null);
+    const at = rows.indexOf(row);
+    const problem = await models.remove(row.key, request);
+    if (problem) return setError(problem);
+    const after = rows[at + 1] ?? rows[at - 1];
+    focusNext.current = after ? rowKey(after.key) : ADD;
+    setConfirm(null);
+  };
 
   if (!view) {
     return (
-      <div className="ai-menu-list">
-        {state.status === "error" ? (
+      <div ref={root} className="ai-picker-body">
+        {status === "error" ? (
           <div className="ai-menu-state" role="alert">
-            <p>Couldn&apos;t load the models: {state.error}</p>
+            <p>Couldn&apos;t load the models: {loadError}</p>
             <button type="button" onClick={models.load} className="ai-btn ai-btn-small ai-btn-outline mt-2">
               Try again
             </button>
@@ -197,44 +106,103 @@ export function ModelList({ models, onEdit }: { models: Models; onEdit: (provide
     );
   }
 
-  const env = view.environment;
   return (
-    <div className="ai-menu-list" aria-busy={pending !== null}>
-      {state.status === "error" && (
-        <p className="ai-error-text px-2 pt-2" role="alert">
-          {state.error}
-        </p>
-      )}
-      {env && (
-        <ProviderGroup
-          providerId={ENVIRONMENT}
-          name={env.name}
-          meta={`web/.env.local · ${env.local ? "local" : "remote"}`}
-          names={[env.model]}
-          view={view}
-          models={models}
-          disabled={env.reason || null}
-        />
-      )}
-      {view.providers.map((p) => (
-        <ProviderGroup
-          key={p.id}
-          providerId={p.id}
-          name={p.name}
-          meta={`${hostOf(p.baseUrl)} · ${p.local ? "local" : "remote"}${p.keySaved ? " · key saved" : ""}`}
-          names={p.models}
-          view={view}
-          models={models}
-          disabled={!p.local && !view.allowRemote ? REMOTE_OFF : null}
-          provider={p}
-          onEdit={() => onEdit(p.id)}
-        />
-      ))}
-      {!env && !view.providers.length && (
-        <p className="ai-menu-state">
-          No model yet. Add a local one (Ollama, LM Studio) or a provider with its API key; the assistant asks the one you choose here.
-        </p>
-      )}
+    <div ref={root} className="ai-picker-form">
+      <div className="ai-picker-body" aria-busy={models.pending !== null}>
+        {status === "error" && (
+          <p className="ai-error-text ai-picker-error" role="alert">
+            {loadError}
+          </p>
+        )}
+        {rows.length > 0 ? (
+          <ul aria-label="Your models" onKeyDown={roving.onKeyDown} className="ai-picker-list">
+            {rows.map((row) => {
+              if (row.key === confirm) {
+                const q = removeQuestion(view, row);
+                return (
+                  <li key={row.key}>
+                    <div
+                      role="group"
+                      aria-label={q.title}
+                      className="ai-menu-confirm"
+                      onKeyDown={(e) => {
+                        if (e.key !== "Escape") return;
+                        e.preventDefault(); // keeps it; the picker stays open
+                        e.stopPropagation();
+                        keep(row);
+                      }}
+                    >
+                      <p className="text-foreground">
+                        Remove <span className="ai-mono">{row.model}</span> ({row.provider})? {q.detail}
+                      </p>
+                      {error && (
+                        <p className="ai-error-text mt-1" role="alert">
+                          {error}
+                        </p>
+                      )}
+                      <div className="mt-2 flex justify-end gap-1.5">
+                        <button type="button" autoFocus onClick={() => keep(row)} className="ai-btn ai-btn-small ai-btn-outline">
+                          No
+                        </button>
+                        <button type="button" onClick={() => void remove(row)} disabled={models.pending !== null} className="ai-btn ai-btn-small ai-btn-danger-solid">
+                          {models.pending === `remove:${row.key}` && <Loader className="size-3.5 animate-spin" aria-hidden />}
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              }
+              return (
+                <li key={row.key} className="ai-picker-row">
+                  <button
+                    type="button"
+                    aria-current={row.checked ? "true" : undefined}
+                    title={row.checked ? "Answers your next question" : `Use ${row.model}`}
+                    onClick={() => void pick(row)}
+                    className="ai-picker-model"
+                    {...roving.item(rowKey(row.key))}
+                  >
+                    <span className="ai-picker-check" aria-hidden>
+                      {models.pending === choiceKey(row.providerId, row.model) ? <Loader className="size-3 animate-spin" /> : row.checked ? <Check className="size-3" strokeWidth={3} /> : null}
+                    </span>
+                    <span className="ai-picker-text">
+                      <span className="ai-picker-model-name">{row.model}</span>{" "}
+                      <span className="ai-picker-meta">
+                        {row.provider} · {row.where}
+                      </span>
+                    </span>
+                  </button>
+                  <IconButton
+                    label={`Remove ${row.model} (${row.provider})`}
+                    onClick={() => {
+                      setError(null);
+                      setConfirm(row.key);
+                    }}
+                    className="ai-picker-remove size-7 hover:text-danger [&_svg]:size-3.5"
+                    {...roving.item(binKey(row.key))}
+                  >
+                    <Trash2 aria-hidden />
+                  </IconButton>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="ai-picker-empty">No model yet.</p>
+        )}
+        {error && confirm === null && (
+          <p className="ai-error-text ai-picker-error" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+      <div className="ai-picker-foot">
+        <button type="button" data-focus="add" aria-label="+ Model" onClick={onAdd} className="ai-btn ai-picker-add">
+          <Plus className="size-3.5" aria-hidden />
+          Model
+        </button>
+      </div>
     </div>
   );
 }

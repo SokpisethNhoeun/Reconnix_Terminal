@@ -2,8 +2,10 @@
 
 The format is the contract the web reads (see the plan, §4):
 
-    index.json   {"format":"reconix.knowledge/v1","sources":[{id,name,kind,bytes,chunks,added_at}]}
+    index.json   {"format":"reconix.knowledge/v1","sources":[{id,name,kind,bytes,chunks,added_at,
+                  source:"web"|"terminal", original:bool}]}   (older rows: terminal, false)
     <id>.json    {"format":"reconix.knowledge.source/v1","id":…,"name":…,"chunks":[passage, …]}
+    <id>.orig    the original file, Fernet-encrypted (original.py); never read by the ranker
 
 Writes are atomic and 0600 (a temp file opened `O_EXCL`, never following a symlink, then
 `os.replace`), reusing `persist`'s helpers so the private-write rules live in one place.
@@ -12,7 +14,8 @@ Reads are as careful as the web reader's: a file is opened without following a l
 blocking and checked through its handle — a regular file, this user's, writable by no one
 else, under its size cap (the index 256 KiB, a source 16 MiB). A file that is missing is "no
 sources yet"; one that is present but fails a check or is malformed raises a clear error.
-`delete_all` needs no readable index: it removes every `<id>.json` in the folder by its name.
+`delete_all` needs no readable index: it removes every `<id>.json` and `<id>.orig` in the
+folder by its name.
 """
 
 import json
@@ -35,7 +38,7 @@ MAX_SOURCES = 50
 MAX_INDEX_BYTES = 256 * 1024
 MAX_SOURCE_BYTES = 16 * 1024 * 1024
 _ID = re.compile(r"^[0-9a-f]{32}$")
-_SOURCE_FILE = re.compile(r"^[0-9a-f]{32}\.json$")
+_SOURCE_FILE = re.compile(r"^[0-9a-f]{32}\.(json|orig)$")
 _CORRUPT_INDEX = "The knowledge index is corrupt. Remove it with /add-on, then add files again."
 _WRITABLE_BY_OTHERS = 0o022
 
@@ -53,6 +56,8 @@ class Source:
     bytes: int
     chunks: int
     added_at: str
+    source: str = "terminal"          # who added it: "web" or "terminal"
+    original: bool = False            # an encrypted `<id>.orig` was kept
     cut: str = field(default="", compare=False)
 
 
@@ -127,8 +132,10 @@ def read_index() -> List[Source]:
             sources.append(Source(
                 id=str(row["id"]), name=str(row["name"]), kind=str(row["kind"]),
                 bytes=int(row["bytes"]), chunks=int(row["chunks"]), added_at=str(row["added_at"]),
+                source="web" if row.get("source") == "web" else "terminal",
+                original=row.get("original") is True,
             ))
-        except (TypeError, KeyError, ValueError):
+        except (TypeError, KeyError, ValueError, AttributeError):
             raise StoreValidationError(_CORRUPT_INDEX) from None
     return sources
 
@@ -172,7 +179,8 @@ def write_index(sources: List[Source]) -> None:
         "format": INDEX_FORMAT,
         "sources": [
             {"id": s.id, "name": s.name, "kind": s.kind, "bytes": s.bytes,
-             "chunks": s.chunks, "added_at": s.added_at}
+             "chunks": s.chunks, "added_at": s.added_at, "source": s.source,
+             "original": s.original}
             for s in sources
         ],
     }
@@ -206,7 +214,7 @@ def delete_all() -> int:
             continue
         try:
             (folder / name).unlink()            # a link is removed, never followed
-            removed += 1
+            removed += name.endswith(".json")      # sources counted once; `.orig` go too
         except OSError:
             pass
     try:

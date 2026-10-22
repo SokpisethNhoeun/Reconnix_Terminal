@@ -1,4 +1,4 @@
-/* GET /api/assessments/<uid>/export called directly: the viewer role, a known format (pdf, json,
+/* GET /api/assessments/<uid>/export called directly: a session, a known format (pdf, json,
    docx: nothing else), 404 for a run that is not saved, every format as a download (an `inline=1`
    changes nothing), 501 with the DOCX link when no browser can print, and 413 with
    DOCX_TOO_LARGE when the Word document would pass DOCX_MAX_MIB — here and on the combined
@@ -46,7 +46,7 @@ beforeEach(() => {
   process.env.RECONIX_DATA_DIR = "sample-data";
   process.env.RECONIX_STALE_AFTER_HOURS = "0";
   delete process.env.RECONIX_CHROME;
-  cookie = sessionValue("viewer", TOKEN);
+  cookie = sessionValue(TOKEN);
 });
 afterEach(() => {
   process.env = { ...saved };
@@ -59,7 +59,7 @@ const get = (id: string, query: string) =>
 const detail = async (res: Response) => ((await res.json()) as { detail: string }).detail;
 
 describe("GET /api/assessments/<uid>/export", () => {
-  it("needs the viewer role", async () => {
+  it("needs a session", async () => {
     cookie = "";
     const res = await get(uid, "format=json");
     expect(res.status).toBe(401);

@@ -1,5 +1,5 @@
-/* A short address for the Terminal view, which lives on the dashboard page (operators only:
-   src/proxy.ts checks the role first, this page checks it again). */
+/* A short address for the Terminal view, which lives on the dashboard page (signed in, and only
+   while this dashboard hosts the terminal: src/proxy.ts checks first, this page again). */
 import { redirect } from "next/navigation";
 
 import { requireTerminalAccess } from "@/lib/auth/guard";

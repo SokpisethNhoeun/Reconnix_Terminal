@@ -25,3 +25,10 @@ def ensure_dir() -> Path:
     folder = knowledge_dir()
     _private_dir(folder)
     return folder
+
+
+def key_file() -> Path:
+    """The knowledge key file: `RECONIX_KNOWLEDGE_KEY_FILE`, else `~/.reconix/knowledge.key`.
+    Read freshly so tests and the CLI can repoint it. It is a separate key from the LLM's."""
+    return Path(os.environ.get("RECONIX_KNOWLEDGE_KEY_FILE") or "~/.reconix/knowledge.key"
+                ).expanduser()

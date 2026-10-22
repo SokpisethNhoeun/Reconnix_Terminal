@@ -165,7 +165,7 @@ export function assessmentView(a: Assessment): AssessmentView {
   const allowed = a.verdicts.filter((v) => v.allowed).length;
   return {
     uid: a.uid,
-    id: a.assessment_id || a.label,
+    id: a.assessment_id || a.label || a.uid, // never empty: the RUN column and every run link name it
     name: [a.client, a.template.name || "Reconix", "assessment"].filter(Boolean).join(" "),
     target: a.target,
     template: a.template.name || "—",
@@ -196,7 +196,7 @@ export function libraryItem(a: Assessment): LibraryItem {
   const created = parseTime(a.created_at) ?? 0;
   return {
     uid: a.uid,
-    id: a.assessment_id || a.label,
+    id: a.assessment_id || a.label || a.uid, // never empty: the RUN column and every run link name it
     template: a.template.name || "—",
     target: a.target,
     status: a.status,

@@ -1,8 +1,8 @@
 "use client";
 
-/* The AI Assistant screen: the header (scope, model, History, New chat, minimize), the
-   conversation in one centred column (the welcome and its globe slot while it is empty), and
-   the composer. The three pieces carry data-assistant-piece so the open animation can bring
+/* The AI Assistant screen: the header (scope, History, New chat, minimize), the conversation in
+   one centred column (the welcome and its globe slot while it is empty), and the composer (with
+   the model chip) over its footnote. The three pieces carry data-assistant-piece so the open animation can bring
    them in as the surface settles. The conversation follows new text while the reader is at the
    bottom; scrolled up, "New messages" brings them back (useStickToBottom). */
 import { forwardRef, useEffect, useRef } from "react";
@@ -50,11 +50,7 @@ export const AssistantView = forwardRef<HTMLTextAreaElement, { onMinimize: () =>
     if (welcome) scrollToTop();
   }, [welcome, scrollToTop]);
 
-  const reason = !info.operator
-    ? "Asking the AI model needs the operator role. Open the dashboard with the sign-in link /web prints."
-    : !model.configured
-      ? model.reason
-      : null;
+  const reason = model.configured ? null : model.reason;
   const elsewhere = conversation.id !== null && conversation.scope.uid !== info.scope.uid;
   const last = messages[messages.length - 1];
 
@@ -105,8 +101,8 @@ export const AssistantView = forwardRef<HTMLTextAreaElement, { onMinimize: () =>
           ) : model.configured && !model.local ? (
             <Reason>
               {model.name}
-              {model.provider ? ` (${model.provider})` : ""} is not on this machine: your questions, the assessment data they need and relevant /add-on knowledge passages are sent to it. Switch in the Model menu
-              above.
+              {model.provider ? ` (${model.provider})` : ""} is not on this machine: your questions, the assessment data they need and relevant /add-on knowledge passages are sent to it. Switch with
+              the model chip below.
             </Reason>
           ) : elsewhere ? (
             <Reason tone="info">
@@ -117,7 +113,7 @@ export const AssistantView = forwardRef<HTMLTextAreaElement, { onMinimize: () =>
             </Reason>
           ) : null}
           <Composer ref={composerRef} label={`Ask about ${conversation.scope.label}`} disabledReason={canAsk ? null : (reason ?? "Asking isn't available.")} />
-          <p className="ai-footnote">Answers use your saved assessment data only. The assistant can&apos;t run scans or approve actions: that stays in the TUI.</p>
+          <p className="ai-footnote">Answers use your saved assessment data. Scans and approvals stay in the terminal.</p>
         </div>
       </div>
     </section>

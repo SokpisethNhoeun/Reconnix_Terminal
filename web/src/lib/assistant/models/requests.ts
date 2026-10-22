@@ -1,10 +1,10 @@
-/* What the browser may send to the Model menu's routes (/api/assistant/models…), checked on the
+/* What the browser may send to the model picker's routes (/api/assistant/models…), checked on the
    server before anything is read: strict shapes, so an unknown field is refused. The server
    cleans and checks the values again (models/store.ts, config.ts); these only bound them.
    Pure: browser and server. */
 import { z } from "zod";
 
-import { API_KEY, ENVIRONMENT, MAX_URL, ModelListSchema, ModelNameSchema, PresetSchema, ProviderIdSchema } from "./schema";
+import { API_KEY, MAX_URL, ModelListSchema, ModelNameSchema, PresetSchema, ProviderIdSchema } from "./schema";
 
 export const MAX_MODELS_BODY = 24_000; // bytes of one request
 
@@ -26,14 +26,14 @@ export const UpdateProviderSchema = z
   .refine((body) => !(body.apiKey && body.removeKey), "Send a new key or remove it, not both.");
 export type UpdateProvider = z.infer<typeof UpdateProviderSchema>;
 
-/** PUT /api/assistant/models/active: the model that answers next. */
-export const SetActiveSchema = z.object({ providerId: z.union([ProviderIdSchema, z.literal(ENVIRONMENT)]), model: ModelNameSchema }).strict();
+/** PUT /api/assistant/models/active: the model that answers next (a saved provider's). */
+export const SetActiveSchema = z.object({ providerId: ProviderIdSchema, model: ModelNameSchema }).strict();
 export type SetActive = z.infer<typeof SetActiveSchema>;
 
-/** POST /api/assistant/models/test and …/fetch: a saved provider (the Environment too) as it is
-    saved, or unsaved values from the form. A saved key is only ever sent to its saved address. */
+/** POST /api/assistant/models/test and …/fetch: a saved provider as it is saved, or unsaved
+    values from the form. A saved key is only ever sent to its saved address. */
 export const ProbeSchema = z.union([
-  z.object({ providerId: z.union([ProviderIdSchema, z.literal(ENVIRONMENT)]), model: ModelNameSchema.optional() }).strict(),
+  z.object({ providerId: ProviderIdSchema, model: ModelNameSchema.optional() }).strict(),
   z.object({ baseUrl: BaseUrl, model: ModelNameSchema.optional(), apiKey: ApiKey.optional() }).strict(),
 ]);
 export type Probe = z.infer<typeof ProbeSchema>;

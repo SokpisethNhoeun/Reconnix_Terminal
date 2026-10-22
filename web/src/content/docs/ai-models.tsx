@@ -220,44 +220,47 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
             <DocRef>The AI agent</DocRef>.
           </p>
           <Callout>
-            The web dashboard&apos;s AI Assistant has its own models, chosen in its <strong>Model</strong> menu (below). The
-            terminal&apos;s providers and <Mono>llm.db</Mono> are never shared with it, and it never reads them.
+            The web dashboard&apos;s AI Assistant has its own models, chosen with the model chip in its message box
+            (below). The terminal&apos;s providers and <Mono>llm.db</Mono> are never shared with it, and it never reads them.
           </Callout>
         </DocSection>
-        <DocSection title="The web assistant's Model menu">
+        <DocSection title="Choosing a model">
           <p>
-            In the dashboard&apos;s AI Assistant, the <strong>Model</strong> button in the header names the model that
-            answers your next question (<Mono>name · local</Mono> or <Mono>· remote</Mono>; an icon on a phone). Its menu
-            lists:
+            In the dashboard&apos;s AI Assistant, the <strong>model chip</strong> at the bottom left of the message box
+            names the model that answers your next question: <Mono>● llama3.2 ▾</Mono> with a green dot, or{" "}
+            <strong>Choose a model</strong> with an amber dot while none can answer (its tooltip says why). The web
+            assistant uses only the models you add here: it reads no model from its environment (no{" "}
+            <Mono>LLM_BASE_URL</Mono>, <Mono>LLM_MODEL</Mono> or <Mono>LLM_API_KEY</Mono>), so until you add one it says
+            &quot;No AI model is set up yet. Add one with the model chip under the message box (+ Model).&quot; The chip
+            opens the model picker above the message box (a sheet over it on a phone). Escape goes back to the list, then
+            closes the picker.
           </p>
-          <ul>
-            <li>
-              <strong>Environment</strong>, read-only: the model from <Mono>web/.env.local</Mono> (<Mono>LLM_BASE_URL</Mono>,{" "}
-              <Mono>LLM_MODEL</Mono>, optional <Mono>LLM_API_KEY</Mono>). It answers while nothing else is chosen, so a
-              setup made before the menu existed keeps working. Change it in that file and restart <Mono>/web</Mono>.
-            </li>
-            <li>
-              Every provider you added, with its models. One click (or Enter) on a model switches to it; the checked one
-              answers next. The pencil edits a provider, the bin removes it (asked first); removing the active one hands
-              the answers back to the Environment.
-            </li>
-          </ul>
           <Steps>
             <li>
-              <strong>+ Add model</strong>. Pick a preset (Ollama, LM Studio, OpenAI, OpenRouter, Groq, Anthropic,
-              DeepSeek or Custom): it fills in the OpenAI-compatible base URL, which you can change.
+              <strong>Model.</strong> Your saved models, each with its provider and where it runs (
+              <Mono>stub-model · Stub · local</Mono>), a check on the one that answers next. One click, Enter or Space uses
+              a model and closes the picker. Each has a bin: removing asks first, with No as the default; removing a
+              provider&apos;s last model removes the provider and its saved key. With nothing saved the list says{" "}
+              <em>No model yet.</em> <strong>+ Model</strong> at the bottom opens the next step.
             </li>
             <li>
-              Give it a name, and an API key if the provider needs one (a password field, never filled in again).
+              <strong>Set the provider.</strong> <em>Provider</em>: OpenAI, Anthropic, DeepSeek, OpenRouter, Groq, Ollama
+              (local), LM Studio (local) or Custom (OpenAI-compatible), every one usable; it starts on Ollama. A cloud one
+              says where your data goes: &quot;Groq runs at api.groq.com: your questions, the assessment data they need and
+              relevant /add-on knowledge passages are sent there.&quot; <em>Base URL</em>, for Custom, Ollama and LM
+              Studio only, filled in from the preset. <em>API key</em>, a password field that is never filled in (&quot;Needed
+              by &lt;Provider&gt;&quot; or &quot;Optional&quot;; with a key saved for that provider, leave it empty to keep it, or tick{" "}
+              <strong>Remove key</strong>); choosing another provider empties it. <em>Model</em>: the list{" "}
+              <strong>Fetch models</strong> brings (<Mono>GET &lt;base URL&gt;/models</Mono>, also fetched once the
+              provider, the address and the key are set), or <strong>Type a model name…</strong>. When the server lists
+              none, a model the saved provider is known to have is tested, or you can type a name instead.
             </li>
             <li>
-              Add the model names: type one and press Enter, or <strong>Fetch models</strong> to ask the server
-              (<Mono>GET &lt;base URL&gt;/models</Mono>) and tick the ones you want.
-            </li>
-            <li>
-              <strong>Test connection</strong> sends one tiny chat completion and says &quot;Connected&quot; or why not
-              (the HTTP status only). <strong>Save</strong>; with &quot;Use it for the next question&quot; ticked it is
-              switched to at once. A refusal stays in the form, said under it.
+              <strong>Add model.</strong> A typed model, or one not from the list fetched for these exact values, is tested
+              first with one tiny chat completion. The provider is then saved (named after its preset), or, when that preset
+              at that address is saved already, the model is added to it; it becomes the active model and the picker
+              closes: the chip names it at once. A refusal (a bad address, a key over http, a cloud provider&apos;s name at
+              another address, a key the provider turns down) stays on the form, in red. <strong>Cancel</strong> goes back to the list.
             </li>
           </Steps>
           <DocTable
@@ -269,27 +272,55 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
             ]}
           />
           <p>
-            A key never goes back to the browser (the menu only says &quot;key saved&quot;) and is never logged. Editing a
-            provider without typing a key keeps the saved one, as long as the address stays on the same host; another host
-            needs the key again, or <strong>Remove the saved key</strong>. Test and Fetch send a saved key only to its
-            saved address.
+            A key never goes back to the browser (the picker only says &quot;Key saved&quot;) and is never logged. Adding a
+            model to a saved provider without typing a key keeps the saved one. A fetch or a test sends a saved key only to
+            its saved address, and neither sends any assessment data.
           </p>
-          <Callout variant="warning" title="The same rules as the environment">
-            Every model, saved or from the environment, must use http(s) with no user or password in the address and a
-            plain model name; a key goes only over https to a model off this machine; and an address off this machine is
-            used only when the dashboard was started with <Mono>LLM_ALLOW_REMOTE=1</Mono> (the browser can&apos;t turn it
-            on). The rules are checked again on every question: a chosen model that no longer passes says why in the
-            assistant, and nothing else answers in its place. Remote models receive your questions and the assessment data
-            they need; see <DocRef>LLM data handling</DocRef>.
+          <Callout variant="warning" title="The same rules for every model">
+            Every model must use http(s) with no user or password in the address and a plain model name; a key goes only
+            over https to a model off this machine; and a cloud provider&apos;s name only goes with its own address. Cloud
+            providers and other addresses off this machine are allowed by default. The rules are
+            checked again on every question: a chosen model that no longer passes says why in the assistant, and nothing else answers in its
+            place. Remote models receive your questions and the assessment data they need; see{" "}
+            <DocRef>LLM data handling</DocRef>.
           </Callout>
         </DocSection>
         <DocSection title="Knowledge in the web assistant">
           <p>
-            The web assistant also uses the files you added with <Mono>/add-on</Mono> in the terminal. It reads{" "}
-            <Mono>~/.reconix/knowledge</Mono> and never changes it; with each question it sends only the passages that
-            match it (at most four, 4,000 characters, secrets masked) as reference material the model must not take orders
-            from, and the answer ends with a muted <strong>Knowledge used: a.md, b.pdf</strong> line. A file removed with{" "}
-            <Mono>/add-on</Mono> is no longer used from the next question on.
+            The web assistant also uses the files you added with <Mono>/add-on</Mono> in the terminal, and the ones
+            uploaded on its <DocRef>Security knowledge page</DocRef>. With each question it reads{" "}
+            <Mono>~/.reconix/knowledge</Mono> and sends only the passages that match it (at most four, 4,000 characters,
+            secrets masked) as reference material the model must not take orders from, and the answer ends with a muted{" "}
+            <strong>Knowledge used: a.md, b.pdf</strong> line. A file removed with <Mono>/add-on</Mono> or on the page is
+            no longer used from the next question on.
+          </p>
+        </DocSection>
+        <DocSection title="Security knowledge page">
+          <p>
+            The <strong>Security knowledge</strong> button in the AI Assistant&apos;s header (a book with a lock; just the
+            icon on a phone) opens the page of knowledge files; <strong>← AI Assistant</strong> goes back.
+          </p>
+          <DocTable
+            caption="The Security knowledge page"
+            head={["Part", "What it does"]}
+            rows={[
+              { key: "Table / Grid", value: "Each file's Name (with its type's icon), Source (Web upload or Terminal (/add-on), with the type and size, for example Web upload · PDF · 1.2 MB) and Uploaded (your local date and time), as rows or as cards, ten a page. Your choice is remembered in this browser; a phone starts on the grid." },
+              { key: "Search", value: "Narrows the list to the files whose name holds what you type." },
+              { key: "Upload", value: "One .docx, .pdf, .txt, .md, .json, .yaml or .yml file of up to 10 MB. A .doc is refused with “Save it as .docx first”. The dialog shows the upload's progress, then the server's answer: a refusal keeps the dialog open with the reason." },
+              { key: "Open", value: "The file as it was added: PDF, text, Markdown, JSON and YAML open in a new tab (shown as text, nothing in them can run), a Word file is downloaded. A file added before originals were kept can't be opened: add it again." },
+              { key: "Remove", value: "Asks first (No is the default), then removes the file, its passages and its original." },
+            ]}
+          />
+          <p>
+            An upload is handled by the same code as <Mono>/add-on</Mono>: the dashboard copies the file to a private temporary
+            file (0600 in a 0700 folder) and runs <Mono>python -m reconix.knowledge add</Mono> on it, then deletes the copy.
+            The text is checked, masked and split into passages exactly as in the terminal, and the original is kept
+            encrypted on this computer (<Mono>&lt;id&gt;.orig</Mono> in the knowledge folder, with the key in{" "}
+            <Mono>~/.reconix/knowledge.key</Mono>, 0600). The model still only ever sees the masked passages. Opening and
+            removing go through the same command (<Mono>original</Mono>, <Mono>remove</Mono>). The command runs with the
+            dashboard&apos;s Python (<Mono>RECONIX_PYTHON</Mono>, else the repository&apos;s <Mono>.venv</Mono>), fixed
+            arguments, a minimal environment that never holds a model key, and a 60-second limit. One upload runs at a time,
+            ten a minute; the folder holds at most 50 files.
           </p>
         </DocSection>
       </>

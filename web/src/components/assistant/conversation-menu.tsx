@@ -2,8 +2,7 @@
 
 /* The History menu: the saved conversations (kept by the dashboard's server on this computer),
    newest first and grouped by day. Each can be opened, renamed or deleted; "Delete all" asks
-   first. Escape or a click outside closes it and focus goes back to its button. Operators
-   only: a viewer sees the button disabled with the reason.
+   first. Escape or a click outside closes it and focus goes back to its button.
    Its own panel rather than the dashboard's Popover: Escape inside the rename field must end
    the rename and leave the panel open, and the panel sits inside the assistant's header. */
 import { useEffect, useId, useRef, useState } from "react";
@@ -177,15 +176,6 @@ export function ConversationMenu() {
     loadHistory();
     requestAnimationFrame(() => panel.current?.querySelector<HTMLElement>("button, input")?.focus({ preventScroll: true }));
   };
-
-  if (!info.operator) {
-    return (
-      <button type="button" disabled className="ai-btn" title="The saved conversations need the operator role" aria-label="History (needs the operator role)">
-        <History className="size-4" aria-hidden />
-        <span className="ai-btn-label">History</span>
-      </button>
-    );
-  }
 
   const groups = GROUPS.map((g) => ({ g, items: history.items.filter((c) => groupOf(c.updatedAt, now) === g) })).filter((x) => x.items.length);
   const days = info.retentionDays;

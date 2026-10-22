@@ -11,7 +11,7 @@ import { dataDir, loadLibrary, readAssessmentFile, shownDir, staleAfterMs } from
 import { SAMPLE_DIR, sampleAssessments, sampleNames } from "./fixtures";
 
 vi.mock("next/server", () => ({ connection: async () => undefined }));
-vi.mock("@/lib/auth/guard", () => ({ requireViewer: async () => undefined }));
+vi.mock("@/lib/auth/guard", () => ({ requireSignedIn: async () => undefined }));
 
 let dir: string;
 const saved = process.env.RECONIX_DATA_DIR;

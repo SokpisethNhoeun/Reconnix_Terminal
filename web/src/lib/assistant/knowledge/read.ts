@@ -13,7 +13,11 @@
 
    Parsed files are kept in memory by their identity (device, inode, size and change times): an
    unchanged folder is checked again on every question but not read or parsed again. The TUI
-   replaces a file atomically, so a change always gives it a new identity. */
+   replaces a file atomically, so a change always gives it a new identity.
+
+   readKnowledgeIndex reads the index alone, the same way, for the Security knowledge page's list
+   (lib/knowledge/list.ts); the page's changes go through the Python CLI (lib/knowledge/cli.ts),
+   never through this module. */
 import "server-only";
 
 import type { Stats } from "node:fs";
@@ -22,7 +26,15 @@ import path from "node:path";
 
 import { myUid, POSIX, READ_FLAGS, readAll } from "../secure-fs";
 import { knowledgeDir } from "./paths";
-import { INDEX_FILE, type KnowledgeIndex, KnowledgeIndexSchema, type KnowledgeSourceFile, KnowledgeSourceSchema, sourceFile } from "./schema";
+import {
+  type IndexEntry,
+  INDEX_FILE,
+  type KnowledgeIndex,
+  KnowledgeIndexSchema,
+  type KnowledgeSourceFile,
+  KnowledgeSourceSchema,
+  sourceFile,
+} from "./schema";
 
 export const MAX_INDEX_BYTES = 256 * 1024;
 /** One source's file: 2,000 passages of 1,200 characters, JSON-escaped, fit with room. */
@@ -152,6 +164,30 @@ const parseIndex = (raw: unknown): KnowledgeIndex | null => KnowledgeIndexSchema
 const parseSource = (raw: unknown): KnowledgeSourceFile | null => KnowledgeSourceSchema.safeParse(raw).data ?? null;
 
 // --- reading -----------------------------------------------------------------------------------
+
+/** The index alone, for the Security knowledge page's list: `entries` in the index's order, each
+    id once (the first counts). An index that is missing, refused or invalid lists nothing; the
+    sources' own files are not opened. Never throws for anything on disk. */
+export interface KnowledgeIndexRead {
+  state: "missing" | "refused" | "ok";
+  entries: IndexEntry[];
+}
+
+export async function readKnowledgeIndex(dir: string = knowledgeDir()): Promise<KnowledgeIndexRead> {
+  const folder = await openFolder(dir);
+  if (folder === "missing" || folder === "refused") return { state: folder, entries: [] };
+  try {
+    const index = await readJson(path.join(dir, INDEX_FILE), MAX_INDEX_BYTES, parseIndex, new Map());
+    if (!(await stillSame(dir, folder))) return { state: "refused", entries: [] };
+    const ids = new Set<string>();
+    const entries = (index?.value.sources ?? []).filter((e) => !ids.has(e.id) && ids.add(e.id));
+    return { state: "ok", entries };
+  } catch {
+    return { state: "refused", entries: [] };
+  } finally {
+    await folder.handle?.close().catch(() => {});
+  }
+}
 
 /** Every readable source in the folder, in the index's order (see the file comment). Never
     throws for anything on disk. */

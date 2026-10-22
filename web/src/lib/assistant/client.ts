@@ -1,13 +1,13 @@
 /* The page's side of the AI Assistant's routes (browser only): ask a question and read the
    NDJSON answer frame by frame, list, read, rename and delete saved conversations, turn a
-   saved conversation into the messages the page shows, and the Model menu's calls (list, add,
+   saved conversation into the messages the page shows, and the model picker's calls (list, add,
    change, remove, switch, test, fetch). Every answer is checked against the shared schemas
    before the page uses it. */
 import { z } from "zod";
 
 import { type Conversation, ConversationSchema, type ConversationSummary, ConversationSummarySchema } from "./history-schema";
 import type { AddProvider, Probe, SetActive, UpdateProvider } from "./models/requests";
-import { FetchResultSchema, type ModelsView, ModelsViewSchema, type ProbeResult, ProbeResultSchema } from "./models/view";
+import { type FetchResult, FetchResultSchema, type ModelsView, ModelsViewSchema, type ProbeResult, ProbeResultSchema } from "./models/view";
 import {
   ASSISTANT_ROUTE,
   conversationRoute,
@@ -55,7 +55,7 @@ export type Failure = { ok: false; status: number; detail: string };
 
 const FALLBACK: Record<number, string> = {
   401: "Your session ended. Open the dashboard again with the sign-in link /web prints.",
-  403: "The AI Assistant needs the operator role. Sign in with the link /web prints.",
+  403: "The dashboard refused that request. Reload the page and try again.",
   404: "That is not saved any more.",
   413: "That is too long to send.",
   429: "Too many questions at once. Wait a moment and ask again.",
@@ -156,9 +156,9 @@ export async function deleteAllConversations(): Promise<{ ok: true; deleted: num
   return result.ok ? { ok: true, deleted: result.value.deleted } : result;
 }
 
-// --- the Model menu ------------------------------------------------------------------------------
+// --- the model picker ----------------------------------------------------------------------------
 
-// The routes add fields the menu doesn't use (the presets, the changed provider): dropped here.
+// The routes add fields the picker doesn't use (the presets, the changed provider): dropped here.
 const ViewAnswer = ModelsViewSchema.strip();
 export type ModelsAnswer = { ok: true; view: ModelsView } | Failure;
 
@@ -179,7 +179,8 @@ export async function testModel(body: Probe): Promise<{ ok: true; result: ProbeR
   return result.ok ? { ok: true, result: result.value } : result;
 }
 
-export async function fetchModelNames(body: Probe): Promise<{ ok: true; models: string[] } | Failure> {
+/** The names the model's server lists, or `listed: false` (it answered without a list). */
+export async function fetchModelNames(body: Probe): Promise<({ ok: true } & FetchResult) | Failure> {
   const result = await call(MODELS_FETCH_ROUTE, send("POST", body), FetchResultSchema);
-  return result.ok ? { ok: true, models: result.value.models } : result;
+  return result.ok ? { ok: true, ...result.value } : result;
 }

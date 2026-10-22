@@ -1,4 +1,4 @@
-/* Single-use tickets: an operator's permission to open one terminal session.
+/* Single-use tickets: a signed-in session's permission to open one terminal session.
 
      <expires>.<nonce>.<base64url(HMAC-SHA256(launch token, "reconix-term:<expires>:<nonce>"))>
 

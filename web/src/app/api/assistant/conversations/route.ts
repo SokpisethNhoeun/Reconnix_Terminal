@@ -1,6 +1,6 @@
-/* The AI Assistant's saved conversations (operators only; src/proxy.ts checks the role too):
+/* The AI Assistant's saved conversations (signed in; src/proxy.ts checks the session too):
    GET lists them, newest first (pruned first); DELETE deletes every one, and needs the page's
-   own Origin. Viewers can't list or read conversations. */
+   own Origin. */
 import { NextResponse } from "next/server";
 
 import { fail, NO_STORE, refuse } from "@/lib/assistant/access";

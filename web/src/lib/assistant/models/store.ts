@@ -1,33 +1,32 @@
 /* The saved models (server only): models.json in the assistant's folder (secure-fs.ts: the folder
    0700, the file 0600, written atomically through the shared queue, read without following a
-   link). It holds the providers the Model menu added and the active choice; an API key is sealed
+   link). It holds the providers the model picker added and the active choice; an API key is sealed
    with models/crypto.ts before it is written and is opened only for the request it is used in.
    Nothing here returns a key to a route except `readSaved().apiKeyOf`, which the server uses to
    call the model. A file that doesn't parse, or whose active choice names no saved model, is
    refused with a fixed error (never silently replaced). Every change re-checks its values:
-   names cleaned, addresses through config.ts's rules (an address off this machine only with
-   LLM_ALLOW_REMOTE=1), a saved key kept only while the address stays on the same host. */
+   names cleaned, addresses through config.ts's rules, a cloud preset only at its own address
+   (presets.ts `fitsPreset`), a saved key kept only while the address stays on the same host. */
 import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { lstat } from "node:fs/promises";
 import path from "node:path";
 
-import { checkAddress, isLocal, remoteAllowed } from "../config";
+import { checkAddress, isLocal } from "../config";
 import { cleanTitle } from "../history-schema";
 import { assistantDir, code, type Folder, inFolder, openFolder, readText, serial, tempSuffix, writeAtomic } from "../secure-fs";
 import { ensureKey, hasKey, open, readKey, seal } from "./crypto";
 import { folderFault, MODELS_FAIL, ModelsError } from "./errors";
+import { CLOUD_FIXED, fitsPreset, type PresetId, presetOf } from "./presets";
 import type { AddProvider, UpdateProvider } from "./requests";
-import { type Active, EMPTY_MODELS, ENVIRONMENT_NAME, MAX_FILE_BYTES, MAX_NAME, MAX_PROVIDERS, type ModelsFile, ModelsFileSchema, type SavedProvider } from "./schema";
+import { type Active, EMPTY_MODELS, MAX_FILE_BYTES, MAX_NAME, MAX_PROVIDERS, type ModelsFile, ModelsFileSchema, type SavedProvider } from "./schema";
 import type { ProviderView } from "./view";
 
 export const MODELS_FILE = "models.json";
 /** A write of models.json that never finished (history-store.ts prunes them once stale). */
 export const MODELS_TEMP = /^\.models\.[0-9a-f]{12}\.tmp$/;
 export const modelsTempName = () => `.models.${tempSuffix()}.tmp`;
-
-type Env = Record<string, string | undefined>;
 
 // --- reading -------------------------------------------------------------------------------------
 
@@ -144,20 +143,25 @@ function change<T>(task: (file: ModelsFile, f: Folder) => Promise<{ file: Models
 const bad = (message: string) => new ModelsError(message, 400);
 const GONE = "That provider is not saved any more.";
 
-/** A provider's name: masked, one line, at most MAX_NAME; unique and never "Environment". */
+/** A provider's name: masked, one line, at most MAX_NAME; unique. */
 function nameFor(raw: string, file: ModelsFile, self: string | null): string {
   const name = cleanTitle(raw, MAX_NAME);
   if (!name) throw bad("Give the provider a name.");
-  if (name.toLowerCase() === ENVIRONMENT_NAME.toLowerCase()) throw bad(`“${ENVIRONMENT_NAME}” is the model from web/.env.local. Give this provider another name.`);
   if (file.providers.some((p) => p.id !== self && p.name.toLowerCase() === name.toLowerCase())) throw bad("A provider with that name is saved already.");
   return name;
 }
 
 /** The address, checked and normalized; `withKey`: a key will be sent to it. */
-function addressFor(baseUrl: string, withKey: boolean, env: Env): string {
-  const checked = checkAddress({ baseUrl, apiKey: withKey ? "key" : null }, { allowRemote: remoteAllowed(env) });
+function addressFor(baseUrl: string, withKey: boolean): string {
+  const checked = checkAddress({ baseUrl, apiKey: withKey ? "key" : null });
   if (!checked.ok) throw bad(checked.reason);
   return checked.baseUrl;
+}
+
+/** A cloud preset names its own address only (the origin of its base URL): another address is
+    saved as Custom. */
+function checkPreset(preset: PresetId, baseUrl: string): void {
+  if (!fitsPreset(presetOf(preset), baseUrl)) throw bad(CLOUD_FIXED);
 }
 
 const hostOf = (url: string) => {
@@ -169,11 +173,12 @@ const hostOf = (url: string) => {
 };
 
 /** Adds a provider; `activate` makes its first model the one that answers. */
-export function addProvider(input: AddProvider, env: Env = process.env): Promise<ProviderView> {
+export function addProvider(input: AddProvider): Promise<ProviderView> {
   return change(async (file, f) => {
     if (file.providers.length >= MAX_PROVIDERS) throw bad(`At most ${MAX_PROVIDERS} providers can be saved. Remove one first.`);
     const name = nameFor(input.name, file, null);
-    const baseUrl = addressFor(input.baseUrl, Boolean(input.apiKey), env);
+    const baseUrl = addressFor(input.baseUrl, Boolean(input.apiKey));
+    checkPreset(input.preset, baseUrl);
     const id = randomUUID();
     const provider: SavedProvider = { id, name, preset: input.preset, baseUrl, models: input.models };
     if (input.apiKey) provider.key = seal(input.apiKey, await ensureKey(f, folderFault), id);
@@ -183,9 +188,11 @@ export function addProvider(input: AddProvider, env: Env = process.env): Promise
 }
 
 /** Changes a saved provider (null: there is none). No `apiKey` keeps the saved key, unless the
-    address moves to another host: then it must be entered again (or removed). When the active
-    model leaves the list, the provider's first model takes its place. */
-export function updateProvider(id: string, patch: UpdateProvider, env: Env = process.env): Promise<ProviderView | null> {
+    address moves to another host: then it must be entered again (or removed). A change of the
+    preset or the address is checked against the preset (a cloud one at its own address only; a
+    provider saved before that rule keeps working until either changes). When the active model
+    leaves the list, the provider's first model takes its place. */
+export function updateProvider(id: string, patch: UpdateProvider): Promise<ProviderView | null> {
   return change(async (file, f) => {
     const at = file.providers.findIndex((p) => p.id === id);
     if (at < 0) throw new ModelsError(GONE, 404);
@@ -197,9 +204,10 @@ export function updateProvider(id: string, patch: UpdateProvider, env: Env = pro
       id,
       name: patch.name === undefined ? old.name : nameFor(patch.name, file, id),
       preset: patch.preset ?? old.preset,
-      baseUrl: addressFor(nextUrl, keep || Boolean(patch.apiKey), env),
+      baseUrl: addressFor(nextUrl, keep || Boolean(patch.apiKey)),
       models: patch.models ?? old.models,
     };
+    if (patch.preset !== undefined || patch.baseUrl !== undefined) checkPreset(provider.preset, provider.baseUrl);
     if (patch.apiKey) provider.key = seal(patch.apiKey, await ensureKey(f, folderFault), id);
     else if (keep) provider.key = old.key;
     let active = file.active;
@@ -210,7 +218,7 @@ export function updateProvider(id: string, patch: UpdateProvider, env: Env = pro
 }
 
 /** Removes a saved provider and its key (false: there was none). The active choice goes with it
-    (the Environment model answers again, when there is one). */
+    (no model answers until another is chosen). */
 export function removeProvider(id: string): Promise<boolean> {
   return change(async (file) => {
     if (!file.providers.some((p) => p.id === id)) throw new ModelsError(GONE, 404);
@@ -220,15 +228,13 @@ export function removeProvider(id: string): Promise<boolean> {
 }
 
 /** Makes a saved provider's model the one that answers (it must be listed and its address
-    usable now), or, with null, the Environment's. */
-export function setActive(choice: Active | null, env: Env = process.env): Promise<void> {
+    usable now). */
+export function setActive(choice: Active): Promise<void> {
   return change(async (file) => {
-    if (choice) {
-      const p = file.providers.find((x) => x.id === choice.providerId);
-      if (!p) throw new ModelsError(GONE, 404);
-      if (!p.models.includes(choice.model)) throw bad("That model is not in the provider's list.");
-      addressFor(p.baseUrl, Boolean(p.key), env);
-    }
+    const p = file.providers.find((x) => x.id === choice.providerId);
+    if (!p) throw new ModelsError(GONE, 404);
+    if (!p.models.includes(choice.model)) throw bad("That model is not in the provider's list.");
+    addressFor(p.baseUrl, Boolean(p.key));
     return { file: { ...file, active: choice }, result: undefined };
   });
 }

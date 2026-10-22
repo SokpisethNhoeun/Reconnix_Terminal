@@ -1,13 +1,15 @@
-/* Runs before every page and route: refuses foreign Host headers, requires the viewer
-   role (except for the sign-in page and route) and the operator role for the terminal and the
-   AI Assistant's route, and sets the strict Content-Security-Policy from lib/auth/csp.ts with a
-   fresh script nonce. */
+/* Runs before every page and route: refuses foreign Host headers, requires a session (except
+   for the sign-in page and route; there are no roles: signed in, everything opens), keeps the
+   Terminal's page and routes shut while this dashboard doesn't host the terminal, and sets the
+   strict Content-Security-Policy from lib/auth/csp.ts with a fresh script nonce (not on a
+   knowledge file's original, which sets a stricter one). */
 import { type NextRequest, NextResponse } from "next/server";
 
 import { contentSecurityPolicy } from "@/lib/auth/csp";
-import { COOKIE, allowedHosts, hasRole, launchToken, mayUseTerminal, readRole } from "@/lib/auth/session";
-import { isAssistantPath } from "@/lib/assistant/paths";
-import { isTerminalPath } from "@/lib/terminal/paths";
+import { COOKIE, allowedHosts, launchToken, readSession } from "@/lib/auth/session";
+import { isKnowledgeOriginalPath } from "@/lib/knowledge/paths";
+import { terminalEnabled } from "@/lib/terminal/config";
+import { TERMINAL_OFF, isTerminalPath } from "@/lib/terminal/paths";
 
 const PUBLIC_PATHS = new Set(["/login", "/api/session"]);
 
@@ -21,18 +23,17 @@ export function proxy(request: NextRequest) {
   }
 
   const { pathname } = request.nextUrl;
-  const role = readRole(request.cookies.get(COOKIE)?.value, token);
-  if (!PUBLIC_PATHS.has(pathname) && !hasRole(role, "viewer")) {
+  if (!PUBLIC_PATHS.has(pathname) && !readSession(request.cookies.get(COOKIE)?.value, token)) {
     if (pathname.startsWith("/api/")) return NextResponse.json({ detail: "Sign in first." }, { status: 401 });
     return NextResponse.redirect(new URL("/login", request.url));
   }
-  if (isTerminalPath(pathname) && !mayUseTerminal(role)) {
-    if (pathname.startsWith("/api/")) return NextResponse.json({ detail: "The terminal needs the operator role." }, { status: 403 });
+  if (isTerminalPath(pathname) && !terminalEnabled()) {
+    if (pathname.startsWith("/api/")) return NextResponse.json({ detail: TERMINAL_OFF }, { status: 403 });
     return NextResponse.redirect(new URL("/", request.url));
   }
-  if (isAssistantPath(pathname) && !hasRole(role, "operator")) {
-    return NextResponse.json({ detail: "The AI Assistant needs the operator role." }, { status: 403 });
-  }
+  // a knowledge file's original carries its own policy (a sandbox with nothing allowed): the
+  // page's policy set here would replace it
+  if (isKnowledgeOriginalPath(pathname)) return NextResponse.next();
 
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const policy = contentSecurityPolicy(nonce);

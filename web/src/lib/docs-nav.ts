@@ -232,5 +232,6 @@ export const DOCS = {
   findings: "/docs/reports#understanding-findings",
   exporting: "/docs/reports#exporting",
   dashboard: "/docs/reports#dashboard",
+  knowledge: "/docs/ai-models#configuration", // its "Security knowledge page" section
 } as const;
 export type DocsLink = (typeof DOCS)[keyof typeof DOCS];

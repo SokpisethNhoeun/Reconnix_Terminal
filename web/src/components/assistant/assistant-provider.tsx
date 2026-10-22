@@ -4,7 +4,7 @@
    conversation and its messages (use-open-conversation), asking, streaming, Stop and Retry
    (use-asking), the saved conversations for History and changes to them (use-history-list,
    use-conversation-changes), what this tab remembers (use-tab-memory), and the model that
-   answers next: the page says which (info.model), and the Model menu replaces it after a switch
+   answers next: the page says which (info.model), and the model picker replaces it after a switch
    without a reload (until a render of the page brings the server's word for it). The Viewer
    mounts it once, so switching views, the live refresh and the open/close animation never touch
    it.
@@ -30,7 +30,7 @@ export type { HistoryState, OpenConversation };
 interface Assistant {
   info: AssistantInfo; // info.model: the model that answers next, as last switched
   canAsk: boolean;
-  /** After the Model menu changed something: the model that answers next now. */
+  /** After the model picker changed something: the model that answers next now. */
   setModel: (model: ModelSummary) => void;
   messages: ChatMessage[];
   draft: string;
@@ -63,7 +63,7 @@ export function useAssistant(): Assistant {
 }
 
 export function AssistantProvider({ info: page, children }: { info: AssistantInfo; children: React.ReactNode }) {
-  // The Model menu's latest word on the model, kept while the page still names the model it
+  // The model picker's latest word on the model, kept while the page still names the model it
   // replaced, compared by value (model-switch.ts): a live refresh the server rendered before
   // the switch brings a new object with the old model in it, and mustn't win. Once the page
   // has caught up its word wins, and the switch is dropped (so a later change back shows too).
@@ -80,13 +80,13 @@ export function AssistantProvider({ info: page, children }: { info: AssistantInf
   const clearDraft = useCallback(() => setDraftState(""), []);
   const [stream] = useState(() => createSlot<AbortController>()); // the reply being streamed
 
-  const list = useHistoryList(info.operator);
+  const list = useHistoryList();
   const open = useOpenConversation(page, stream, list.forget);
   const asking = useAsking({ info, open, stream, draft, clearDraft, refreshHistory: list.refreshHistory });
   const changes = useConversationChanges(list, open);
   useTabMemory(page, open, draft, setDraft);
 
-  const canAsk = info.operator && info.model.configured;
+  const canAsk = info.model.configured; // no model chosen: nothing can be asked
   const { messages, conversation, opening, notice, newChat, openConversation } = open;
   const { busy, ask, retry, stop } = asking;
   const { history, loadHistory } = list;

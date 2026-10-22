@@ -56,7 +56,7 @@ export function useTabMemory(info: AssistantInfo, open: OpenState, draft: string
       const { info: now, open: state } = latest.current;
       setDraft(latest.current.draft || kept.draft);
       restored.current = true;
-      if (!kept.openId || kept.pageUid !== now.scope.uid || !now.operator || state.opened || state.messages.length) return;
+      if (!kept.openId || kept.pageUid !== now.scope.uid || state.opened || state.messages.length) return;
       void state.openConversation(kept.openId).then((ok) => {
         if (!ok && !latest.current.open.opened) save({ openId: null, pageUid: latest.current.info.scope.uid, draft: latest.current.draft }); // forget it
       });

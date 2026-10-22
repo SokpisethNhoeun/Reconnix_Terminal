@@ -32,7 +32,7 @@ import { INFO_MARK, rawWithInfo, sampleAssessments } from "./fixtures";
 import { unzip } from "./unzip";
 
 vi.mock("next/server", () => ({ connection: async () => undefined }));
-vi.mock("@/lib/auth/guard", () => ({ requireViewer: async () => undefined }));
+vi.mock("@/lib/auth/guard", () => ({ requireSignedIn: async () => undefined }));
 
 const NOW = new Date("2026-10-22T08:00:00Z");
 const raw = rawWithInfo();

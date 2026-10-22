@@ -21,9 +21,8 @@ export interface AssistantInfo {
   scope: ScopeRef;
   runs: RunSummary[]; // every saved run, newest first
   prompts: WelcomePrompt[]; // the welcome screen's suggestions, from the data in scope
-  operator: boolean; // this browser may ask the model and read the saved conversations
-  terminal: boolean; // this browser may open the Terminal view
+  terminal: boolean; // this dashboard hosts the terminal (the Terminal view runs the TUI)
   retentionDays: number; // how long a conversation is kept without use (0: until deleted)
-  /** The model that answers next (lib/assistant/models/resolve.ts); the Model menu updates it. */
+  /** The model that answers next (lib/assistant/models/resolve.ts); the model picker updates it. */
   model: ModelSummary;
 }

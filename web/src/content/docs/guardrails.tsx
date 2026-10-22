@@ -177,8 +177,9 @@ export const guardrails: GroupContent = {
           </Callout>
           <p>
             Chat lines and replies are kept in <Mono>~/.reconix/llm.db</Mono> (redacted). The dashboard&apos;s AI Assistant
-            is separate: it is configured in <Mono>web/.env.local</Mono>, builds its context from the saved files with no
-            evidence, and masks the questions before they leave.
+            is separate: you choose its model with the model chip, local or cloud (cloud providers are allowed by
+            default, and the assistant says when your questions go off this machine); it builds its context from the saved
+            files with no evidence, and masks the questions before they leave.
           </p>
         </DocSection>
         <DocSection title="What it never does">
