@@ -2,7 +2,7 @@
 
 from .activity import AuditEvent, Feedback, HistoryEntry
 from .api_schema import ApiBodyField, ApiEndpoint, ApiParam, ApiSchemaDigest
-from .api_spec import ApiSpec
+from .api_spec import ApiFormResult, ApiSpec
 from .approval import ApprovalDecision, ApprovalRequest, Confirmation
 from .assessment import Assessment, UserRequest
 from .auth import AuthChallenge, AuthField, challenge_for
@@ -21,7 +21,7 @@ from .transcript import ActivityEntry, ChatEntry
 from .vault import Secret, TestAccount, VaultEntry
 
 __all__ = [
-    "ApiSpec", "ApiSchemaDigest", "ApiEndpoint", "ApiParam", "ApiBodyField",
+    "ApiSpec", "ApiFormResult", "ApiSchemaDigest", "ApiEndpoint", "ApiParam", "ApiBodyField",
     "Assessment", "UserRequest", "AuthChallenge", "AuthField", "challenge_for",
     "ApprovalRequest", "ApprovalDecision", "Confirmation",
     "Finding", "AuditEvent", "HistoryEntry", "Choice", "Feedback", "Template",

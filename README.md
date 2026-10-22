@@ -119,10 +119,16 @@ The dashboard has no terminal of its own: run assessments and decide their gates
    **scope manifest**, shown in plain words (what it will test, what it may do, what it
    will never touch, its tools): approve it, edit it (methods, excluded paths, ports,
    tools, time limit), or reject it (nothing is tested; a fresh assessment starts).
-   On the API template, the **Attach OpenAPI spec** form opens on its own once the scope is
-   drafted (Cancel to skip; **Attach / Replace / Remove** stay in the Scope menu). It reads a
-   `.json` / `.yaml` OpenAPI 3 or Swagger 2 file (read, never run; it never widens the scope)
-   and fills the endpoint count, plan and methods. A redacted digest of the schema — each
+   On the API template, the **API template: base URL and spec** form opens on its own once
+   the scope is drafted (Cancel to skip; **Attach / Replace / Remove** stay in the Scope menu
+   until you approve). **API base URL** is prefilled from the draft; a different one is
+   checked like a typed target and re-drafts the scope for it (your manifest edits stay; an
+   attached spec whose servers are all on another host is removed, with a notice).
+   **OpenAPI spec (optional)** is a `.json` / `.yaml` OpenAPI 3 or Swagger 2 file, or a URL on
+   the API's own host: `https` (plain `http` only for localhost), one read of at most 5 MB, no
+   redirects, a 10 s limit, audit-logged as `api_spec.fetched` with the host and path (never
+   the query). Leave it empty to keep only the base URL (an attached spec stays). The spec is
+   read, never run, never widens the scope, and fills the endpoint count, plan and methods. A redacted digest of the schema — each
    endpoint's parameters, request body, responses and security — is also kept in memory for
    the AI (the `/assess` agent and the chat see it as untrusted reference data); it is never
    saved, never in the snapshot the web reads, and never in a report.
