@@ -1,9 +1,11 @@
 "use client";
 
 /* The assistant's header: the Reconix mark (the terminal's ◆) and its name, what the open
-   conversation is about (a run, or every run) with that scope's status, History, New chat and
+   conversation is about (a run, or every run) with that scope's status, Security knowledge (the
+   documents it may quote; operators only, its label hidden on a phone), History, New chat and
    minimize (back to the dashboard). The model is chosen in the composer (model-chip.tsx). */
-import { Crosshair, Minimize2, SquarePen } from "lucide-react";
+import { BookLock, Crosshair, Minimize2, SquarePen } from "lucide-react";
+import { leaveAssistant } from "@/components/dashboard/view-url";
 import { IconButton } from "@/components/ui/icon-button";
 import { ReconixMark } from "@/components/ui/reconix-mark";
 import { useAssistant } from "./assistant-provider";
@@ -28,6 +30,18 @@ export function AssistantHeader({ onMinimize }: { onMinimize: () => void }) {
         <ScopeBadge scope={conversation.scope} runs={info.runs} />
       </div>
       <div className="ai-tools">
+        {info.operator && (
+          <button
+            type="button"
+            onClick={() => leaveAssistant("knowledge")}
+            className="ai-btn"
+            aria-label="Security knowledge"
+            title="Security knowledge: the documents the AI can quote"
+          >
+            <BookLock className="size-4" aria-hidden />
+            <span className="ai-btn-label">Security knowledge</span>
+          </button>
+        )}
         <ConversationMenu />
         <button type="button" onClick={newChat} disabled={empty && !busy} className="ai-btn" title={empty ? "This is a new chat already" : "Start a new chat (this one stays in History)"}>
           <SquarePen className="size-4" aria-hidden />

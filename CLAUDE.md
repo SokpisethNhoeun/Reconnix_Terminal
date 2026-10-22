@@ -256,22 +256,39 @@ never a download): `GET /api/assessments/<uid>/export?format=pdf|json|docx`
 1–5 saved runs combined in memory from the saved, already-redacted files, `lib/report/combined/`,
 the query validated first; the preview inline, the PDF printed by the same headless Chrome as the
 single export, 501 with the DOCX link without one; the Word files come from `lib/report/docx/`).
+**Security knowledge** (`?view=knowledge`, `components/knowledge/`, operators only: the page
+renders it for no one else, and a viewer's address opens the Overview) opens from the assistant
+header's Security knowledge button (no sidebar item; "← AI Assistant" goes back): the knowledge
+files as a table or a grid (remembered per browser), a search over names, Upload (one
+`.docx .pdf .txt .md .json .yaml .yml` file ≤ 10 MB; a `.doc` is told to become a `.docx`), Open
+(the kept original: inline in a `sandbox; default-src 'none'` policy for PDF and text, a download
+for DOCX) and Remove (asked first). `GET /api/knowledge` reads the index itself
+(`lib/assistant/knowledge/read.ts`, never a path); every change goes through the same Python code
+as `/add-on`: `lib/knowledge/cli.ts` runs `python -m reconix.knowledge add|original|remove`
+(the dashboard's Python, as `serve.mjs` finds it; fixed arguments, no shell, a minimal env with
+no `LLM_*`, 60 s), an upload first copied to a private temp file (0600 in a 0700 folder) that is
+always deleted, one upload at a time and ten a minute (`docs/WEB_KNOWLEDGE_PAGE_AND_MODELS_PLAN.md`).
 **Read-only for assessments**: no route writes or deletes anything the TUI reads; the only
-writes are the assistant's own conversation and model files, and the only things started are the Terminal
+writes are the assistant's own conversation and model files and the knowledge files the Security
+knowledge page adds or removes (through that CLI only; the knowledge folder is not assessment
+data), and the only things started are the Terminal
 page's TUI (the ticket route hands out a ticket; `reconix/webterm`, started by
-`web/scripts/serve.mjs`, runs the TUI, so its gates are the store's gates) and, for both PDF
-routes, a headless Chrome that prints a temp file the server wrote (`lib/report/pdf.ts`,
-`RECONIX_CHROME`; never anything the request said). Minting a ticket needs the operator session
+`web/scripts/serve.mjs`, runs the TUI, so its gates are the store's gates), the knowledge CLI and,
+for both PDF routes, a headless Chrome that prints a temp file the server wrote
+(`lib/report/pdf.ts`, `RECONIX_CHROME`; never anything the request said). Minting a ticket needs the operator session
 cookie **and** the terminal key cookie (`Path=/api/terminal`, signed differently); the helper
 proves itself with a hello before the page sends anything; the TUI's pty is its controlling
 terminal, so
 it dies with the helper (on Windows the TUI runs in a ConPTY console the helper owns, see
-`docs/WEB_WINDOWS_PLAN.md`; keep both backends behind `webterm/session.py`'s `spawn()`). A stand-in command needs `RECONIX_TERM_TEST=1` (tests only).
+`docs/WEB_WINDOWS_PLAN.md`; keep both backends behind `webterm/session.py`'s `spawn()`). A stand-in command needs `RECONIX_TERM_TEST=1` (tests only),
+and so does the knowledge CLI's stand-in (`RECONIX_KNOWLEDGE_CLI`, `web/e2e/knowledge-cli-stub.mjs`:
+the same contract over a temp folder).
 Read `web/CLAUDE.md` and `web/README.md` (Rules) before changing it. This Next.js version
 differs from older ones, so check `web/node_modules/next/dist/docs/` before writing code.
-Every page and route needs the `viewer` role; `/terminal`, `/api/terminal/*` and
-`/api/assistant` (and everything under it) need `operator` (`proxy.ts`, and the pages / handlers check again; the Terminal view is rendered
-only for operators, and guarded pages read the cookies first so none is prerendered). The ticket format lives in
+Every page and route needs the `viewer` role; `/terminal`, `/api/terminal/*`,
+`/api/assistant` and `/api/knowledge` (and everything under them) need `operator` (`proxy.ts`, and the pages / handlers check again; the Terminal and
+Security knowledge views are rendered only for operators, and guarded pages read the cookies first
+so none is prerendered). The ticket format lives in
 both `web/src/lib/auth/ticket.ts` and `reconix/webterm/ticket.py` (shared test vector), and
 the frame protocol in `web/src/lib/terminal/protocol.ts` and `reconix/webterm/protocol.py`:
 change each pair together. The helper never logs terminal data (`TEST_PASSWORD` test), and

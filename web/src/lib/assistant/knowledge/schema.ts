@@ -1,5 +1,6 @@
 /* The knowledge folder's files, as the TUI's /add-on writes them (the contract:
-   docs/KNOWLEDGE_OPENAPI_FINDINGS_PLAN.md §4). `index.json` lists the sources; `<id>.json` holds
+   docs/KNOWLEDGE_OPENAPI_FINDINGS_PLAN.md §4) and `python -m reconix.knowledge` for the Security
+   knowledge page. `index.json` lists the sources; `<id>.json` holds
    one source's passages, already cleaned and redacted by the TUI. Every shape is strict and
    bounded: a file that doesn't match is skipped (read.ts), never half-trusted. Lengths are
    counted in characters as Python counts them (code points), so a passage of emoji the TUI kept
@@ -38,6 +39,10 @@ const Id = z.string().regex(SOURCE_ID);
 const Name = chars(MAX_NAME).refine((s) => s.trim().length > 0, { message: "a name" });
 const Count = (max: number) => z.number().int().min(0).max(max);
 
+/** Where a source came from: the dashboard's Security knowledge page, or the TUI's /add-on. */
+export const ORIGINS = ["web", "terminal"] as const;
+export type KnowledgeOrigin = (typeof ORIGINS)[number];
+
 export const IndexEntrySchema = z
   .object({
     id: Id,
@@ -46,6 +51,10 @@ export const IndexEntrySchema = z
     bytes: Count(MAX_SOURCE_BYTES),
     chunks: Count(MAX_CHUNKS),
     added_at: z.string().max(40).regex(ISO_UTC),
+    // since the Security knowledge page (docs/WEB_KNOWLEDGE_PAGE_AND_MODELS_PLAN.md): an older
+    // entry has neither, and reads as added in the terminal with no original kept
+    source: z.enum(ORIGINS).default("terminal"),
+    original: z.boolean().default(false),
   })
   .strict();
 export type IndexEntry = z.infer<typeof IndexEntrySchema>;

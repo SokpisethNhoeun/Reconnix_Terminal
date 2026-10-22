@@ -15,20 +15,26 @@ export const fail = (detail: string, status: number) => NextResponse.json({ deta
 
 export const OPERATOR_ONLY = "The AI Assistant needs the operator role. Sign in with the link /web prints.";
 
-/** A refusal, or null when the request may go on. `change`: it writes or deletes something. */
-export async function refuse(request: Request, { change }: { change: boolean }): Promise<NextResponse | null> {
+/** A refusal, or null when the request may go on. `change`: it writes or deletes something.
+    `operatorOnly`: the refusal a signed-in viewer gets (the Security knowledge routes name their
+    own page). */
+export async function refuse(
+  request: Request,
+  { change, operatorOnly = OPERATOR_ONLY }: { change: boolean; operatorOnly?: string },
+): Promise<NextResponse | null> {
   const token = launchToken();
   if (!token) return fail("The dashboard was not started with npm start.", 503);
   if (change && !isSameOrigin(request)) return fail("Ask from the dashboard page.", 403);
   const role = readRole((await cookies()).get(COOKIE)?.value, token);
-  if (!hasRole(role, "operator")) return fail(OPERATOR_ONLY, 403);
+  if (!hasRole(role, "operator")) return fail(operatorOnly, 403);
   return null;
 }
 
-/** The body as text, or null once it passes `max` bytes (a missing Content-Length can't hide it). */
-export async function readBody(request: Request, max: number): Promise<string | null> {
+/** The body's bytes, or null once they pass `max` (a missing Content-Length can't hide it: the
+    stream is counted as it is read, and dropped at the first byte too many). */
+export async function readBytes(request: Request, max: number): Promise<Buffer | null> {
   if (Number(request.headers.get("content-length") ?? 0) > max) return null;
-  if (!request.body) return "";
+  if (!request.body) return Buffer.alloc(0);
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -42,7 +48,13 @@ export async function readBody(request: Request, max: number): Promise<string | 
     }
     chunks.push(value);
   }
-  return Buffer.concat(chunks).toString("utf8");
+  return Buffer.concat(chunks);
+}
+
+/** The body as text, or null once it passes `max` bytes (readBytes). */
+export async function readBody(request: Request, max: number): Promise<string | null> {
+  const bytes = await readBytes(request, max);
+  return bytes === null ? null : bytes.toString("utf8");
 }
 
 /** The body as JSON, or a refusal (too big: 413, not JSON: 400). */
