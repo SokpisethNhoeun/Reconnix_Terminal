@@ -1,4 +1,4 @@
-/* Which paths the proxy keeps for operators. */
+/* The terminal's paths: the proxy opens them only to a session, and only while the terminal is on. */
 import { describe, expect, it } from "vitest";
 
 import { isTerminalPath } from "@/lib/terminal/paths";

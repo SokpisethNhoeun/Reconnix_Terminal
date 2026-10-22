@@ -1,19 +1,10 @@
-/* The launch token, the signed role cookie, the Host allowlist and the terminal's roles. */
+/* The launch token, the signed session cookie (no roles), the Host allowlist and the terminal key. */
+import { createHmac } from "node:crypto";
+
 import { afterEach, describe, expect, it } from "vitest";
 
 import { isSameOrigin } from "@/lib/auth/origin";
-import {
-  allowedHosts,
-  hasRole,
-  launchToken,
-  mayUseTerminal,
-  readRole,
-  readTerminalKey,
-  sessionValue,
-  signInRole,
-  terminalKeyValue,
-  tokenMatches,
-} from "@/lib/auth/session";
+import { allowedHosts, launchToken, readSession, readTerminalKey, sessionValue, terminalKeyValue, tokenMatches } from "@/lib/auth/session";
 
 const TOKEN = "unit-token-0123456789abcdef";
 const env = { ...process.env };
@@ -22,73 +13,63 @@ afterEach(() => {
   process.env = { ...env };
 });
 
+/** A cookie as the dashboard signed it while it had roles: "<role>.<issued>.<signature>". */
+function oldRoleCookie(role: "viewer" | "operator", now = Date.now()): string {
+  const issued = Math.floor(now / 1000);
+  return `${role}.${issued}.${createHmac("sha256", TOKEN).update(`reconix-web:${role}:${issued}`).digest("base64url")}`;
+}
+
 describe("session cookie", () => {
-  it("round-trips the viewer role", () => {
-    expect(readRole(sessionValue("viewer", TOKEN), TOKEN)).toBe("viewer");
+  it("round-trips, naming no role", () => {
+    const value = sessionValue(TOKEN);
+    expect(value).toMatch(/^\d+\.[A-Za-z0-9_-]+$/);
+    expect(readSession(value, TOKEN)).toBe(true);
   });
 
   it.each([
     undefined,
     "",
-    "viewer",
-    "viewer.",
-    "viewer.forged",
-    "viewer.123.forged",
-    "admin.whatever",
-    `.${sessionValue("viewer", TOKEN).split(".").slice(1).join(".")}`,
-    `${sessionValue("viewer", TOKEN)}.extra`,
+    "123",
+    "123.",
+    "123.forged",
+    "abc.whatever",
+    `.${sessionValue(TOKEN).split(".")[1]}`,
+    `${sessionValue(TOKEN)}.extra`,
+    `viewer.${sessionValue(TOKEN)}`,
+    `operator.${sessionValue(TOKEN)}`,
   ])("refuses %s", (value) => {
-    expect(readRole(value, TOKEN)).toBeNull();
+    expect(readSession(value, TOKEN)).toBe(false);
+  });
+
+  it("no longer reads an old role-prefixed cookie, however genuine: its owner signs in again", () => {
+    expect(readSession(oldRoleCookie("viewer"), TOKEN)).toBe(false);
+    expect(readSession(oldRoleCookie("operator"), TOKEN)).toBe(false);
+    const [, issued, signature] = oldRoleCookie("operator").split(".");
+    expect(readSession(`${issued}.${signature}`, TOKEN)).toBe(false); // nor without its prefix
   });
 
   it("expires on the server after 12 hours, whatever the browser keeps", () => {
     const issued = Date.parse("2026-10-05T08:00:00Z");
-    const value = sessionValue("viewer", TOKEN, issued);
-    expect(readRole(value, TOKEN, issued + 11 * 3_600_000)).toBe("viewer");
-    expect(readRole(value, TOKEN, issued + 13 * 3_600_000)).toBeNull();
+    const value = sessionValue(TOKEN, issued);
+    expect(readSession(value, TOKEN, issued + 11 * 3_600_000)).toBe(true);
+    expect(readSession(value, TOKEN, issued + 13 * 3_600_000)).toBe(false);
+  });
+
+  it("allows a minute of clock skew, not more", () => {
+    const issued = Date.parse("2026-10-05T08:00:00Z");
+    const value = sessionValue(TOKEN, issued);
+    expect(readSession(value, TOKEN, issued - 30_000)).toBe(true);
+    expect(readSession(value, TOKEN, issued - 120_000)).toBe(false);
   });
 
   it("can't be re-dated without the token", () => {
-    const [role, , signature] = sessionValue("viewer", TOKEN, Date.parse("2026-10-01T00:00:00Z")).split(".");
+    const [, signature] = sessionValue(TOKEN, Date.parse("2026-10-01T00:00:00Z")).split(".");
     const later = Math.floor(Date.now() / 1000);
-    expect(readRole(`${role}.${later}.${signature}`, TOKEN)).toBeNull();
+    expect(readSession(`${later}.${signature}`, TOKEN)).toBe(false);
   });
 
   it("stops working when the dashboard restarts with a new token", () => {
-    expect(readRole(sessionValue("viewer", TOKEN), "another-token-0123456789")).toBeNull();
-  });
-
-  it("round-trips the operator role, which can't be forged from a viewer cookie", () => {
-    expect(readRole(sessionValue("operator", TOKEN), TOKEN)).toBe("operator");
-    const [, issued, signature] = sessionValue("viewer", TOKEN).split(".");
-    expect(readRole(`operator.${issued}.${signature}`, TOKEN)).toBeNull();
-  });
-
-  it("checks roles, weakest first", () => {
-    expect(hasRole("viewer", "viewer")).toBe(true);
-    expect(hasRole("operator", "viewer")).toBe(true);
-    expect(hasRole("viewer", "operator")).toBe(false);
-    expect(hasRole(null, "viewer")).toBe(false);
-  });
-});
-
-describe("terminal roles", () => {
-  it("signs in as operator only while the dashboard hosts the terminal", () => {
-    process.env.RECONIX_WEB_TERMINAL = "1";
-    expect(signInRole()).toBe("operator");
-    process.env.RECONIX_WEB_TERMINAL = "0";
-    expect(signInRole()).toBe("viewer");
-    delete process.env.RECONIX_WEB_TERMINAL;
-    expect(signInRole()).toBe("viewer");
-  });
-
-  it("opens the terminal to operators, and only while it is on", () => {
-    process.env.RECONIX_WEB_TERMINAL = "1";
-    expect(mayUseTerminal("operator")).toBe(true);
-    expect(mayUseTerminal("viewer")).toBe(false);
-    expect(mayUseTerminal(null)).toBe(false);
-    process.env.RECONIX_WEB_TERMINAL = "0";
-    expect(mayUseTerminal("operator")).toBe(false);
+    expect(readSession(sessionValue(TOKEN), "another-token-0123456789")).toBe(false);
   });
 });
 
@@ -101,10 +82,9 @@ describe("terminal key", () => {
     expect(readTerminalKey(key, TOKEN, issued + 13 * 3_600_000)).toBe(false);
   });
 
-  it("can't be made from a session cookie", () => {
-    const [, issued, signature] = sessionValue("operator", TOKEN).split(".");
-    expect(readTerminalKey(`${issued}.${signature}`, TOKEN)).toBe(false);
-    expect(readTerminalKey(sessionValue("operator", TOKEN), TOKEN)).toBe(false);
+  it("can't be made from a session cookie, nor the other way round (same shape, signed differently)", () => {
+    expect(readTerminalKey(sessionValue(TOKEN), TOKEN)).toBe(false);
+    expect(readSession(terminalKeyValue(TOKEN), TOKEN)).toBe(false);
   });
 
   it.each([undefined, "", "123", "123.", "abc.def", "1.2.3"])("refuses %s", (value) => {

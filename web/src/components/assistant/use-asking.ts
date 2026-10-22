@@ -46,7 +46,7 @@ export function useAsking({
   const send = useCallback(
     (question: string, retry: boolean): boolean => {
       const { info: now, opened } = latest.current;
-      if (!question || stream.get() || isReading() || !(now.operator && now.model.configured)) return false;
+      if (!question || stream.get() || isReading() || !now.model.configured) return false;
       const asked: ChatMessage = { id: newId(), role: "user", content: question };
       const reply: ChatMessage = { id: newId(), role: "assistant", content: "", cards: [], state: "streaming", question };
       setMessages((list) => [...list, asked, reply]);

@@ -1,7 +1,7 @@
 "use client";
 
 /* The saved conversations for the History menu: read when the menu opens, read again after an
-   answer once it has been opened. Operators only (a viewer can't list them). */
+   answer once it has been opened. */
 import { useCallback, useState } from "react";
 
 import * as api from "@/lib/assistant/client";
@@ -14,17 +14,16 @@ export interface HistoryState {
   error: string | null;
 }
 
-export function useHistoryList(operator: boolean) {
+export function useHistoryList() {
   const [history, setHistory] = useState<HistoryState>({ status: "idle", items: [], error: null });
-  const latest = useLatest({ operator, status: history.status });
+  const latest = useLatest({ status: history.status });
 
   const loadHistory = useCallback(() => {
-    if (!latest.current.operator) return;
     setHistory((h) => ({ ...h, status: h.status === "ready" ? "ready" : "loading", error: null }));
     void api.listConversations().then((result) =>
       setHistory((h) => (result.ok ? { status: "ready", items: result.conversations, error: null } : { ...h, status: "error", error: result.detail })),
     );
-  }, [latest]);
+  }, []);
 
   const refreshHistory = useCallback(() => {
     if (latest.current.status !== "idle") loadHistory();

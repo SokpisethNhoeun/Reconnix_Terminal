@@ -10,8 +10,9 @@
    provider; a one-click switch back; removing a model, and a provider with its last one; cloud
    providers usable by default (Groq, with where the questions go); a refusal kept on the form; no model at all; Escape, Back
    and Cancel; a typed API key never in the markup and gone with the form, with another
-   provider, and with the picker when the Assistant is left by keyboard or by Back); what a
-   viewer can't do; and the routes' locks (the old "environment" refused). The web reads no
+   provider, and with the picker when the Assistant is left by keyboard or by Back); no roles:
+   signed in, the chip, History and Security knowledge are all there; and the routes' locks (the
+   old "environment" refused). The web reads no
    model from its environment: e2e/global-setup.ts saves the stand-in (e2e/models.ts).
    The chat panel holds still (text never moves), but the welcome's globe and the sidebar's icon
    breathe, so this project runs with reduced motion (playwright.config.ts; the motion itself is
@@ -22,8 +23,7 @@ import { type BrowserContext, type Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
 
-import { sessionValue } from "../src/lib/auth/session";
-import { LLM_PORT, PORT, TOKEN } from "../playwright.config";
+import { LLM_PORT, PORT } from "../playwright.config";
 import { clearModels, seedModels, STUB_URL } from "./models";
 import { counted, newest, runsWithFindings, sample, signIn, signInFresh } from "./support";
 
@@ -683,30 +683,22 @@ test.describe("the composer and its model picker", () => {
   });
 });
 
-test("a viewer sees the assistant but can't ask or read conversations", async ({ page, context }) => {
-  await context.addCookies([{ name: "reconix_view", value: sessionValue("viewer", TOKEN), domain: "127.0.0.1", path: "/" }]);
+test("no roles: signed in, the model chip, History and Security knowledge are all there", async ({ page }) => {
+  await signIn(page);
   await page.goto("/?view=assistant");
   await assistantShown(page);
-  await expect(page.getByText(/needs the operator role/).first()).toBeVisible();
-  await expect(composer(page)).toBeDisabled();
-  await expect(page.getByRole("button", { name: /^History/ })).toBeDisabled();
-  // the model chip names the model, but choosing one is the operator's: disabled, with the reason
-  await expect(chip(page)).toBeDisabled();
-  await expect(chip(page)).toHaveAttribute("title", "Choosing a model needs the operator role");
-  await expect(chip(page)).toHaveAccessibleDescription("Choosing a model needs the operator role");
-  await chip(page).click({ force: true });
+  await expect(page.getByText(/operator role/)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^History/ })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Security knowledge" })).toBeVisible();
+  await expect(chip(page)).toBeEnabled();
+  await chip(page).click();
+  await expect(page.getByRole("dialog", { name: "Model" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "+ Model" })).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Model" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "+ Model" })).toHaveCount(0);
-  await expect(page.getByRole("list", { name: "Suggested questions" }).getByRole("button").first()).toBeDisabled();
-  const post = await page.request.post("/api/assistant", { headers: { Origin: ORIGIN }, data: { uid: null, question: "hi" } });
-  expect(post.status()).toBe(403);
-  expect((await page.request.get("/api/assistant/conversations")).status()).toBe(403);
-  expect((await page.request.get("/api/assistant/models")).status()).toBe(403);
-  expect((await page.request.put("/api/assistant/models/active", { headers: { Origin: ORIGIN }, data: { providerId: "environment", model: "stub-model" } })).status()).toBe(403);
-  expect((await page.request.get("/api/assistant/conversations/0b0e2d55-1c5a-4b1e-9b8c-2f1d3c4b5a69")).status()).toBe(403);
 });
 
-test("the routes want a signed-in operator, the page's origin and a valid request", async ({ page, playwright }) => {
+test("the routes want a session, the page's origin and a valid request", async ({ page, playwright }) => {
   const body = { uid: null, question: "hi" };
   // no session: a context that starts with no cookies (the default one is signed in)
   const anonymous = await playwright.request.newContext({ baseURL: ORIGIN, storageState: { cookies: [], origins: [] } });

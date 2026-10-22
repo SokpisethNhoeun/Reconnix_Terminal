@@ -219,7 +219,7 @@ export const reports: GroupContent = {
           <p>
             The combined report has ten sections and counts <strong>unique findings</strong> (same title, weakness and
             target) separately from their <strong>occurrences</strong> across runs. It is built on request from the saved
-            files by <Mono>GET /api/reports/combined?uids=…&amp;format=preview|pdf|docx</Mono>, which needs the viewer role,
+            files by <Mono>GET /api/reports/combined?uids=…&amp;format=preview|pdf|docx</Mono>, which needs you signed in,
             accepts one to five valid run ids (otherwise 400), only reads, and writes nothing. Missing data, a failed
             preview and a failed export each show their own state. The terminal keeps its own per-run export; combining
             runs is web-only.

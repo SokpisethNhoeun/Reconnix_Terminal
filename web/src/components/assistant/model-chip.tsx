@@ -5,26 +5,26 @@
    model ▾` with an amber dot while none can (the reason in the tooltip; the label carries the
    state, never the colour alone). It opens the model picker above the composer
    (model-picker.tsx), whose data it keeps between opens (use-models.ts) and reloads on each.
-   Operators only: a viewer sees it disabled, with the reason. It stays usable while the message
-   box is disabled for want of a model: it is how one is chosen. The picker closes when the
+   It stays usable while the message box is disabled for want of a model: it is how one is
+   chosen. The picker closes when the
    Assistant is hidden (Minimize, Back, another view: use-assistant-shown.ts), so nothing typed in
    it stays behind the inert stage. */
 import { useCallback, useId, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { useAssistant } from "./assistant-provider";
-import { chipState, VIEWER_REASON } from "./model-picker-rules";
+import { chipState } from "./model-picker-rules";
 import { ModelPicker } from "./model-picker";
 import { useAssistantShown } from "./use-assistant-shown";
 import { useModels } from "./use-models";
 
 export function ModelChip() {
   const { info, setModel } = useAssistant();
-  const models = useModels(info.operator, setModel);
+  const models = useModels(setModel);
   const [open, setOpen] = useState(false);
   const chip = useRef<HTMLButtonElement>(null);
   const id = useId();
-  const state = chipState(info.model, info.operator);
+  const state = chipState(info.model);
 
   // the Assistant hidden: the picker closes with it (and what was typed in it goes)
   const shown = useAssistantShown();
@@ -46,19 +46,6 @@ export function ModelChip() {
       <ChevronDown className="ai-model-chip-caret" aria-hidden />
     </>
   );
-
-  if (!info.operator) {
-    return (
-      <>
-        <button type="button" disabled aria-label={state.name} aria-describedby={`${id}-why`} title={VIEWER_REASON} data-tone={state.tone} className="ai-model-chip">
-          {content}
-        </button>
-        <span id={`${id}-why`} className="sr-only">
-          {VIEWER_REASON}
-        </span>
-      </>
-    );
-  }
 
   return (
     <>

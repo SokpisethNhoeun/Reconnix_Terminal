@@ -1,4 +1,4 @@
-/* The AI Assistant's models (operators only; src/proxy.ts checks the role too). GET: the saved
+/* The AI Assistant's models (signed in; src/proxy.ts checks the session too). GET: the saved
    providers without their keys (only whether one is saved), the active choice, a summary of the
    model that answers next and the presets in the model picker's order (each with its key rule
    and kind: cloud, local or custom). Every model is one saved here: none comes from the environment. POST adds a provider

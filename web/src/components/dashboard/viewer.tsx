@@ -5,18 +5,19 @@ import { useSearchParams } from "next/navigation";
 import { AssistantProvider } from "@/components/assistant/assistant-provider";
 import { AssistantStage } from "@/components/assistant/assistant-stage";
 import type { AssistantInfo } from "@/components/assistant/types";
+import type { TerminalAccess } from "@/lib/auth/guard";
 import { CardCursorLight } from "@/components/dashboard/card-cursor-light";
 import { HydratedMark } from "@/components/dashboard/hydrated-mark";
 import { Intro } from "@/components/dashboard/intro";
 import { Sidebar } from "@/components/dashboard/sidebar";
-import { allowedView, leaveAssistant, openAssistant, parseView, showView, watchHistory, type View } from "@/components/dashboard/view-url";
+import { leaveAssistant, openAssistant, parseView, showView, watchHistory, type View } from "@/components/dashboard/view-url";
 
 export type { View };
 
 /**
  * Local Assessment Viewer shell: sidebar + top bar around a content area that switches between
- * the Overview dashboard, Assessments, Findings (list + evidence), Reports, Terminal and, for
- * operators, Security knowledge (opened from the assistant's header), plus the AI Assistant,
+ * the Overview dashboard, Assessments, Findings (list + evidence), Reports, Terminal and
+ * Security knowledge (opened from the assistant's header), plus the AI Assistant,
  * which opens over the top bar and content (AssistantStage). The views are
  * server-rendered and passed in as props; all stay mounted and are toggled with `hidden` so the
  * globe keeps its WebGL context (it pauses itself when it can't be seen) and the intro's
@@ -46,13 +47,12 @@ export function Viewer({
   findings: React.ReactNode;
   reports: React.ReactNode;
   terminal: React.ReactNode;
-  terminalState: "operator" | "viewer" | "off";
-  /** The Security knowledge page: given to operators only (null for anyone else, whose
-      ?view=knowledge opens the Overview). */
-  knowledge: React.ReactNode | null;
+  terminalState: TerminalAccess;
+  /** The Security knowledge page. */
+  knowledge: React.ReactNode;
   assistant: AssistantInfo;
 }) {
-  const view = allowedView(parseView(useSearchParams().get("view")), knowledge !== null);
+  const view = parseView(useSearchParams().get("view"));
   const [shown, setShown] = useState<View>(view);
   const [terminalOpened, setTerminalOpened] = useState(view === "terminal");
   if (view === "terminal" && !terminalOpened) setTerminalOpened(true); // first visit: start the session
@@ -95,9 +95,7 @@ export function Viewer({
             <div data-view-pane="findings" hidden={shown !== "findings"}>{findings}</div>
             <div data-view-pane="reports" hidden={shown !== "reports"}>{reports}</div>
             <div data-view-pane="terminal" hidden={shown !== "terminal"}>{terminalOpened && terminal}</div>
-            {knowledge !== null && (
-              <div data-view-pane="knowledge" hidden={shown !== "knowledge"}>{knowledgeOpened && knowledge}</div>
-            )}
+            <div data-view-pane="knowledge" hidden={shown !== "knowledge"}>{knowledgeOpened && knowledge}</div>
           </main>
           <AssistantStage view={view} shown={shown} setShown={setShown} />
         </div>

@@ -1,8 +1,9 @@
-/* Access control: sign-in, the roles on every page and route, Host checks, headers. */
+/* Access control: sign-in (no roles: signed in, everything opens), the terminal's own locks,
+   Host checks, headers. */
 import { expect, test } from "./fixtures";
 
 import { sessionValue } from "../src/lib/auth/session";
-import { PORT, TOKEN } from "../playwright.config";
+import { LIVE_PORT, PORT, TOKEN } from "../playwright.config";
 import { sample, signInFresh } from "./support";
 
 // every test here starts with no cookies at all (the others start signed in)
@@ -17,11 +18,11 @@ test("pages and routes need a session", async ({ page, request }) => {
   expect(api.status()).toBe(401);
 });
 
-test("the combined report needs a session, and a viewer can read it", async ({ context, request }) => {
+test("the combined report needs a session, and a session can read it", async ({ context, request }) => {
   const url = `/api/reports/combined?uids=${sample()[0].uid}&format=preview&evidence=1&low=1&appendix=1`;
   const none = await request.get(url);
   expect(none.status()).toBe(401);
-  await context.addCookies([{ name: "reconix_view", value: sessionValue("viewer", TOKEN), domain: "127.0.0.1", path: "/" }]);
+  await context.addCookies([{ name: "reconix_view", value: sessionValue(TOKEN), domain: "127.0.0.1", path: "/" }]);
   const ok = await context.request.get(url);
   expect(ok.status()).toBe(200);
   expect(ok.headers()["content-type"]).toContain("text/html");
@@ -39,24 +40,50 @@ test("the terminal needs a session too", async ({ page, request }) => {
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test("a viewer can read the pages but not use the terminal", async ({ page, context }) => {
-  await context.addCookies([{ name: "reconix_view", value: sessionValue("viewer", TOKEN), domain: "127.0.0.1", path: "/" }]);
-  await page.goto("/?view=terminal");
-  await expect(page.getByText("The terminal needs the operator role")).toBeVisible();
-  await expect(page.locator(".xterm")).toHaveCount(0); // the terminal is never rendered for a viewer
-  await page.goto("/docs"); // the documentation is for every role
-  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
-  const res = await page.request.post("/api/terminal/ticket", { headers: { Origin: `http://127.0.0.1:${PORT}` } });
-  expect(res.status()).toBe(403);
-  await page.goto("/terminal");
-  await expect(page).toHaveURL(`http://127.0.0.1:${PORT}/`);
+test("an old role-prefixed cookie no longer signs you in", async ({ page, context }) => {
+  for (const role of ["viewer", "operator"]) {
+    await context.addCookies([{ name: "reconix_view", value: `${role}.${sessionValue(TOKEN)}`, domain: "127.0.0.1", path: "/" }]);
+    await page.goto("/");
+    await expect(page).toHaveURL(/\/login$/);
+    expect((await page.request.get(`/api/assessments/${sample()[0].uid}`)).status()).toBe(401);
+    expect((await page.request.get("/api/assistant/models")).status()).toBe(401);
+  }
+});
+
+test("signed in, the assistant, Security knowledge and the terminal ticket open", async ({ page }) => {
+  await signInFresh(page);
+  const origin = { Origin: `http://127.0.0.1:${PORT}` };
+  expect((await page.request.get("/api/assistant/models")).status()).toBe(200);
+  expect((await page.request.get("/api/assistant/conversations")).status()).toBe(200);
+  expect((await page.request.get("/api/knowledge")).status()).toBe(200);
+  const ticket = await page.request.post("/api/terminal/ticket", { headers: origin }); // the key cookie rides along
+  expect(ticket.status()).toBe(200);
+  expect(typeof (await ticket.json()).ticket).toBe("string");
+  await page.goto("/?view=knowledge");
+  await expect(page.getByRole("heading", { name: "Security knowledge", level: 1 })).toBeVisible();
 });
 
 test("a copied session cookie alone can't get a terminal ticket", async ({ page, context }) => {
-  await context.addCookies([{ name: "reconix_view", value: sessionValue("operator", TOKEN), domain: "127.0.0.1", path: "/" }]);
+  await context.addCookies([{ name: "reconix_view", value: sessionValue(TOKEN), domain: "127.0.0.1", path: "/" }]);
   await page.goto("/");
   const res = await page.request.post("/api/terminal/ticket", { headers: { Origin: `http://127.0.0.1:${PORT}` } });
   expect(res.status()).toBe(403);
+  expect((await res.json()).detail).toContain("terminal's key");
+});
+
+test("with the terminal off, the Terminal view says so and its routes stay shut", async ({ page, context }) => {
+  // the live-refresh dashboard runs with --no-terminal and the same launch token
+  const off = `http://127.0.0.1:${LIVE_PORT}`;
+  await context.addCookies([{ name: "reconix_view", value: sessionValue(TOKEN), domain: "127.0.0.1", path: "/" }]);
+  await page.goto(`${off}/?view=terminal`);
+  await expect(page.getByRole("heading", { name: "The terminal is off" })).toBeVisible();
+  await expect(page.locator(".xterm")).toHaveCount(0);
+  const res = await page.request.post(`${off}/api/terminal/ticket`, { headers: { Origin: off } });
+  expect(res.status()).toBe(403);
+  expect((await res.json()).detail).toContain("--no-terminal");
+  await page.goto(`${off}/terminal`);
+  await expect(page).toHaveURL(`${off}/`);
+  expect((await page.request.get(`${off}/api/knowledge`)).status()).toBe(200); // everything else stays open
 });
 
 test("a wrong token does not sign in", async ({ page }) => {
@@ -72,7 +99,7 @@ test("the token is removed from the address bar after sign-in", async ({ page })
   const cookie = (await page.context().cookies()).find((c) => c.name === "reconix_view");
   expect(cookie?.httpOnly).toBe(true);
   expect(cookie?.sameSite).toBe("Strict");
-  expect(cookie?.value.startsWith("operator.")).toBe(true); // the terminal is on
+  expect(cookie?.value).toMatch(/^\d+\.[\w-]+$/); // "<issued>.<signature>": no role
   const key = (await page.context().cookies()).find((c) => c.name === "reconix_term");
   expect(key?.path).toBe("/api/terminal"); // never sent to other paths, servers or the socket
   expect(key?.httpOnly).toBe(true);

@@ -22,7 +22,7 @@ const TOKEN = "route-test-token-0123456789";
 let cookie = "";
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: (name: string) => (name === COOKIE && cookie ? { value: cookie } : undefined) }) }));
 vi.mock("next/server", async (load) => ({ ...(await load<typeof import("next/server")>()), connection: async () => undefined }));
-vi.mock("@/lib/auth/guard", () => ({ requireViewer: async () => undefined }));
+vi.mock("@/lib/auth/guard", () => ({ requireSignedIn: async () => undefined }));
 
 const { POST } = await import("@/app/api/assistant/route");
 const one = await import("@/app/api/assistant/conversations/[id]/route");
@@ -63,7 +63,7 @@ beforeEach(async () => {
   process.env.RECONIX_KNOWLEDGE_DIR = knowledge;
   // the stand-in, saved as + Model saves a model (the web reads none from its environment)
   await addProvider({ name: "Stand-in", preset: "custom", baseUrl: modelUrl, models: ["test-model"], activate: true });
-  cookie = sessionValue("operator", TOKEN);
+  cookie = sessionValue(TOKEN);
   seen = [];
 });
 afterEach(() => {

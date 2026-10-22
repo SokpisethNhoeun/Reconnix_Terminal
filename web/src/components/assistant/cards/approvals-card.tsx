@@ -1,7 +1,8 @@
 /* Approvals from the saved data: each gated action with its recorded decision (Approved,
    Rejected, Waiting for approval or Not reached, as lib/status.ts names them) and its risk, the
    server's count of every decision by state, and runs paused on another input (a sign-in). Nothing can be approved here:
-   decisions are made in the TUI, with its double check. Operators get a way to the Terminal view. */
+   decisions are made in the TUI, with its double check. While the terminal is on there is a way
+   to the Terminal view. */
 import { Hand } from "lucide-react";
 import { APPROVAL_STATE, riskMeaning, RUN_STATUS } from "@/lib/status";
 import { StatusBadge } from "@/components/ui/status-badge";

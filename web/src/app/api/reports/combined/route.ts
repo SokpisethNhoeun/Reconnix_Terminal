@@ -1,4 +1,4 @@
-/* One report that combines 1–5 saved runs (viewer role), built in memory from the saved,
+/* One report that combines 1–5 saved runs (signed in), built in memory from the saved,
    already-redacted files, masked once more at this boundary (lib/report/mask.ts), and streamed back: `?uids=a,b&format=preview|pdf|docx&evidence=1&low=1&appendix=1`.
    `preview` is the report's HTML, served inline for the Report view's sandboxed frame (it is never
    offered as a download); the PDF is a download printed by the same headless Chrome the single
@@ -9,7 +9,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { COOKIE, hasRole, launchToken, readRole } from "@/lib/auth/session";
+import { COOKIE, launchToken, readSession } from "@/lib/auth/session";
 import { loadLibrary } from "@/lib/data/store";
 import { renderCombinedDocx } from "@/lib/report/docx/combined";
 import { DocxTooLarge } from "@/lib/report/docx/ooxml";
@@ -26,8 +26,7 @@ const refuse = (detail: string, status: number) => NextResponse.json({ detail },
 
 export async function GET(request: Request) {
   const token = launchToken();
-  const role = token ? readRole((await cookies()).get(COOKIE)?.value, token) : null;
-  if (!hasRole(role, "viewer")) return refuse("Sign in first.", 401);
+  if (!token || !readSession((await cookies()).get(COOKIE)?.value, token)) return refuse("Sign in first.", 401);
 
   const parsed = parseCombinedQuery(new URL(request.url).searchParams);
   if (!parsed.ok) return refuse(`Bad request — ${parsed.error}.`, 400);

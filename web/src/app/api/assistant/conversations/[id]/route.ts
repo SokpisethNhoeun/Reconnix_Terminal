@@ -1,4 +1,4 @@
-/* One saved conversation (operators only; src/proxy.ts checks the role too): GET reads it with
+/* One saved conversation (signed in; src/proxy.ts checks the session too): GET reads it with
    every message and the cards shown with each reply, PATCH renames it ({ title }, masked, one
    line, at most 80 characters), DELETE deletes it. Changes need the page's own Origin; the id
    must be a conversation id (a random UUID) before anything is read. */

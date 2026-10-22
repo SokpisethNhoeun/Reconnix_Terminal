@@ -80,13 +80,13 @@ export function AssistantProvider({ info: page, children }: { info: AssistantInf
   const clearDraft = useCallback(() => setDraftState(""), []);
   const [stream] = useState(() => createSlot<AbortController>()); // the reply being streamed
 
-  const list = useHistoryList(info.operator);
+  const list = useHistoryList();
   const open = useOpenConversation(page, stream, list.forget);
   const asking = useAsking({ info, open, stream, draft, clearDraft, refreshHistory: list.refreshHistory });
   const changes = useConversationChanges(list, open);
   useTabMemory(page, open, draft, setDraft);
 
-  const canAsk = info.operator && info.model.configured;
+  const canAsk = info.model.configured; // no model chosen: nothing can be asked
   const { messages, conversation, opening, notice, newChat, openConversation } = open;
   const { busy, ask, retry, stop } = asking;
   const { history, loadHistory } = list;

@@ -1,11 +1,11 @@
 /* A short address for the AI Assistant, which lives on the dashboard page (`?view=assistant`).
-   Any signed-in role may open it; asking the model needs the operator role (the route checks). */
+   Anyone signed in may open it (src/proxy.ts checks the session first, this page again). */
 import { redirect } from "next/navigation";
 
 import { ASSISTANT_VIEW } from "@/lib/assistant/paths";
-import { requireViewer } from "@/lib/auth/guard";
+import { requireSignedIn } from "@/lib/auth/guard";
 
 export default async function AssistantPage() {
-  await requireViewer();
+  await requireSignedIn();
   redirect(ASSISTANT_VIEW);
 }

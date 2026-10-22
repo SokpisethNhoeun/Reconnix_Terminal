@@ -1,6 +1,6 @@
 """Single-use tickets: the dashboard's permission to open one terminal session.
 
-The dashboard mints them (web/src/lib/auth/ticket.ts) for signed-in operators only:
+The dashboard mints them (web/src/lib/auth/ticket.ts) for a signed-in session only:
 
     <expires>.<nonce>.<base64url(HMAC-SHA256(launch token, "reconix-term:<expires>:<nonce>"))>
 

@@ -23,7 +23,7 @@ export function Welcome() {
           Answers come from your saved assessment data, with verified cards for findings, progress and approvals. Decisions and approvals stay in the Reconix TUI.
         </p>
       </div>
-      <PromptCards prompts={conversation.scope.uid === info.scope.uid ? info.prompts : []} onPick={pick} disabled={canAsk ? null : "Asking needs the operator role and a model (see below)"} />
+      <PromptCards prompts={conversation.scope.uid === info.scope.uid ? info.prompts : []} onPick={pick} disabled={canAsk ? null : "Asking needs a model (see below)"} />
     </div>
   );
 }

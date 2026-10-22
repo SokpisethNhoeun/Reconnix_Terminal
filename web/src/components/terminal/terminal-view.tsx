@@ -1,6 +1,6 @@
-/* The viewer's Terminal view: the Reconix TUI for operators, otherwise how to get access.
-   The page decides `access` on the server (src/lib/auth/guard.ts), so the terminal is never
-   rendered for a browser that may not use it. The Viewer mounts this view on its first
+/* The viewer's Terminal view: the Reconix TUI while this dashboard hosts it, otherwise how to
+   turn it on. The page decides `access` on the server (src/lib/auth/guard.ts), so the terminal
+   is never rendered while it is off. The Viewer mounts this view on its first
    visit and then only hides it, so the session keeps running while you browse. */
 import type { TerminalAccess } from "@/lib/auth/guard";
 
@@ -16,7 +16,7 @@ export function TerminalView({ access }: { access: TerminalAccess }) {
           The Reconix TUI on this computer, with the same gates and approvals. What you run here shows up in the other views.
         </p>
       </header>
-      {access === "operator" ? <TerminalPanel /> : <TerminalNotice access={access} />}
+      {access === "on" ? <TerminalPanel /> : <TerminalNotice />}
     </div>
   );
 }

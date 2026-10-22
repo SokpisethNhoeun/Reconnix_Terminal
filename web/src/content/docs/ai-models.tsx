@@ -233,7 +233,7 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
             <Mono>LLM_BASE_URL</Mono>, <Mono>LLM_MODEL</Mono> or <Mono>LLM_API_KEY</Mono>), so until you add one it says
             &quot;No AI model is set up yet. Add one with the model chip under the message box (+ Model).&quot; The chip
             opens the model picker above the message box (a sheet over it on a phone). Escape goes back to the list, then
-            closes the picker. Choosing a model needs the operator role: a viewer sees the chip, disabled.
+            closes the picker.
           </p>
           <Steps>
             <li>
@@ -279,7 +279,7 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
           <Callout variant="warning" title="The same rules for every model">
             Every model must use http(s) with no user or password in the address and a plain model name; a key goes only
             over https to a model off this machine; and a cloud provider&apos;s name only goes with its own address. Cloud
-            providers and other addresses off this machine are allowed by default, for operators only. The rules are
+            providers and other addresses off this machine are allowed by default. The rules are
             checked again on every question: a chosen model that no longer passes says why in the assistant, and nothing else answers in its
             place. Remote models receive your questions and the assessment data they need; see{" "}
             <DocRef>LLM data handling</DocRef>.
@@ -298,8 +298,7 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
         <DocSection title="Security knowledge page">
           <p>
             The <strong>Security knowledge</strong> button in the AI Assistant&apos;s header (a book with a lock; just the
-            icon on a phone) opens the page of knowledge files; <strong>← AI Assistant</strong> goes back. It is for
-            operators only: a viewer sees neither the button nor the page.
+            icon on a phone) opens the page of knowledge files; <strong>← AI Assistant</strong> goes back.
           </p>
           <DocTable
             caption="The Security knowledge page"

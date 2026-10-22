@@ -1,32 +1,24 @@
-/* The locks every AI Assistant route checks itself (src/proxy.ts checks the role too): the
-   launch token, a signed-in operator, and for anything that changes something the page's own
-   Origin. Server only. */
+/* The locks every AI Assistant route checks itself (src/proxy.ts checks the session too): the
+   launch token, a session, and for anything that changes something the page's own Origin.
+   Server only. */
 import "server-only";
 
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { isSameOrigin } from "../auth/origin";
-import { COOKIE, hasRole, launchToken, readRole } from "../auth/session";
+import { COOKIE, launchToken, readSession } from "../auth/session";
 
 export const NO_STORE = { "Cache-Control": "no-store" };
 
 export const fail = (detail: string, status: number) => NextResponse.json({ detail }, { status, headers: NO_STORE });
 
-export const OPERATOR_ONLY = "The AI Assistant needs the operator role. Sign in with the link /web prints.";
-
-/** A refusal, or null when the request may go on. `change`: it writes or deletes something.
-    `operatorOnly`: the refusal a signed-in viewer gets (the Security knowledge routes name their
-    own page). */
-export async function refuse(
-  request: Request,
-  { change, operatorOnly = OPERATOR_ONLY }: { change: boolean; operatorOnly?: string },
-): Promise<NextResponse | null> {
+/** A refusal, or null when the request may go on. `change`: it writes or deletes something. */
+export async function refuse(request: Request, { change }: { change: boolean }): Promise<NextResponse | null> {
   const token = launchToken();
   if (!token) return fail("The dashboard was not started with npm start.", 503);
   if (change && !isSameOrigin(request)) return fail("Ask from the dashboard page.", 403);
-  const role = readRole((await cookies()).get(COOKIE)?.value, token);
-  if (!hasRole(role, "operator")) return fail(operatorOnly, 403);
+  if (!readSession((await cookies()).get(COOKIE)?.value, token)) return fail("Sign in first.", 401);
   return null;
 }
 

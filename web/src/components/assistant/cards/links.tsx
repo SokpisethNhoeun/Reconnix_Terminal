@@ -2,7 +2,7 @@
 
 /* Where a card's links go. A finding or the Reports of the run the dashboard already shows
    open in place (the address changes, nothing reloads); another run's open through a normal
-   link to that run. The Terminal (operators only) is left to through the assistant's own
+   link to that run. The Terminal (while it is on) is left to through the assistant's own
    history entry. Every address is built here from a checked run uid (protocol.ts), never
    taken from the card's text. */
 import Link from "next/link";
@@ -69,7 +69,7 @@ export function FindingLink({ uid, id, children, className }: { uid: string; id:
   );
 }
 
-/** Opens the Terminal view (the TUI): operators only, and only when this dashboard hosts it. */
+/** Opens the Terminal view (the TUI): only when this dashboard hosts it. */
 export function TerminalButton({ className }: { className?: string }) {
   const { info } = useAssistant();
   if (!info.terminal) return null;

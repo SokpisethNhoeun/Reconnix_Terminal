@@ -1,7 +1,7 @@
 /* The Security knowledge routes called directly, with the CLI's stand-in (e2e/knowledge-cli-stub.mjs,
    which keeps the CLI's contract over a temporary folder and refuses an environment that holds
    anything but PATH, HOME and the knowledge folder and key file, and an upload copy that isn't a
-   0600 file in a 0700 folder): the roles (the proxy's 401 and 403, the handlers' own 403), the
+   0600 file in a 0700 folder): the session (the proxy's 401, the handlers' own 401), the
    Origin on every change, the 10 MB cap counted while the body is read (413), the extension
    allow-list and the .doc message, the CLI's exit codes (0 → 201, 2 → 400 with its message,
    1 → 500 with a fixed one), the temp copy removed every time, the original's headers, the id
@@ -60,7 +60,7 @@ beforeEach(() => {
   process.env.LLM_API_KEY = "sk-never-to-the-cli"; // the stand-in refuses any key it wasn't promised
   process.env.LLM_BASE_URL = "http://127.0.0.1:9/v1";
   mkdirSync(uploads, { mode: 0o700 });
-  cookie = sessionValue("operator", TOKEN);
+  cookie = sessionValue(TOKEN);
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -143,39 +143,38 @@ describe("the CLI's process", () => {
   });
 });
 
-// --- roles and origin --------------------------------------------------------------------------
+// --- session and origin ------------------------------------------------------------------------
 
 describe("access", () => {
-  const through = (url: string, method = "GET", role: "viewer" | "operator" | null = null) =>
-    proxy(new NextRequest(`${ORIGIN}${url}`, { method, headers: { host: "127.0.0.1:3100", ...(role ? { cookie: `${COOKIE}=${sessionValue(role, TOKEN)}` } : {}) } }));
+  const through = (url: string, method = "GET", session: string | null = null) =>
+    proxy(new NextRequest(`${ORIGIN}${url}`, { method, headers: { host: "127.0.0.1:3100", ...(session !== null ? { cookie: `${COOKIE}=${session}` } : {}) } }));
+  const signedIn = () => sessionValue(TOKEN);
 
-  it("the proxy answers 401 without a session and 403 to a viewer, on every knowledge route", async () => {
+  it("the proxy answers 401 without a session (or with an old role-prefixed cookie) and passes a session on, on every knowledge route", async () => {
     for (const [url, method] of [["/api/knowledge", "GET"], ["/api/knowledge", "POST"], [`/api/knowledge/${"a".repeat(32)}`, "DELETE"], [`/api/knowledge/${"a".repeat(32)}/original`, "GET"]]) {
       expect((await through(url, method)).status, `${method} ${url} anon`).toBe(401);
-      const viewer = await through(url, method, "viewer");
-      expect(viewer.status, `${method} ${url} viewer`).toBe(403);
-      expect((await viewer.json()).detail).toContain("operator role");
-      expect((await through(url, method, "operator")).status, `${method} ${url} operator`).toBe(200); // passed on
+      expect((await through(url, method, `operator.${signedIn()}`)).status, `${method} ${url} old cookie`).toBe(401);
+      expect((await through(url, method, signedIn())).status, `${method} ${url} signed in`).toBe(200); // passed on
     }
   });
 
   it("the proxy leaves the page's policy off a knowledge file's original (it sets its own), and only there", async () => {
     const id = "a".repeat(32);
-    expect((await through(`/api/knowledge/${id}/original`, "GET", "operator")).headers.get("content-security-policy")).toBeNull();
-    expect((await through("/api/knowledge", "GET", "operator")).headers.get("content-security-policy")).toContain("default-src 'self'");
-    expect((await through(`/api/knowledge/${id}/original/x`, "GET", "operator")).headers.get("content-security-policy")).toContain("default-src 'self'");
-    expect((await through(`/api/knowledge/${id}/original`, "GET", "viewer")).status).toBe(403);
+    expect((await through(`/api/knowledge/${id}/original`, "GET", signedIn())).headers.get("content-security-policy")).toBeNull();
+    expect((await through("/api/knowledge", "GET", signedIn())).headers.get("content-security-policy")).toContain("default-src 'self'");
+    expect((await through(`/api/knowledge/${id}/original/x`, "GET", signedIn())).headers.get("content-security-policy")).toContain("default-src 'self'");
+    expect((await through(`/api/knowledge/${id}/original`, "GET")).status).toBe(401);
   });
 
-  it("the handlers refuse a viewer and a missing session themselves", async () => {
-    for (const who of ["viewer", null] as const) {
-      cookie = who ? sessionValue(who, TOKEN) : "";
+  it("the handlers refuse a missing session and an old role-prefixed cookie themselves", async () => {
+    for (const who of ["", `operator.${sessionValue(TOKEN)}`]) {
+      cookie = who;
       const res = await list.GET(get("/api/knowledge"));
-      expect(res.status).toBe(403);
-      expect((await res.json()).detail).toMatch(/^Security knowledge needs the operator role/);
-      expect((await upload({ "a.md": "# a" })).status).toBe(403);
-      expect((await one.DELETE(del(`/api/knowledge/${"a".repeat(32)}`), ctx("a".repeat(32)))).status).toBe(403);
-      expect((await original.GET(get(`/api/knowledge/${"a".repeat(32)}/original`), ctx("a".repeat(32)))).status).toBe(403);
+      expect(res.status).toBe(401);
+      expect((await res.json()).detail).toBe("Sign in first.");
+      expect((await upload({ "a.md": "# a" })).status).toBe(401);
+      expect((await one.DELETE(del(`/api/knowledge/${"a".repeat(32)}`), ctx("a".repeat(32)))).status).toBe(401);
+      expect((await original.GET(get(`/api/knowledge/${"a".repeat(32)}/original`), ctx("a".repeat(32)))).status).toBe(401);
     }
     expect(existsSync(knowledge)).toBe(false);
   });

@@ -55,7 +55,7 @@ export type Failure = { ok: false; status: number; detail: string };
 
 const FALLBACK: Record<number, string> = {
   401: "Your session ended. Open the dashboard again with the sign-in link /web prints.",
-  403: "The AI Assistant needs the operator role. Sign in with the link /web prints.",
+  403: "The dashboard refused that request. Reload the page and try again.",
   404: "That is not saved any more.",
   413: "That is too long to send.",
   429: "Too many questions at once. Wait a moment and ask again.",

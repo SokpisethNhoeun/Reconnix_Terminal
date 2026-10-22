@@ -23,7 +23,7 @@ export type Result<T> = { ok: true; value: T } | { ok: false; status: number; de
 
 const FALLBACK: Record<number, string> = {
   401: "Your session ended. Open the dashboard again with the sign-in link /web prints.",
-  403: "Security knowledge needs the operator role. Sign in with the link /web prints.",
+  403: "The dashboard refused that request. Reload the page and try again.",
   404: "That knowledge file is not saved any more.",
   413: "The file is over 10 MB.",
   429: "Too many uploads at once. Wait a moment and try again.",

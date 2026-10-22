@@ -1,5 +1,5 @@
 /* The model picker's routes called directly (e2e/access.spec.ts and e2e/assistant.spec.ts go
-   through the proxy too): the operator role and the page's Origin on every change, strict
+   through the proxy too): a session, and the page's Origin on every change, strict
    bodies within a byte cap, remote addresses allowed by default (a Groq provider at its real
    address, its requests sent to the stand-in, end to end), a cloud preset only at its own address, an API key that never comes back in any answer, "Test connection"
    and "Fetch models" against a stand-in model server (a server that answers without a list said
@@ -25,7 +25,7 @@ const SECRET = "sk-route-secret-0123456789abcdef";
 let cookie = "";
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: (name: string) => (name === COOKIE && cookie ? { value: cookie } : undefined) }) }));
 vi.mock("next/server", async (load) => ({ ...(await load<typeof import("next/server")>()), connection: async () => undefined }));
-vi.mock("@/lib/auth/guard", () => ({ requireViewer: async () => undefined }));
+vi.mock("@/lib/auth/guard", () => ({ requireSignedIn: async () => undefined }));
 
 const models = await import("@/app/api/assistant/models/route");
 const one = await import("@/app/api/assistant/models/[id]/route");
@@ -91,7 +91,7 @@ beforeEach(() => {
   process.env.LLM_BASE_URL = `${base}/v1`;
   process.env.LLM_MODEL = "env-model";
   process.env.LLM_API_KEY = "sk-env-key-never-read";
-  cookie = sessionValue("operator", TOKEN);
+  cookie = sessionValue(TOKEN);
   seen = [];
 });
 afterEach(() => {
@@ -132,13 +132,13 @@ const provider = (over: Record<string, unknown> = {}) => ({ name: "Stand-in", pr
 const ID = "0b0e2d55-1c5a-4b1e-9b8c-2f1d3c4b5a69";
 
 describe("the locks", () => {
-  it("refuse a viewer and a missing session, on reads and changes", async () => {
-    for (const who of [sessionValue("viewer", TOKEN), ""]) {
+  it("refuse a missing session and an old role-prefixed cookie, on reads and changes", async () => {
+    for (const who of ["", `operator.${sessionValue(TOKEN)}`]) {
       cookie = who;
-      expect((await list()).status).toBe(403);
-      expect((await add(provider())).status).toBe(403);
-      expect((await choose({ providerId: "environment", model: "env-model" })).status).toBe(403);
-      expect((await test({ providerId: "environment" })).status).toBe(403);
+      expect((await list()).status).toBe(401);
+      expect((await add(provider())).status).toBe(401);
+      expect((await choose({ providerId: "environment", model: "env-model" })).status).toBe(401);
+      expect((await test({ providerId: "environment" })).status).toBe(401);
     }
   });
   it("want the page's own Origin on every change", async () => {
@@ -415,7 +415,7 @@ describe("switching", () => {
       const summary = chosen.body.summary as { configured: boolean; name: string; provider: string; local: boolean; reason: string };
       expect(summary).toEqual({ configured: true, name: "llama-3.3-70b-versatile", provider: "Groq", local: false, reason: "" });
       // the remote warning: the chip's tooltip names where the data goes
-      const chip = chipState(summary, true);
+      const chip = chipState(summary);
       expect(chip.name).toBe("Model: llama-3.3-70b-versatile (Groq, remote)");
       expect(chip.title).toBe(
         "llama-3.3-70b-versatile (Groq): a remote model. Questions, the assessment data they need and relevant /add-on knowledge passages are sent to it.",

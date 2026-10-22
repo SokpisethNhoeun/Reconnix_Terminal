@@ -1,6 +1,7 @@
 /* What the assistant can't do, or what went wrong, and what to do instead: plan or start an
    assessment, run a tool, approve (all in the TUI), a model that isn't set up, too many
-   questions. Operators get a way to the Terminal view; a failed answer gets Retry. */
+   questions. While the terminal is on there is a way to the Terminal view; a failed answer gets
+   Retry. */
 import { Info, OctagonAlert, RotateCcw, TriangleAlert } from "lucide-react";
 import type { CardOf } from "@/lib/assistant/protocol";
 import { CardShell } from "./card-shell";
