@@ -1,7 +1,9 @@
 # AI Assistant: the model picker in the composer
 
 Status: built (2026-10-22, branch `r5/composer-picker` off `feature/next-update`); the Figma
-frames follow separately. Follows `WEB_DOCS_AND_MODELS_PLAN.md` §2: the providers, the encrypted
+frames follow separately. **Superseded** (2026-10-22, branch `r6/picker-v2`) by
+`WEB_KNOWLEDGE_PAGE_AND_MODELS_PLAN.md`: no Environment model, the chip's popup lists only your
+models with + Model, and + Model opens one "Set the provider" form instead of steps 2 and 3. Follows `WEB_DOCS_AND_MODELS_PLAN.md` §2: the providers, the encrypted
 keys and the routes stay as they are; only the way you pick and set up a model changes.
 
 Built as below, plus:

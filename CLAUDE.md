@@ -226,9 +226,10 @@ and the docs scroll natively: on the fixed desktop frame `.dash-content` is the 
 window. The **AI Assistant** (`?view=assistant`, `components/assistant/`) opens from the Ask bar
 and its sidebar tab with a ≈1.6 s GSAP transition (`MOTION` in `motion.ts`) that carries the one
 WebGL globe (never mount a second) behind the welcome; `POST /api/assistant` (operators) asks
-the OpenAI-compatible model named by `LLM_BASE_URL` / `LLM_MODEL` (`web/.env.local`; off this
-machine only with
-`LLM_ALLOW_REMOTE=1`), with a context the server builds from the saved files
+the OpenAI-compatible model chosen with the composer's model chip (only models added there with
+**+ Model**, saved in `models.json`/`models.key` in its folder: the web reads no `LLM_BASE_URL` /
+`LLM_MODEL` / `LLM_API_KEY`; off this machine only with `LLM_ALLOW_REMOTE=1`; the e2e seeds its
+stand-in as a saved provider, `e2e/models.ts`), with a context the server builds from the saved files
 (`lib/assistant/context.ts`: no evidence, every value cleaned, framed as untrusted data) and
 questions masked by `lib/assistant/redact.ts` (a port of `store/redact.py`: change both, the
 vectors in `web/tests/redact-vectors.json` check both), streams NDJSON frames with cards the

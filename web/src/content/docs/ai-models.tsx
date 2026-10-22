@@ -228,36 +228,39 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
           <p>
             In the dashboard&apos;s AI Assistant, the <strong>model chip</strong> at the bottom left of the message box
             names the model that answers your next question: <Mono>● llama3.2 ▾</Mono> with a green dot, or{" "}
-            <strong>Choose a model</strong> with an amber dot while none can answer (its tooltip says why). It opens the
-            model picker above the message box (a sheet over it on a phone), in three steps. Escape goes back a step, then
+            <strong>Choose a model</strong> with an amber dot while none can answer (its tooltip says why). The web
+            assistant uses only the models you add here: it reads no model from its environment (no{" "}
+            <Mono>LLM_BASE_URL</Mono>, <Mono>LLM_MODEL</Mono> or <Mono>LLM_API_KEY</Mono>), so until you add one it says
+            &quot;No AI model is set up yet. Add one with the model chip under the message box (+ Model).&quot; The chip
+            opens the model picker above the message box (a sheet over it on a phone). Escape goes back to the list, then
             closes the picker. Choosing a model needs the operator role: a viewer sees the chip, disabled.
           </p>
           <Steps>
             <li>
-              <strong>Choose a model.</strong> <em>Your models</em> lists the <strong>Environment</strong> model, read-only,
-              from <Mono>web/.env.local</Mono> (<Mono>LLM_BASE_URL</Mono>, <Mono>LLM_MODEL</Mono>, optional{" "}
-              <Mono>LLM_API_KEY</Mono>; it answers while nothing else is chosen: change it in that file and restart{" "}
-              <Mono>/web</Mono>), and every model you saved, the one that answers next checked. One click, Enter or Space
-              switches to a model and closes the picker. <em>Add or change a provider</em> lists OpenAI, Anthropic,
-              DeepSeek, OpenRouter, Groq, Ollama (local), LM Studio (local) and Custom (OpenAI-compatible), each with its
-              state (<Mono>key saved</Mono>, <Mono>local</Mono>). The cloud ones are disabled, with the reason, unless the
-              dashboard was started with <Mono>LLM_ALLOW_REMOTE=1</Mono>. A saved provider has a bin beside its row:
-              removing it asks first, with No as the default, and removing the active one hands the answers back to the
-              Environment.
+              <strong>Model.</strong> Your saved models, each with its provider and where it runs (
+              <Mono>stub-model · Stub · local</Mono>), a check on the one that answers next. One click, Enter or Space uses
+              a model and closes the picker. A remote one is disabled, with the reason, unless the dashboard was started
+              with <Mono>LLM_ALLOW_REMOTE=1</Mono>. Each has a bin: removing asks first, with No as the default; removing a
+              provider&apos;s last model removes the provider and its saved key. With nothing saved the list says{" "}
+              <em>No model yet.</em> <strong>+ Model</strong> at the bottom opens the next step.
             </li>
             <li>
-              <strong>Credentials.</strong> The API key, in a password field that is never filled in (with a key saved,
-              leave it empty to keep it, or tick <strong>Remove key</strong>) and, for Custom, Ollama and LM Studio only, the
-              base URL, filled in from the preset. <strong>Continue</strong> asks the provider for its models (
-              <Mono>GET &lt;base URL&gt;/models</Mono>); when it lists none, a model it is known to have is tested with one
-              tiny chat completion, or you can type a model name instead. A refusal (an address off this machine, a bad
-              address, a key over http, a key the provider turns down) stays on this step, in red.
+              <strong>Set the provider.</strong> <em>Provider</em>: OpenAI, Anthropic, DeepSeek, OpenRouter, Groq, Ollama
+              (local), LM Studio (local) or Custom (OpenAI-compatible); the cloud ones are disabled, with the reason, unless
+              the dashboard was started with <Mono>LLM_ALLOW_REMOTE=1</Mono>. <em>Base URL</em>, for Custom, Ollama and LM
+              Studio only, filled in from the preset. <em>API key</em>, a password field that is never filled in (&quot;Needed
+              by &lt;Provider&gt;&quot; or &quot;Optional&quot;; with a key saved for that provider, leave it empty to keep it, or tick{" "}
+              <strong>Remove key</strong>); choosing another provider empties it. <em>Model</em>: the list{" "}
+              <strong>Fetch models</strong> brings (<Mono>GET &lt;base URL&gt;/models</Mono>, also fetched once the
+              provider, the address and the key are set), or <strong>Type a model name…</strong>. When the server lists
+              none, a model the saved provider is known to have is tested, or you can type a name instead.
             </li>
             <li>
-              <strong>Choose the provider&apos;s model.</strong> The models it listed, or <strong>Type a model name</strong>{" "}
-              (tested before it is saved). <strong>Use this model</strong> saves the provider the first time (named after
-              its preset) or adds the model to it, switches to it and closes the picker: the chip names the new model at
-              once.
+              <strong>Add model.</strong> A typed model, or one not from the list fetched for these exact values, is tested
+              first with one tiny chat completion. The provider is then saved (named after its preset), or, when that preset
+              at that address is saved already, the model is added to it; it becomes the active model and the picker
+              closes: the chip names it at once. A refusal (an address off this machine, a bad address, a key over http, a
+              key the provider turns down) stays on the form, in red. <strong>Cancel</strong> goes back to the list.
             </li>
           </Steps>
           <DocTable
@@ -269,18 +272,17 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
             ]}
           />
           <p>
-            A key never goes back to the browser (the picker only says &quot;key saved&quot;) and is never logged. Using a
-            saved provider again without typing a key keeps the saved one, as long as the address stays on the same host;
-            another host needs the key again, or <strong>Remove key</strong>. Continue sends a saved key only to its saved
-            address, and neither the model list nor the test sends any assessment data.
+            A key never goes back to the browser (the picker only says &quot;Key saved&quot;) and is never logged. Adding a
+            model to a saved provider without typing a key keeps the saved one. A fetch or a test sends a saved key only to
+            its saved address, and neither sends any assessment data.
           </p>
-          <Callout variant="warning" title="The same rules as the environment">
-            Every model, saved or from the environment, must use http(s) with no user or password in the address and a
-            plain model name; a key goes only over https to a model off this machine; and an address off this machine is
-            used only when the dashboard was started with <Mono>LLM_ALLOW_REMOTE=1</Mono> (the browser can&apos;t turn it
-            on). The rules are checked again on every question: a chosen model that no longer passes says why in the
-            assistant, and nothing else answers in its place. Remote models receive your questions and the assessment data
-            they need; see <DocRef>LLM data handling</DocRef>.
+          <Callout variant="warning" title="The same rules for every model">
+            Every model must use http(s) with no user or password in the address and a plain model name; a key goes only
+            over https to a model off this machine; and an address off this machine is used only when the dashboard was
+            started with <Mono>LLM_ALLOW_REMOTE=1</Mono> (the browser can&apos;t turn it on). The rules are checked again on
+            every question: a chosen model that no longer passes says why in the assistant, and nothing else answers in its
+            place. Remote models receive your questions and the assessment data they need; see{" "}
+            <DocRef>LLM data handling</DocRef>.
           </Callout>
         </DocSection>
         <DocSection title="Knowledge in the web assistant">
