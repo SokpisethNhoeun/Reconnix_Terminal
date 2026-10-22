@@ -4,7 +4,7 @@ Only a summary is kept (never the file): what the spec says about the API, as da
 """
 
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 MAX_ENDPOINTS = 500
 
@@ -21,6 +21,7 @@ class ApiSpec:
     total: int = 0                      # every endpoint in the file (endpoints is capped)
     methods: List[str] = field(default_factory=list)
     security_schemes: List[str] = field(default_factory=list)
+    base_methods: Optional[List[str]] = None   # the scope's methods before the first attach
 
     @property
     def label(self) -> str:

@@ -146,6 +146,16 @@ class ActionsMixin:
         """Ask for an OpenAPI file (the API template's scope draft); the store reads it."""
         self.open_dialog(OpenApiForm(), lambda _result: self.refresh_view())
 
+    def remove_api_spec(self) -> None:
+        """Detach the OpenAPI file: the template's endpoints and methods come back."""
+        try:
+            store.remove_api_spec()
+        except store.StoreValidationError as exc:
+            self._warn(exc)
+            return
+        self.notify("OpenAPI spec removed.", title="OpenAPI", markup=False)
+        self.refresh_view()
+
     # --- editing where a gated action runs ("Edit params", the plan's "Edit steps") --------
     def edit_approval(self, request_id: str) -> None:
         if not store.can_edit(request_id):
