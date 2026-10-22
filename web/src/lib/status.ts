@@ -86,13 +86,13 @@ export const FINDING_REVIEW: Record<"confirmed" | "review" | "closed", Meaning> 
   closed: { label: "Closed", tone: "info", icon: "closed", hint: "Fixed, accepted or a false positive." },
 };
 
-/** Severity, on the TUI's scale (theme.SEVERITY): its own colours, always with its name. */
+/** Severity, on the TUI's four-level scale (theme.SEVERITY): its own colours, always with its
+    name. There is no Info level: an older file's informational findings are never shown. */
 export const SEVERITY_META: Record<Severity, { label: string; color: string; hint: string }> = {
   CRITICAL: { label: "Critical", color: "var(--sev-critical)", hint: "Fix first: severe impact, easy to exploit." },
   HIGH: { label: "High", color: "var(--sev-high)", hint: "Serious: fix soon." },
   MEDIUM: { label: "Medium", color: "var(--sev-medium)", hint: "Worth fixing; limited impact or harder to exploit." },
   LOW: { label: "Low", color: "var(--sev-low)", hint: "Minor." },
-  INFO: { label: "Info", color: "var(--sev-info)", hint: "For information; not a weakness on its own." },
 };
 
 /** An approval's risk, as the TUI colours it (LOW green, MEDIUM amber, HIGH red). */

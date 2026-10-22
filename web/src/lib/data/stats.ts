@@ -32,12 +32,11 @@ export const isConfirmed = (f: Finding) => f.validation === "CONFIRMED";
 
 // --- analyst triage ----------------------------------------------------------------------
 
-const isSeverity = (s: string): s is Severity => (SEVERITIES as readonly string[]).includes(s);
-
-/** The analyst's severity when one was set, else the detected one (older files have neither). */
+/** The analyst's severity when one was set, else the detected one (older files have neither).
+    Never INFO: the reader dropped every finding with INFO in any of the three (schema.ts
+    `withoutInfo`), so an Info override can't bring the detected severity back. */
 export function effectiveSeverity(f: Finding): Severity {
-  const chosen = f.effective_severity || f.severity_override;
-  return isSeverity(chosen) ? chosen : f.severity;
+  return f.effective_severity || f.severity_override || f.severity;
 }
 
 /** Triage statuses that take a finding out of the open risk; anything else counts as open. */

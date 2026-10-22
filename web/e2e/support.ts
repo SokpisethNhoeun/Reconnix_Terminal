@@ -7,6 +7,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect } from "./fixtures";
 
 import { TOKEN } from "../playwright.config";
+import { isInfoFinding } from "../src/lib/data/schema";
 
 /** Sign in through the sign-in link (the page's own flow). Specs start signed in through
     `storageState` (e2e/global-setup.ts); only the ones that test the sign-in itself call this. */
@@ -73,7 +74,7 @@ interface SampleAssessment {
   target: string;
   status: string;
   waiting_for: string;
-  findings: { severity: string; validation: string; title: string; status: string; cvss_score: number }[];
+  findings: { severity: string; severity_override?: string; effective_severity?: string; validation: string; title: string; status: string; cvss_score: number; triage_note?: string }[];
   verdicts: { allowed: boolean }[];
   approvals: unknown[];
   created_at: string;
@@ -81,11 +82,14 @@ interface SampleAssessment {
   run: { requests: number };
 }
 
+/** The sample files as the dashboard reads them: an informational finding an older file may
+    hold is left out, as the reader leaves it out (lib/data/schema.ts `isInfoFinding`). */
 export function sample(): SampleAssessment[] {
   const dir = path.join(__dirname, "..", "sample-data");
   return readdirSync(dir)
     .filter((n) => n.endsWith(".json"))
-    .map((n) => JSON.parse(readFileSync(path.join(dir, n), "utf8")) as SampleAssessment);
+    .map((n) => JSON.parse(readFileSync(path.join(dir, n), "utf8")) as SampleAssessment)
+    .map((a) => ({ ...a, findings: a.findings.filter((f) => !isInfoFinding(f)) }));
 }
 
 /** The assessment the dashboard opens first: the newest by creation time (as store.ts sorts). */

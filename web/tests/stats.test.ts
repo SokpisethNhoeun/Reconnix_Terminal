@@ -34,9 +34,9 @@ import { AssessmentSchema, type TimelineEntry } from "@/lib/data/schema";
 
 import { SAMPLE_DIR, sampleAssessments } from "./fixtures";
 
-/* The sample data holds one false positive (the triage tests below add their own), and these counts
-   check the arithmetic over untriaged findings: that finding is read as open here, and the real file
-   is checked in "the sample's false positive" below. */
+/* These counts check the arithmetic over untriaged findings: a false positive the sample data may
+   hold is read as open here (the triage tests below add their own, and "a false positive" below
+   checks one is left out of every count). */
 const saved = sampleAssessments();
 const list = saved.map((a) => ({ ...a, findings: a.findings.map((f) => (f.status === "false-positive" ? { ...f, status: "open" } : f)) }));
 const findings = list.flatMap((a) => a.findings);
@@ -86,7 +86,7 @@ describe("findings", () => {
     const rows = allFindings(list);
     expect(rows).toHaveLength(findings.length);
     expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length);
-    const order = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
+    const order = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
     expect(rows.map((r) => order.indexOf(r.severity))).toEqual([...rows.map((r) => order.indexOf(r.severity))].sort((a, b) => a - b));
   });
 
@@ -239,12 +239,13 @@ describe("analyst triage", () => {
     expect(effectiveSeverity({ ...f, effective_severity: "CRITICAL" })).toBe("CRITICAL");
     expect(effectiveSeverity({ ...f, effective_severity: "", severity_override: "CRITICAL" })).toBe("CRITICAL");
     expect(effectiveSeverity({ ...f, effective_severity: "", severity_override: "" })).toBe(f.severity); // older files
-    expect(effectiveSeverity({ ...f, effective_severity: "SEVERE" })).toBe(f.severity);
+    // anything else the file says is read as unset, and an INFO drops the finding
+    // (tests/info-dropped.test.ts)
   });
 
   it("sorts and counts by the analyst's severity", () => {
     const low = findings.find((x) => x.severity === "LOW")!;
-    const raised = list.map((a) => ({ ...a, findings: a.findings.map((f) => (f === low ? { ...f, effective_severity: "CRITICAL" } : f)) }));
+    const raised = list.map((a) => ({ ...a, findings: a.findings.map((f) => (f === low ? { ...f, effective_severity: "CRITICAL" as const } : f)) }));
     const criticals = severityCounts(findings).CRITICAL + 1;
     expect(allFindings(raised).slice(0, criticals).map((f) => f.id)).toContain(low.id); // among the critical ones first
     expect(allFindings(raised)[criticals].severity).not.toBe("CRITICAL");
@@ -330,13 +331,16 @@ describe("average testing time", () => {
   });
 });
 
-describe("the sample's false positive", () => {
-  it("is in the file with its note, and left out of every count", () => {
-    const all = saved.flatMap((a) => a.findings);
+describe("a false positive", () => {
+  it("is kept with its note, and left out of every count", () => {
+    // a sample run with one of its findings marked as a false positive, as the TUI's triage saves it
+    const run = list.find((a) => a.findings.length > 1)!;
+    const marked = { ...run, findings: run.findings.map((f, i) => (i === 0 ? { ...f, status: "false-positive", triage_note: "Not reachable from outside." } : f)) };
+    const all = marked.findings;
     const fps = all.filter((f) => f.status === "false-positive");
     expect(fps).toHaveLength(1);
     expect(fps[0].triage_note).not.toBe("");
-    expect(overview(saved).findings).toBe(all.length - 1);
+    expect(overview([marked]).findings).toBe(all.length - 1);
     expect(triageCounts(all).falsePositive).toBe(1);
   });
 });

@@ -9,7 +9,7 @@
    (combined/html.ts), which must look the same. */
 import { type Assessment, type Finding, SEVERITIES as SEV_ORDER } from "@/lib/data/schema";
 
-const SEV_CLASS: Record<string, string> = { CRITICAL: "crit", HIGH: "high", MEDIUM: "med", LOW: "low", INFO: "info" };
+const SEV_CLASS: Record<string, string> = { CRITICAL: "crit", HIGH: "high", MEDIUM: "med", LOW: "low" };
 const VALIDATION_CLASS: Record<string, string> = { CONFIRMED: "confirmed", UNCONFIRMED: "unconfirmed", INCONCLUSIVE: "inconclusive" };
 const STATUS_CLASS: Record<string, string> = { open: "open", fixed: "fixed", accepted: "accepted", "false-positive": "falsepos" };
 const STATUS_LABEL: Record<string, string> = { open: "Open", fixed: "Fixed", accepted: "Accepted", "false-positive": "False+" };
@@ -43,7 +43,8 @@ export const sevRank = (s: string) => {
   const i = (SEV_ORDER as readonly string[]).indexOf(s.toUpperCase());
   return i < 0 ? SEV_ORDER.length : i;
 };
-/** The CSS class of a severity ("crit", "high", …; unknown ones read as info). */
+/** The CSS class of a severity ("crit", "high", "med", "low"). Anything else, such as an
+    approval with no recorded risk, gets the neutral grey "info" pill: it is not a severity. */
 export const sevClass = (severity: string) => own(SEV_CLASS, severity.toUpperCase(), "info");
 
 function counts(findings: Pick<Finding, "severity">[]): Record<string, number> {
@@ -116,10 +117,10 @@ a{color:var(--accent); text-decoration:none}
 .tile .n{font-family:"IBM Plex Mono"; font-weight:600; font-size:24px; line-height:1}
 .tile .k{margin-top:5px; font-size:9px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted)}
 .tile.crit .n{color:var(--crit)} .tile.high .n{color:var(--high)} .tile.med .n{color:var(--med)} .tile.low .n{color:var(--low)}
-.tile.info .n{color:var(--info)} .tile.tot .n{color:var(--accent)}
+.tile.tot .n{color:var(--accent)}
 .dist{display:flex; height:22px; border-radius:6px; overflow:hidden; border:1px solid var(--line)}
 .dist i{display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:600; font-family:"IBM Plex Mono"}
-.dist .crit{background:var(--crit)} .dist .high{background:var(--high)} .dist .med{background:var(--med)} .dist .low{background:var(--low)} .dist .info{background:var(--info)}
+.dist .crit{background:var(--crit)} .dist .high{background:var(--high)} .dist .med{background:var(--med)} .dist .low{background:var(--low)}
 .legend{display:flex; flex-wrap:wrap; gap:5px; margin-top:9px}
 .tw{overflow-x:auto; border:1px solid var(--line); border-radius:10px}
 table{border-collapse:collapse; width:100%; font-size:11.5px}
@@ -137,7 +138,7 @@ td.id{font-family:"IBM Plex Mono"; font-weight:600; color:var(--accent); white-s
 .find+.find{margin-top:14px}
 .find-head{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:11px 15px; border-bottom:1px solid var(--line); border-left:4px solid var(--line)}
 .find.s-crit .find-head{border-left-color:var(--crit)} .find.s-high .find-head{border-left-color:var(--high)}
-.find.s-med .find-head{border-left-color:var(--med)} .find.s-low .find-head{border-left-color:var(--low)} .find.s-info .find-head{border-left-color:var(--info)}
+.find.s-med .find-head{border-left-color:var(--med)} .find.s-low .find-head{border-left-color:var(--low)}
 .find-id{font-family:"IBM Plex Mono"; font-weight:600; color:var(--muted); font-size:12px}
 .find-head h3{font-size:14.5px; font-weight:600; flex:1 1 220px; min-width:0}
 .find-cvss{font-family:"IBM Plex Mono"; font-size:11px; color:var(--ink-soft); background:var(--zebra); border:1px solid var(--line); border-radius:7px; padding:2px 8px}
@@ -202,10 +203,10 @@ export function severityBlock(findings: Pick<Finding, "severity">[]): string {
   const c = counts(findings);
   const total = findings.length || 1;
   const present = SEV_ORDER.filter((s) => c[s]);
-  let tiles = SEV_ORDER.filter((s) => s !== "INFO" || c.INFO)
-    .map((s) => `<div class="tile ${SEV_CLASS[s]}"><div class="n">${c[s]}</div><div class="k">${esc(title(s))}</div></div>`)
-    .join("");
-  tiles += `<div class="tile tot"><div class="n">${findings.length}</div><div class="k">Total</div></div>`;
+  // the four severities and the total: the grid's five columns
+  const tiles =
+    SEV_ORDER.map((s) => `<div class="tile ${SEV_CLASS[s]}"><div class="n">${c[s]}</div><div class="k">${esc(title(s))}</div></div>`).join("") +
+    `<div class="tile tot"><div class="n">${findings.length}</div><div class="k">Total</div></div>`;
   const segs = present
     .map((s) => {
       const pct = Math.round((100 * c[s]) / total);
@@ -222,7 +223,7 @@ export function severityBlock(findings: Pick<Finding, "severity">[]): string {
 
 function narrative(a: Assessment, findings: Finding[], blocked: number, approvals: number): string {
   const c = counts(findings);
-  const highest = SEV_ORDER.find((s) => c[s]) ?? "INFO";
+  const highest = SEV_ORDER.find((s) => c[s]) ?? "NONE"; // no findings: "None"
   const breakdown = SEV_ORDER.filter((s) => c[s]).map((s) => `${c[s]} ${title(s)}`).join(", ") || "no findings";
   const lead = findings.length ? `, led by <b>${esc(findings[0].title)}</b>` : "";
   return (

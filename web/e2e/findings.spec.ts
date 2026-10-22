@@ -133,9 +133,10 @@ test("a finding the address names but the list lacks falls back to the first row
   await expect(notice(page)).not.toContainText("<b>");
 });
 
-// 20261001-083000-2265_RCX-DEMO-001 completed with nothing found; ...-8c51_RCX-DEMO-002 found twelve
+// 20261001-083000-2265_RCX-DEMO-001 completed with nothing found; MOST is the run with the most
+// findings the page lists (...-8c51_RCX-DEMO-002, twelve; an Info finding would not count)
 const NO_FINDINGS = "20261001-083000-2265_RCX-DEMO-001";
-const TWELVE = "20260929-112000-8c51_RCX-DEMO-002";
+const MOST = [...sample()].sort((a, b) => b.findings.length - a.findings.length)[0];
 
 test("a run with no findings says so: no list, no filters, no pager", async ({ page }) => {
   const run = sample().find((a) => a.uid === NO_FINDINGS)!;
@@ -153,9 +154,9 @@ test("a run with no findings says so: no list, no filters, no pager", async ({ p
 });
 
 test("one run with more than ten findings pages at ten, and its last page holds the rest", async ({ page }) => {
-  const run = sample().find((a) => a.uid === TWELVE)!;
-  expect(run.findings.length).toBeGreaterThan(PER_PAGE);
-  await go(page, `/?uid=${TWELVE}&view=findings`);
+  const run = MOST;
+  test.skip(run.findings.length <= PER_PAGE, "no sample run lists more than ten findings (Info ones are not listed)");
+  await go(page, `/?uid=${run.uid}&view=findings`);
   await expect(rows(page)).toHaveCount(PER_PAGE);
   await expect(pager(page)).toContainText(`Page 1 of 2 · ${run.findings.length} results`);
   await pager(page).getByRole("button", { name: "Next page" }).click();
@@ -173,25 +174,38 @@ test("a run that fits one page shows no pager", async ({ page }) => {
   await expect(pager(page)).toHaveCount(0);
 });
 
-test("a critical finding, an info finding and a false positive show their own badges; titles stay text", async ({ page }) => {
+test("a critical finding shows its badge first, there is no Info level, and titles stay text", async ({ page }) => {
   const uid = "20260929-112000-8c51_RCX-DEMO-001";
   await go(page, `/?uid=${uid}&view=findings`);
   await expect(rows(page).first().locator("button")).toHaveAttribute("data-severity", "CRITICAL");
-  await expect(page.getByRole("group", { name: "Severity" }).getByRole("button", { name: /^critical/ })).toBeVisible();
-  await expect(page.getByRole("group", { name: "Severity" }).getByRole("button", { name: /^info/ })).toBeVisible();
+  const severity = page.getByRole("group", { name: "Severity" });
+  await expect(severity.getByRole("button", { name: /^critical/ })).toBeVisible();
+  // an informational finding an older file holds is listed nowhere, and has no chip
+  await expect(severity.getByRole("button", { name: /^info/ })).toHaveCount(0);
+  await expect(rows(page)).toHaveCount(Math.min(PER_PAGE, sample().find((a) => a.uid === uid)!.findings.length));
+  await expect(list(page).locator('[data-severity="INFO"]')).toHaveCount(0);
   // the title with markup in it is shown as the characters it is
   const markup = rows(page).filter({ hasText: "<b>Status page</b> leaks build details" });
   await expect(markup).toHaveCount(1);
   await expect(page.locator("b", { hasText: "Status page" })).toHaveCount(0);
-  // the false positive is listed, marked closed, and its triage note shows in its detail
-  await rows(page).filter({ hasText: "Technology detected: nginx" }).locator("button").click();
-  await expect(detail(page)).toContainText("False positive");
-  // the analyst's note is part of the report, and the markup in a title is escaped there too
+  // the markup in a title is escaped in the report too
   const doc = unzip(await (await page.request.get(`/api/assessments/${uid}/export?format=docx`)).body()).get("word/document.xml") ?? "";
-  expect(doc).toContain("Analyst note");
-  expect(doc).toContain("Banner is a test fixture; the scanner matched a stale cache.");
   expect(doc).toContain("&lt;b&gt;Status page&lt;/b&gt; leaks build details");
   expect(doc).not.toContain("<b>Status page</b>");
+  expect(doc).not.toMatch(/>Info</);
+});
+
+test("a false positive is listed as closed, and its analyst note is in the report", async ({ page }) => {
+  // the sample data's false positive with a note, if it holds one (an Info one is left out)
+  const run = sample().find((a) => a.findings.some((f) => f.status === "false-positive" && f.triage_note));
+  test.skip(!run, "the sample data holds no false positive with a note (an Info one is not listed)");
+  const fp = run!.findings.find((f) => f.status === "false-positive" && f.triage_note)!;
+  await go(page, `/?uid=${run!.uid}&view=findings`);
+  await rows(page).filter({ hasText: fp.title }).locator("button").click();
+  await expect(detail(page)).toContainText("False positive");
+  const doc = unzip(await (await page.request.get(`/api/assessments/${run!.uid}/export?format=docx`)).body()).get("word/document.xml") ?? "";
+  expect(doc).toContain("Analyst note");
+  expect(doc).toContain(fp.triage_note!.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"));
 });
 
 /* The sample run whose target held a login (scripts/make_sample_data.py): the store masked it

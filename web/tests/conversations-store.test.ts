@@ -257,6 +257,55 @@ describe("what is saved", () => {
   });
 });
 
+describe("a conversation saved while there was an Info level", () => {
+  const now = Date.now();
+  const run = { uid: "20261005-140300-9f76_RCX-DEMO-002", label: "RCX-DEMO-002", when: "5 Oct 14:03" };
+  const item = (id: string, severity: string) => ({ id, title: `Finding ${id}`, severity, cvss: null, target: "https://example.test", review: "review", run });
+  const findings = { kind: "findings", total: 7, counts: { CRITICAL: 1, HIGH: 2, MEDIUM: 1, LOW: 1, INFO: 2 }, items: [item("F-1", "CRITICAL"), item("IMP-5", "INFO")], runs: 1 };
+  const finding = { kind: "finding", item: item("IMP-6", "INFO"), cwe: "—", tool: "nuclei", description: "d", impact: "i", remediation: [] };
+  const reply = (n: number, cards: unknown[]) => ({ id: uuid(n + 1), role: "assistant", replyTo: uuid(n), content: `answer ${n}`, cards, state: "done", at: now });
+  const old = {
+    format: CONVERSATION_FORMAT,
+    id: uuid(7),
+    title: "Old findings",
+    scope: ALL,
+    createdAt: now,
+    updatedAt: now,
+    messages: [
+      { id: uuid(1), role: "user", content: "Analyze the findings", at: now },
+      reply(1, [findings]),
+      { id: uuid(3), role: "user", content: "Explain IMP-6", at: now },
+      reply(3, [finding, findings]),
+    ],
+  };
+
+  it("still loads, without the INFO count, rows and card, and its total without them", async () => {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    writeFileSync(fileOf(old.id), JSON.stringify(old), { mode: 0o600 });
+    const c = (await readConversation(old.id))!;
+    expect(c).not.toBeNull();
+    expect(c.messages.map((m) => m.content)).toEqual(["Analyze the findings", "answer 1", "Explain IMP-6", "answer 3"]);
+    const cards = c.messages.flatMap((m) => (m.role === "assistant" ? m.cards : []));
+    expect(cards.map((x) => x.kind)).toEqual(["findings", "findings"]); // the card about the INFO finding is gone
+    for (const card of cards) {
+      expect(card).toMatchObject({ total: 5, counts: { CRITICAL: 1, HIGH: 2, MEDIUM: 1, LOW: 1 }, runs: 1 });
+      if (card.kind === "findings") expect(card.items.map((i) => i.id)).toEqual(["F-1"]);
+    }
+    expect(JSON.stringify(c)).not.toContain("INFO");
+    expect((await listConversations()).map((s) => s.id)).toContain(old.id);
+  });
+
+  it("is saved back without Info on its next answer", async () => {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    writeFileSync(fileOf(old.id), JSON.stringify(old), { mode: 0o600 });
+    const { asked } = await ask("And now?", old.id);
+    expect(await saveReply(old.id, { replyTo: asked.id, content: "fine", cards: [], state: "done" })).toBe(true);
+    const text = readFileSync(fileOf(old.id), "utf8");
+    expect(text).not.toContain("INFO");
+    expect(text).not.toContain('"IMP-5"'); // the INFO rows left with their count
+  });
+});
+
 describe("retention and limits", () => {
   it("deletes a conversation after 30 days without use, on the next list", async () => {
     const now = Date.now();

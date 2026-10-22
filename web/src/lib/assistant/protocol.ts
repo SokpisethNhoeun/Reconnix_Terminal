@@ -57,7 +57,9 @@ const FindingsCardSchema = z
   .object({
     kind: z.literal("findings"),
     total: count,
-    counts: z.object({ CRITICAL: count, HIGH: count, MEDIUM: count, LOW: count, INFO: count }).strict(),
+    // the four levels (a conversation saved with an INFO count reads back without it:
+    // history-schema.ts `withoutInfoCards`)
+    counts: z.object({ CRITICAL: count, HIGH: count, MEDIUM: count, LOW: count }).strict(),
     items: z.array(FindingItemSchema).max(8),
     runs: count, // how many runs the findings come from
   })

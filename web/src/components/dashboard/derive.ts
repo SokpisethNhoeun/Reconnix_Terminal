@@ -16,7 +16,7 @@
 import { redact } from "@/lib/assistant/redact";
 import { clock, duration, hourMinute, minutesLimit, shortDay } from "@/lib/data/format";
 import { SEVERITIES } from "@/lib/data/schema";
-import type { ApprovalView, AssessmentView, FindingView, PhaseView, ScopeView, Severity } from "@/lib/data/view-types";
+import type { ApprovalView, AssessmentView, FindingView, PhaseView, ScopeView } from "@/lib/data/view-types";
 
 import { activityCard } from "./derive-activity";
 import { executionCard } from "./derive-execution";
@@ -55,7 +55,7 @@ export interface Dashboard {
     window: string | null;
   };
   phases: PhaseView[];
-  findingTotal: number; // every finding, INFO too (false positives left out)
+  findingTotal: number; // every finding (false positives left out)
   severity: FindingsSlice["severity"];
   requests: number;
   minutes: { used: number; max: number | null; over: boolean };
@@ -80,16 +80,13 @@ export function findingRow(f: FindingView, run: FindingRow["run"] = null): Findi
   return { ...f, icon: findingIcon(f), key: run ? `${run.uid}~${f.id}` : f.id, run };
 }
 
-/** The levels Findings by Severity lists, Critical first: always these four, each even at 0.
-    INFO is never on the card (the Findings view and the summary strip still count it). */
-export const CARD_LEVELS: readonly Severity[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
-
-/** Findings by Severity, over the four CARD_LEVELS: counts and shares by severity, review state
-    and the top CVSS scores. False positives are left out of every count. */
+/** Findings by Severity, over the four SEVERITIES (Critical first, each even at 0): counts and
+    shares by severity, review state and the top CVSS scores. False positives are left out of
+    every count, so its total is the summary strip's (findingsSummary). */
 export function findingsSlice(rows: FindingRow[]): FindingsSlice {
-  const counted = rows.filter((f) => !f.falsePositive && CARD_LEVELS.includes(f.severity));
+  const counted = rows.filter((f) => !f.falsePositive);
   const total = counted.length;
-  const severity = CARD_LEVELS.map((level) => {
+  const severity = SEVERITIES.map((level) => {
     const count = counted.filter((f) => f.severity === level).length;
     return { level, count, share: total ? Math.round((count / total) * 100) : 0, frac: total ? count / total : 0 };
   });
@@ -109,8 +106,8 @@ export function findingsSlice(rows: FindingRow[]): FindingsSlice {
   };
 }
 
-/** The summary strip's Findings card: every finding (INFO too; false positives left out), the
-    worst severity present and how many need review. */
+/** The summary strip's Findings card: every finding (false positives left out, so the same
+    total as Findings by Severity), the worst severity present and how many need review. */
 export function findingsSummary(rows: Pick<FindingView, "severity" | "falsePositive" | "needsReview">[]): SummaryStrip["findings"] {
   const counted = rows.filter((f) => !f.falsePositive);
   const worst = SEVERITIES.find((level) => counted.some((f) => f.severity === level)) ?? null;

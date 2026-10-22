@@ -64,7 +64,7 @@ describe("combineAssessments", () => {
   });
 
   it("orders unique findings by worst severity, then CVSS, then how often they were seen", () => {
-    const order = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
+    const order = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
     for (let i = 1; i < r.findings.length; i += 1) {
       const a = r.findings[i - 1];
       const b = r.findings[i];
@@ -81,7 +81,8 @@ describe("combineAssessments", () => {
 
   it("counts every number from the files", () => {
     const sum = (k: keyof typeof r.summary.uniqueBySeverity) => r.summary.uniqueBySeverity[k];
-    expect(sum("CRITICAL") + sum("HIGH") + sum("MEDIUM") + sum("LOW") + sum("INFO")).toBe(r.summary.unique);
+    expect(Object.keys(r.summary.uniqueBySeverity)).toEqual(["CRITICAL", "HIGH", "MEDIUM", "LOW"]);
+    expect(sum("CRITICAL") + sum("HIGH") + sum("MEDIUM") + sum("LOW")).toBe(r.summary.unique);
     expect(r.summary.byStatus).toEqual([
       { status: "Completed", count: 1 },
       { status: "Stopped", count: 1 },
@@ -111,26 +112,26 @@ describe("combineAssessments", () => {
 });
 
 describe("the options", () => {
-  it("leave out LOW and INFO findings, and say so", () => {
+  it("leave out LOW findings, and say so", () => {
     const full = combineAssessments([api1, api2], opts);
     const r = combineAssessments([api1, api2], { ...opts, low: false });
-    const minor = full.findings.flatMap((u) => u.occurrences).filter((o) => o.severity === "LOW" || o.severity === "INFO").length;
+    const minor = full.findings.flatMap((u) => u.occurrences).filter((o) => o.severity === "LOW").length;
     expect(minor).toBeGreaterThan(0);
     expect(r.summary.occurrences).toBe(full.summary.occurrences - minor);
-    expect(r.findings.every((u) => u.severity !== "LOW" && u.severity !== "INFO")).toBe(true);
+    expect(r.findings.every((u) => u.severity !== "LOW")).toBe(true);
     expect(r.summary.leftOut.minor).toBe(minor);
-    expect(r.limitations.some((l) => l.kind === "left-out" && l.text.includes(`(${minor} in these runs)`))).toBe(true);
+    expect(r.limitations.some((l) => l.kind === "left-out" && l.text === `LOW findings were left out by the report's options (${minor} in these runs).`)).toBe(true);
     // the priorities and the top risks drop them too
-    expect(r.priorities.every((p) => p.severity !== "LOW" && p.severity !== "INFO")).toBe(true);
-    expect(r.summary.topRisks.every((u) => u.severity !== "LOW" && u.severity !== "INFO")).toBe(true);
-    expect(r.priorities.length).toBe(full.priorities.length - full.priorities.filter((p) => p.severity === "LOW" || p.severity === "INFO").length);
+    expect(r.priorities.every((p) => p.severity !== "LOW")).toBe(true);
+    expect(r.summary.topRisks.every((u) => u.severity !== "LOW")).toBe(true);
+    expect(r.priorities.length).toBe(full.priorities.length - full.priorities.filter((p) => p.severity === "LOW").length);
   });
 
-  it("say nothing was dropped when no LOW or INFO finding existed", () => {
+  it("say nothing was dropped when no LOW finding existed", () => {
     const high = { ...api1, findings: api1.findings.filter((f) => f.severity === "MEDIUM") };
     const r = combineAssessments([high], { ...opts, low: false });
-    const line = r.limitations.find((l) => l.text.startsWith("LOW and INFO"))!;
-    expect(line.text).toBe("LOW and INFO findings were left out by the report's options.");
+    const line = r.limitations.find((l) => l.text.startsWith("LOW findings"))!;
+    expect(line.text).toBe("LOW findings were left out by the report's options.");
   });
 
   it("leave out the evidence lines and the appendix", () => {

@@ -7,7 +7,7 @@ import type { AssessmentView, FindingView } from "../data/view-types";
 import type { RunRef, ScopeRef } from "./protocol";
 import { redact } from "./redact";
 
-/** Worst first: the schema's order (lib/data/schema.ts). */
+/** Worst first: the schema's four levels (lib/data/schema.ts). */
 export const SEVERITY_ORDER: readonly Severity[] = SEVERITIES;
 const rank = (s: Severity) => SEVERITY_ORDER.indexOf(s);
 
@@ -62,7 +62,7 @@ export function rankFindings(views: AssessmentView[]): Located[] {
 }
 
 export function severityCounts(views: AssessmentView[]): Record<Severity, number> {
-  const counts: Record<Severity, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+  const counts: Record<Severity, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
   for (const v of views) for (const f of realFindings(v)) counts[f.severity] += 1;
   return counts;
 }

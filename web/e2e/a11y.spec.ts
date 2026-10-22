@@ -287,7 +287,7 @@ const contrast = (a: number[], b: number[]) => {
 const tint = (c: number[], under: number[], share = 0.13) => c.map((v, i) => share * v + (1 - share) * under[i]);
 
 test("the meaning colours read at 4.5:1 on the cards, the page and inside their own badges", () => {
-  const colours = ["primary", "success", "warning", "danger", "info", "sev-critical", "sev-high", "sev-medium", "sev-low", "sev-info"];
+  const colours = ["primary", "success", "warning", "danger", "info", "sev-critical", "sev-high", "sev-medium", "sev-low"];
   const grounds = ["card", "card-2", "background", "surface"]; // a card's gradient runs --card → --card-2; a row's tile is --surface
   const low: string[] = [];
   for (const name of colours) {

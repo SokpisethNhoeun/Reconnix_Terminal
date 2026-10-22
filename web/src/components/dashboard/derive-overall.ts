@@ -50,7 +50,7 @@ export interface Overall {
   runs: number;
   waiting: number;
   completed: number;
-  findingTotal: number; // every finding, INFO too (false positives left out)
+  findingTotal: number; // every finding (false positives left out)
   operator: string; // the newest run's operator
   operators: string[];
   targets: CountRow[];
