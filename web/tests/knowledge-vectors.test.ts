@@ -12,7 +12,7 @@ import { buildCorpus, rank, tokenize } from "@/lib/assistant/knowledge/rank";
 
 interface Vectors {
   tokens: { input: string; expected: string[] }[];
-  corpus: { source: string; chunks: string[] }[];
+  corpus: { name: string; chunks: string[] }[]; // a source: its file name, as in index.json
   queries: { query: string; expected: { source: string; index: number; score: number }[] }[];
 }
 
@@ -32,7 +32,7 @@ if (!vectors) {
       expect(tokenize(t.input)).toEqual(t.expected);
     });
 
-    const corpus = buildCorpus(vectors.corpus.map((s) => ({ name: s.source, chunks: s.chunks })));
+    const corpus = buildCorpus(vectors.corpus);
     it.each(vectors.queries.map((q) => [JSON.stringify(q.query).slice(0, 60), q] as const))("ranks %s", (_, q) => {
       const got = rank(corpus, q.query);
       expect(got.map((p) => [p.source, p.index])).toEqual(q.expected.map((e) => [e.source, e.index]));
