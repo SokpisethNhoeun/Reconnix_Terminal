@@ -195,9 +195,11 @@ export function ModelForm({ view, editing, saving, onSave, onDone }: Props) {
               ? removeKey
                 ? "The saved key is removed when you save."
                 : "A key is saved (encrypted on this computer, never shown). Type a new one to replace it."
-              : remote
-                ? "Sent only over https, kept encrypted on this computer and never shown again."
-                : "Kept encrypted on this computer and never shown again."}
+              : needsKey
+                ? "This provider needs an API key. It is kept encrypted on this computer and never shown again."
+                : remote
+                  ? "Sent only over https, kept encrypted on this computer and never shown again."
+                  : "Kept encrypted on this computer and never shown again."}
           </p>
           {editing?.keySaved && <Checkbox label="Remove the saved key" checked={removeKey} onChange={(e) => setRemoveKey(e.target.checked)} />}
         </div>
