@@ -6,7 +6,7 @@
    the server, whose answer (the whole view) replaces what the picker shows and tells the
    assistant which model answers next (setModel), so the chip, the reason above the composer and
    Ask follow without a reload. One change at a time: `pending` names it (a switch:
-   "<providerId>/<model>", a removal: "remove:<providerId>/<model>"). Operators only. */
+   "<providerId>/<model>", a removal: "remove:<providerId>/<model>"). */
 import { useCallback, useRef, useState } from "react";
 
 import * as api from "@/lib/assistant/client";
@@ -23,7 +23,7 @@ export interface ModelsState {
 /** The key of one model choice (a switch in flight). */
 export const choiceKey = (providerId: string, model: string) => `${providerId}/${model}`;
 
-export function useModels(operator: boolean, setModel: (model: ModelSummary) => void) {
+export function useModels(setModel: (model: ModelSummary) => void) {
   const [state, setState] = useState<ModelsState>({ status: "idle", view: null, error: null });
   const [pending, setPending] = useState<string | null>(null);
   const busy = useRef(false);
@@ -37,13 +37,12 @@ export function useModels(operator: boolean, setModel: (model: ModelSummary) => 
   );
 
   const load = useCallback(() => {
-    if (!operator) return;
     setState((s) => ({ ...s, status: s.view ? "ready" : "loading", error: null }));
     void api.listModels().then((result) => {
       if (result.ok) take(result.view);
       else setState((s) => ({ ...s, status: "error", error: result.detail }));
     });
-  }, [operator, take]);
+  }, [take]);
 
   /** Runs one change; resolves to null when it worked, or what went wrong. A provider that is
       gone (404: removed in another tab) reloads the list, so the picker stops offering it. */

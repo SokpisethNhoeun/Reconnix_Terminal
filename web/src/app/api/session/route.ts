@@ -1,5 +1,5 @@
-/* Sign-in: trade the launch token for the session cookie (operator while the dashboard
-   hosts the terminal, else viewer: see lib/auth/session.ts). */
+/* Sign-in: trade the launch token for the session cookie, and, while the dashboard hosts the
+   terminal, the terminal key (see lib/auth/session.ts). There are no roles. */
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -12,10 +12,10 @@ import {
   TERMINAL_COOKIE_PATH,
   launchToken,
   sessionValue,
-  signInRole,
   terminalKeyValue,
   tokenMatches,
 } from "@/lib/auth/session";
+import { terminalEnabled } from "@/lib/terminal/config";
 
 const Body = z.object({ token: z.string().min(1).max(200) });
 
@@ -32,14 +32,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ detail: "This sign-in link is not valid any more." }, { status: 401 });
   }
 
-  const role = signInRole();
+  const terminal = terminalEnabled();
   const jar = await cookies();
   const options = { httpOnly: true, sameSite: "strict", secure: false /* http on 127.0.0.1 only */ } as const;
-  jar.set(COOKIE, sessionValue(role, token), { ...options, path: "/", maxAge: MAX_AGE_SECONDS });
-  jar.set(TERMINAL_COOKIE, role === "operator" ? terminalKeyValue(token) : "", {
+  jar.set(COOKIE, sessionValue(token), { ...options, path: "/", maxAge: MAX_AGE_SECONDS });
+  jar.set(TERMINAL_COOKIE, terminal ? terminalKeyValue(token) : "", {
     ...options,
     path: TERMINAL_COOKIE_PATH,
-    maxAge: role === "operator" ? MAX_AGE_SECONDS : 0,
+    maxAge: terminal ? MAX_AGE_SECONDS : 0,
   });
-  return NextResponse.json({ role });
+  return NextResponse.json({ signedIn: true, terminal });
 }

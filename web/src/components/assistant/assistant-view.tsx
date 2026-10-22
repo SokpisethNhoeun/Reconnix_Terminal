@@ -50,11 +50,7 @@ export const AssistantView = forwardRef<HTMLTextAreaElement, { onMinimize: () =>
     if (welcome) scrollToTop();
   }, [welcome, scrollToTop]);
 
-  const reason = !info.operator
-    ? "Asking the AI model needs the operator role. Open the dashboard with the sign-in link /web prints."
-    : !model.configured
-      ? model.reason
-      : null;
+  const reason = model.configured ? null : model.reason;
   const elsewhere = conversation.id !== null && conversation.scope.uid !== info.scope.uid;
   const last = messages[messages.length - 1];
 

@@ -15,7 +15,6 @@ import type { FetchResult, ModelsView, ProviderView } from "@/lib/assistant/mode
 import { nameProblem } from "./model-name-rules";
 import type { ModelSummary } from "./types";
 
-export const VIEWER_REASON = "Choosing a model needs the operator role";
 export const NO_CHOICE = "Choose a model";
 
 // --- the chip ------------------------------------------------------------------------------------
@@ -28,18 +27,16 @@ export interface ChipState {
 }
 
 /** What the composer's model chip says about the model that answers next. */
-export function chipState(model: ModelSummary, operator: boolean): ChipState {
+export function chipState(model: ModelSummary): ChipState {
   const usable = model.configured && model.name !== "";
   if (!usable) {
-    return { label: NO_CHOICE, name: NO_CHOICE, title: operator ? model.reason || "No model answers yet: add one with + Model." : VIEWER_REASON, tone: "warning" };
+    return { label: NO_CHOICE, name: NO_CHOICE, title: model.reason || "No model answers yet: add one with + Model.", tone: "warning" };
   }
   const where = model.local ? "local" : "remote";
   const from = model.provider ? `${model.provider}, ${where}` : where;
-  const title = !operator
-    ? VIEWER_REASON
-    : model.local
-      ? `${model.name} (${model.provider}): a local endpoint on this machine`
-      : `${model.name} (${model.provider}): a remote model. Questions, the assessment data they need and relevant /add-on knowledge passages are sent to it.`;
+  const title = model.local
+    ? `${model.name} (${model.provider}): a local endpoint on this machine`
+    : `${model.name} (${model.provider}): a remote model. Questions, the assessment data they need and relevant /add-on knowledge passages are sent to it.`;
   return { label: model.name, name: `Model: ${model.name} (${from})`, title, tone: "success" };
 }
 

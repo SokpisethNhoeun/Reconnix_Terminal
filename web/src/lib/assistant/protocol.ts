@@ -157,7 +157,7 @@ const NoticeCardSchema = z
     title: short,
     body: line,
     steps: z.array(line).max(6),
-    action: z.enum(["terminal"]).nullable(), // operators get the button; nothing acts from the chat
+    action: z.enum(["terminal"]).nullable(), // the button shows while the terminal is on; nothing acts from the chat
   })
   .strict();
 

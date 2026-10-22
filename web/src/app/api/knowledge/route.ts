@@ -1,4 +1,4 @@
-/* The Security knowledge page's files (operators only; src/proxy.ts checks the role too).
+/* The Security knowledge page's files (signed in; src/proxy.ts checks the session too).
 
    GET lists them from the knowledge index, read-only (lib/knowledge/list.ts): ids, names, kinds,
    sizes and times, never a path.

@@ -1,4 +1,4 @@
-/* A Security knowledge file as it was added (operators only; src/proxy.ts checks the role too):
+/* A Security knowledge file as it was added (signed in; src/proxy.ts checks the session too):
    the Python CLI decrypts the kept original (`original <id>`, lib/knowledge/cli.ts) and it is
    answered with its kind's type (lib/knowledge/original.ts): PDF and the text kinds inline, in a
    sandbox with nothing allowed, a Word file as a download; nosniff, never cached. The id must be

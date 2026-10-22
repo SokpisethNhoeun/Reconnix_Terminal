@@ -1,9 +1,9 @@
 /* How the Security knowledge page words a file (lib/knowledge/format.ts), the search over names,
-   the index's new fields (an older entry reads as the terminal's, with no original), and the view
-   only operators may open (view-url.ts allowedView). */
+   the index's new fields (an older entry reads as the terminal's, with no original), and its view
+   in the address (view-url.ts). */
 import { describe, expect, it } from "vitest";
 
-import { allowedView, parseView, VIEWS } from "@/components/dashboard/view-url";
+import { parseView, VIEWS } from "@/components/dashboard/view-url";
 import { IndexEntrySchema } from "@/lib/assistant/knowledge/schema";
 import { humanSize, matchName, opensInline, sourceLine } from "@/lib/knowledge/format";
 import type { KnowledgeItem } from "@/lib/knowledge/types";
@@ -65,11 +65,8 @@ describe("the index's source and original", () => {
 });
 
 describe("the Security knowledge view", () => {
-  it("is a view only operators open: anyone else lands on the Overview", () => {
+  it("is a view of its own in the address", () => {
     expect(VIEWS).toContain("knowledge");
     expect(parseView("knowledge")).toBe("knowledge");
-    expect(allowedView("knowledge", true)).toBe("knowledge");
-    expect(allowedView("knowledge", false)).toBe("overview");
-    expect(allowedView("findings", false)).toBe("findings");
   });
 });

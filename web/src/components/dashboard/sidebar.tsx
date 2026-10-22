@@ -26,9 +26,9 @@ const VIEWS: NavItem[] = [
   { icon: FileText, label: "Reports", view: "reports" },
   { icon: TerminalSquare, label: "Terminal", view: "terminal" },
 ];
-// The Terminal item always opens its view; when this browser can't use the terminal, the
-// view says why (no dead ends), and the tooltip says so up front.
-const TERMINAL_HINT = { operator: "Terminal", viewer: "Terminal · operator role needed", off: "Terminal · off" } as const;
+// The Terminal item always opens its view; when the terminal is off, the view says why (no dead
+// ends), and the tooltip says so up front.
+const TERMINAL_HINT = { on: "Terminal", off: "Terminal · off" } as const;
 const DOC_ITEMS: DocItem[] = [
   { icon: BookOpen, label: "Documentation", href: DOCS.home },
 ];

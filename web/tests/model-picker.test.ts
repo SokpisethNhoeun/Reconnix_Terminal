@@ -34,7 +34,6 @@ import {
   showsUrl,
   TYPED,
   typeInstead,
-  VIEWER_REASON,
 } from "@/components/assistant/model-picker-rules";
 import { liveSwitch, switchOver } from "@/components/assistant/model-switch";
 import { rovingIndex } from "@/components/assistant/roving";
@@ -61,23 +60,19 @@ const ollama = presetOf("ollama");
 
 describe("the chip", () => {
   it("names the model that answers, green, with its provider in the name and the tooltip", () => {
-    const chip = chipState({ configured: true, name: "stub-model", provider: "Stub", local: true, reason: "" }, true);
+    const chip = chipState({ configured: true, name: "stub-model", provider: "Stub", local: true, reason: "" });
     expect(chip).toMatchObject({ label: "stub-model", name: "Model: stub-model (Stub, local)", tone: "success" });
     expect(chip.title).toContain("Stub");
-    const remote = chipState({ configured: true, name: "claude-sonnet-5-5", provider: "Anthropic", local: false, reason: "" }, true);
+    const remote = chipState({ configured: true, name: "claude-sonnet-5-5", provider: "Anthropic", local: false, reason: "" });
     expect(remote.name).toBe("Model: claude-sonnet-5-5 (Anthropic, remote)");
     expect(remote.title).toContain("sent to it");
   });
   it("says Choose a model, amber, when none can answer (the reason in the tooltip)", () => {
     const reason = "No AI model is set up yet. Add one with the model chip under the message box (+ Model).";
-    const empty = chipState({ configured: false, name: "", provider: "", local: false, reason }, true);
+    const empty = chipState({ configured: false, name: "", provider: "", local: false, reason });
     expect(empty).toEqual({ label: "Choose a model", name: "Choose a model", title: reason, tone: "warning" });
-    const broken = chipState({ configured: false, name: "gpt-4o-mini", provider: "OpenAI", local: false, reason: "OpenAI: not on this machine." }, true);
+    const broken = chipState({ configured: false, name: "gpt-4o-mini", provider: "OpenAI", local: false, reason: "OpenAI: not on this machine." });
     expect(broken).toMatchObject({ label: "Choose a model", tone: "warning", title: "OpenAI: not on this machine." });
-  });
-  it("tells a viewer why it is off", () => {
-    expect(chipState({ configured: true, name: "m", provider: "Stub", local: true, reason: "" }, false).title).toBe(VIEWER_REASON);
-    expect(VIEWER_REASON).toBe("Choosing a model needs the operator role");
   });
 });
 

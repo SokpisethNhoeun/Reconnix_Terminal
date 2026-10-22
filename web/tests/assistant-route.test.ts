@@ -1,5 +1,5 @@
 /* The assistant's routes called directly (the e2e tests go through the proxy too): the page's
-   origin, the operator role, a configured model, a request checked before anything is read,
+   origin, a session, a configured model, a request checked before anything is read,
    the NDJSON answer (cards from the saved data, then the stand-in model's text), the
    conversation the server saves and reads back itself, Stop, and the conversation routes. A
    stand-in model runs on a free local port; conversations go to a temporary folder. */
@@ -17,7 +17,7 @@ const TOKEN = "route-test-token-0123456789";
 let cookie = "";
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: (name: string) => (name === COOKIE && cookie ? { value: cookie } : undefined) }) }));
 vi.mock("next/server", async (load) => ({ ...(await load<typeof import("next/server")>()), connection: async () => undefined }));
-vi.mock("@/lib/auth/guard", () => ({ requireViewer: async () => undefined }));
+vi.mock("@/lib/auth/guard", () => ({ requireSignedIn: async () => undefined }));
 
 const { POST } = await import("@/app/api/assistant/route");
 const list = await import("@/app/api/assistant/conversations/route");
@@ -71,7 +71,7 @@ beforeEach(async () => {
   process.env.RECONIX_ASSISTANT_DIR = dir;
   // the model is saved as + Model saves it (the web reads none from its environment)
   standIn = (await addProvider({ name: "Stand-in", preset: "custom", baseUrl: modelUrl, models: ["test-model"], activate: true })).id;
-  cookie = sessionValue("operator", TOKEN);
+  cookie = sessionValue(TOKEN);
   seen = [];
   slow = false;
 });
@@ -102,14 +102,12 @@ const getList = async () => (await (await list.GET(request("/api/assistant/conve
 const getOne = (id: string) => one.GET(request(`/api/assistant/conversations/${id}`, { origin: null }), ctx(id));
 
 describe("POST /api/assistant", () => {
-  it("refuses a viewer", async () => {
-    cookie = sessionValue("viewer", TOKEN);
-    expect((await ask(question)).status).toBe(403);
-  });
-  it("refuses another origin and a missing session", async () => {
+  it("refuses another origin, a missing session and an old role-prefixed cookie", async () => {
     expect((await ask(question, "http://evil.example")).status).toBe(403);
     cookie = "";
-    expect((await ask(question)).status).toBe(403);
+    expect((await ask(question)).status).toBe(401);
+    cookie = `operator.${sessionValue(TOKEN)}`;
+    expect((await ask(question)).status).toBe(401);
   });
   it("says when no model is set up, and never asks one named in its environment", async () => {
     await removeProvider(standIn);
@@ -250,16 +248,14 @@ describe("the conversation routes", () => {
   const rename = (id: string, body: unknown, origin?: string) => one.PATCH(request(`/api/assistant/conversations/${id}`, { method: "PATCH", body: JSON.stringify(body), origin }), ctx(id));
   const remove = (id: string, origin?: string) => one.DELETE(request(`/api/assistant/conversations/${id}`, { method: "DELETE", origin }), ctx(id));
 
-  it("are for operators only: a viewer can't list, read, rename or delete", async () => {
+  it("need a session: signed out, nothing can be listed, read, renamed or deleted", async () => {
     const id = await started();
-    cookie = sessionValue("viewer", TOKEN);
-    expect((await list.GET(request("/api/assistant/conversations", { origin: null }))).status).toBe(403);
-    expect((await getOne(id)).status).toBe(403);
-    expect((await rename(id, { title: "x" })).status).toBe(403);
-    expect((await remove(id)).status).toBe(403);
-    expect((await list.DELETE(request("/api/assistant/conversations", { method: "DELETE" }))).status).toBe(403);
     cookie = "";
-    expect((await getOne(id)).status).toBe(403);
+    expect((await list.GET(request("/api/assistant/conversations", { origin: null }))).status).toBe(401);
+    expect((await getOne(id)).status).toBe(401);
+    expect((await rename(id, { title: "x" })).status).toBe(401);
+    expect((await remove(id)).status).toBe(401);
+    expect((await list.DELETE(request("/api/assistant/conversations", { method: "DELETE" }))).status).toBe(401);
   });
   it("need the page's origin for every change", async () => {
     const id = await started();
@@ -279,7 +275,7 @@ describe("the conversation routes", () => {
     expect((await rename(ID, { title: "x" })).status).toBe(404);
     expect((await remove(ID)).status).toBe(404);
   });
-  it("list, read, rename and delete for an operator", async () => {
+  it("list, read, rename and delete for a session", async () => {
     const id = await started();
     const other = await started();
     expect((await getList()).conversations.map((c) => c.id).sort()).toEqual([id, other].sort());

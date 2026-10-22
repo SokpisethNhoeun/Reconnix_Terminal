@@ -16,7 +16,7 @@ import path from "node:path";
 import { connection } from "next/server";
 import { cache } from "react";
 
-import { requireViewer } from "../auth/guard";
+import { requireSignedIn } from "../auth/guard";
 import { type Assessment, AssessmentSchema } from "./schema";
 import { markIdle, STALE_AFTER_HOURS } from "./stats";
 
@@ -102,7 +102,7 @@ export async function readAssessmentFile(dir: string, name: string): Promise<Ass
 }
 
 export const loadLibrary = cache(async (): Promise<Library> => {
-  await requireViewer();
+  await requireSignedIn();
   await connection();
   const dir = dataDir();
   let names: string[];

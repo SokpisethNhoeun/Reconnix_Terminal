@@ -1,6 +1,6 @@
 "use client";
 
-/* Security knowledge (`?view=knowledge`, operators only: the page renders it for no one else):
+/* Security knowledge (`?view=knowledge`, opened from the AI Assistant's header):
    the documents the AI Assistant may quote, the ones uploaded here and the ones the TUI's /add-on
    added, newest first. The header: "← AI Assistant" (back to the assistant), the title, a search
    over the names, Table / Grid (remembered per browser) and Upload (upload-dialog.tsx). The files

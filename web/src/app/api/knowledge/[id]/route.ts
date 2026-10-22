@@ -1,4 +1,4 @@
-/* One Security knowledge file (operators only; src/proxy.ts checks the role too). DELETE removes
+/* One Security knowledge file (signed in; src/proxy.ts checks the session too). DELETE removes
    it, from the page's own Origin: its index entry, its passages and its kept original, through the
    Python CLI (`remove <id>`, lib/knowledge/cli.ts), one change at a time. The id must be a
    knowledge id (32 hex digits) and listed before anything runs. */

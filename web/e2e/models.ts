@@ -1,6 +1,6 @@
 /* The e2e server's AI model (the web reads none from its environment): the stand-in
    (e2e/llm-stub.mjs) saved as a provider "Stub" (Custom, its address, stub-model) and made
-   active, through the dashboard's own route with the operator's cookies, so models.json is
+   active, through the dashboard's own route with a signed-in session's cookies, so models.json is
    written by the real store in its own format. e2e/global-setup.ts seeds it before any spec;
    a spec that changes the models (or needs none: `clearModels`) puts it back with `seedModels`. */
 import { rmSync } from "node:fs";
@@ -21,7 +21,7 @@ export function clearModels() {
   for (const name of ["models.json", "models.key"]) rmSync(path.join(ASSISTANT_DIR, name), { force: true });
 }
 
-/** Only the stand-in, saved and active, as + Model saves it. `api` is signed in as an operator. */
+/** Only the stand-in, saved and active, as + Model saves it. `api` is signed in. */
 export async function seedModels(api: APIRequestContext) {
   clearModels();
   const origin = `http://127.0.0.1:${PORT}`;

@@ -1,4 +1,4 @@
-/* The model picker's connection test (operators only; src/proxy.ts checks the role too): when
+/* The model picker's connection test (signed in; src/proxy.ts checks the session too): when
    the model's server lists no models, a model the provider is known to have, and a model name
    typed in "Set the provider" before it is saved. POST { providerId, model? } tests a saved
    provider as saved, POST { baseUrl, model, apiKey? } tests the picker's unsaved values; a saved

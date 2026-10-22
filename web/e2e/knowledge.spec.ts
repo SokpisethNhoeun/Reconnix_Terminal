@@ -4,17 +4,16 @@
    e2e/assistant-knowledge.spec.ts, one spec at a time). In order: the assistant's button opens the
    page and "← AI Assistant" goes back; a .md and a .pdf are uploaded and listed as web uploads;
    search, the Grid switch (remembered), Open (the original with its type) and Remove (asked first);
-   the dialog refuses a .doc and shows the server's refusal; a viewer sees neither the button nor
-   the page; a phone starts on the grid with nothing sideways; axe on the table, the grid and the
-   dialog. */
+   the dialog refuses a .doc and shows the server's refusal; signed out, the page goes to sign-in
+   and the routes answer 401; a phone starts on the grid with nothing sideways; axe on the table,
+   the grid and the dialog. */
 import { rmSync } from "node:fs";
 
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
 
-import { sessionValue } from "../src/lib/auth/session";
-import { KNOWLEDGE_DIR, PORT, TOKEN } from "../playwright.config";
+import { KNOWLEDGE_DIR, PORT } from "../playwright.config";
 import { axe } from "./axe";
 import { sideways } from "./support";
 
@@ -215,22 +214,15 @@ test("through the proxy: a file of exactly 10 MB is taken, one byte more is refu
   expect((await page.request.delete(`/api/knowledge/${source.id}`, { headers: { Origin: ORIGIN } })).status()).toBe(200);
 });
 
-test.describe("a viewer", () => {
+test.describe("signed out", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("sees neither the button nor the page, and the routes refuse", async ({ page, context }) => {
-    await context.addCookies([{ name: "reconix_view", value: sessionValue("viewer", TOKEN), domain: "127.0.0.1", path: "/" }]);
-    await page.goto("/?view=assistant");
-    await expect(page.getByRole("heading", { name: "Reconix AI Assistant" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Security knowledge" })).toHaveCount(0);
-
+  test("the page goes to sign-in and the routes answer 401", async ({ page }) => {
     await page.goto("/?view=knowledge");
-    await expect(page.locator('[data-view-pane="overview"]')).toBeVisible();
-    await expect(page.locator('[data-view-pane="knowledge"]')).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "Security knowledge" })).toHaveCount(0);
+    await expect(page).toHaveURL(/\/login$/);
 
-    expect((await page.request.get("/api/knowledge")).status()).toBe(403);
+    expect((await page.request.get("/api/knowledge")).status()).toBe(401);
     const post = await page.request.post("/api/knowledge", { headers: { Origin: ORIGIN }, multipart: { file: RUNBOOK } });
-    expect(post.status()).toBe(403);
+    expect(post.status()).toBe(401);
   });
 });

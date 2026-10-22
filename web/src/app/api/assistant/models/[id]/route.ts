@@ -1,4 +1,4 @@
-/* One saved provider of the AI Assistant's models (operators only; src/proxy.ts checks the role
+/* One saved provider of the AI Assistant's models (signed in; src/proxy.ts checks the session
    too). PATCH changes it ({ name?, preset?, baseUrl?, models?, apiKey?, removeKey? }: no apiKey
    keeps the saved key while the address stays on its host); DELETE removes it and its key (the
    active choice goes with it). Both need the page's own Origin; the id must be a provider id

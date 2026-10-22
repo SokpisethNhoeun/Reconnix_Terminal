@@ -1,5 +1,5 @@
-/* The model that answers the AI Assistant's next question (operators only; src/proxy.ts checks
-   the role too). PUT { providerId, model }: a saved provider's listed model whose address may be
+/* The model that answers the AI Assistant's next question (signed in; src/proxy.ts checks
+   the session too). PUT { providerId, model }: a saved provider's listed model whose address may be
    used now (a provider id is a random UUID: anything else, "environment" too, is refused before
    anything is read; no model comes from the environment). Needs the page's own Origin. Answers
    with the model picker's whole view (never a key); the next question is asked with the new
