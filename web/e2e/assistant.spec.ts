@@ -1,5 +1,6 @@
 /* The AI Assistant: both entries open the same screen without a reload, the history entry and
-   the shared draft; answers streamed by the stand-in model (e2e/llm-stub.mjs) with the cards the
+   the shared draft; the terminal's mark (◆) in the header and beside each answer, lit while one
+   is written; answers streamed by the stand-in model (e2e/llm-stub.mjs) with the cards the
    server built from the sample data; conversations the dashboard's server keeps (they survive
    a reload and a new browser; open, rename, delete); Markdown with Copy; Stop and "New
    messages"; Retry; an answer with nothing in it; the Model menu (the Environment's model, + Add
@@ -51,6 +52,24 @@ const forgetModels = () => {
   const dir = path.join(tmpdir(), `reconix-e2e-assistant-${PORT}`);
   for (const name of ["models.json", "models.key"]) rmSync(path.join(dir, name), { force: true });
 };
+/** The Reconix mark's colours as drawn (tile, diamond) and the tokens it should use, resolved the
+    same way (ui/reconix-mark.tsx: --surface and --globe-glow, the TUI's cyan). */
+const markColours = (svg: SVGElement | HTMLElement) => {
+  const resolve = (token: string) => {
+    const probe = document.createElement("span");
+    probe.style.color = `var(${token})`;
+    document.body.append(probe);
+    const colour = getComputedStyle(probe).color;
+    probe.remove();
+    return colour;
+  };
+  return {
+    tile: getComputedStyle(svg.querySelector("rect")!).fill,
+    diamond: getComputedStyle(svg.querySelector("path")!).fill,
+    surface: resolve("--surface"),
+    cyan: resolve("--globe-glow"),
+  };
+};
 const modelButton = (page: Page) => page.getByRole("button", { name: /^Model:/ });
 const modelMenu = (page: Page) => page.getByRole("dialog", { name: "Models" });
 
@@ -95,6 +114,16 @@ test.describe("with reduced motion", () => {
     await page.goto("/assistant");
     await expect(page).toHaveURL(/\/\?view=assistant$/);
     await assistantShown(page);
+    // the header's logo is the terminal's: the cyan ◆ on its dark tile, beside the name (so hidden)
+    const logo = header(page).locator("[data-reconix-mark]");
+    await expect(logo).toBeVisible();
+    await expect(logo).toHaveAttribute("aria-hidden", "true");
+    expect(await logo.boundingBox()).toMatchObject({ width: 26, height: 26 });
+    const colours = await logo.evaluate(markColours);
+    expect(colours.tile).toBe(colours.surface);
+    expect(colours.diamond).toBe(colours.cyan);
+    expect(colours.cyan).toBe("rgb(34, 211, 238)"); // #22D3EE, the TUI's CYAN
+    await expect(logo).toHaveCSS("animation-name", "none");
     const all = sample();
     const suggestions = page.getByRole("list", { name: "Suggested questions" });
     await expect(suggestions.getByRole("button")).toHaveCount(6); // one run waits: the approvals suggestion is there
@@ -130,6 +159,17 @@ test.describe("with reduced motion", () => {
     await expect(approvals).toContainText("Waiting for approval");
     await expect(approvals).toContainText("Nothing can be approved from this chat.");
     await expect(approvals.getByRole("button", { name: /approve/i })).toHaveCount(0);
+    // each answer sits beside the mark (hidden: "Reconix AI:" names it), still once it is written
+    await expect(log(page)).toHaveAttribute("aria-busy", "false");
+    const avatars = log(page).locator(".ai-row-assistant > [data-reconix-mark]");
+    await expect(avatars).toHaveCount(2);
+    for (const avatar of await avatars.all()) {
+      await expect(avatar).toHaveAttribute("aria-hidden", "true");
+      expect(await avatar.boundingBox()).toMatchObject({ width: 26, height: 26 });
+      const colours = await avatar.evaluate(markColours);
+      expect([colours.tile, colours.diamond]).toEqual([colours.surface, colours.cyan]);
+    }
+    await expect(log(page).locator("[data-reconix-mark][data-live]")).toHaveCount(0);
 
     // the tab keeps only which conversation is open and the draft, never the messages
     await composer(page).fill("not sent token=abc123secret");
@@ -218,8 +258,14 @@ test.describe("with reduced motion", () => {
     await expect(down).toBeVisible();
     await down.click();
     await expect(down).toBeHidden();
+    // the reply being written has a lit mark: with reduced motion a still glow, no loop
+    const live = log(page).locator(".ai-row-assistant").last().locator("[data-reconix-mark][data-live]");
+    await expect(live).toHaveCount(1);
+    await expect(live).toHaveCSS("animation-name", "none");
+    await expect(live).toHaveCSS("filter", /drop-shadow/);
     await page.getByRole("button", { name: "Stop the answer" }).click();
     await expect(log(page).getByText("Stopped")).toBeVisible();
+    await expect(log(page).locator("[data-reconix-mark][data-live]")).toHaveCount(0); // stopped: still
     await expect(log(page)).not.toContainText("The end of the long answer");
     // the server saves what had arrived, marked stopped
     const id = await page.evaluate(() => JSON.parse(sessionStorage.getItem("reconix.assistant.v2") ?? "{}").openId as string);
