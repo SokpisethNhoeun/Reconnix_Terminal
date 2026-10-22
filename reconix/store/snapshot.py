@@ -115,6 +115,16 @@ def _scope(assessment: Assessment) -> Optional[Dict[str, Any]]:
     }
 
 
+def _api_spec(assessment: Assessment) -> Optional[Dict[str, Any]]:
+    """What the attached OpenAPI file said, never the file: counts, methods, in-scope servers."""
+    spec = assessment.api_spec
+    if spec is None:
+        return None
+    return {"title": spec.title, "version": spec.version, "spec_version": spec.spec_version,
+            "endpoints": spec.total, "methods": list(spec.methods),
+            "servers": list(spec.servers)}
+
+
 def _findings(assessment: Assessment) -> List[Dict[str, Any]]:
     revealed = set(assessment.run.revealed)
     rows = [f for f in assessment.findings if f.fid in revealed]
@@ -168,6 +178,7 @@ def snapshot(assessment: Assessment, *, session_closed: bool = False) -> Dict[st
             "name": template_name(template_id) if template_id else "",
             "confirmed": bool(assessment.selected_template),
         },
+        "api_spec": _api_spec(assessment),
         "operator": assessment.operator,
         "client": assessment.client,
         "mode": assessment.mode,
