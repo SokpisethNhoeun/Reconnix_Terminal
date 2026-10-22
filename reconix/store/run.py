@@ -24,7 +24,7 @@ from .assessment import add_request, clean_request, get_assessment
 from .errors import StoreValidationError
 from .findings import finding_exists, findings_line, list_findings
 from .parser import parse_request
-from .replies import reply_to, reply_while_running
+from .replies import reply_after_run, reply_to, reply_while_running
 from .scope import (
     blocked_count, check_request, get_scope, is_scope_approved, time_limit_reached,
 )
@@ -166,7 +166,8 @@ def llm_answer(text: str) -> None:
         except LLMError as exc:
             add_chat("text", "reconix",
                      f"LLM unavailable ({exc}). Showing the built-in reply.", tone="muted")
-    add_chat("text", "reconix", reply_while_running(text), tone="muted")
+    builtin = reply_after_run if is_finished() else reply_while_running
+    add_chat("text", "reconix", builtin(text), tone="muted")
 
 
 def say_to_assistant(text: str) -> None:

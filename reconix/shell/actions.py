@@ -33,8 +33,10 @@ class ActionsMixin:
 
         Before a run, a target starts the run (an empty line uses the demo request) and
         anything else gets a short answer. During a run the line goes to the assistant;
-        an empty line reopens what the run waits for. After a finished run, a new line
-        starts a fresh assessment (the finished one stays under /assessments).
+        an empty line reopens what the run waits for. After the run has finished
+        (completed or stopped) every line is still a chat turn about that same assessment,
+        with its history and context; an empty line opens Findings (or Report when there are
+        none). A new assessment starts only with /new, /assess <target> or /template.
         """
         text = text.strip()
         run = store.get_run()
@@ -51,9 +53,12 @@ class ActionsMixin:
                 self.agent_mode = False             # plain chat: no run to complete
                 self._send_to_agent(text)
                 return True
-        if run.started and not store.is_finished():
+        if run.started:
             if not text:
-                self.goto(self.resume_screen_name())
+                if store.is_finished():
+                    self.goto("findings" if store.list_findings() else "report")
+                else:
+                    self.goto(self.resume_screen_name())
                 return True
             try:
                 answer = store.say_operator_line(text)
@@ -73,9 +78,6 @@ class ActionsMixin:
                 self.refresh_view()
             return True
         self.agent_mode = False          # scripted path from here on
-        if run.started:
-            self.controller.stop()
-            store.new_assessment()
         try:
             result = store.submit_prompt(text or store.DEMO_REQUEST)
         except store.StoreValidationError as exc:
