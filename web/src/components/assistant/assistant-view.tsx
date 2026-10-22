@@ -103,7 +103,11 @@ export const AssistantView = forwardRef<HTMLTextAreaElement, { onMinimize: () =>
               </Link>
             </Reason>
           ) : model.configured && !model.local ? (
-            <Reason>This model is not on this machine: your questions and the assessment data they need are sent to it (LLM_BASE_URL).</Reason>
+            <Reason>
+              {model.name}
+              {model.provider ? ` (${model.provider})` : ""} is not on this machine: your questions and the assessment data they need are sent to it. Switch in the Model menu
+              above.
+            </Reason>
           ) : elsewhere ? (
             <Reason tone="info">
               This conversation is about {conversation.scope.label}; the dashboard shows {info.scope.label}.{" "}

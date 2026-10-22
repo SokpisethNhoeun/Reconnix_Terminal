@@ -9,6 +9,8 @@
 //   [stub:fail]      HTTP 500 the first time each such question is asked, a normal answer after
 //                    (so Retry can succeed)
 //   [stub:empty]     a well-formed stream with no text at all (the model "answered" nothing)
+// A model other than stub-model adds " Model: <name>." to the default answer (the Model menu's
+// switch is visible), and GET /v1/models lists stub-model and stub-model-2 ("Fetch models").
 import { createServer } from "node:http";
 
 const port = Number(process.env.LLM_STUB_PORT || 3195);
@@ -34,13 +36,16 @@ for (let i = 1; i <= 40; i++) LONG.push(`Paragraph ${i}: the saved data says thi
 
 const chunk = (text) => `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`;
 
+const MODELS = { object: "list", data: [{ id: "stub-model", object: "model" }, { id: "stub-model-2", object: "model" }] };
+
 createServer((req, res) => {
+  if (req.method === "GET" && req.url === "/v1/models") return res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(MODELS));
   if (req.method === "GET") return res.writeHead(200).end("stub ready");
   if (req.method !== "POST" || req.url !== "/v1/chat/completions") return res.writeHead(404).end();
   let body = "";
   req.on("data", (c) => (body += c));
   req.on("end", () => {
-    const { messages = [] } = JSON.parse(body || "{}");
+    const { messages = [], model = "stub-model" } = JSON.parse(body || "{}");
     const system = messages.find((m) => m.role === "system")?.content ?? "";
     const runs = system.match(/ALL SAVED ASSESSMENTS: (\d+)/)?.[1] ?? (system.includes("ASSESSMENT ") ? "1" : "0");
     const question = messages.at(-1)?.content ?? "";
@@ -56,7 +61,7 @@ createServer((req, res) => {
         ? LONG
         : question.includes("[stub:empty]")
           ? []
-          : ["Stub answer:", ` I saw ${runs} runs.`, ` Earlier turns: ${earlier}.`, " You asked:", ` ${question}`];
+          : ["Stub answer:", ` I saw ${runs} runs.`, ` Earlier turns: ${earlier}.`, " You asked:", ` ${question}`, ...(model === "stub-model" ? [] : [` Model: ${model}.`])];
     res.writeHead(200, { "Content-Type": "text/event-stream" });
     let i = 0;
     const next = () => {

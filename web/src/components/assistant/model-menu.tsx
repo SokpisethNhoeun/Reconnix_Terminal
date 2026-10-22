@@ -1,0 +1,184 @@
+"use client";
+
+/* The Model menu in the assistant's header: its button names the model that answers next
+   (`name · local|remote`, or "Add a model"); its panel lists every model (the Environment's
+   from web/.env.local first, read-only, then the saved providers) and switches in one click,
+   edits and removes a saved provider, and + Add model opens the form in the same panel.
+   Escape or a click outside closes it and focus goes back to its button (Escape inside the form
+   only closes the form). Operators only: a viewer sees the button disabled with the reason.
+   Its own panel, like History (conversation-menu.tsx): the form's Escape must stay inside. */
+import { useEffect, useId, useRef, useState } from "react";
+import { ChevronDown, Cpu, Plus, X } from "lucide-react";
+
+import { IconButton } from "@/components/ui/icon-button";
+import { MAX_PROVIDERS } from "@/lib/assistant/models/schema";
+import { useAssistant } from "./assistant-provider";
+import { ModelForm } from "./model-form";
+import { ModelList } from "./model-list";
+import type { ModelSummary } from "./types";
+import { useFitBelow } from "./use-fit-below";
+import { useModels } from "./use-models";
+
+type Mode = { kind: "list" } | { kind: "add" } | { kind: "edit"; id: string };
+
+/** What the button says: the model and where it runs, or that there is none yet. */
+export function modelLabel(model: ModelSummary): string {
+  if (!model.name) return "Add a model";
+  return `${model.name} · ${model.configured ? (model.local ? "local" : "remote") : "unavailable"}`;
+}
+
+function modelTitle(model: ModelSummary): string {
+  if (!model.configured) return model.reason;
+  const from = model.provider ? ` (${model.provider})` : "";
+  return model.local
+    ? `${model.name}${from}: a local endpoint on this machine`
+    : `${model.name}${from}: a remote model. Questions and the assessment data they need are sent to it.`;
+}
+
+export function ModelMenu() {
+  const { info, setModel } = useAssistant();
+  const models = useModels(info.operator, setModel);
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<Mode>({ kind: "list" });
+  const button = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const id = useId();
+  const { model } = info;
+  const label = modelLabel(model);
+  const tone = model.configured ? "success" : "warning";
+  useFitBelow(panel, open, mode.kind);
+
+  /** Focuses the first of `selectors` (in that order) found in the panel, once it has rendered. */
+  const focusIn = (...selectors: string[]) =>
+    requestAnimationFrame(() => {
+      for (const selector of selectors) {
+        const el = panel.current?.querySelector<HTMLElement>(selector);
+        if (el) return el.focus({ preventScroll: true });
+      }
+    });
+
+  const close = (refocus = true) => {
+    setOpen(false);
+    setMode({ kind: "list" });
+    if (refocus) button.current?.focus({ preventScroll: true });
+  };
+
+  // a click outside closes it; so does Escape wherever focus is, unless the form took it first
+  useEffect(() => {
+    if (!open) return;
+    const shut = () => {
+      setOpen(false);
+      setMode({ kind: "list" });
+    };
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!panel.current?.contains(t) && !button.current?.contains(t)) shut();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      e.preventDefault();
+      shut();
+      button.current?.focus({ preventScroll: true });
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const toggle = () => {
+    if (open) return close();
+    setMode({ kind: "list" });
+    setOpen(true);
+    models.load();
+    focusIn('[role="radio"][aria-checked="true"]', '[role="radio"][tabindex="0"]', "button");
+  };
+
+  const showList = (focus: string) => {
+    setMode({ kind: "list" });
+    focusIn(focus);
+  };
+
+  if (!info.operator) {
+    return (
+      <button type="button" disabled className="ai-btn ai-model-btn" title="Choosing the model needs the operator role" aria-label={`Model: ${label} (changing it needs the operator role)`}>
+        <Cpu className="size-4" aria-hidden />
+        <span className="ai-dot" data-tone={tone} aria-hidden />
+        <span className="ai-btn-label ai-model-label">{label}</span>
+      </button>
+    );
+  }
+
+  const view = models.state.view;
+  const editing = mode.kind === "edit" ? (view?.providers.find((p) => p.id === mode.id) ?? null) : null;
+  const full = (view?.providers.length ?? 0) >= MAX_PROVIDERS;
+
+  return (
+    <>
+      <button
+        ref={button}
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        aria-haspopup="dialog"
+        aria-label={`Model: ${label}`}
+        title={modelTitle(model)}
+        className="ai-btn ai-model-btn"
+      >
+        <Cpu className="size-4" aria-hidden />
+        <span className="ai-dot" data-tone={tone} aria-hidden />
+        <span className="ai-btn-label ai-model-label">{label}</span>
+        <ChevronDown className="ai-btn-chevron size-3.5 opacity-70" aria-hidden />
+      </button>
+      {open && (
+        <div ref={panel} id={id} role="dialog" aria-label="Models" className="ai-menu ai-model-panel">
+          <div className="ai-menu-head">
+            <p className="ai-menu-heading">{mode.kind === "add" ? "Add a model" : editing ? `Edit ${editing.name}` : "Model"}</p>
+            <IconButton label="Close the model menu" onClick={() => close()} className="size-7">
+              <X aria-hidden />
+            </IconButton>
+          </div>
+          {mode.kind !== "list" && view ? (
+            <ModelForm
+              key={mode.kind === "edit" ? mode.id : "add"}
+              view={view}
+              editing={editing}
+              saving={models.pending === "save"}
+              onSave={(save) => (save.kind === "add" ? models.add(save.body) : models.update(save.id, save.body))}
+              onDone={() => showList(editing ? `[data-edit="${editing.id}"]` : ".ai-model-add")}
+            />
+          ) : (
+            <>
+              <ModelList
+                models={models}
+                onEdit={(providerId) => {
+                  setMode({ kind: "edit", id: providerId });
+                  focusIn("select, input");
+                }}
+              />
+              <div className="ai-menu-foot">
+                <span>API keys stay encrypted on this computer</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode({ kind: "add" });
+                    focusIn("select, input");
+                  }}
+                  disabled={!view || full}
+                  title={full ? `At most ${MAX_PROVIDERS} providers can be saved. Remove one first.` : undefined}
+                  className="ai-btn ai-btn-small ai-btn-outline ai-model-add"
+                >
+                  <Plus className="size-3.5" aria-hidden />
+                  Add model
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
