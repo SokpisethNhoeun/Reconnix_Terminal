@@ -143,10 +143,16 @@ async def pass_gate(app, pilot) -> str:
     from textual.widgets import Input
 
     from reconix.screens import ApprovalScreen, ChoiceScreen, PlanScreen, TemplateScreen
-    from reconix.screens.forms import LoginForm
+    from reconix.screens.forms import LoginForm, OpenApiForm
 
     gate = store.waiting_gate()
     screen = app.screen
+    if isinstance(screen, OpenApiForm):
+        # The API template auto-opens the spec form at the scope gate; skip it (Cancel) and
+        # decide the scope on the review screen underneath.
+        await pilot.press("escape")
+        await settle(pilot)
+        screen = app.screen
     if isinstance(screen, TemplateScreen):
         await pilot.press("1" if gate == "scope" else "enter")   # Approve / the suggestion
     elif isinstance(screen, PlanScreen):

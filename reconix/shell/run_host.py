@@ -10,6 +10,7 @@ from typing import Optional
 
 from .. import store
 from ..flow import RunController, is_form_gate, screen_for
+from ..models import GATE_SCOPE
 from ..screens.base import ReconixScreen
 from ..screens.forms import LoginForm
 
@@ -22,6 +23,7 @@ class RunHostMixin:
         self._deferred_gate = ""      # a gate that arrived while a dialog was open
         self._login_open = False      # the login form is open (or about to open)
         self._save_warned = False     # warn about a failed save once, not on every step
+        self._api_spec_offered_for = None   # the assessment whose spec form we auto-opened
 
     # --- RunHost: what the controller calls -------------------------------------------------
     def refresh_view(self) -> None:
@@ -48,6 +50,23 @@ class RunHostMixin:
         target = screen_for(gate)
         if target and self.current_flow != target:
             self.goto(target)
+        if gate == GATE_SCOPE:
+            self._offer_api_spec()
+
+    def _offer_api_spec(self) -> None:
+        """On the API template's scope gate, open the OpenAPI form once (Cancel skips it).
+
+        Only for the API template, only while a spec can still be attached, and only once per
+        assessment — so cancelling, or attaching then removing, never reopens it. Replace and
+        Remove stay in the Scope menu.
+        """
+        assessment = store.get_assessment()
+        if self._api_spec_offered_for is assessment:
+            return
+        if store.get_api_spec() is not None or not store.can_attach_api_spec():
+            return
+        self._api_spec_offered_for = assessment
+        self.attach_api_spec()              # opens OpenApiForm via open_dialog (ActionsMixin)
 
     def run_finished(self) -> None:
         self.refresh_view()
