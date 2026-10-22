@@ -21,11 +21,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <body className="min-h-screen antialiased">
-        {/* The dashboard page (src/app/page.tsx) adds the `js` class itself, with the request's
-            CSP nonce (the docs don't use it). */}
-        {/* No smooth scrolling here: Lenis (SmoothScroll) runs in the docs layout only. The
-            dashboard at / scrolls natively, because its scroller on a desktop frame is the
-            content area (.dash-content), not the window, and Lenis only moves the window. */}
+        {/* No smooth scrolling library: the dashboard and the docs (which share its frame)
+            scroll natively, because on a desktop frame the scroller is the content area
+            (.dash-content), not the window. */}
         {children}
       </body>
     </html>

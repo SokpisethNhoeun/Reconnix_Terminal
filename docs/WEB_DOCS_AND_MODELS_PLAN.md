@@ -14,9 +14,16 @@ The docs (`/docs`, `components/docs-*.tsx`, `styles/docs.css`, `site-nav.tsx`,
 the same tokens, type scale, surfaces (`dash-card`), borders, radii, icon buttons, badges,
 focus rings and spacing as the views at `/`.
 
+Done (2026-10-22): the docs are one more tab of the local viewer, not a separate site. Every
+`/docs/**` page renders inside the dashboard's frame (`app/docs/layout.tsx`): the same sidebar
+(its views are links back to `/?view=…`, its Documentation item marked), a docs top bar with the
+way back to the dashboard, and `.dash-content` as the scroller. The old site chrome (`site-nav`,
+`site-footer`, nav menus, scroll progress, `site.css`) and Lenis are gone: the docs scroll
+natively like the dashboard. Cards use `.dash-card`.
+
 Kept: every address (`DOCS_NAV`, `DOCS_ROUTES`, the `DOCS` link map, the 308 redirects), the
 content in `content/docs/`, the generated `commands.json`, docs search, the table of
-contents, Lenis on docs pages only, the viewer check, native-scroll rules for the dashboard,
+contents, the viewer check, native-scroll rules for the dashboard,
 dark only, colours only from tokens. Responsive: sidebar → drawer on phones, no horizontal
 scroll at 360 px.
 

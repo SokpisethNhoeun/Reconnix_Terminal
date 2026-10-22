@@ -30,7 +30,7 @@ export function DocsSidebar({ index }: { index: DocsSearchEntry[] }) {
   const isOpen = (g: DocGroup) => toggled[g.id] ?? (pathname === g.href || g.pages.some((p) => p.href === pathname));
 
   return (
-    <aside className="docs-sidebar lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100vh-7rem)] lg:flex-col lg:self-start" data-lenis-prevent>
+    <aside className="docs-sidebar lg:sticky lg:top-4 lg:flex lg:max-h-[calc(100dvh-9rem)] lg:flex-col lg:self-start">
       <DocsSearch index={index} />
 
       <button

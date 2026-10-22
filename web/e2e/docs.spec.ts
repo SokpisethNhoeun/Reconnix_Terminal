@@ -26,6 +26,20 @@ const GROUPS = [
 
 const sidebar = (page: import("@playwright/test").Page) => page.getByRole("navigation", { name: "Documentation", exact: true });
 
+test("the docs open in the dashboard's frame, with Documentation marked in its sidebar", async ({ page }) => {
+  await page.goto("/docs/commands/model");
+  const views = page.getByRole("navigation", { name: "Views" });
+  await expect(views.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/");
+  await expect(views.getByRole("link", { name: "Findings" })).toHaveAttribute("href", "/?view=findings");
+  const docs = page.getByRole("link", { name: "Documentation", exact: true });
+  await expect(docs).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("link", { name: "Configuration", exact: true })).not.toHaveAttribute("aria-current", "page");
+  await expect(page.locator(".dash-frame .dash-content h1")).toHaveText("/model");
+  await views.getByRole("link", { name: "Findings" }).click();
+  await page.waitForURL((url) => url.pathname === "/" && url.searchParams.get("view") === "findings");
+  await expect(page.locator('nav[aria-label="Views"] button[aria-label="Findings"]')).toHaveAttribute("aria-current", "page");
+});
+
 test("the sidebar lists every group and marks the current page", async ({ page }) => {
   await page.goto("/docs/terminal-guide/keys");
   const nav = sidebar(page);
@@ -61,7 +75,7 @@ test("a command page shows its facts and sections", async ({ page }) => {
 test("every code block has a Copy button that copies its text", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: ORIGIN });
   await page.goto("/docs/getting-started/launching");
-  await expect(page.locator("html.lenis")).toHaveCount(1); // hydrated: the buttons are live
+  await expect(page.locator("html[data-hydrated]")).toHaveCount(1); // hydrated: the buttons are live
   const blocks = page.locator("pre");
   const buttons = page.getByRole("button", { name: "Copy code" });
   await expect(buttons).toHaveCount(await blocks.count());
@@ -187,9 +201,6 @@ test("every old docs address redirects to a page that exists", async ({ page }) 
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
   }
 });
-
-// Lenis (the docs' smooth scroll) runs with motion on only
-test.use({ reducedMotion: "no-preference" });
 
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });

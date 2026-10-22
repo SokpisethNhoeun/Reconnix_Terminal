@@ -171,7 +171,6 @@ for (const size of [SIZES[0], SIZES[2]]) {
         if (view !== "overview") expect(start.range).toBeGreaterThan(200); // the sample's findings and runs don't fit
         await wheelToEnd(page, size.width * 0.6, size.height * 0.6);
         expect(await page.evaluate(() => scrollY)).toBe(0);
-        expect(await page.evaluate(() => document.documentElement.classList.contains("lenis"))).toBe(false);
       });
     }
   });
@@ -290,32 +289,37 @@ test.describe("on a tablet (1024×768) the page scrolls", () => {
   });
 });
 
-// ---- the docs keep Lenis; leaving them leaves it behind --------------------------------------
+// ---- the docs share the dashboard's frame and its native scrolling ----------------------------
 
 test.describe("the docs", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test("glide with the wheel, follow their own hash links, and hand back a natively scrolling dashboard", async ({ page }) => {
+  test("scroll in the content area, follow their own hash links, and lead back to the dashboard", async ({ page }) => {
     await page.goto("/docs/architecture");
-    await expect(page.locator("html.lenis")).toHaveCount(1);
-    await page.mouse.move(720, 500);
+    await expect(page.locator("html[data-hydrated]")).toHaveCount(1);
+    await page.mouse.move(900, 500);
     await page.mouse.wheel(0, 600);
-    await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(200);
+    // the fixed frame: the content area scrolls, never the page
+    await expect.poll(() => page.locator(".dash-content").evaluate((el) => el.scrollTop)).toBeGreaterThan(200);
+    expect(await page.evaluate(() => scrollY)).toBe(0);
 
-    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.locator(".dash-content").evaluate((el) => el.scrollTo(0, 0));
     const toc = page.getByRole("navigation", { name: "On this page" }).getByRole("link");
     const target = toc.nth(2);
     const hash = (await target.getAttribute("href"))!;
     await target.click();
     await expect(page).toHaveURL(new RegExp(`${hash}$`));
-    // the heading glides to just under the sticky nav (64px and its border), at its scroll-margin-top
-    await expect.poll(() => page.locator(hash).evaluate((el) => Math.round(el.getBoundingClientRect().top)), { timeout: 5000 }).toBeLessThan(140);
-    expect(await page.locator(hash).evaluate((el) => el.getBoundingClientRect().top), "the heading is under the nav").toBeGreaterThanOrEqual(65);
+    // the heading lands near the top of the content area (below the top bar), at its scroll-margin-top
+    const top = async () =>
+      page.evaluate((h) => {
+        const content = document.querySelector(".dash-content")!.getBoundingClientRect().top;
+        return Math.round(document.querySelector(h)!.getBoundingClientRect().top - content);
+      }, hash);
+    await expect.poll(top, { timeout: 5000 }).toBeLessThan(60);
+    expect(await top(), "the heading is inside the content area").toBeGreaterThanOrEqual(0);
 
-    await page.getByRole("banner").getByRole("link").first().click(); // the nav's logo: back to the dashboard
+    await page.locator('nav[aria-label="Views"] a[aria-label="Reports"]').click();
     await page.waitForURL((url) => url.pathname === "/");
-    await expect(page.locator("html.lenis")).toHaveCount(0);
-    await page.locator('nav[aria-label="Views"] button[aria-label="Reports"]').click();
     await settled(page);
     const end = await wheelToEnd(page, 900, 600);
     expect(end.range).toBeGreaterThan(0);

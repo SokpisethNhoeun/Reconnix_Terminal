@@ -6,6 +6,7 @@ import { AssistantProvider } from "@/components/assistant/assistant-provider";
 import { AssistantStage } from "@/components/assistant/assistant-stage";
 import type { AssistantInfo } from "@/components/assistant/types";
 import { CardCursorLight } from "@/components/dashboard/card-cursor-light";
+import { HydratedMark } from "@/components/dashboard/hydrated-mark";
 import { Intro } from "@/components/dashboard/intro";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { leaveAssistant, openAssistant, parseView, showView, watchHistory, type View } from "@/components/dashboard/view-url";
@@ -55,13 +56,6 @@ export function Viewer({
   const backdrop = shown === "assistant"; // the Overview under the open assistant
 
   useEffect(() => watchHistory(), []);
-  // The page is interactive: the e2e specs wait for this instead of guessing from network idle.
-  useEffect(() => {
-    document.documentElement.dataset.hydrated = "";
-    return () => {
-      delete document.documentElement.dataset.hydrated;
-    };
-  }, []);
 
   // The sidebar: the assistant gets its own history entry; leaving it goes back that entry. It
   // reads the address, not this render's `view`, which can lag a quick click behind.
@@ -75,6 +69,7 @@ export function Viewer({
   return (
     <AssistantProvider info={assistant}>
       <div className="dash-page">
+        <HydratedMark />
         <CardCursorLight />
         <Intro />
         <div className="dash-frame" data-assistant-open={shown === "assistant" ? "" : undefined}>

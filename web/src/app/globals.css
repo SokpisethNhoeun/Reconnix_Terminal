@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "lenis/dist/lenis.css";
 
 /* Colour tokens: GENERATED into src/styles/tokens.css from reconix/theme.py (WEB_TOKENS) by
    scripts/export_tokens.py; add or change a colour there, never here. Meanings (src/lib/status.ts):
@@ -7,14 +6,13 @@
    to review; --danger errors and blocked; --info informational; --sev-* the TUI's severity
    scale; --term-* is the browser terminal (the TUI's own colours). */
 @import "../styles/tokens.css";
-/* The app's styles, one file per area: frame (page and scrolling), dashboard, motion (sidebar,
-   transition, breathing), terminal, site (docs chrome), assistant, ui (shared controls and the
+/* The app's styles, one file per area: frame (page and scrolling, the docs' too), dashboard,
+   motion (sidebar, transition, breathing), terminal, assistant, ui (shared controls and the
    shared row), findings, assessments, reports and docs. Order matters for the cascade. */
 @import "../styles/frame.css";
 @import "../styles/dashboard.css";
 @import "../styles/motion.css";
 @import "../styles/terminal.css";
-@import "../styles/site.css";
 @import "../styles/assistant.css";
 @import "../styles/ui.css";
 @import "../styles/findings.css";
@@ -67,10 +65,9 @@ html {
   color-scheme: dark;
 }
 
-/* Native smooth anchors only when Lenis is not driving the page (no JS).
-   Lenis adds the `lenis` class to <html>; reduced-motion users get neither. */
+/* Smooth anchors (the docs' "On this page" below the fixed frame); reduced-motion users get none. */
 @media (prefers-reduced-motion: no-preference) {
-  html:not(.lenis) { scroll-behavior: smooth; }
+  html { scroll-behavior: smooth; }
 }
 
 body {
@@ -78,7 +75,7 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   line-height: 1.6;
-  /* clip, not hidden: hidden would make body a scroll container (breaks sticky + Lenis) */
+  /* clip, not hidden: hidden would make body a scroll container (breaks sticky) */
   overflow-x: clip;
 }
 

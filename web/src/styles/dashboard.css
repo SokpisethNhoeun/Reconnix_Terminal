@@ -396,6 +396,12 @@
   .dash-navbtn,
   .dash-reveal { visibility: hidden; }
 }
+/* The docs pages (app/docs/layout.tsx) share the frame but have no intro: nothing waits for it. */
+.dash-page[data-docs] :is(.dash-navbtn, .dash-reveal) { visibility: inherit; }
+/* Their "On this page" links glide in whichever box scrolls (the content area or the window). */
+@media (prefers-reduced-motion: no-preference) {
+  .dash-page[data-docs] .dash-content { scroll-behavior: smooth; }
+}
 
 /* ---- Ambient loops ---- */
 @keyframes dash-ping {
