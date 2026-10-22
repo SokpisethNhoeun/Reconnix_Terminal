@@ -7,7 +7,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { COMBINED_FILES, FileStatus, type FileState, GenerateButton } from "@/components/dashboard/report-file";
+import { COMBINED_FILES, EXPORT_FILES, FileStatus, type FileState, GenerateButton } from "@/components/dashboard/report-file";
 import type { CombinedFile } from "@/lib/report/combined/options";
 import { DOCX_MEDIA, DOCX_TOO_LARGE, NO_PRINTER } from "@/lib/report/formats";
 
@@ -68,6 +68,17 @@ describe("FileStatus", () => {
     const html = status({ kind: "failed", format: "docx", message: "the dashboard could not be reached" });
     expect(text(html)).toContain("The DOCX could not be generated: the dashboard could not be reached.");
     expect(text(html)).toContain("Retry");
+  });
+
+  it("names the run whose file failed, where several runs offer files (the runs table)", () => {
+    const html = status({ kind: "failed", format: "pdf", message: "the printer took too long", of: "RCX-DEMO-001 (Web URL, 5 Oct 14:03)" });
+    expect(text(html)).toContain("The PDF of RCX-DEMO-001 (Web URL, 5 Oct 14:03) could not be generated: the printer took too long.");
+  });
+
+  it("covers one run's JSON too", () => {
+    expect(EXPORT_FILES.json.accept).toBe("application/json");
+    expect(text(status({ kind: "failed", format: "json", message: "x" }))).toContain("The JSON could not be generated: x.");
+    expect(COMBINED_FILES.pdf).toBe(EXPORT_FILES.pdf);
   });
 
   it("says what is happening and what was saved", () => {

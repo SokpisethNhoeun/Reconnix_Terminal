@@ -9,11 +9,16 @@ import { sampleAssessments } from "./fixtures";
 
 const dashes = sampleAssessments().map((a) => deriveDashboard(assessmentView(a)));
 const findings = dashes.flatMap((d) => d.findings);
-const none = { sev: [], val: "", q: "" };
+const none = { sev: [], val: "", q: "", fp: true }; // nothing filtered, false positives listed
 
 describe("findingMatches", () => {
   it("keeps everything with no filter", () => {
     expect(findings.every((f) => findingMatches(f, none))).toBe(true);
+  });
+  it("leaves the false positives out unless they are listed", () => {
+    expect(findings.some((f) => f.falsePositive)).toBe(true); // the sample data holds one
+    const kept = findings.filter((f) => findingMatches(f, { ...none, fp: false }));
+    expect(kept).toEqual(findings.filter((f) => !f.falsePositive));
   });
   it("filters by severity, any of several", () => {
     const kept = findings.filter((f) => findingMatches(f, { ...none, sev: ["HIGH", "LOW"] }));

@@ -34,7 +34,11 @@ the reports and the TUI.)
   desktop frame the list scrolls on its own under the filters with no scrollbar drawn (wheel,
   touch, trackpad and keys still move it; the detail and the page keep theirs), and on a phone
   the list and the detail take turns (Back returns to the list). Ten rows a page is
-  `lib/paging.ts`, shared with Assessments and the Report view's runs.
+  `lib/paging.ts`, shared with Assessments and the Report view's runs. False positives are left
+  out of the list as they are out of every count (so its headline and chips are the Overview's
+  numbers); the **False positives · Show** chip (`?fp=1`) lists them, beside the total
+  ("Showing 41 of 40 findings + 1 false positive"), and a link naming one while they are hidden
+  says so, with **Show it**.
 - **Reports:** the Overview's summary strip and Findings by Severity, its top list cut to the top
   3 CVSS findings (`derive-report.ts` `REPORT_TOP_FINDINGS`; the Overview's card shows more).
   With every run shown, the **Targets** card beside it lists every target, the most findings
@@ -374,7 +378,8 @@ src/
 │   │                        #   view-url.ts (?view=, each view's keys, run links), live-refresh.tsx,
 │   │                        #   intro.tsx (GSAP, by data-motion); the Assessments view (assessments-*.ts(x)),
 │   │                        #   Findings (findings-view/-list.tsx, finding-detail.tsx, filters.ts, filter-bar.tsx),
-│   │                        #   Reports (reports-view.tsx, report-selection/-runs/-preview.tsx, derive-report.ts),
+│   │                        #   Reports (reports-view.tsx, report-selection/-runs/-preview/-downloads/-file.tsx,
+│   │                        #   use-file-download.ts: fetch then save, with a status line; derive-report.ts),
 │   │                        #   run-cells.tsx (the one run row of Assessments and Reports), view-header.tsx,
 │   │                        #   view-link.tsx and run-link.tsx (drill-downs), docs-search.tsx
 │   ├── assistant/           # AssistantProvider (+ use-* hooks: open, asking, history, tab memory),
@@ -406,7 +411,11 @@ public/globe/land.bin        # the globe's land dots (scripts/build-globe-points
 ## Exports
 
 The Reports view's **Download** row offers PDF, JSON and DOCX (the same three the TUI saves),
-straight from `/api/assessments/<uid>/export?format=…`. The PDF is printed by a Chrome/Chromium
+from `/api/assessments/<uid>/export?format=…`, and so does each row of the runs table. Each
+button fetches the whole file, then saves it (`use-file-download.ts`, shared with the combined
+report), so a refusal is shown, never saved as a file: the status line under the buttons (under
+the table, naming the run) says "Downloaded …", offers **Retry** on a failure, and offers
+**Download DOCX** when the PDF can't be printed. The PDF is printed by a Chrome/Chromium
 on the dashboard machine (`RECONIX_CHROME` names one); without a browser the route says so and
 links the Word document. Every format is a download, and no route may be framed. The DOCX is
 written by `lib/report/docx/` (no dependency: a stored ZIP of the document and its styles, every

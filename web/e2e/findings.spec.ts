@@ -10,7 +10,7 @@ import { unzip } from "../tests/unzip";
 import { expect, test } from "./fixtures";
 
 import { PER_PAGE } from "../src/lib/paging";
-import { hydrated, sample, signIn } from "./support";
+import { counted, hydrated, sample, signIn } from "./support";
 
 const list = (page: Page) => page.getByRole("list", { name: "Findings", exact: true });
 const rows = (page: Page) => list(page).getByRole("listitem");
@@ -30,7 +30,8 @@ async function go(page: Page, url: string) {
   await hydrated(page);
 }
 
-const TOTAL = sample().reduce((n, a) => n + a.findings.length, 0);
+// what the list holds and counts: every finding but the false positives (shown only on request)
+const TOTAL = sample().reduce((n, a) => n + counted(a).length, 0);
 const PAGES = Math.ceil(TOTAL / PER_PAGE);
 test.beforeAll(() => expect(PAGES, "the sample data needs more than one page of findings").toBeGreaterThan(1));
 
@@ -136,7 +137,7 @@ test("a finding the address names but the list lacks falls back to the first row
 // 20261001-083000-2265_RCX-DEMO-001 completed with nothing found; MOST is the run with the most
 // findings the page lists (...-8c51_RCX-DEMO-002, twelve; an Info finding would not count)
 const NO_FINDINGS = "20261001-083000-2265_RCX-DEMO-001";
-const MOST = [...sample()].sort((a, b) => b.findings.length - a.findings.length)[0];
+const MOST = [...sample()].sort((a, b) => counted(b).length - counted(a).length)[0];
 
 test("a run with no findings says so: no list, no filters, no pager", async ({ page }) => {
   const run = sample().find((a) => a.uid === NO_FINDINGS)!;
@@ -155,22 +156,22 @@ test("a run with no findings says so: no list, no filters, no pager", async ({ p
 
 test("one run with more than ten findings pages at ten, and its last page holds the rest", async ({ page }) => {
   const run = MOST;
-  test.skip(run.findings.length <= PER_PAGE, "no sample run lists more than ten findings (Info ones are not listed)");
+  test.skip(counted(run).length <= PER_PAGE, "no sample run lists more than ten findings (Info ones are not listed)");
   await go(page, `/?uid=${run.uid}&view=findings`);
   await expect(rows(page)).toHaveCount(PER_PAGE);
-  await expect(pager(page)).toContainText(`Page 1 of 2 · ${run.findings.length} results`);
+  await expect(pager(page)).toContainText(`Page 1 of 2 · ${counted(run).length} results`);
   await pager(page).getByRole("button", { name: "Next page" }).click();
   await expect(page).toHaveURL(/page=2/);
-  await expect(rows(page)).toHaveCount(run.findings.length - PER_PAGE);
+  await expect(rows(page)).toHaveCount(counted(run).length - PER_PAGE);
   await expect(pager(page).getByRole("button", { name: "Next page" })).toBeDisabled();
   await expect(selected(page)).toHaveCount(1);
-  await expect(detail(page)).toContainText(`${PER_PAGE + 1} of ${run.findings.length}`);
+  await expect(detail(page)).toContainText(`${PER_PAGE + 1} of ${counted(run).length}`);
 });
 
 test("a run that fits one page shows no pager", async ({ page }) => {
-  const one = sample().find((a) => a.findings.length > 1 && a.findings.length <= PER_PAGE)!;
+  const one = sample().find((a) => counted(a).length > 1 && counted(a).length <= PER_PAGE)!;
   await go(page, `/?uid=${one.uid}&view=findings`);
-  await expect(rows(page)).toHaveCount(one.findings.length);
+  await expect(rows(page)).toHaveCount(counted(one).length);
   await expect(pager(page)).toHaveCount(0);
 });
 
@@ -182,7 +183,7 @@ test("a critical finding shows its badge first, there is no Info level, and titl
   await expect(severity.getByRole("button", { name: /^critical/ })).toBeVisible();
   // an informational finding an older file holds is listed nowhere, and has no chip
   await expect(severity.getByRole("button", { name: /^info/ })).toHaveCount(0);
-  await expect(rows(page)).toHaveCount(Math.min(PER_PAGE, sample().find((a) => a.uid === uid)!.findings.length));
+  await expect(rows(page)).toHaveCount(Math.min(PER_PAGE, counted(sample().find((a) => a.uid === uid)!).length));
   await expect(list(page).locator('[data-severity="INFO"]')).toHaveCount(0);
   // the title with markup in it is shown as the characters it is
   const markup = rows(page).filter({ hasText: "<b>Status page</b> leaks build details" });
@@ -195,14 +196,35 @@ test("a critical finding shows its badge first, there is no Info level, and titl
   expect(doc).not.toMatch(/>Info</);
 });
 
-test("a false positive is listed as closed, and its analyst note is in the report", async ({ page }) => {
+test("a false positive is left out until Show lists it as closed, and its analyst note is in the report", async ({ page }) => {
   // the sample data's false positive with a note, if it holds one (an Info one is left out)
   const run = sample().find((a) => a.findings.some((f) => f.status === "false-positive" && f.triage_note));
   test.skip(!run, "the sample data holds no false positive with a note (an Info one is not listed)");
   const fp = run!.findings.find((f) => f.status === "false-positive" && f.triage_note)!;
+  const n = counted(run!).length;
   await go(page, `/?uid=${run!.uid}&view=findings`);
+  // left out: the list, the headline and the summary count what the Overview counts
+  await expect(rows(page)).toHaveCount(Math.min(PER_PAGE, n));
+  await expect(rows(page).filter({ hasText: fp.title })).toHaveCount(0);
+  await expect(page.getByText(`Showing ${n} of ${n} findings`)).toBeVisible();
+  // Show lists it (closed), beside the total rather than in it
+  const chips = page.getByRole("group", { name: "False positives" });
+  await chips.getByRole("button", { name: /^Show/ }).click();
+  await expect(page).toHaveURL(/fp=1/);
+  await expect(page.getByText(`Showing ${n + 1} of ${n} findings + 1 false positive`)).toBeVisible();
   await rows(page).filter({ hasText: fp.title }).locator("button").click();
   await expect(detail(page)).toContainText("False positive");
+  // Clear filters hides it again
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(page).not.toHaveURL(/fp=/);
+  await expect(rows(page).filter({ hasText: fp.title })).toHaveCount(0);
+  // a link naming it says why it isn't listed, and Show it lists and selects it
+  await go(page, `/?uid=${run!.uid}&view=findings&finding=${fp.id}`);
+  await expect(notice(page)).toContainText(`${fp.id} is marked as a false positive, and false positives are hidden.`);
+  await page.getByRole("button", { name: "Show it" }).click();
+  await expect(page).toHaveURL(/fp=1/);
+  await expect(selected(page)).toContainText(fp.id);
+  await expect(notice(page)).toHaveCount(0);
   const doc = unzip(await (await page.request.get(`/api/assessments/${run!.uid}/export?format=docx`)).body()).get("word/document.xml") ?? "";
   expect(doc).toContain("Analyst note");
   expect(doc).toContain(fp.triage_note!.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"));

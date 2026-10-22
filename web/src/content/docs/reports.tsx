@@ -177,7 +177,8 @@ export const reports: GroupContent = {
           <p>
             In the Reports view, with a run chosen, the summary strip shows its findings, plan steps, requests sent and
             masked evidence, Findings by Severity lists the top three findings by CVSS, and the findings table lists
-            every finding. The download links offer:
+            every finding (a false positive with its review state, named beside the count rather than in it:
+            &quot;7 findings + 1 false positive&quot;). The download buttons offer:
           </p>
           <DocTable
             caption="The dashboard's export formats for one run"
@@ -189,10 +190,25 @@ export const reports: GroupContent = {
             ]}
           />
           <p>
-            Every format is a download. With no run chosen, the Reports view sums up every saved run: Findings by
+            Every format is a download: the dashboard fetches the whole file, then saves it, and the line under the
+            buttons says what happened (&quot;Downloaded &lt;run&gt;.pdf.&quot;). A PDF that can&apos;t be printed shows the
+            hint above with a <strong>Download DOCX</strong> link; any other failure says why, with{" "}
+            <strong>Retry</strong>. With no run chosen, the Reports view sums up every saved run: Findings by
             Severity (the top three by CVSS) beside the Targets card, which lists every target, the most findings first,
             seven a page with Previous and Next (a target opens its newest run&apos;s report), and a table of the runs;
-            each row opens that run&apos;s report and offers the same three downloads.
+            each row opens that run&apos;s report and offers the same three downloads, with one status line under the
+            table that names the run.
+          </p>
+        </DocSection>
+        <DocSection title="False positives">
+          <p>
+            A finding an analyst marked as a false positive in the TUI is left out of every count on the dashboard: the
+            Overview&apos;s summary strip and Findings by Severity, the Assessments rows, the Reports and the AI
+            Assistant&apos;s cards all count the same findings. The Findings view leaves false positives out of its list
+            too, so its headline and chips agree; the <strong>False positives · Show</strong> chip lists them (as
+            Closed, with the analyst&apos;s note), shown beside the total (&quot;Showing 41 of 40 findings + 1 false
+            positive&quot;), and Clear filters hides them again. A link that names a false positive while they are
+            hidden says so, with <strong>Show it</strong>.
           </p>
         </DocSection>
         <DocSection title="The combined report">
@@ -207,7 +223,9 @@ export const reports: GroupContent = {
               appendix.
             </li>
             <li>
-              <strong>Preview:</strong> exactly what the PDF prints, shown in a sandboxed frame.
+              <strong>Preview:</strong> exactly what the PDF prints, shown in a sandboxed frame. A change to the
+              selection or the options after it marks it out of date (&quot;Preview again before generating the PDF or
+              the DOCX.&quot;) and the Generate buttons wait for a new preview; a preview that fails offers Retry.
             </li>
             <li>
               <strong>Generate PDF or Generate DOCX</strong> (once the preview is shown): the dashboard fetches the

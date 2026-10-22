@@ -30,6 +30,7 @@ export interface ReportFindingRow {
   tool: string;
   cwe: string;
   rating: string; // "CVSS 7.3" or "no CVSS"
+  falsePositive: boolean; // listed with its review state, never counted
 }
 
 /** A saved run in the runs table (a LibraryItem, so the run search reads it). */

@@ -79,11 +79,26 @@ export function SearchField({ value, onChange, placeholder, label }: { value: st
 
 /** "Showing 4 of 60 findings · Clear filters" (the button only while a filter is on); `noun` is
     the singular. The filters' one live region. */
-export function FilterSummary({ shown, total, noun, active, onClear }: { shown: number; total: number; noun: string; active: boolean; onClear: () => void }) {
+export function FilterSummary({
+  shown,
+  total,
+  noun,
+  extra,
+  active,
+  onClear,
+}: {
+  shown: number;
+  total: number;
+  noun: string;
+  extra?: string; // listed beside the total, not in it ("1 false positive")
+  active: boolean;
+  onClear: () => void;
+}) {
   return (
     <div className="flex items-center gap-2 text-[11px] text-muted-foreground" aria-live="polite">
       <span>
         Showing <span className="tabnums text-foreground">{shown}</span> of <span className="tabnums">{plural(total, noun)}</span>
+        {extra && <span className="tabnums"> + {extra}</span>}
       </span>
       {active && (
         <button type="button" onClick={onClear} className="ui-link inline-flex items-center gap-1">
