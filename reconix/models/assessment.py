@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional
 
+from .api_schema import ApiSchemaDigest
 from .api_spec import ApiSpec
 from .approval import ApprovalDecision, ApprovalRequest, Confirmation
 from .base import utc_now
@@ -55,6 +56,9 @@ class Assessment:
     requested_ports: List[int] = field(default_factory=list)   # intent from the prompt
     requested_tools: List[str] = field(default_factory=list)   # intent from the prompt
     api_spec: Optional[ApiSpec] = None   # an OpenAPI file attached to an API scope draft
+    # The schema digest built from that file, for the AI only. In memory, never saved,
+    # never in the snapshot or a report; cleared/replaced with the spec (store/openapi.py).
+    api_schema_digest: Optional[ApiSchemaDigest] = None
     login_2fa: bool = False         # the target asks for a one-time code after the password
     approvals: List[ApprovalRequest] = field(default_factory=list)
     decisions: List[ApprovalDecision] = field(default_factory=list)

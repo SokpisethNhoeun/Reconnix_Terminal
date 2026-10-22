@@ -69,8 +69,9 @@ def _agent(uid: Optional[str] = None):
     agent = _agents.get(uid)
     if agent is None:
         settings = load_settings()      # Kali MCP + DB from env; the LLM is set per turn
-        # Give the agent the store's /add-on knowledge as a read-only reference tool.
-        agent = Agent(settings, knowledge=_knowledge_search)
+        # Give the agent the store's /add-on knowledge and (for an API run) the attached
+        # OpenAPI schema, both as read-only reference tools.
+        agent = Agent(settings, knowledge=_knowledge_search, api_schema=_api_schema_lookup)
         agent.guard = agent_guard.make_guard(
             uid, lambda ref: _lookup_target(agent, ref), lambda a, kind: _tools_for(agent, a, kind))
         _agents[uid] = agent
@@ -88,6 +89,17 @@ def _knowledge_search(query: str) -> list:
     from . import knowledge
     return [{"source": p.source, "index": p.index, "text": p.text}
             for p in knowledge.fit_budget(knowledge.search(query))]
+
+
+def _api_schema_lookup(path: str, method: Optional[str] = None) -> Dict[str, Any]:
+    """The store's OpenAPI schema digest for one endpoint, as the harness tool expects it.
+
+    The digest is already redacted and cleaned when it is built; this returns a fenced block
+    (or an error). Empty / an error when no spec is attached. The harness never imports
+    Reconix, so this mapping lives here.
+    """
+    from . import openapi
+    return openapi.api_schema_endpoint(path, method)
 
 
 def _lookup_target(agent, ref: str) -> Optional[tuple]:
