@@ -2,15 +2,14 @@
 
 /* The model picker's list, "Model": every saved model (model-picker-rules.ts `modelRows`), ✓ on
    the one that answers next, each with its provider and where it runs ("Stub · local"). One
-   click, Enter or Space uses a model and closes the picker (the ✓ one just closes it); a remote
-   one is disabled while the server keeps data on this machine, with the reason under the list.
-   Each row has a bin: an inline confirm ("Remove <model> (<provider>)? …"), focused on No; Escape
-   there keeps it. Removing a provider's last model removes the provider (and its saved key).
-   One tab stop for the rows and their bins (use-roving.ts). + Model, at the bottom, opens Set the
-   provider. The first time it opens the models are on their way ("Loading the models…"); once
+   click, Enter or Space uses a model and closes the picker (the ✓ one just closes it), a remote
+   one as much as a local one. Each row has a bin: an inline confirm ("Remove <model>
+   (<provider>)? …"), focused on No; Escape there keeps it. Removing a provider's last model
+   removes the provider (and its saved key). One tab stop for the rows and their bins
+   (use-roving.ts). + Model, at the bottom, opens Set the provider. The first time it opens the models are on their way ("Loading the models…"); once
    they are there, focus goes to the model that answers next (else the first, else + Model), or
    to + Model when it comes back from the form. */
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Loader, Plus, Trash2 } from "lucide-react";
 
 import { IconButton } from "@/components/ui/icon-button";
@@ -32,7 +31,6 @@ interface Props {
 
 export function ModelList({ models, fromForm, onChosen, onAdd }: Props) {
   const root = useRef<HTMLDivElement>(null);
-  const reasonId = useId();
   const focused = useRef(false);
   const focusNext = useRef<string | null>(null); // a roving key (or ADD) to focus once drawn
   const [confirm, setConfirm] = useState<string | null>(null); // the row asked about
@@ -44,9 +42,6 @@ export function ModelList({ models, fromForm, onChosen, onAdd }: Props) {
     rows.filter((r) => r.key !== confirm).flatMap((r) => [rowKey(r.key), binKey(r.key)]),
     checked ? rowKey(checked.key) : null,
   );
-  // one note per distinct reason, under the list; each disabled model points at its own
-  const reasons = [...new Set(rows.flatMap((r) => (r.disabled ? [r.disabled] : [])))];
-  const reasonOf = (r: ModelRow) => (r.disabled ? `${reasonId}-${reasons.indexOf(r.disabled)}` : undefined);
   const ready = view !== null || status === "error";
 
   useEffect(() => {
@@ -68,7 +63,7 @@ export function ModelList({ models, fromForm, onChosen, onAdd }: Props) {
   });
 
   const pick = async (row: ModelRow) => {
-    if (row.disabled || models.pending) return;
+    if (models.pending) return;
     if (row.checked) return onChosen();
     setError(null);
     const problem = await models.choose(row.providerId, row.model);
@@ -163,9 +158,7 @@ export function ModelList({ models, fromForm, onChosen, onAdd }: Props) {
                   <button
                     type="button"
                     aria-current={row.checked ? "true" : undefined}
-                    aria-disabled={row.disabled ? true : undefined}
-                    aria-describedby={reasonOf(row)}
-                    title={row.disabled ?? (row.checked ? "Answers your next question" : `Use ${row.model}`)}
+                    title={row.checked ? "Answers your next question" : `Use ${row.model}`}
                     onClick={() => void pick(row)}
                     className="ai-picker-model"
                     {...roving.item(rowKey(row.key))}
@@ -198,11 +191,6 @@ export function ModelList({ models, fromForm, onChosen, onAdd }: Props) {
         ) : (
           <p className="ai-picker-empty">No model yet.</p>
         )}
-        {reasons.map((reason, i) => (
-          <p key={reason} id={`${reasonId}-${i}`} className="ai-picker-off">
-            {reason}
-          </p>
-        ))}
         {error && confirm === null && (
           <p className="ai-error-text ai-picker-error" role="alert">
             {error}

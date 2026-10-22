@@ -228,8 +228,9 @@ and its sidebar tab with a ≈1.6 s GSAP transition (`MOTION` in `motion.ts`) th
 WebGL globe (never mount a second) behind the welcome; `POST /api/assistant` (operators) asks
 the OpenAI-compatible model chosen with the composer's model chip (only models added there with
 **+ Model**, saved in `models.json`/`models.key` in its folder: the web reads no `LLM_BASE_URL` /
-`LLM_MODEL` / `LLM_API_KEY`; off this machine only with `LLM_ALLOW_REMOTE=1`; the e2e seeds its
-stand-in as a saved provider, `e2e/models.ts`), with a context the server builds from the saved files
+`LLM_MODEL` / `LLM_API_KEY`; cloud and remote addresses work by default, the picker and the
+chip saying the data goes there; the e2e seeds its stand-in as a saved provider,
+`e2e/models.ts`), with a context the server builds from the saved files
 (`lib/assistant/context.ts`: no evidence, every value cleaned, framed as untrusted data) and
 questions masked by `lib/assistant/redact.ts` (a port of `store/redact.py`: change both, the
 vectors in `web/tests/redact-vectors.json` check both), streams NDJSON frames with cards the
@@ -245,7 +246,7 @@ The model is chosen with the **model chip** in the assistant's composer (`model-
 `model-picker.tsx` upward: "Model", your saved models with **+ Model** (`model-list.tsx`), and
 "Set the provider" (`model-provider-form.tsx`: provider, base URL, API key, fetched or typed
 model, Add model); the header has no model control; `/api/assistant/models…`,
-`lib/assistant/models/`; cloud presets stay disabled without `LLM_ALLOW_REMOTE=1`): providers and
+`lib/assistant/models/`; every preset usable, cloud included): providers and
 the active choice live in `models.json` beside the conversations, API keys AES-256-GCM-sealed
 with `models.key` (0600) and never sent to the browser; every model passes `config.ts`'s
 `checkModel`, and while nothing is chosen no model answers (there is no Environment model).

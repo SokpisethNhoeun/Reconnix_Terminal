@@ -8,7 +8,7 @@
    anywhere; the list of your models with + Model; Set the provider: Custom at the stand-in,
    Fetch models, stub-model-2 added to Stub and asked with; a typed model saved as a new
    provider; a one-click switch back; removing a model, and a provider with its last one; cloud
-   providers disabled with the reason; a refusal kept on the form; no model at all; Escape, Back
+   providers usable by default (Groq, with where the questions go); a refusal kept on the form; no model at all; Escape, Back
    and Cancel; a typed API key never in the markup and gone with the form, with another
    provider, and with the picker when the Assistant is left by keyboard or by Back); what a
    viewer can't do; and the routes' locks (the old "environment" refused). The web reads no
@@ -427,7 +427,7 @@ test.describe("the composer and its model picker", () => {
     const form = picker(page, "Set the provider");
     const provider = form.getByLabel("Provider", { exact: true });
     await expect(provider).toBeFocused();
-    await expect(provider).toHaveValue("ollama"); // the first that may be chosen
+    await expect(provider).toHaveValue("ollama"); // the first local one: nothing leaves this machine yet
     await provider.selectOption({ label: "Custom (OpenAI-compatible)" });
     const url = form.getByLabel("Base URL", { exact: true });
     await expect(url).toHaveValue("");
@@ -523,17 +523,22 @@ test.describe("the composer and its model picker", () => {
     expect(after.active).toBeNull();
   });
 
-  test("cloud providers are disabled with the reason while the server keeps data here", async ({ page }) => {
+  test("cloud providers can be chosen, each with where the questions go: Groq", async ({ page }) => {
     await page.goto("/?view=assistant");
     await chip(page).click();
     await picker(page, "Model").getByRole("button", { name: "+ Model" }).click();
     const form = picker(page, "Set the provider");
     const provider = form.getByLabel("Provider", { exact: true });
     await expect(provider.locator("option")).toHaveText(["OpenAI", "Anthropic", "DeepSeek", "OpenRouter", "Groq", "Ollama (local)", "LM Studio (local)", "Custom (OpenAI-compatible)"]);
-    for (const name of ["OpenAI", "Anthropic", "DeepSeek", "OpenRouter", "Groq"]) await expect(provider.locator("option", { hasText: new RegExp(`^${name}$`) })).toBeDisabled();
-    for (const name of ["Ollama (local)", "LM Studio (local)", "Custom (OpenAI-compatible)"]) await expect(provider.locator("option", { hasText: name })).toBeEnabled();
-    await expect(form.getByText("Start the dashboard with LLM_ALLOW_REMOTE=1 to use cloud models")).toBeVisible();
-    await expect(provider).toHaveAccessibleDescription(/Start the dashboard with LLM_ALLOW_REMOTE=1 to use cloud models/);
+    for (const option of await provider.locator("option").all()) await expect(option).toBeEnabled(); // cloud allowed by default
+    await expect(form.getByText(/LLM_ALLOW_REMOTE/)).toHaveCount(0);
+    await provider.selectOption({ label: "Groq" });
+    await expect(provider).toHaveValue("groq");
+    const warning = "Groq runs at api.groq.com: your questions, the assessment data they need and relevant /add-on knowledge passages are sent there.";
+    await expect(form.getByText(warning)).toBeVisible();
+    await expect(provider).toHaveAccessibleDescription(warning);
+    await expect(form.getByLabel("Base URL", { exact: true })).toHaveCount(0); // its address is fixed
+    await expect(form.getByLabel("API key", { exact: true })).toBeVisible();
   });
 
   test("a refusal stays on the form with the server's words", async ({ page }) => {
@@ -544,9 +549,10 @@ test.describe("the composer and its model picker", () => {
     await form.getByLabel("Provider", { exact: true }).selectOption("custom");
     const url = form.getByLabel("Base URL", { exact: true });
     await url.fill("http://example.com/v1");
-    await expect(form.getByText("Off this machine: the dashboard uses it only when started with LLM_ALLOW_REMOTE=1.")).toBeVisible(); // the hint, before anything is sent
+    await expect(form.getByText("Off this machine: your questions, the assessment data they need and relevant /add-on knowledge passages are sent there.")).toBeVisible(); // the hint, before anything is sent
+    await form.getByLabel("API key", { exact: true }).fill("sk-e2e-not-a-real-key");
     await form.getByRole("button", { name: "Fetch models" }).click();
-    await expect(form.getByRole("alert")).toContainText("is not on this machine");
+    await expect(form.getByRole("alert")).toContainText("only sent over https to a remote model"); // refused: nothing sent
     await url.fill(`http://user:pw@127.0.0.1:${LLM_PORT}/v1`);
     await url.press("Enter"); // Fetch models
     await expect(form.getByRole("alert")).toContainText("not in the base URL");

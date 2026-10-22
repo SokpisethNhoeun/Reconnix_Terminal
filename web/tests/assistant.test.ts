@@ -40,12 +40,10 @@ describe("ChatRequestSchema", () => {
 });
 
 describe("checkModel (every saved model, again on each use)", () => {
-  const model = (baseUrl: string, name = "m", apiKey: string | null = null, allowRemote = false) => checkModel({ baseUrl, model: name, apiKey }, { allowRemote });
-  it("needs consent before data goes off this machine", () => {
-    const refused = model("https://llm.example.com/v1");
-    expect(refused.ok).toBe(false);
-    expect(!refused.ok && refused.reason).toContain("LLM_ALLOW_REMOTE=1");
-    expect(model("https://llm.example.com/v1", "m", null, true).ok).toBe(true);
+  const model = (baseUrl: string, name = "m", apiKey: string | null = null) => checkModel({ baseUrl, model: name, apiKey });
+  it("allows an address off this machine by default (cloud allowed), marked not local", () => {
+    expect(model("https://llm.example.com/v1")).toEqual({ ok: true, config: { baseUrl: "https://llm.example.com/v1", model: "m", apiKey: null, local: false } });
+    expect(model("https://api.groq.com/openai/v1", "llama-3.3-70b-versatile", "gsk-k").ok).toBe(true);
   });
   it("reads a local endpoint", () => {
     expect(model("http://127.0.0.1:11434/v1/", "llama3.2")).toEqual({ ok: true, config: { baseUrl: "http://127.0.0.1:11434/v1", model: "llama3.2", apiKey: null, local: true } });
@@ -53,14 +51,14 @@ describe("checkModel (every saved model, again on each use)", () => {
   it.each([
     ["not an address", () => model("nope")],
     ["another scheme", () => model("file:///etc/passwd")],
-    ["a key in the address", () => model("https://user:secret@llm.example.com/v1", "m", null, true)],
-    ["a key over plain http to a remote host", () => model("http://llm.example.com/v1", "m", "k", true)],
+    ["a key in the address", () => model("https://user:secret@llm.example.com/v1")],
+    ["a key over plain http to a remote host", () => model("http://llm.example.com/v1", "m", "k")],
     ["an odd model name", () => model("http://127.0.0.1:1/v1", "a b\nc")],
   ])("refuses %s", (_name, check) => {
     expect(check().ok).toBe(false);
   });
   it("sends a key to a remote model over https only", () => {
-    const setup = model("https://llm.example.com/v1", "m", "k", true);
+    const setup = model("https://llm.example.com/v1", "m", "k");
     expect(setup.ok && setup.config.apiKey).toBe("k");
     expect(setup.ok && setup.config.local).toBe(false);
   });

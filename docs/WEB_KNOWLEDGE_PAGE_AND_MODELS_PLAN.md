@@ -1,6 +1,7 @@
 # Security knowledge page, and models without the env
 
-Status: in progress (2026-10-22). Branch `feature/next-update`. Follows
+Status: in progress (2026-10-22). Branch `feature/next-update`; cloud allowed by default (owner,
+2026-10-22; branch `r7/cloud-default`: no `LLM_ALLOW_REMOTE`, the remote warnings stay). Follows
 `WEB_COMPOSER_MODEL_PICKER_PLAN.md` (the chip stays) and `KNOWLEDGE_OPENAPI_FINDINGS_PLAN.md` §4 (the
 `/add-on` store). Code and Figma change together.
 
@@ -10,13 +11,16 @@ Status: in progress (2026-10-22). Branch `feature/next-update`. Follows
   - The web assistant uses only models added with **+ Model**.
   - `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` are no longer read by the web (they leave the
     docs, the "Environment" row goes, and the e2e seeds its stand-in model as a saved provider).
-  - `LLM_ALLOW_REMOTE` stays as the server's switch for cloud providers, still off by default.
+  - ~~`LLM_ALLOW_REMOTE` stays as the server's switch for cloud providers, still off by default.~~
+    Superseded (owner, 2026-10-22): **cloud allowed by default.** There is no switch: cloud
+    providers and any remote address work for operators; the warnings that the data leaves the
+    machine (the form's "<Provider> runs at <host>: …", the Base URL's "Off this machine: …",
+    the chip's remote tooltip) stay.
 - **The model popup.**
   - Clicking the chip shows only **your models**: click one to use it (✓ on the active one).
     Each row has a remove action (confirm first).
   - A **+ Model** button opens a second popup, **Set the provider**, with:
-    - Provider (select, the presets in order; cloud ones disabled without `LLM_ALLOW_REMOTE=1`,
-      with the reason)
+    - Provider (select, the presets in order, every one usable; it starts on the first local one)
     - Base URL (Custom and local only)
     - API key (password, never prefilled)
     - Model: a select filled by fetching the provider's list, or typed

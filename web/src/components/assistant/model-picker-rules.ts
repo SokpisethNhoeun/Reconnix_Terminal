@@ -1,9 +1,8 @@
 /* The model picker's rules (model-chip.tsx, model-picker.tsx, its list model-list.tsx and its
    "Set the provider" form model-provider-form.tsx), before the server checks everything again:
-   what the chip says; the list's rows (every saved model, ✓ on the one that answers next, a
-   remote one disabled with the reason while the server keeps data on this machine) and what
-   removing one sends (DELETE the provider with its last model, else PATCH its models); the
-   form's provider options (the presets in order, a cloud one disabled with the reason), which
+   what the chip says; the list's rows (every saved model, ✓ on the one that answers next) and
+   what removing one sends (DELETE the provider with its last model, else PATCH its models); the
+   form's provider options (the presets in order, every one usable: cloud included), which
    fields it shows, the saved provider it adds to (the same preset at the same address), what a
    fetch or a test asks, where a fetch's answer leaves the model field, and the requests "Add
    model" sends (a new provider made active, or the saved one's changes and a switch). A saved key
@@ -16,7 +15,6 @@ import type { FetchResult, ModelsView, ProviderView } from "@/lib/assistant/mode
 import { nameProblem } from "./model-name-rules";
 import type { ModelSummary } from "./types";
 
-export const CLOUD_OFF = "Start the dashboard with LLM_ALLOW_REMOTE=1 to use cloud models";
 export const VIEWER_REASON = "Choosing a model needs the operator role";
 export const NO_CHOICE = "Choose a model";
 
@@ -54,7 +52,6 @@ export interface ModelRow {
   provider: string; // the provider's name as shown
   where: "local" | "remote";
   checked: boolean; // answers the next question
-  disabled: string | null; // why it can't be chosen now
 }
 
 const hostOf = (url: string) => {
@@ -77,7 +74,7 @@ export function presetFor(provider: ProviderView): Preset {
 export const savedName = (provider: ProviderView) => (presetFor(provider).id === provider.preset ? provider.name : `${provider.name} (${hostOf(provider.baseUrl)})`);
 
 /** Every saved model, provider by provider in the order they were saved: ✓ on the one that
-    answers next; a remote one is disabled, with the reason, while the server keeps data here. */
+    answers next. */
 export function modelRows(view: ModelsView): ModelRow[] {
   const active = view.active;
   return view.providers.flatMap((p) =>
@@ -88,7 +85,6 @@ export function modelRows(view: ModelsView): ModelRow[] {
       provider: savedName(p),
       where: p.local ? ("local" as const) : ("remote" as const),
       checked: active?.providerId === p.id && active.model === model,
-      disabled: !p.local && !view.allowRemote ? CLOUD_OFF : null,
     })),
   );
 }
@@ -122,20 +118,18 @@ export function removeQuestion(view: ModelsView, row: ModelRow): { title: string
 export interface ProviderOption {
   id: Preset["id"];
   label: string;
-  disabled: string | null; // why it can't be chosen now
 }
 
 /** The preset's name in the list: "Ollama (local)", "Custom (OpenAI-compatible)". */
 export const presetLabel = (preset: Preset) => (preset.kind === "local" ? `${preset.label} (local)` : preset.kind === "custom" ? "Custom (OpenAI-compatible)" : preset.label);
 
-/** The Provider select: the presets in their order; a cloud one is disabled, with the reason,
-    while the server doesn't allow remote models (a local or custom one never is: its address
-    can be changed). */
-export const providerOptions = (view: ModelsView): ProviderOption[] =>
-  PRESETS.map((p) => ({ id: p.id, label: presetLabel(p), disabled: p.kind === "cloud" && !view.allowRemote ? CLOUD_OFF : null }));
+/** The Provider select: the presets in their order, every one usable (a cloud one sends the
+    questions off this machine: the form says so under it). */
+export const providerOptions = (): ProviderOption[] => PRESETS.map((p) => ({ id: p.id, label: presetLabel(p) }));
 
-/** The provider the form starts on: the first one that may be chosen. */
-export const firstPreset = (view: ModelsView): Preset => presetOf(providerOptions(view).find((o) => !o.disabled)?.id ?? "custom");
+/** The provider the form starts on: the first local one (nothing leaves this machine until a
+    cloud preset or a remote address is chosen). */
+export const firstPreset = (): Preset => PRESETS.find((p) => p.kind === "local") ?? presetOf("custom");
 
 /** Only Custom and the local presets take an address; a cloud preset's is fixed. */
 export const showsUrl = (preset: Preset) => preset.kind !== "cloud";

@@ -40,7 +40,6 @@ export const ModelsViewSchema = z
     providers: z.array(ProviderViewSchema).max(MAX_PROVIDERS),
     active: ActiveViewSchema.nullable(),
     summary: ModelSummarySchema,
-    allowRemote: z.boolean(), // the server sends data off this machine (LLM_ALLOW_REMOTE=1)
   })
   .strict();
 export type ModelsView = z.infer<typeof ModelsViewSchema>;

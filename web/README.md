@@ -145,10 +145,10 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   the composer's **+ Model** and saved by the dashboard. The web reads no model from its
   environment (`LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` are not used); until one is added
   the screen says "No AI model is set up yet. Add one with the model chip under the message box
-  (+ Model)." An endpoint off this machine also needs the dashboard started with
-  `LLM_ALLOW_REMOTE=1` (assessment data goes there; the screen says so; the browser can't turn
-  it on) and takes an API key over https only. The terminal helper and the TUI it runs never
-  get `LLM_*`.
+  (+ Model)." Cloud providers and any address off this machine work by default for operators
+  (the owner's decision, 2026-10-22; no server switch): assessment data goes there, and the
+  picker says so when one is chosen, the chip's tooltip while it answers. A remote endpoint
+  takes an API key over https only. The terminal helper and the TUI it runs never get `LLM_*`.
 - **The composer** (`composer.tsx`): a rounded box (radius 16) with the text area on top and a
   row under it: the model chip on the left; on the right "Enter to send · Shift+Enter for new
   line" (hidden on a phone) and the round 32 px send button (Stop while a reply is written).
@@ -161,14 +161,15 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   model needs the operator role"). It opens a picker upward (a sheet over the composer on a
   phone), a dialog named after its step; Escape goes back to the list, then closes; focus goes to
   each step's first control and back to the chip. **Model**: only your saved models (✓ on the
-  active one, the name in mono, "`<provider>` · local|remote"; a remote one disabled with "Start
-  the dashboard with LLM_ALLOW_REMOTE=1 to use cloud models" unless the server allows it; one
-  click switches, roving focus), each with a bin and an inline confirm "Remove `<model>`
+  active one, the name in mono, "`<provider>` · local|remote"; one click switches, roving
+  focus), each with a bin and an inline confirm "Remove `<model>`
   (`<provider>`)? …" (No by default; the provider's last model DELETEs the provider, else its
   list is PATCHed); "No model yet." when empty; **+ Model** at the bottom. **Set the provider**
   (Back, or Cancel, returns to the list): Provider (a native select of OpenAI, Anthropic,
-  DeepSeek, OpenRouter, Groq, Ollama (local), LM Studio (local), Custom (OpenAI-compatible), the
-  cloud ones disabled with the same reason), Base URL (Custom and the local ones only, from the
+  DeepSeek, OpenRouter, Groq, Ollama (local), LM Studio (local), Custom (OpenAI-compatible), all
+  usable, starting on Ollama; a cloud one says "`<Provider>` runs at `<host>`: your questions, the
+  assessment data they need and relevant /add-on knowledge passages are sent there." and a
+  remote Base URL "Off this machine: …" the same), Base URL (Custom and the local ones only, from the
   preset), API key (uncontrolled, never filled in or kept, emptied with another provider; "Key
   saved: leave empty to keep it" and Remove key for a saved one), Model (a select filled by
   **Fetch models**, `…/models/fetch` = `GET {base}/models`, also fetched once the provider,
@@ -180,11 +181,10 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   refusal stays on the form. A saved key goes only to its saved address (the saved provider is
   asked by its id). Providers live in `models.json` in the assistant's folder (0600, atomic), the
   keys AES-256-GCM-sealed with `models.key` (32 bytes, 0600, made once): never sent to the
-  browser or logged. `GET /api/assistant/models` also says whether the server allows remote
-  models (`allowRemote`) and lists the presets in the picker's order with their kind. Every
-  model passes the same rules (`config.ts` `checkModel`: http(s), no credentials
-  in the URL, the model name pattern, a key only over https to a remote host, remote only with
-  `LLM_ALLOW_REMOTE=1`), again on every use: a chosen model that can't be used says why instead
+  browser or logged. `GET /api/assistant/models` also lists the presets in the picker's order
+  with their kind. Every model passes the same rules (`config.ts` `checkModel`: http(s), no
+  credentials in the URL, the model name pattern, a key only over https to a remote host, a
+  cloud preset only at its own address), again on every use: a chosen model that can't be used says why instead
   of falling back. Outbound tests and fetches refuse redirects, stop after 10 s and never cache.
   Routes: `GET|POST /api/assistant/models`, `PATCH|DELETE …/models/<id>`, `PUT …/models/active`,
   `POST …/models/test` and `…/models/fetch` (operators; changes need the page's origin).
