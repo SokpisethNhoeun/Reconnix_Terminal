@@ -3,7 +3,7 @@
 A local dashboard for what the Reconix terminal app did, opened from the TUI with `/web`. It
 reads the assessments the TUI saves to `~/.reconix/assessments/` and shows them as the
 **Assessment Operations Center** (the globe UI from the reconix-web-ui site), with Assessments,
-Findings, Reports, Terminal and AI Assistant views (and, for operators, Security knowledge), all
+Findings, Reports, Terminal, AI Assistant and Security knowledge views, all
 switched in-page (`?view=`; each view's
 own address keys and every run link live in `components/dashboard/view-url.ts`). By default the
 Overview totals **every saved run** (`derive-overall.ts`) and Findings lists them all, each
@@ -72,7 +72,7 @@ npm run build
 npm start                          # http://127.0.0.1:3100, prints and opens the sign-in link
 RECONIX_DATA_DIR=sample-data npm start   # the sample assessments instead of your own
 npm start -- --no-open             # don't open a browser
-npm start -- --no-terminal         # no Terminal page; the sign-in grants viewer only
+npm start -- --no-terminal         # no Terminal page (the Terminal view says it is off)
 ```
 
 | Variable | Default | Meaning |
@@ -94,9 +94,10 @@ npm start -- --no-terminal         # no Terminal page; the sign-in grants viewer
 The page asks `POST /api/terminal/ticket` for a single-use ticket valid for 60 s, then opens
 `ws://127.0.0.1:3101/?ticket=…`.
 
-- **Ticket route:** same origin, the operator session cookie **and** the terminal key
-  cookie (`reconix_term`, `Path=/api/terminal`, signed differently, so a session cookie
-  seen by another server on 127.0.0.1 can't mint tickets). It returns the ticket, the
+- **Ticket route:** same origin, the session cookie, the terminal on **and** the terminal key
+  cookie (`reconix_term`, `Path=/api/terminal`, signed differently and set at sign-in only
+  while the terminal is on, so a session cookie seen by another server on 127.0.0.1 can't mint
+  tickets). It returns the ticket, the
   socket URL and the `proof` the real helper will send.
 - **Helper:** checks the `Host` (loopback), the `Origin` (this dashboard) and the ticket
   (signed with the launch token, used once). Its first frame is `{"type":"hello","proof"}`;
@@ -114,7 +115,7 @@ The page asks `POST /api/terminal/ticket` for a single-use ticket valid for 60 s
   a same-size resize message has the TUI repaint it), restart (asks first while a session
   is live), expand (fills the browser window, so Esc still reaches the TUI), and "↓ Latest"
   while scrolled up. None of them sends keystrokes.
-- **The sign-in link** grants operator control, so `serve.mjs` prints it only to a
+- **The sign-in link** grants full control (there are no roles), so `serve.mjs` prints it only to a
   terminal; started by the TUI, it is only in `~/.reconix/web.url` (0600).
 
 ## AI Assistant
@@ -145,7 +146,7 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   the composer's **+ Model** and saved by the dashboard. The web reads no model from its
   environment (`LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` are not used); until one is added
   the screen says "No AI model is set up yet. Add one with the model chip under the message box
-  (+ Model)." Cloud providers and any address off this machine work by default for operators
+  (+ Model)." Cloud providers and any address off this machine work by default
   (the owner's decision, 2026-10-22; no server switch): assessment data goes there, and the
   picker says so when one is chosen, the chip's tooltip while it answers. A remote endpoint
   takes an API key over https only. The terminal helper and the TUI it runs never get `LLM_*`.
@@ -157,8 +158,7 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
 - **Choosing a model** (`model-chip.tsx`, `model-picker.tsx` with `model-list.tsx` and
   `model-provider-form.tsx` (+ `model-key-field.tsx`, `model-name-field.tsx`), the rules in
   `model-picker-rules.ts`, `lib/assistant/models/`): the chip says `● <model> ▾` (green) or
-  `● Choose a model ▾` (amber, the reason in its tooltip); a viewer sees it disabled ("Choosing a
-  model needs the operator role"). It opens a picker upward (a sheet over the composer on a
+  `● Choose a model ▾` (amber, the reason in its tooltip). It opens a picker upward (a sheet over the composer on a
   phone), a dialog named after its step; Escape goes back to the list, then closes; focus goes to
   each step's first control and back to the chip. **Model**: only your saved models (✓ on the
   active one, the name in mono, "`<provider>` · local|remote"; one click switches, roving
@@ -187,9 +187,9 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   cloud preset only at its own address), again on every use: a chosen model that can't be used says why instead
   of falling back. Outbound tests and fetches refuse redirects, stop after 10 s and never cache.
   Routes: `GET|POST /api/assistant/models`, `PATCH|DELETE …/models/<id>`, `PUT …/models/active`,
-  `POST …/models/test` and `…/models/fetch` (operators; changes need the page's origin).
-- **Route:** `POST /api/assistant` takes `{ conversationId?, uid, question, retry? }`: operators
-  only (proxy and handler), same origin, zod-checked, a byte cap, 12 questions a minute and 2
+  `POST …/models/test` and `…/models/fetch` (signed in; changes need the page's origin).
+- **Route:** `POST /api/assistant` takes `{ conversationId?, uid, question, retry? }`: a
+  session (proxy and handler), same origin, zod-checked, a byte cap, 12 questions a minute and 2
   replies at once (`RECONIX_ASSISTANT_RATE_PER_MINUTE`, `RECONIX_ASSISTANT_RATE_RUNNING`). The
   browser never sends history: the server reads it from the conversation file. It builds the
   model's context from the saved files itself (no evidence lines; every value one line with no
@@ -207,15 +207,15 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
 - **Cards the server picks** (`lib/assistant/cards.ts`, `intent.ts`): findings, a finding,
   progress, approvals, policy blocks, tools used, report downloads and notices, built from the
   saved data only; the model writes the explanation and never the numbers. Nothing can be run
-  or approved from the chat: approvals say "Decide in the TUI", with Open Terminal for
-  operators. Questions are masked with the TUI's secret patterns (`lib/assistant/redact.ts`,
+  or approved from the chat: approvals say "Decide in the TUI", with Open Terminal
+  while the terminal is on. Questions are masked with the TUI's secret patterns (`lib/assistant/redact.ts`,
   vectors shared with `reconix/store/redact.py` in `tests/redact-vectors.json`).
 - **Saved conversations** (`lib/assistant/history-store.ts`): one `<uuid>.json` per
   conversation in `~/.reconix/assistant/` (`RECONIX_ASSISTANT_DIR`; the folder `0700`, files
   `0600`, the parent not writable by others), written atomically, read like the saved
   assessments. A conversation keeps the run it began with; its title is the first question.
   History, rename, delete and "Delete all" through `/api/assistant/conversations[/<id>]`
-  (operators; changes need the page's origin). Kept 30 days after last use
+  (signed in; changes need the page's origin). Kept 30 days after last use
   (`RECONIX_ASSISTANT_RETENTION_DAYS`, `0` keeps them), at most 100 conversations and 200
   messages each. The tab keeps only the open conversation's id and the masked unsent draft.
   Plans: `docs/WEB_AI_ASSISTANT_PLAN.md`, `docs/WEB_REDESIGN_V2_PLAN.md` (the transition and
@@ -224,8 +224,7 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
 ## Security knowledge
 
 The AI Assistant's header has a **Security knowledge** button (a book with a lock; just the icon
-on a phone; operators only) that opens `?view=knowledge` (`components/knowledge/`; no sidebar item,
-and anyone but an operator lands on the Overview: the page renders the view for operators only).
+on a phone) that opens `?view=knowledge` (`components/knowledge/`; no sidebar item).
 "← AI Assistant" goes back.
 
 - **Header:** the title, a search over the names, **Table / Grid** (remembered per browser in
@@ -243,7 +242,7 @@ and anyone but an operator lands on the Overview: the page renders the view for 
   Word file downloaded. A file added before originals were kept has Open unavailable, with why.
 - **Remove** asks in place ("Remove this file?", No focused, Escape is No).
 
-Routes (operators only in `proxy.ts` and again in each handler, `lib/knowledge/access.ts`; changes
+Routes (a session in `proxy.ts` and again in each handler, `lib/knowledge/access.ts`; changes
 need the page's Origin):
 
 | Route | Does |
@@ -283,7 +282,8 @@ npm run build && npm run e2e        # Playwright on sample-data (npx playwright 
                                     #   ports (default 3199, plus 3198 and 3195)
 ```
 
-The e2e specs: `access` (roles, origin, headers), `pages` (views, switcher, downloads, the docs,
+The e2e specs: `access` (sign-in, no roles, an old role cookie refused, the terminal's locks,
+origin, headers), `pages` (views, switcher, downloads, the docs,
 the Terminal view with a stand-in program), `assessments` (ten a page, the pager, chips, search,
 the address), `findings` (paging, deep links, Previous / Next across a page end, the notice for
 a hidden finding, the list scroller and its hidden scrollbars, the phone's list → detail →
@@ -300,7 +300,7 @@ provider with a refusal and a fetched list, and the phone's sheet),
 `assistant-knowledge` (an `/add-on` folder written as the TUI does: "Knowledge used" under the
 answer, kept after a reload), `knowledge` (the Security knowledge page with the CLI's stand-in: the
 assistant's button and back, uploads, the table and the grid, search, Open, Remove, a refused
-`.doc`, a viewer kept out, a phone, axe), `motion` (directions,
+`.doc`, signed out kept out, a phone, axe), `motion` (directions,
 timing, the globe, history), `scroll` (the wheel and keys at six sizes, no sideways scroll) and
 `a11y` (axe via `@axe-core/playwright`, focus order). Known faults are listed in the specs as
 expected failures that fail with "remove this entry" once fixed. The specs wait for
@@ -316,21 +316,21 @@ counts from it (`e2e/support.ts`), never from literals.
 
 ```
 src/
-├── proxy.ts                 # Host allowlist, viewer role on every route, operator for the terminal, the
-│                            #   assistant and knowledge, nonce CSP
+├── proxy.ts                 # Host allowlist, a session on every route (no roles), the terminal only
+│                            #   while it is on, nonce CSP
 ├── app/
 │   ├── layout.tsx           # fonts (Inter, JetBrains Mono), metadata (no smooth-scroll library: everything scrolls natively)
 │   ├── page.tsx             # the viewer: loads the saved runs, every run or ?uid=, derives the dashboard
-│   ├── docs/                # documentation in the dashboard frame (layout checks the viewer role): /docs and
+│   ├── docs/                # documentation in the dashboard frame (layout checks the session): /docs and
 │   │                        #   /docs/[group], one page per group (content in src/content/docs/)
-│   ├── terminal/            # /terminal → /?view=terminal (operators)
+│   ├── terminal/            # /terminal → /?view=terminal (while the terminal is on)
 │   ├── assistant/           # /assistant → /?view=assistant
 │   ├── login/               # sign-in (token from the link's #fragment) → the Overview
 │   └── api/                 # session (sign-in), assessments/[uid] (JSON), assessments/[uid]/export,
-│                            #   reports/combined (1–5 runs as one PDF / DOCX; viewer), terminal/ticket,
+│                            #   reports/combined (1–5 runs as one PDF / DOCX), terminal/ticket,
 │                            #   assistant, assistant/conversations and assistant/models (+ [id], active,
 │                            #   test, fetch: the model picker), knowledge (+ [id], [id]/original: the
-│                            #   Security knowledge page) (operators)
+│                            #   Security knowledge page)
 ├── lib/
 │   ├── data/                # schema.ts (zod), store.ts (server-only reader), stats.ts (pure),
 │   │                        #   adapt.ts (a saved run → the viewer's terms), view-types.ts, format.ts
@@ -338,7 +338,7 @@ src/
 │   │                        #   combined/ (query.ts validates ?uids=&format=&evidence=&low=&appendix=,
 │   │                        #   select.ts merges the runs, html.ts renders, options.ts names the file),
 │   │                        #   docx/ (zip.ts, ooxml.ts, report.ts and combined.ts: the Word documents)
-│   ├── auth/                # session.ts (launch token, signed cookie, roles, hosts), csp.ts, guard.ts
+│   ├── auth/                # session.ts (launch token, signed cookie, hosts), csp.ts, guard.ts
 │   │                        #   (+ terminalAccess), origin.ts (same-origin check), ticket.ts (terminal tickets)
 │   ├── terminal/            # config.ts (on/off, helper port), paths.ts, protocol.ts (frames, close codes),
 │   │                        #   screen-text.ts (what Copy output copies)
@@ -431,18 +431,17 @@ once, with each run as an occurrence; what a run lacks is listed under Limitatio
   `~/.reconix/assistant` (and nothing else). The Security knowledge page adds and removes
   knowledge files, never itself: it starts the Python knowledge CLI (the same code as `/add-on`)
   for each change and for each original it opens (the knowledge folder is not assessment data). The assistant's route is also the one place saved
-  data leaves the machine, and only to the model the operator chose (the model picker's test and
+  data leaves the machine, and only to the model you chose (the model picker's test and
   fetch send no assessment data). The PDF exports (single and combined) start a headless Chrome on a
   temp file the server wrote (`lib/report/pdf.ts`), never on anything the request said.
 - **One data source.** Pages read through `lib/data/store.ts` only; it accepts regular files
   named `<YYYYMMDD-HHMMSS-xxxx>_<id>.json` up to 5 MB that pass `AssessmentSchema`.
   Change `schema.ts` together with `reconix/store/snapshot.py`.
-- **Access.** Every page and route needs the `viewer` role, and `/terminal`,
-  `/api/terminal/*`, `/api/assistant` and `/api/knowledge` (with everything under them) need
-  `operator` (`proxy.ts`, and pages / handlers check again; the page renders the Terminal and
-  Security knowledge views only for operators). The
-  sign-in link grants `operator` while the terminal is on (`--no-terminal`: `viewer`). The
-  dashboard binds to 127.0.0.1 and refuses other Host headers; so does the terminal helper.
+- **Access.** No roles: one local user. Every page and route but the sign-in page and route
+  needs a session (the cookie `<issued>.<signature>`, 12 h; an old role-prefixed one no longer
+  reads), and signed in everything is open. `/terminal` and `/api/terminal/*` also need the
+  dashboard to host the terminal, and a ticket the terminal key cookie too (`proxy.ts`, and pages
+  / handlers check again). Every change checks the page's Origin. The dashboard binds to 127.0.0.1 and refuses other Host headers; so does the terminal helper.
 - **Text is text.** Saved values (targets, evidence, chat) and the model's replies are
   rendered by React as text (`MessageText` turns a small markdown subset into elements);
   never use `dangerouslySetInnerHTML`.

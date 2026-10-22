@@ -225,7 +225,7 @@ Overview by `data-motion` (`top|hero|fade|right|bottom`), never by class names. 
 and the docs scroll natively: on the fixed desktop frame `.dash-content` is the one scroller, elsewhere the
 window. The **AI Assistant** (`?view=assistant`, `components/assistant/`) opens from the Ask bar
 and its sidebar tab with a ≈1.6 s GSAP transition (`MOTION` in `motion.ts`) that carries the one
-WebGL globe (never mount a second) behind the welcome; `POST /api/assistant` (operators) asks
+WebGL globe (never mount a second) behind the welcome; `POST /api/assistant` (signed in) asks
 the OpenAI-compatible model chosen with the composer's model chip (only models added there with
 **+ Model**, saved in `models.json`/`models.key` in its folder: the web reads no `LLM_BASE_URL` /
 `LLM_MODEL` / `LLM_API_KEY`; cloud and remote addresses work by default, the picker and the
@@ -253,12 +253,11 @@ with `models.key` (0600) and never sent to the browser; every model passes `conf
 `webterm` drops `LLM_*` from the TUI's env. Exports: a report is saved as PDF, JSON or DOCX,
 in the TUI and the web alike (the report HTML is only the PDF's source and the combined preview,
 never a download): `GET /api/assessments/<uid>/export?format=pdf|json|docx`
-(`lib/report/formats.ts`) and `GET /api/reports/combined?uids=a,b&format=preview|pdf|docx` (viewer;
+(`lib/report/formats.ts`) and `GET /api/reports/combined?uids=a,b&format=preview|pdf|docx` (signed in;
 1–5 saved runs combined in memory from the saved, already-redacted files, `lib/report/combined/`,
 the query validated first; the preview inline, the PDF printed by the same headless Chrome as the
 single export, 501 with the DOCX link without one; the Word files come from `lib/report/docx/`).
-**Security knowledge** (`?view=knowledge`, `components/knowledge/`, operators only: the page
-renders it for no one else, and a viewer's address opens the Overview) opens from the assistant
+**Security knowledge** (`?view=knowledge`, `components/knowledge/`) opens from the assistant
 header's Security knowledge button (no sidebar item; "← AI Assistant" goes back): the knowledge
 files as a table or a grid (remembered per browser), a search over names, Upload (one
 `.docx .pdf .txt .md .json .yaml .yml` file ≤ 10 MB; a `.doc` is told to become a `.docx`), Open
@@ -276,8 +275,9 @@ data), and the only things started are the Terminal
 page's TUI (the ticket route hands out a ticket; `reconix/webterm`, started by
 `web/scripts/serve.mjs`, runs the TUI, so its gates are the store's gates), the knowledge CLI and,
 for both PDF routes, a headless Chrome that prints a temp file the server wrote
-(`lib/report/pdf.ts`, `RECONIX_CHROME`; never anything the request said). Minting a ticket needs the operator session
-cookie **and** the terminal key cookie (`Path=/api/terminal`, signed differently); the helper
+(`lib/report/pdf.ts`, `RECONIX_CHROME`; never anything the request said). Minting a ticket needs the session
+cookie, the terminal on **and** the terminal key cookie (`Path=/api/terminal`, signed differently,
+set at sign-in only while the terminal is on); a ticket is single use; the helper
 proves itself with a hello before the page sends anything; the TUI's pty is its controlling
 terminal, so
 it dies with the helper (on Windows the TUI runs in a ConPTY console the helper owns, see
@@ -286,14 +286,15 @@ and so does the knowledge CLI's stand-in (`RECONIX_KNOWLEDGE_CLI`, `web/e2e/know
 the same contract over a temp folder).
 Read `web/CLAUDE.md` and `web/README.md` (Rules) before changing it. This Next.js version
 differs from older ones, so check `web/node_modules/next/dist/docs/` before writing code.
-Every page and route needs the `viewer` role; `/terminal`, `/api/terminal/*`,
-`/api/assistant` and `/api/knowledge` (and everything under them) need `operator` (`proxy.ts`, and the pages / handlers check again; the Terminal and
-Security knowledge views are rendered only for operators, and guarded pages read the cookies first
-so none is prerendered). The ticket format lives in
+There are no roles (one local user, `docs/WEB_NO_ROLES_AND_WORKFLOW_PARITY_PLAN.md` §1): every
+page and route but the sign-in page and route needs a session (`<issued>.<signature>`; an old
+role-prefixed cookie no longer reads), and signed in everything is open; `/terminal` and
+`/api/terminal/*` also need the dashboard to host the terminal (`proxy.ts`, and the pages /
+handlers check again; guarded pages read the cookies first so none is prerendered). The ticket format lives in
 both `web/src/lib/auth/ticket.ts` and `reconix/webterm/ticket.py` (shared test vector), and
 the frame protocol in `web/src/lib/terminal/protocol.ts` and `reconix/webterm/protocol.py`:
 change each pair together. The helper never logs terminal data (`TEST_PASSWORD` test), and
-the sign-in link (operator control) is printed only to a TTY, never to `~/.reconix/web.log`.
+the sign-in link (full control) is printed only to a TTY, never to `~/.reconix/web.log`.
 
 ## Project rules (applied to this TUI)
 

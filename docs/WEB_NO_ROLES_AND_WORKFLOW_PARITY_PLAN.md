@@ -18,6 +18,20 @@ Local Application vs Figma "Local Web UI (Copy)": 27 has, 18 missing, 5 differen
 
 ## 1. No roles (web code)
 
+Status: **done** (2026-10-22, branch `r8/no-roles`). `session.ts` has `sessionValue(token)` /
+`readSession()` (signed `reconix-web:session:<issued>`, so an old `<role>.<issued>.<sig>` cookie
+never reads, prefixed or not); `guard.ts` has `signedIn()`, `requireSignedIn()` and
+`terminalAccess(): "on" | "off"`. Handlers behind the proxy now answer a missing session with
+**401 "Sign in first."** (they answered 403 with the role message); a terminal route while the
+terminal is off answers 403 "The terminal is off: this dashboard was started with --no-terminal.",
+and the ticket route without the key 403 "The terminal's key is missing or has expired. Sign in
+again with the dashboard's link." Also gone: the History button's disabled state ("The saved
+conversations need the operator role"), the sidebar's "Terminal · operator role needed" tooltip,
+`allowedView` / `OPERATOR_VIEWS`, and `isAssistantPath` / `isKnowledgePath` (unused now). The
+sign-in route answers `{ signedIn: true, terminal }` instead of `{ role }`. New tests:
+`web/tests/access.test.ts` (proxy + ticket route) and the access e2e's old-cookie, signed-in and
+terminal-off cases (the latter on the `--no-terminal` live-refresh server).
+
 - `lib/auth/session.ts`: the session cookie names no role (`<issued>.<signature>`); an old cookie
   with a role no longer reads, so it signs in again. `ROLES`, `hasRole`, `signInRole`, the role in
   `currentRole()` go: `signedIn()` answers yes or no.

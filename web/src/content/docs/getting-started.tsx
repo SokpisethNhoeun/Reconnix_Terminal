@@ -219,7 +219,7 @@ python run.py         # the launcher in the repository root`}</Code>
         <DocSection title="In the browser">
           <p>
             The web dashboard&apos;s <strong>Terminal</strong> page runs this same terminal in a browser tab, with the same
-            screens, commands and gates. It needs the operator role (the sign-in link the dashboard prints). Inside it,{" "}
+            screens, commands and gates, once you are signed in with the link the dashboard prints. Inside it,{" "}
             <Mono>/web</Mono> only tells you that you are already in the dashboard.
           </p>
         </DocSection>
