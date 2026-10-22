@@ -39,7 +39,12 @@ export async function streamReply(config: ModelConfig, turns: Turn[], signal: Ab
   }
   if (!response.ok || !response.body) {
     await response.body?.cancel().catch(() => {});
-    const hint = response.status === 404 ? ` Check LLM_MODEL ("${config.model}") and LLM_BASE_URL.` : response.status === 401 || response.status === 403 ? " Check LLM_API_KEY." : "";
+    const hint =
+      response.status === 404
+        ? ` Check the model name ("${config.model}") and the base URL in the Model menu (or LLM_MODEL and LLM_BASE_URL).`
+        : response.status === 401 || response.status === 403
+          ? " Check the API key in the Model menu (or LLM_API_KEY)."
+          : "";
     throw new ModelError(`The AI model answered with HTTP ${response.status}.${hint}`, 502);
   }
 

@@ -4,7 +4,7 @@
    (derive-scope.ts, derive-report.ts); `?uid=` opens one run (derive.ts). `?view=` is
    the open view, read by the client Viewer. The terminal is rendered only when the server says
    this browser may use it (lib/auth/guard.ts); the AI Assistant learns what it is about, whether
-   this browser may ask (operator role), which model answers (lib/assistant/config.ts) and what
+   this browser may ask (operator role), which model answers (lib/assistant/models/resolve.ts) and what
    to suggest, from the data in scope (lib/assistant/prompts.ts). */
 import type { AssistantInfo } from "@/components/assistant/types";
 import { deriveDashboard } from "@/components/dashboard/derive";
@@ -20,8 +20,8 @@ import { ScopeView } from "@/components/dashboard/scope-view";
 import { TopBar } from "@/components/dashboard/top-bar";
 import { Viewer } from "@/components/dashboard/viewer";
 import { TerminalView } from "@/components/terminal/terminal-view";
-import { modelSummary } from "@/lib/assistant/config";
 import { retentionDays } from "@/lib/assistant/history-store";
+import { activeModel } from "@/lib/assistant/models/resolve";
 import { runRef, scopedViews, scopeOf } from "@/lib/assistant/insights";
 import { welcomePrompts } from "@/lib/assistant/prompts";
 import { currentRole, terminalAccess } from "@/lib/auth/guard";
@@ -42,7 +42,7 @@ export default async function Home({ searchParams }: Props) {
   const items = library.assessments.map(libraryItem);
   const dir = shownDir(library.dir);
   const terminal = access === "operator";
-  const model = modelSummary();
+  const { summary: model } = await activeModel();
   const assistant: AssistantInfo = {
     scope: scopeOf(chosen),
     runs: scopedViews(views, null).map((v) => ({ ...runRef(v), status: v.status })),
@@ -50,7 +50,7 @@ export default async function Home({ searchParams }: Props) {
     operator: hasRole(role, "operator"),
     terminal,
     retentionDays: retentionDays(),
-    model: { configured: model.configured, name: model.model, local: model.local, reason: model.reason },
+    model,
   };
   const empty = <EmptyView dir={dir} problems={library.problems} compact />;
   const runs = views.map(runRow); // once: the Assessments view and the all-runs Report share it
