@@ -1,6 +1,7 @@
 /* The knowledge the assistant hands the model (lib/assistant/knowledge/index.ts): the relevant
    passages of a temporary knowledge folder, masked again and cleaned, within the budget, with
-   their files' names; then where they go: inside the prompt's fence, as untrusted reference
+   their files' names, ranked over the readable sources only (a corrupt one counts for nothing);
+   then where they go: inside the prompt's fence, as untrusted reference
    material, within the context's limit; the `meta` frame's names and a saved reply that keeps
    them (an older conversation without them still loads). */
 import { mkdtempSync, rmSync } from "node:fs";
@@ -12,13 +13,13 @@ import { toMessages } from "@/lib/assistant/client";
 import { buildContext, CONTEXT_LIMIT, KNOWLEDGE_TITLE, knowledgeSection } from "@/lib/assistant/context";
 import { CONVERSATION_FORMAT, ConversationSchema } from "@/lib/assistant/history-schema";
 import { NO_KNOWLEDGE, searchKnowledge } from "@/lib/assistant/knowledge";
-import { BUDGET } from "@/lib/assistant/knowledge/rank";
+import { BUDGET, buildCorpus, rank, scoreAll } from "@/lib/assistant/knowledge/rank";
 import { fenceTag, systemPrompt } from "@/lib/assistant/prompt";
 import { FrameSchema, parseFrame } from "@/lib/assistant/protocol";
 import { MASK } from "@/lib/assistant/redact";
 
 import { sampleAssessments } from "./fixtures";
-import { writeKnowledge } from "./knowledge-fixtures";
+import { writeAtomic, writeKnowledge } from "./knowledge-fixtures";
 
 const samples = sampleAssessments();
 let root = "";
@@ -84,6 +85,28 @@ describe("searchKnowledge", () => {
     expect(found.sources).toEqual([...new Set(found.passages.map((p) => p.source))]);
     expect(found.sources.sort()).toEqual(["a.md", "b.md"]);
   });
+
+  it("ranks over the readable sources only: a corrupt file adds nothing to N or avgdl", async () => {
+    const question = "zephyrine quokka keys";
+    const good = { name: "alpha.md", chunks: ["Rotate the zephyrine quokka keys monthly.", "Quokka habitat notes.", "Lunch is at noon."] };
+    // many long passages that share the question's tokens: counted, they would change every score
+    const bad = { name: "beta.md", chunks: Array.from({ length: 12 }, (_, i) => `zephyrine quokka keys rotation drill ${i} `.repeat(6)) };
+    const [, badId] = writeKnowledge(dir, [good, bad]);
+    const scores = (passages: { source: string; index: number; score: number }[]) => passages.map((p) => [p.source, p.index, p.score]);
+    const both = scores(rank(buildCorpus([good, bad]), question));
+    expect(scores((await searchKnowledge(question, dir)).passages)).toEqual(both); // the cache now holds both
+
+    writeAtomic(path.join(dir, `${badId}.json`), '{"format":"reconix.knowledge.source/v1","id":'); // corrupt
+    const found = await searchKnowledge(question, dir);
+    const alone = scores(rank(buildCorpus([good]), question));
+    expect(alone).toEqual([["alpha.md", 0, expect.any(Number)]]);
+    expect(scores(found.passages)).toEqual(alone);
+    expect(found.sources).toEqual(["alpha.md"]);
+    // and the test can tell: with the corrupt file counted, alpha.md's score differs
+    const counted = scoreAll(buildCorpus([good, bad]), question).find((p) => p.source === "alpha.md" && p.index === 0);
+    expect(counted?.score).toBeGreaterThan(0);
+    expect(counted?.score).not.toBe(alone[0][2]);
+  });
 });
 
 describe("the prompt", () => {
@@ -116,7 +139,9 @@ describe("the prompt", () => {
   it("names the knowledge rule only when there are passages", () => {
     const plain = buildContext(samples, null)!;
     expect(plain.text).not.toContain(KNOWLEDGE_TITLE);
-    expect(systemPrompt(plain.scope, plain.text)).not.toContain("/add-on");
+    const prompt = systemPrompt(plain.scope, plain.text);
+    expect(prompt).not.toContain("internal knowledge: passages of files"); // the knowledge rule
+    expect(prompt).toContain("text taken from targets, tools and /add-on knowledge files"); // the data's rule, always
     expect(knowledgeSection([])).toBe("");
   });
 

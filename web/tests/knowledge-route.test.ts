@@ -135,7 +135,7 @@ describe("POST /api/assistant with /add-on knowledge", () => {
     const meta = metaOf(frames);
     expect(meta).not.toHaveProperty("knowledge");
     expect(seen[0][0].content).not.toContain(KNOWLEDGE_TITLE);
-    expect(seen[0][0].content).not.toContain("/add-on");
+    expect(seen[0][0].content).not.toContain("internal knowledge: passages of files"); // the knowledge rule
     expect(await savedReply(meta.conversationId)).not.toHaveProperty("knowledge");
   });
 

@@ -142,4 +142,36 @@ describe("withinBudget", () => {
     expect(kept.map((k) => k.index)).toEqual([0, 1]);
     expect(withinBudget([p(0, 3950), p(1, 1000), p(2, 10)]).map((k) => k.index)).toEqual([0]);
   });
+
+  // Python counts and slices code points: an emoji is one character there, two UTF-16 units here
+  const text = (index: number, body: string) => ({ source: "a.md", index, text: body, score: 2 });
+  const points = (s: string) => [...s].length;
+
+  it("counts the budget in code points, as Python does", () => {
+    const emoji = "\u{1F600}".repeat(1000); // 1,000 code points, 2,000 UTF-16 units
+    const kept = withinBudget([text(0, emoji), text(1, emoji), text(2, emoji), text(3, emoji)]);
+    expect(kept.map((k) => k.text)).toEqual([emoji, emoji, emoji, emoji]);
+    expect(kept.reduce((n, k) => n + points(k.text), 0)).toBe(BUDGET);
+  });
+  it("cuts on code points, so a surrogate pair is never split", () => {
+    const kept = withinBudget([text(0, "x".repeat(3700)), text(1, "\u{1F600}".repeat(1000))]);
+    expect(kept[1].text).toBe(`${"\u{1F600}".repeat(299)}…`); // left - 1 = 299 code points
+    expect(kept[1].text).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/); // no lone high surrogate
+    expect(kept.reduce((n, k) => n + points(k.text), 0)).toBe(BUDGET);
+  });
+  it("keeps MIN_PIECE in code points: 199 left is too few, 200 is enough", () => {
+    const emoji = "\u{1F600}".repeat(500);
+    expect(withinBudget([text(0, "x".repeat(3801)), text(1, emoji)]).map((k) => k.index)).toEqual([0]);
+    const kept = withinBudget([text(0, "x".repeat(3800)), text(1, emoji)]);
+    expect(kept.map((k) => k.index)).toEqual([0, 1]);
+    expect(points(kept[1].text)).toBe(200);
+  });
+  it('trims only " \\t\\n\\r" before the "…", like rstrip(" \\t\\n\\r")', () => {
+    const cut = (body: string) => withinBudget([text(0, "x".repeat(3700)), text(1, body)])[1].text;
+    expect(cut(`${"y".repeat(290)} \t\n\r     ${"z".repeat(100)}`)).toBe(`${"y".repeat(290)}…`); // 290 + 9 = 299
+    // trimEnd() would also drop these; Python keeps them
+    for (const kept of [" ", "\f", "\v", " ", "　"]) {
+      expect(cut(`${"y".repeat(298)}${kept}${"z".repeat(100)}`)).toBe(`${"y".repeat(298)}${kept}…`);
+    }
+  });
 });
