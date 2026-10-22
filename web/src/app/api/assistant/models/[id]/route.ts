@@ -2,26 +2,24 @@
    too). PATCH changes it ({ name?, preset?, baseUrl?, models?, apiKey?, removeKey? }: no apiKey
    keeps the saved key while the address stays on its host); DELETE removes it and its key (the
    active choice goes with it). Both need the page's own Origin; the id must be a provider id
-   (a random UUID) before anything is read. The Environment model is read-only. Answers carry
-   the model picker's whole view, never a key. */
+   (a random UUID) before anything is read. Answers carry the model picker's whole view, never a
+   key. */
 import { NextResponse } from "next/server";
 
 import { fail, NO_STORE, refuse } from "@/lib/assistant/access";
 import { UpdateProviderSchema } from "@/lib/assistant/models/requests";
 import { modelsView } from "@/lib/assistant/models/resolve";
 import { readBody, trouble } from "@/lib/assistant/models/respond";
-import { ENVIRONMENT, isProviderId } from "@/lib/assistant/models/schema";
+import { isProviderId } from "@/lib/assistant/models/schema";
 import { removeProvider, updateProvider } from "@/lib/assistant/models/store";
 
 type Context = { params: Promise<{ id: string }> };
 
 const GONE = "That provider is not saved any more.";
-const READ_ONLY = "The Environment model comes from web/.env.local: change it there and restart /web.";
 
-/** The id, or a refusal (the Environment: read-only; anything else not a provider id). */
+/** The id, or a refusal (anything not a provider id). */
 async function idOf(ctx: Context): Promise<{ ok: true; id: string } | { ok: false; response: NextResponse }> {
   const { id } = await ctx.params;
-  if (id === ENVIRONMENT) return { ok: false, response: fail(READ_ONLY, 400) };
   if (!isProviderId(id)) return { ok: false, response: fail("That is not a provider id.", 400) };
   return { ok: true, id };
 }

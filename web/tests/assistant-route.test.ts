@@ -22,6 +22,8 @@ vi.mock("@/lib/auth/guard", () => ({ requireViewer: async () => undefined }));
 const { POST } = await import("@/app/api/assistant/route");
 const list = await import("@/app/api/assistant/conversations/route");
 const one = await import("@/app/api/assistant/conversations/[id]/route");
+const { addProvider, removeProvider, updateProvider } = await import("@/lib/assistant/models/store");
+const { NO_MODEL } = await import("@/lib/assistant/models/resolve");
 
 // --- a stand-in model: it streams back how many turns it got and the last question -------------
 let seen: { role: string; content: string }[][] = [];
@@ -57,7 +59,8 @@ afterAll(() => new Promise<void>((done) => model.close(() => done())));
 const saved = { ...process.env };
 let dir = "";
 let clock = Date.now();
-beforeEach(() => {
+let standIn = ""; // the saved provider of the stand-in model (the one that answers)
+beforeEach(async () => {
   // the route allows 12 questions a minute (each refused one counts too): a new minute per test
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime((clock += 120_000));
@@ -66,8 +69,8 @@ beforeEach(() => {
   process.env.RECONIX_DATA_DIR = "sample-data";
   process.env.RECONIX_STALE_AFTER_HOURS = "0";
   process.env.RECONIX_ASSISTANT_DIR = dir;
-  process.env.LLM_BASE_URL = modelUrl;
-  process.env.LLM_MODEL = "test-model";
+  // the model is saved as + Model saves it (the web reads none from its environment)
+  standIn = (await addProvider({ name: "Stand-in", preset: "custom", baseUrl: modelUrl, models: ["test-model"], activate: true })).id;
   cookie = sessionValue("operator", TOKEN);
   seen = [];
   slow = false;
@@ -108,11 +111,15 @@ describe("POST /api/assistant", () => {
     cookie = "";
     expect((await ask(question)).status).toBe(403);
   });
-  it("says when no model is set up", async () => {
-    delete process.env.LLM_BASE_URL;
+  it("says when no model is set up, and never asks one named in its environment", async () => {
+    await removeProvider(standIn);
+    process.env.LLM_BASE_URL = modelUrl;
+    process.env.LLM_MODEL = "test-model";
     const res = await ask(question);
     expect(res.status).toBe(503);
-    expect((await res.json()).detail).toContain("LLM_BASE_URL");
+    expect((await res.json()).detail).toBe(NO_MODEL);
+    expect(NO_MODEL).toBe("No AI model is set up yet. Add one with the model chip under the message box (+ Model).");
+    expect(seen).toHaveLength(0);
   });
   it("checks the request before reading any data, and never takes history from the browser", async () => {
     expect((await ask({ uid: null })).status).toBe(400);
@@ -159,7 +166,7 @@ describe("POST /api/assistant", () => {
     expect(listed.conversations).toEqual([expect.objectContaining({ id, title: "Summarize the findings", count: 4 })]);
   });
   it("reports a model it cannot reach without saying where, and keeps the cards", async () => {
-    process.env.LLM_BASE_URL = "http://127.0.0.1:9/v1"; // nothing listens
+    await updateProvider(standIn, { baseUrl: "http://127.0.0.1:9/v1" }); // nothing listens
     const res = await ask({ uid: null, question: "Analyze the findings" });
     expect(res.status).toBe(200);
     const frames = await framesOf(res);

@@ -1,14 +1,12 @@
 /* The rules for the AI model the assistant asks (server only): any OpenAI-compatible endpoint,
    the same convention as the product docs' "Model switching". `checkModel` holds the rules every
-   model passes, wherever it comes from (the environment, or one saved in the model picker:
-   models/resolve.ts): http(s) only, no credentials in the address, a model name of the usual
-   characters, an API key only over https to a remote host, and an address off this machine
-   only when the server runs with LLM_ALLOW_REMOTE=1 (the browser can't turn that on). An
-   endpoint off this machine receives assessment data. "local" means a loopback address: a
-   local proxy may still forward elsewhere (the page says "local endpoint").
-
-   `modelSetup` reads the environment's model: LLM_BASE_URL and LLM_MODEL pick it; LLM_API_KEY
-   is an optional bearer key that never leaves the server. */
+   model passes (each one is added with the composer's + Model and saved: models/store.ts; checked
+   again on every use: models/resolve.ts): http(s) only, no credentials in the address, a model
+   name of the usual characters, an API key only over https to a remote host, and an address off
+   this machine only when the server runs with LLM_ALLOW_REMOTE=1 (the browser can't turn that
+   on). An endpoint off this machine receives assessment data. "local" means a loopback address:
+   a local proxy may still forward elsewhere (the page says "local endpoint"). The web reads no
+   model from its environment: LLM_ALLOW_REMOTE is its only LLM_* setting. */
 import "server-only";
 
 import { MAX_URL, MODEL_NAME } from "./models/schema";
@@ -32,16 +30,6 @@ export interface Wording {
   allow: string; // how remote models are allowed
 }
 
-/** The environment's words (web/.env.local). */
-export const ENV_WORDING: Wording = {
-  url: "LLM_BASE_URL",
-  urlIn: "LLM_BASE_URL",
-  key: "LLM_API_KEY",
-  keyStart: "LLM_API_KEY",
-  model: "LLM_MODEL",
-  allow: "Set LLM_ALLOW_REMOTE=1 to allow that.",
-};
-
 /** The model picker's words. */
 export const FORM_WORDING: Wording = {
   url: "The base URL",
@@ -53,7 +41,6 @@ export const FORM_WORDING: Wording = {
 };
 
 const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
-const SETUP = "Set LLM_BASE_URL and LLM_MODEL (for a local Ollama: http://127.0.0.1:11434/v1 and llama3.2) in web/.env.local, then restart /web.";
 
 export interface ModelInput {
   baseUrl: string;
@@ -88,7 +75,7 @@ export function checkAddress(
   return { ok: true, baseUrl, local };
 }
 
-/** A model, wherever it comes from, against the rules above. */
+/** A model against the rules above. */
 export function checkModel(input: ModelInput, options: { allowRemote: boolean; words?: Wording }): ModelSetup {
   const address = checkAddress(input, options);
   if (!address.ok) return address;
@@ -107,11 +94,3 @@ export function isLocal(baseUrl: string): boolean {
 
 /** Whether this server may send data to a model off this machine (LLM_ALLOW_REMOTE=1). */
 export const remoteAllowed = (env: Record<string, string | undefined> = process.env) => env.LLM_ALLOW_REMOTE?.trim() === "1";
-
-/** The environment's model (LLM_BASE_URL, LLM_MODEL, LLM_API_KEY, LLM_ALLOW_REMOTE). */
-export function modelSetup(env: Record<string, string | undefined> = process.env): ModelSetup {
-  const base = env.LLM_BASE_URL?.trim();
-  const model = env.LLM_MODEL?.trim();
-  if (!base || !model) return { ok: false, reason: `No AI model is set up. ${SETUP}` };
-  return checkModel({ baseUrl: base, model, apiKey: env.LLM_API_KEY?.trim() || null }, { allowRemote: remoteAllowed(env), words: ENV_WORDING });
-}

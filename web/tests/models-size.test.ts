@@ -29,7 +29,7 @@ const saved = { ...process.env };
 let dir = "";
 beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), "reconix-models-size-"));
-  process.env = { ...saved, RECONIX_WEB_TOKEN: TOKEN, RECONIX_ASSISTANT_DIR: dir, LLM_BASE_URL: "http://127.0.0.1:1/v1", LLM_MODEL: "env-model" };
+  process.env = { ...saved, RECONIX_WEB_TOKEN: TOKEN, RECONIX_ASSISTANT_DIR: dir };
   delete process.env.LLM_ALLOW_REMOTE;
   cookie = sessionValue("operator", TOKEN);
 });
@@ -38,13 +38,15 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-/** A provider of about 3.5 KB in the file (50 model names and a sealed key). */
+/** A provider of about 3.5 KB in the file (50 model names and a sealed key); the first one is
+    made the model that answers. */
 const bulky = (i: number) => ({
   name: `Provider ${i}`,
   preset: "custom" as const,
   baseUrl: "http://127.0.0.1:11434/v1",
   models: Array.from({ length: 50 }, (_, m) => `model-${i}-${m}-`.padEnd(64, "x")),
   apiKey: SECRET,
+  ...(i === 0 ? { activate: true } : {}),
 });
 const file = () => path.join(dir, "models.json");
 
@@ -65,7 +67,7 @@ describe("a change that would make models.json too big", () => {
     const before = readFileSync(file(), "utf8");
     expect(statSync(file()).size).toBeLessThanOrEqual(LIMIT);
 
-    // nothing was written: every provider and key still reads, and the Environment still answers
+    // nothing was written: every provider and key still reads, and the chosen model still answers
     const { file: kept, apiKeyOf } = await readSaved();
     expect(kept.providers.map((p) => p.id)).toEqual(added);
     expect(apiKeyOf(kept.providers[0])).toBe(SECRET);

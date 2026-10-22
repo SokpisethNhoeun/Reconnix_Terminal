@@ -1,32 +1,25 @@
 "use client";
 
 /* The model picker: a popover that opens upward from the composer's model chip (on a phone, a
-   sheet over the composer's width), in three steps: 1 "Choose a model" (your models, switched in
-   one click, and the providers to add or change; model-pick.tsx), 2 "<Provider> · credentials"
-   (model-credentials.tsx) and 3 "<Provider> · choose a model" (model-choose.tsx). A dialog named
-   after its step; Escape goes back a step, then closes; a click outside, or focus moving on to
-   something else on the page, closes it (so does hiding the Assistant: model-chip.tsx). Focus
-   goes to each step's first control and back to the chip when it closes (model-chip.tsx). Its
-   height fits the room above the composer (use-fit-above.ts). What was typed in step 2 lives
-   here only while it is open, so Back keeps it and closing forgets it. The API key is never
-   React state nor a DOM attribute: step 2 reads it from its field on Continue, and it is kept
-   here (a ref) for step 3 only. */
-import { useCallback, useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+   sheet over the composer's width) with two steps in the same panel: "Model", your saved models
+   with + Model at the bottom (model-list.tsx), and "Set the provider", the form + Model opens
+   (model-provider-form.tsx). A dialog named after its step; Escape goes back to the list, then
+   closes; so do Back and Cancel on the form. A click outside, or focus moving on to something
+   else on the page, closes it (so does hiding the Assistant: model-chip.tsx). Focus goes to
+   each step's first control, to + Model when the form goes back, and to the chip when the picker
+   closes (model-chip.tsx). Its height fits the room above the composer (use-fit-above.ts).
+   Nothing typed in the form outlives it: the API key is never React state nor a DOM attribute,
+   and its field is emptied when the form goes. */
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, X } from "lucide-react";
 
 import { IconButton } from "@/components/ui/icon-button";
-import { type PresetId, presetOf } from "@/lib/assistant/models/presets";
-import { ModelChoose } from "./model-choose";
-import { ModelCredentials } from "./model-credentials";
-import { ModelPick } from "./model-pick";
-import { type ChooseList, type Fields, type ProviderRow, providerName, startFields, withKey } from "./model-picker-rules";
+import { ModelList } from "./model-list";
+import { ModelProviderForm } from "./model-provider-form";
 import { useFitAbove } from "./use-fit-above";
 import type { Models } from "./use-models";
 
-type Step =
-  | { kind: "pick"; returnTo: string | null }
-  | { kind: "credentials"; row: string; presetId: PresetId; providerId: string | null }
-  | { kind: "choose"; row: string; presetId: PresetId; providerId: string | null; list: ChooseList };
+type Step = { kind: "list"; fromForm: boolean } | { kind: "add" };
 
 interface Props {
   id: string;
@@ -38,24 +31,13 @@ interface Props {
 
 export function ModelPicker({ id, models, chip, onClose }: Props) {
   const panel = useRef<HTMLDivElement>(null);
-  const [step, setStep] = useState<Step>({ kind: "pick", returnTo: null });
-  const [fields, setFields] = useState<Fields>({ baseUrl: "", removeKey: false, keyTyped: false });
-  const typedKey = useRef(""); // the key step 2 read on Continue, for step 3 (and Back to step 2)
-  const keptKey = useCallback(() => typedKey.current, []);
+  const [step, setStep] = useState<Step>({ kind: "list", fromForm: false });
   useFitAbove(panel, step.kind);
   const view = models.state.view;
-  const preset = step.kind === "pick" ? null : presetOf(step.presetId);
-  // the saved provider the step changes, as the server last said (gone meanwhile: a new one)
-  const provider = step.kind !== "pick" && step.providerId ? (view?.providers.find((p) => p.id === step.providerId) ?? null) : null;
-  const title = !preset ? "Choose a model" : `${providerName(preset, provider)} · ${step.kind === "credentials" ? "credentials" : "choose a model"}`;
+  const adding = step.kind === "add" && view !== null;
+  const title = adding ? "Set the provider" : "Model";
 
-  const back = () => {
-    if (step.kind === "choose") setStep({ kind: "credentials", row: step.row, presetId: step.presetId, providerId: step.providerId });
-    else if (step.kind === "credentials") {
-      typedKey.current = "";
-      setStep({ kind: "pick", returnTo: step.row });
-    } else onClose(true);
-  };
+  const toList = () => setStep({ kind: "list", fromForm: true });
 
   // a click outside closes it; so does Escape while focus is outside it (on the chip), and focus
   // moving on to anything else on the page (Tab past it, say). Focus that goes nowhere (another
@@ -84,60 +66,36 @@ export function ModelPicker({ id, models, chip, onClose }: Props) {
     };
   }, [chip, onClose]);
 
-  const chooseProvider = (row: ProviderRow) => {
-    typedKey.current = "";
-    setFields(startFields(row.preset, row.provider));
-    setStep({ kind: "credentials", row: row.key, presetId: row.preset.id, providerId: row.provider?.id ?? null });
-  };
-
   return (
     <div
       ref={panel}
       id={id}
       role="dialog"
       aria-label={title}
-      data-step={step.kind}
+      data-step={adding ? "add" : "list"}
       className="ai-picker"
       onKeyDown={(e) => {
         if (e.key !== "Escape" || e.defaultPrevented) return;
-        e.preventDefault(); // one step back (the document's listener leaves it alone)
-        back();
+        e.preventDefault(); // back to the list, or closed (the document's listener leaves it alone)
+        if (adding) toList();
+        else onClose(true);
       }}
     >
       <div className="ai-picker-head">
+        {adding && (
+          <IconButton label="Back to your models" onClick={toList} className="size-7 [&_svg]:size-3.5">
+            <ArrowLeft aria-hidden />
+          </IconButton>
+        )}
         <h2 className="ai-picker-title">{title}</h2>
         <IconButton label="Close" onClick={() => onClose(true)} className="size-7 [&_svg]:size-3.5">
           <X aria-hidden />
         </IconButton>
       </div>
-      {step.kind === "pick" || !preset || !view ? (
-        <ModelPick models={models} returnTo={step.kind === "pick" ? step.returnTo : null} onChosen={() => onClose(true)} onProvider={chooseProvider} />
-      ) : step.kind === "credentials" ? (
-        <ModelCredentials
-          key={step.row}
-          preset={preset}
-          provider={provider}
-          view={view}
-          value={fields}
-          onChange={setFields}
-          keptKey={keptKey}
-          onBack={back}
-          onNext={(list, apiKey) => {
-            typedKey.current = apiKey;
-            setStep({ ...step, kind: "choose", list });
-          }}
-        />
+      {adding ? (
+        <ModelProviderForm view={view} models={models} onCancel={toList} onDone={() => onClose(true)} />
       ) : (
-        <ModelChoose
-          preset={preset}
-          provider={provider}
-          view={view}
-          credentials={() => withKey(fields, typedKey.current)}
-          list={step.list}
-          models={models}
-          onBack={back}
-          onDone={() => onClose(true)}
-        />
+        <ModelList models={models} fromForm={step.kind === "list" && step.fromForm} onChosen={() => onClose(true)} onAdd={() => setStep({ kind: "add" })} />
       )}
     </div>
   );

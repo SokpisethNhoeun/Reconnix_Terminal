@@ -1,10 +1,10 @@
 /* What the model picker's routes answer (and the page tells the assistant): the saved providers
-   without their keys (only whether one is saved), the read-only Environment model, the active
-   choice and a summary of the model that answers next. Never an API key. Pure: browser and
-   server (the browser checks every answer against these before it uses it). */
+   without their keys (only whether one is saved), the active choice and a summary of the model
+   that answers next. Never an API key. Pure: browser and server (the browser checks every
+   answer against these before it uses it). */
 import { z } from "zod";
 
-import { ENVIRONMENT, MAX_MODELS, MAX_NAME, MAX_PROVIDERS, MAX_URL, ModelNameSchema, PresetSchema, ProviderIdSchema } from "./schema";
+import { MAX_MODELS, MAX_NAME, MAX_PROVIDERS, MAX_URL, ModelNameSchema, PresetSchema, ProviderIdSchema } from "./schema";
 
 /** The model that answers next, in words the page can show. `name` is the chosen model even
     when it can't be used (`configured` false, `reason` says why); empty when nothing is chosen. */
@@ -32,19 +32,12 @@ export const ProviderViewSchema = z
   .strict();
 export type ProviderView = z.infer<typeof ProviderViewSchema>;
 
-/** The Environment provider (LLM_BASE_URL / LLM_MODEL): its address is never sent. */
-export const EnvironmentViewSchema = z
-  .object({ name: z.string().max(MAX_NAME), model: z.string().max(400), local: z.boolean(), reason: z.string().max(600) })
-  .strict();
-export type EnvironmentView = z.infer<typeof EnvironmentViewSchema>;
-
-export const ActiveViewSchema = z.object({ providerId: z.union([ProviderIdSchema, z.literal(ENVIRONMENT)]), model: z.string().max(400) }).strict();
+export const ActiveViewSchema = z.object({ providerId: ProviderIdSchema, model: ModelNameSchema }).strict();
 export type ActiveView = z.infer<typeof ActiveViewSchema>;
 
 export const ModelsViewSchema = z
   .object({
     providers: z.array(ProviderViewSchema).max(MAX_PROVIDERS),
-    environment: EnvironmentViewSchema.nullable(),
     active: ActiveViewSchema.nullable(),
     summary: ModelSummarySchema,
     allowRemote: z.boolean(), // the server sends data off this machine (LLM_ALLOW_REMOTE=1)

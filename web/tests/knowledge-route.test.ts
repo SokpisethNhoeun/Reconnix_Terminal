@@ -26,6 +26,7 @@ vi.mock("@/lib/auth/guard", () => ({ requireViewer: async () => undefined }));
 
 const { POST } = await import("@/app/api/assistant/route");
 const one = await import("@/app/api/assistant/conversations/[id]/route");
+const { addProvider } = await import("@/lib/assistant/models/store");
 
 // --- a stand-in model that records what it was sent ------------------------------------------
 let seen: { role: string; content: string }[][] = [];
@@ -50,7 +51,7 @@ const saved = { ...process.env };
 let root = "";
 let knowledge = "";
 let clock = Date.now();
-beforeEach(() => {
+beforeEach(async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime((clock += 120_000)); // a new rate-limit minute per test
   root = mkdtempSync(path.join(tmpdir(), "reconix-knowledge-route-"));
@@ -60,8 +61,8 @@ beforeEach(() => {
   process.env.RECONIX_STALE_AFTER_HOURS = "0";
   process.env.RECONIX_ASSISTANT_DIR = path.join(root, "assistant");
   process.env.RECONIX_KNOWLEDGE_DIR = knowledge;
-  process.env.LLM_BASE_URL = modelUrl;
-  process.env.LLM_MODEL = "test-model";
+  // the stand-in, saved as + Model saves a model (the web reads none from its environment)
+  await addProvider({ name: "Stand-in", preset: "custom", baseUrl: modelUrl, models: ["test-model"], activate: true });
   cookie = sessionValue("operator", TOKEN);
   seen = [];
 });
