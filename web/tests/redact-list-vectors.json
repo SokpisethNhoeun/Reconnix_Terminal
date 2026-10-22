@@ -75,5 +75,15 @@
       "•••• (private key)",
       "Server: nginx"
     ]
+  ],
+  [
+    [
+      "eyJ-eyJ-eyJ-eyJ-",
+      "see.https://admin:hunter2@app.example.com"
+    ],
+    [
+      "eyJ-eyJ-eyJ-eyJ-",
+      "see.https://••••@app.example.com"
+    ]
   ]
 ]

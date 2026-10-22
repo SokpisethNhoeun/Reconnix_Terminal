@@ -20,8 +20,11 @@ MASK = "••••"
 _SCHEMES = r"bearer|basic|digest|token|negotiate|ntlm|dpop|apikey|aws4-hmac-sha256"
 
 _PATTERNS = (
-    # https://user:password@host → https://••••@host
-    (re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/\s@:]+:[^/\s@]*@"), rf"\g<1>{MASK}@"),
+    # https://user:password@host → https://••••@host. The scheme starts where no scheme
+    # character precedes it (a lookbehind, not \b): from every boundary inside a run such as
+    # "a.a.a.…" the scheme would swallow the rest of the run and back off, quadratic in its length
+    (re.compile(r"(?i)(?<![a-z0-9+.-])([a-z][a-z0-9+.-]*://)[^/\s@:]+:[^/\s@]*@"),
+     rf"\g<1>{MASK}@"),
     # Authorization: Bearer … → keep the header and the scheme, mask the credential
     (re.compile(r"(?i)\b((?:proxy-)?authorization)\b(\s*[:=]\s*)((?:" + _SCHEMES + r")\s+)?"
                 r"(\"[^\"]*\"|'[^']*'|[^\s,;&]+)"), rf"\g<1>\g<2>\g<3>{MASK}"),
@@ -34,7 +37,10 @@ _PATTERNS = (
         r"access[_-]?key|session[_-]?id|sessionid)\b(\s*[:=]\s*)(\"[^\"]*\"|'[^']*'|[^\s,;&]+)"),
      rf"\g<1>\g<2>{MASK}"),
     (re.compile(r"(?i)\bbearer\s+[a-z0-9._~+/=-]{8,}"), f"Bearer {MASK}"),
-    (re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"), f"{MASK} (JWT)"),
+    # A JWT starts where no base64url character precedes it (not \b, which also matches after
+    # each "-" of a run like "eyJ-eyJ-…": every start would scan to the run's end, quadratic)
+    (re.compile(r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"),
+     f"{MASK} (JWT)"),
     (re.compile(r"\b(AKIA|ASIA)[0-9A-Z]{16}\b"), rf"\g<1>{MASK}"),
     (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)"),
      f"{MASK} (private key)"),

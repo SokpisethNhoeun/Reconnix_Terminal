@@ -1,6 +1,8 @@
 """Secrets in free text are masked before anything is saved."""
 
 
+import time
+
 import pytest
 
 from reconix import store
@@ -69,3 +71,18 @@ def test_a_crafted_finding_cannot_crash_saving():
     assert store.autosave() is True
     saved = next(persist.DATA_DIR.glob("*.json")).read_text()
     assert "abcdef123456" not in saved
+
+
+# A pattern that may start at every boundary of a long run backs off over the rest of the run
+# from each start: quadratic. These 2 MB runs (the size of a knowledge file's text) took hours
+# with `\b` before the URL scheme and the JWT; linear, they take well under a second. The limit
+# is generous so a busy machine can't flake it; a quadratic pattern misses it by hours.
+_LINEAR_LIMIT_S = 3.0
+
+
+@pytest.mark.parametrize("unit", ["a.", "eyJ-", "a+", "a-b.", "eyJaaaa."])
+def test_redact_is_linear_on_long_runs(unit):
+    text = unit * (2 * 1024 * 1024 // len(unit))
+    started = time.perf_counter()
+    assert redact(text) == text
+    assert time.perf_counter() - started < _LINEAR_LIMIT_S
