@@ -1,6 +1,7 @@
 # Web: the docs read inline, one page per group
 
-Status: in progress (2026-10-22). Branch `r4/web-docs` (from `feature/next`).
+Status: done (2026-10-22). Branch `r4/web-docs` (from `feature/next`). `npm test`, lint,
+typecheck, build and the full e2e (210) pass.
 
 The owner: "Remove Settings from the sidebar. In Docs, remove all buttons that open links or
 redirect to another page. Display documentation directly inside the Docs screen, without
@@ -30,8 +31,9 @@ button, and every in-text `DocLink` (content and home): the words stay, as plain
 text (`DocRef`). The left rail of views still leads back to the dashboard.
 
 - The docs sidebar: the eight groups (links to `/docs/<group>`: choosing one shows that group's
-  page) and, under the open group, its pages as in-page anchors. No Expand / Collapse. On a
-  phone the "Docs menu" button opens the same list (and closes after a choice).
+  page) and, under the open group, its pages as in-page anchors, below xl only (at xl "On this
+  page" lists the same pages beside the text). No Expand / Collapse. On a phone the "Docs menu"
+  button opens the same list (and closes after a choice).
 - The docs search (`components/docs-search.tsx`) looks only through the group shown (titles,
   section headings, descriptions, command aliases) and jumps within the page (`#anchor`, never
   a route change). Placeholder and name: "Search this section…".

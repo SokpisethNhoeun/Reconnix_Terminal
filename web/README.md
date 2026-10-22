@@ -40,10 +40,14 @@ the reports and the TUI.)
   a search past six runs, "All assessments", one row per run, and a warning when a saved file
   was skipped and why. Those views never change
   anything. The **Terminal** view runs the TUI itself in the browser, so every gate and
-  decision still goes through the TUI's store. `/docs` holds the project's documentation
-  (`lib/docs-nav.ts` over `content/docs/`: getting started, the terminal guide, AI models, one
-  page per command, the assessment guide, reports, troubleshooting, guardrails; a search; the
-  addresses of the previous structure redirect, 308, through `lib/docs-redirects.ts`).
+  decision still goes through the TUI's store. `/docs` holds the project's documentation, read
+  in place (`../docs/WEB_DOCS_INLINE_PLAN.md`): one page per group (`lib/docs-nav.ts` over
+  `content/docs/`: getting started, the terminal guide, AI models, the commands, the assessment
+  guide, reports, troubleshooting, guardrails), each showing all of its pages as parts anchored
+  `#<page>` (their sections `#<page>-<section>`); `/docs` itself shows Getting started. Nothing
+  in the docs links off the page but the docs sidebar's groups; the search looks through the
+  group shown and jumps within the page. Every old address, a page's own `/docs/<group>/<page>`
+  included, redirects (308) to its anchor through `lib/docs-redirects.ts`.
   (The Audit log view was removed; the audit data stays in the saved files and the TUI.)
 
 Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind v4 · GSAP ·
@@ -196,7 +200,8 @@ the Terminal view with a stand-in program), `assessments` (ten a page, the pager
 the address), `findings` (paging, deep links, Previous / Next across a page end, the notice for
 a hidden finding, the list scroller, the phone's list → detail → Back), `reports` (combining
 runs: the selection, the preview frame, one real PDF and DOCX, the 500 / 501 / 413 paths),
-`docs` (groups, command pages, Copy, search, redirects, the phone menu), `dashboard-fit` (the
+`docs` (group pages with their pages in place, no link off the page, the rail without
+Configuration, Copy, the in-page search, the old addresses on their anchors, the phone menu), `dashboard-fit` (the
 Overview fits the fixed frame with nothing to scroll), `assistant` (with the stand-in model
 `e2e/llm-stub.mjs`; `[stub:markdown]`, `[stub:long]` and `[stub:fail]` pick its answers),
 `assistant-knowledge` (an `/add-on` folder written as the TUI does: "Knowledge used" under the
@@ -220,7 +225,8 @@ src/
 ├── app/
 │   ├── layout.tsx           # fonts (Inter, JetBrains Mono), metadata (no smooth-scroll library: everything scrolls natively)
 │   ├── page.tsx             # the viewer: loads the saved runs, every run or ?uid=, derives the dashboard
-│   ├── docs/                # documentation in the dashboard frame (layout checks the viewer role; content in src/content/docs/)
+│   ├── docs/                # documentation in the dashboard frame (layout checks the viewer role): /docs and
+│   │                        #   /docs/[group], one page per group (content in src/content/docs/)
 │   ├── terminal/            # /terminal → /?view=terminal (operators)
 │   ├── assistant/           # /assistant → /?view=assistant
 │   ├── login/               # sign-in (token from the link's #fragment) → the Overview
@@ -255,9 +261,11 @@ src/
 │   ├── scroll.ts            # scrolling a row into view by hand (never scrollIntoView, which moves the page)
 │   ├── paging.ts            # ten rows a page: the page clamped from the address, the label
 │   ├── status.ts            # what every status, step, approval, policy decision and severity means
-│   ├── docs-nav.ts          # DOCS_NAV / DOCS_ROUTES / the DOCS link map, and the commands from commands.json
-│   ├── docs-redirects.ts    # the old docs addresses → the new pages (308, loaded by next.config.ts)
-│   ├── docs-search-index.ts # what the docs search looks through (titles, headings, aliases)
+│   ├── docs-nav.ts          # DOCS_NAV (groups → pages, each `/docs/<group>#<page>`), DOCS_ROUTES (/docs + the
+│   │                        #   group pages), the DOCS link map, and the commands from commands.json
+│   ├── docs-redirects.ts    # the old docs addresses → their anchors (308, loaded by next.config.ts): the v2
+│   │                        #   pages, then one rule for every page's own /docs/<group>/<page>
+│   ├── docs-search-index.ts # what the docs search looks through (titles, headings, aliases), per group
 │   └── globe*.ts (three.js globe: scene, post, holds), site.ts, templates.ts, utils.ts
 ├── components/
 │   ├── dashboard/           # Viewer, Sidebar, TopBar, the views, the summary strip and the three panels;
@@ -278,7 +286,8 @@ src/
 │   │                        #   ScrollToLatest, useXterm, useTerminalSession, useTerminalView, useLeaveWarning
 │   ├── ui/                  # Button, Badge, StatusBadge / SeverityBadge, IconButton, Checkbox, CopyButton,
 │   │                        #   Pagination, ListDetail, EmptyNote (cva + cn; styles/ui.css)
-│   └── docs-*.tsx           # the docs' page frame, sidebar, search, top bar (the rail: dashboard/sidebar.tsx)
+│   └── docs-*.tsx           # the docs' group page, page frame, part, sidebar, search, "On this page", top bar,
+│                            #   docs-headings.ts (what is being read); the rail: dashboard/sidebar.tsx
 ├── content/docs/            # the documentation pages, one file per group; commands.json is GENERATED from
 │                            #   reconix/commands/builtin.py by scripts/export_commands.py (never edit it:
 │                            #   tests/test_export_commands.py and tests/docs-nav.test.ts check it)

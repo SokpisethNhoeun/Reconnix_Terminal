@@ -27,6 +27,10 @@ contents, the viewer check, native-scroll rules for the dashboard,
 dark only, colours only from tokens. Responsive: sidebar → drawer on phones, no horizontal
 scroll at 360 px.
 
+Next (2026-10-22, `WEB_DOCS_INLINE_PLAN.md`): the docs read in place, one page per group, with
+no card, link or button that leads to another page (the top bar's way back went: the rail leads
+back), and the rail's Configuration (Settings) item is gone.
+
 ## 2. AI Assistant: several providers and models
 
 Status: done (2026-10-22, branch `next/assistant-models` off `feature/next`): a **Model** menu
