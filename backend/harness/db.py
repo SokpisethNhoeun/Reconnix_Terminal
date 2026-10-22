@@ -166,7 +166,8 @@ class Database:
                 "WHERE s.target_id = ? ORDER BY f.id DESC",
                 (target_id,),
             ).fetchall()
-        return [self._row_to_finding(r) for r in rows]
+        findings = [self._row_to_finding(r) for r in rows]
+        return [f for f in findings if f.severity is not None]   # old Info rows are hidden
 
     @staticmethod
     def _row_to_finding(row: sqlite3.Row) -> Finding:

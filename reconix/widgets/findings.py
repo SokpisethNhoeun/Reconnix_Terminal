@@ -14,7 +14,7 @@ def severity_text(finding: Finding) -> Text:
     """■ HIGH — the effective severity (an analyst override is marked with *)."""
     severity = finding.effective_severity
     mark = "*" if finding.severity_override else ""
-    return Text(f"■ {severity}{mark}", style=f"bold {theme.SEVERITY.get(severity, theme.INFO)}")
+    return Text(f"■ {severity}{mark}", style=f"bold {theme.SEVERITY.get(severity, theme.MUTED)}")
 
 
 def validation_text(finding: Finding) -> Text:

@@ -220,10 +220,9 @@ def test_parse_httpprobe_bola():
     ])
     fm = parse_httpprobe(tmpl, 1)
     assert len(fm) == 1 and fm[0].severity.value == "medium" and not fm[0].verified
-    # All 401 -> no BOLA, just an info status line.
+    # All 401 -> no BOLA, and no Info finding: nothing is stored.
     out401 = '{"id":"1","url":"http://x/1","status":401,"len":10,"body":"nope"}'
-    f2 = parse_httpprobe(out401, 1)
-    assert f2[0].severity.value == "info"
+    assert parse_httpprobe(out401, 1) == []
 
 
 def test_find_token():

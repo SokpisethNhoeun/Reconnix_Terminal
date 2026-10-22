@@ -6,7 +6,7 @@ VULN_ANALYSIS = (
     "1. What it means and the realistic impact.\n"
     "2. How to confirm/exploit it safely in a lab (high level, no destructive payloads).\n"
     "3. Concrete remediation steps.\n"
-    "Keep it under ~180 words. If the finding is purely informational, say so briefly."
+    "Keep it under ~180 words."
 )
 
 

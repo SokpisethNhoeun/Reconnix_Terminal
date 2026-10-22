@@ -82,7 +82,6 @@ WEB_TOKENS: Dict[str, Dict[str, str]] = {
         # `info` = informational; the severity scale is the TUI's own (SEVERITY below)
         "warning": "#E7C183", "info": INFO,
         "sev-critical": CRITICAL_WEB, "sev-high": HIGH, "sev-medium": MEDIUM, "sev-low": LOW,
-        "sev-info": INFO,
         **TERMINAL_WEB_TOKENS,
     },
 }
@@ -92,7 +91,6 @@ SEVERITY = {
     "HIGH": HIGH,
     "MEDIUM": MEDIUM,
     "LOW": LOW,
-    "INFO": INFO,
 }
 
 # Risk of a gated action (plan rows, approval panel)
@@ -144,7 +142,7 @@ SPEAKER = {"reconix": CYAN, "you": VIOLET, "policy": MEDIUM}
 SOURCE = {"SYS": TEXT, "AI": CYAN, "USER": VIOLET, "TOOL": TEAL, "POLICY": MEDIUM}
 
 SEVERITY_CHIP = {
-    "CRITICAL": "red", "HIGH": "red", "MEDIUM": "amber", "LOW": "cyan", "INFO": "muted",
+    "CRITICAL": "red", "HIGH": "red", "MEDIUM": "amber", "LOW": "cyan",
 }
 RISK_CHIP = {"LOW": "green", "MEDIUM": "amber", "HIGH": "red"}
 

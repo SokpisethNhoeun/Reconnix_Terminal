@@ -345,7 +345,7 @@ def _resolved_target(args: Dict[str, Any]) -> str:
 
 
 _SEV = {"critical": "CRITICAL", "high": "HIGH", "medium": "MEDIUM",
-        "low": "LOW", "info": "INFO"}
+        "low": "LOW"}
 
 
 def ingest_scan_findings(result: Any) -> int:
@@ -364,16 +364,18 @@ def ingest_scan_findings(result: Any) -> int:
     except Exception:
         return 0
     from .findings import ingest_external
-    mapped = [_to_finding(hf) for hf in rows]
+    mapped = [f for f in (_to_finding(hf) for hf in rows) if f is not None]
     return ingest_external(mapped, prefix="AI")
 
 
 def _to_finding(hf: Any):
-    """Harness `Finding` dataclass -> Reconix `Finding`."""
+    """Harness `Finding` dataclass -> Reconix `Finding`, or None for a non-reportable severity."""
     from ..models import Finding
     from .redact import redact
 
-    sev = _SEV.get(getattr(hf.severity, "value", str(hf.severity)).lower(), "INFO")
+    sev = _SEV.get(str(getattr(hf.severity, "value", hf.severity) or "").lower())
+    if sev is None:                               # Info, unknown or empty: never stored
+        return None
     evidence = [redact(hf.evidence)[:500]] if getattr(hf, "evidence", "") else []
     return Finding(
         fid="",                                   # assigned by ingest_external

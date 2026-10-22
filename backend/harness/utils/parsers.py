@@ -12,34 +12,12 @@ import re
 
 from ..models import Finding, Severity
 
-# e.g. "22/tcp   open  ssh     OpenSSH 8.4p1"
-_NMAP_PORT = re.compile(
-    r"^(?P<port>\d+)/(?P<proto>tcp|udp)\s+(?P<state>\w+)\s+(?P<service>[\w\-/]+)?\s*(?P<version>.*)$"
-)
-
-
 def parse_nmap(output: str, scan_id: int) -> list[Finding]:
-    findings: list[Finding] = []
-    for line in output.splitlines():
-        m = _NMAP_PORT.match(line.strip())
-        if not m or m.group("state") != "open":
-            continue
-        port = m.group("port")
-        proto = m.group("proto")
-        service = (m.group("service") or "unknown").strip()
-        version = (m.group("version") or "").strip()
-        findings.append(
-            Finding(
-                scan_id=scan_id,
-                severity=Severity.INFO,
-                title=f"Open port {port}/{proto} ({service})",
-                description=f"nmap reports {service} open on {port}/{proto}.",
-                evidence=line.strip(),
-                location=f"{port}/{proto}",
-                verified=True,
-            )
-        )
-    return findings
+    """Open ports are observations, not findings (there is no Info severity): none stored.
+
+    The raw output stays on the scan record for the agent to read.
+    """
+    return []
 
 
 def parse_nuclei(output: str, scan_id: int) -> list[Finding]:
@@ -60,10 +38,13 @@ def parse_nuclei(output: str, scan_id: int) -> list[Finding]:
         cve_ids = classification.get("cve-id") or classification.get("cve_id") or []
         cve = cve_ids[0] if isinstance(cve_ids, list) and cve_ids else (cve_ids or None)
         cvss = classification.get("cvss-score") or classification.get("cvss_score")
+        severity = Severity.coerce(info.get("severity", ""))
+        if severity is None:           # info / unknown / missing: not reportable
+            continue
         findings.append(
             Finding(
                 scan_id=scan_id,
-                severity=Severity.coerce(info.get("severity", "info")),
+                severity=severity,
                 title=info.get("name") or template,
                 description=(info.get("description") or "").strip(),
                 evidence=line,
@@ -133,25 +114,8 @@ def _clean(text: str) -> str:
 
 
 def parse_whatweb(output: str, scan_id: int) -> list[Finding]:
-    """whatweb prints one line per target: 'URL [200 OK] Plugin[val], Plugin2, …'."""
-    findings: list[Finding] = []
-    for line in _clean(output).splitlines():
-        line = line.strip()
-        if not line or not line.lower().startswith("http"):
-            continue
-        url = line.split()[0]
-        findings.append(
-            Finding(
-                scan_id=scan_id,
-                severity=Severity.INFO,
-                title="Technology fingerprint (whatweb)",
-                description="Detected technologies/plugins on the target.",
-                evidence=_excerpt(line, 1000),
-                location=url,
-                verified=True,
-            )
-        )
-    return findings
+    """A technology fingerprint is an observation, not a finding: none stored."""
+    return []
 
 
 # nikto lines that are run metadata, not findings.
@@ -176,7 +140,7 @@ def parse_nikto(output: str, scan_id: int) -> list[Finding]:
         elif any(k in low for k in ("osvdb", "vulnerable", "injection", "traversal", "disclosure", "outdated")):
             sev = Severity.MEDIUM
         else:
-            sev = Severity.INFO
+            continue                   # informational lines are not findings
         findings.append(
             Finding(
                 scan_id=scan_id,
@@ -207,28 +171,9 @@ def parse_commix(output: str, scan_id: int) -> list[Finding]:
     ]
 
 
-_GOBUSTER = re.compile(r"^(/\S*)\s+\(Status:\s*(\d+)\)")
-
-
 def parse_gobuster(output: str, scan_id: int) -> list[Finding]:
-    findings: list[Finding] = []
-    for line in _clean(output).splitlines():
-        m = _GOBUSTER.match(line.strip())
-        if not m:
-            continue
-        path, status = m.group(1), m.group(2)
-        findings.append(
-            Finding(
-                scan_id=scan_id,
-                severity=Severity.INFO,
-                title=f"Discovered path {path} (HTTP {status})",
-                description="Content discovered by gobuster.",
-                evidence=line.strip(),
-                location=path,
-                verified=True,
-            )
-        )
-    return findings
+    """Discovered paths are observations, not findings: none stored."""
+    return []
 
 
 def _trim(text: str, n: int) -> str:
@@ -240,7 +185,7 @@ def parse_httpprobe(output: str, scan_id: int) -> list[Finding]:
     """Parse the HttpProbeScanner's JSON-line output (one request per line).
 
     Flags IDOR/BOLA when one authenticated session reads ≥2 distinct objects by
-    id (HTTP 200 with differing bodies); otherwise records the statuses as info.
+    id (HTTP 200 with differing bodies); otherwise nothing is stored.
     """
     recs: list[dict] = []
     for line in output.splitlines():
@@ -254,9 +199,7 @@ def parse_httpprobe(output: str, scan_id: int) -> list[Finding]:
     if not recs:
         return []
     if len(recs) == 1 and "error" in recs[0]:
-        return [Finding(scan_id=scan_id, severity=Severity.INFO, title="Authenticated probe error",
-                        description="The authenticated HTTP probe could not complete.",
-                        evidence=str(recs[0])[:400], location="")]
+        return []
     ided_ok = [r for r in recs if r.get("status") == 200 and r.get("body") and r.get("id") not in (None, "-")]
     distinct_bodies = {r["body"] for r in ided_ok}
     if len(ided_ok) >= 2 and len(distinct_bodies) >= 2:
@@ -280,13 +223,8 @@ def parse_httpprobe(output: str, scan_id: int) -> list[Finding]:
                         f"size (ids: {ids}). This may be real per-object data or a templated catch-all; "
                         f"verify the bodies are distinct objects before confirming.",
             evidence=ev[:500], location=str(ided_ok[0].get("url", "")), verified=False)]
-    # Surface status AND body length per id: identical lengths across ids suggest a catch-all
-    # (e.g. an SPA root), differing lengths suggest real per-object data.
-    statuses = ", ".join(f"{r.get('id')}:{r.get('status')}(len={r.get('len')})" for r in recs)
-    return [Finding(scan_id=scan_id, severity=Severity.INFO, title="Authenticated probe result",
-                    description="Authenticated HTTP probe responses (status + body length per id). "
-                                "Differing lengths across object ids indicate real per-object data.",
-                    evidence=statuses[:500], location=str(recs[0].get("url", "")))]
+    # No access-control signal: the statuses are an observation, not a finding.
+    return []
 
 
 def parse_upload(output: str, scan_id: int) -> list[Finding]:
@@ -315,8 +253,6 @@ _ZAP_RISK = {
     "high": Severity.HIGH,
     "medium": Severity.MEDIUM,
     "low": Severity.LOW,
-    "informational": Severity.INFO,
-    "info": Severity.INFO,
 }
 # "[Medium] Content Security Policy (CSP) Header Not Set (High) — http://host/x"
 _ZAP_LINE = re.compile(
@@ -347,9 +283,13 @@ def parse_zap(output: str, scan_id: int) -> list[Finding]:
                 current = None
                 continue
             seen.add(key)
+            severity = _ZAP_RISK.get(risk.lower())
+            if severity is None:       # Informational or unknown: not a finding
+                current = None
+                continue
             current = Finding(
                 scan_id=scan_id,
-                severity=_ZAP_RISK.get(risk.lower(), Severity.INFO),
+                severity=severity,
                 title=name,
                 description="Reported by OWASP ZAP.",
                 location=url,

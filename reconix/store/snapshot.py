@@ -117,7 +117,8 @@ def _scope(assessment: Assessment) -> Optional[Dict[str, Any]]:
 
 def _findings(assessment: Assessment) -> List[Dict[str, Any]]:
     revealed = set(assessment.run.revealed)
-    rows = [f for f in assessment.findings if f.fid in revealed]
+    rows = [f for f in assessment.findings
+            if f.fid in revealed and f.severity in SEVERITY_ORDER]
     rows.sort(key=lambda f: SEVERITY_ORDER.index(f.severity))
     return [{
         "id": f.fid, "severity": f.severity, "title": f.title, "path": f.path,

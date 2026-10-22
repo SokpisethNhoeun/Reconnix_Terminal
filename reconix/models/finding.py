@@ -7,7 +7,7 @@ from typing import List
 @dataclass
 class Finding:
     fid: str               # "001"
-    severity: str          # CRITICAL | HIGH | MEDIUM | LOW | INFO
+    severity: str          # CRITICAL | HIGH | MEDIUM | LOW
     title: str
     path: str              # e.g. "/api/orders/{id}"
     validation: str        # CONFIRMED | UNCONFIRMED | INCONCLUSIVE

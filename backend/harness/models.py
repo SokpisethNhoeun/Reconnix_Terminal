@@ -24,19 +24,19 @@ class Severity(str, Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
-    INFO = "info"
 
     @property
     def rank(self) -> int:
-        order = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
+        order = {"critical": 4, "high": 3, "medium": 2, "low": 1}
         return order[self.value]
 
     @classmethod
-    def coerce(cls, value: str) -> "Severity":
+    def coerce(cls, value: str) -> Optional["Severity"]:
+        """The matching severity, or None for Info, unknown or empty (never reported)."""
         try:
             return cls(str(value).strip().lower())
         except ValueError:
-            return cls.INFO
+            return None
 
 
 def _now() -> str:
