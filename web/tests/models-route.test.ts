@@ -1,7 +1,7 @@
 /* The model picker's routes called directly (e2e/access.spec.ts and e2e/assistant.spec.ts go
    through the proxy too): the operator role and the page's Origin on every change, strict
-   bodies within a byte cap, remote addresses only when the server allows them, a cloud preset
-   only at its own address, an API key that never comes back in any answer, "Test connection"
+   bodies within a byte cap, remote addresses allowed by default (a Groq provider at its real
+   address, its requests sent to the stand-in, end to end), a cloud preset only at its own address, an API key that never comes back in any answer, "Test connection"
    and "Fetch models" against a stand-in model server (a server that answers without a list said
    apart from one that can't be asked, and a redirect, which is refused), a switch that the
    next question uses, and no model from the environment: LLM_BASE_URL / LLM_MODEL /
@@ -15,7 +15,8 @@ import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MODELS_FAIL } from "@/lib/assistant/models/errors";
-import { CLOUD_FIXED } from "@/lib/assistant/models/presets";
+import { chipState } from "@/components/assistant/model-picker-rules";
+import { CLOUD_FIXED, presetOf } from "@/lib/assistant/models/presets";
 import { NO_MODEL } from "@/lib/assistant/models/resolve";
 import { COOKIE, sessionValue } from "@/lib/auth/session";
 
@@ -90,7 +91,6 @@ beforeEach(() => {
   process.env.LLM_BASE_URL = `${base}/v1`;
   process.env.LLM_MODEL = "env-model";
   process.env.LLM_API_KEY = "sk-env-key-never-read";
-  delete process.env.LLM_ALLOW_REMOTE;
   cookie = sessionValue("operator", TOKEN);
   seen = [];
 });
@@ -186,16 +186,15 @@ describe("the providers", () => {
   it("list nothing before anything is saved, whatever the environment names", async () => {
     const { status, body } = await list();
     expect(status).toBe(200);
-    expect(Object.keys(body).sort()).toEqual(["active", "allowRemote", "presets", "providers", "summary"]);
+    expect(Object.keys(body).sort()).toEqual(["active", "presets", "providers", "summary"]);
     expect(body).toMatchObject({
       providers: [],
       active: null,
       summary: { configured: false, name: "", provider: "", local: false, reason: NO_MODEL },
-      allowRemote: false,
     });
     for (const env of ["env-model", "sk-env-key", base]) expect(JSON.stringify(body)).not.toContain(env); // nothing of LLM_*
     // the model picker's rows, in its order, each saying what it needs: a key, and whether its
-    // address is a fixed cloud one (usable only with LLM_ALLOW_REMOTE=1), local or any
+    // address is a fixed cloud one (usable by default: the data goes there), local or any
     const presets = body.presets as { id: string; key: string; kind: string; baseUrl: string }[];
     expect(presets.map((p) => [p.id, p.key, p.kind])).toEqual([
       ["openai", "required", "cloud"],
@@ -212,16 +211,9 @@ describe("the providers", () => {
       if (p.kind === "local") expect(p.baseUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/v1$/);
     }
   });
-  it("keep the cloud presets off while the server keeps data on this machine, and allow them with LLM_ALLOW_REMOTE=1", async () => {
-    expect((await list()).body.allowRemote).toBe(false);
+  it("allow the cloud presets by default (no server switch), whatever LLM_ALLOW_REMOTE says", async () => {
+    process.env.LLM_ALLOW_REMOTE = "0"; // the old switch: not read any more
     const cloud = { name: "OpenAI", preset: "openai", baseUrl: "https://api.openai.com/v1", models: ["gpt-4o-mini"], apiKey: SECRET };
-    const refused = await add(cloud);
-    expect(refused.status).toBe(400);
-    expect(refused.body.detail).toContain("LLM_ALLOW_REMOTE=1");
-    expect((await fetchNames({ baseUrl: cloud.baseUrl, apiKey: SECRET })).status).toBe(400); // nothing sent
-    expect(seen).toEqual([]);
-    process.env.LLM_ALLOW_REMOTE = "1";
-    expect((await list()).body.allowRemote).toBe(true);
     const added = await add({ ...cloud, activate: true });
     expect(added.status).toBe(201);
     expect(added.body.summary).toMatchObject({ configured: true, name: "gpt-4o-mini", provider: "OpenAI", local: false });
@@ -248,19 +240,14 @@ describe("the providers", () => {
     expect((await remove(p.id)).status).toBe(404);
     expect((await patch(p.id, { name: "x" })).status).toBe(404);
   });
-  it("refuse an address off this machine unless the server allows it", async () => {
-    const refused = await add(provider({ baseUrl: "https://api.openai.com/v1", preset: "openai" }));
-    expect(refused.status).toBe(400);
-    expect(refused.body.detail).toContain("LLM_ALLOW_REMOTE=1");
-    expect((await test({ baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", apiKey: SECRET })).status).toBe(400);
-    expect((await fetchNames({ baseUrl: "https://api.openai.com/v1" })).status).toBe(400);
-    process.env.LLM_ALLOW_REMOTE = "1";
+  it("take an address off this machine, a key only over https and never in the address", async () => {
     expect((await add(provider({ baseUrl: "http://api.openai.com/v1", preset: "openai" }))).body.detail).toContain("only sent over https");
+    expect((await test({ baseUrl: "http://llm.example.com/v1", model: "m", apiKey: SECRET })).body.detail).toContain("only sent over https");
+    expect((await fetchNames({ baseUrl: "https://u:p@llm.example.com/v1" })).body.detail).toContain("not in the base URL");
     expect((await add(provider({ baseUrl: "https://api.openai.com/v1", preset: "openai" }))).status).toBe(201);
     expect(seen).toHaveLength(0); // nothing was sent anywhere
   });
   it("tie a cloud preset to its own address: another one is refused, Custom takes it", async () => {
-    process.env.LLM_ALLOW_REMOTE = "1";
     const crafted = { name: "OpenAI", preset: "openai", baseUrl: "https://other.example/v1", models: ["gpt-4o-mini"], apiKey: SECRET };
     for (const baseUrl of ["https://other.example/v1", "https://api.openai.com.other.example/v1", "https://api.openai.com:8443/v1"]) {
       const refused = await add({ ...crafted, baseUrl });
@@ -285,7 +272,6 @@ describe("the providers", () => {
     expect(seen).toHaveLength(0);
   });
   it("leave a cloud preset saved at another address before that rule working until its preset or address changes", async () => {
-    process.env.LLM_ALLOW_REMOTE = "1";
     const older = { id: ID, name: "OpenAI", preset: "openai", baseUrl: "https://llm.other.example/v1", models: ["gpt-4o-mini"] };
     writeFileSync(path.join(dir, "models.json"), JSON.stringify({ format: "reconix.assistant.models/v1", providers: [older], active: null }), { mode: 0o600 });
     expect((await list()).body.providers).toEqual([expect.objectContaining({ preset: "openai", baseUrl: older.baseUrl })]);
@@ -397,14 +383,50 @@ describe("switching", () => {
     expect(seen.map((s) => s.model).filter(Boolean)).toEqual(["stub-b", "stub-a"]); // never env-model
   });
   it("a chosen model that can't be used any more is reported, not replaced", async () => {
-    process.env.LLM_ALLOW_REMOTE = "1";
     const p = (await add(provider({ baseUrl: "https://llm.example.com/v1", activate: true }))).body.provider as { id: string };
     expect(p).toBeTruthy();
-    delete process.env.LLM_ALLOW_REMOTE;
+    rmSync(path.join(dir, "models.key")); // its key can't be opened any more
     const res = await question.POST(json("POST", "/api/assistant", { uid: null, question: "hi" }));
     expect(res.status).toBe(503);
     const body = (await res.json()) as { detail: string };
-    expect(body.detail).toMatch(/^Stand-in: The base URL is not on this machine/);
+    expect(body.detail).toBe(`Stand-in: ${MODELS_FAIL.sealed}`);
     expect(seen).toHaveLength(0);
+  });
+  it("Groq at its real address: added, its models fetched, chosen and asked (the stand-in answers for it)", async () => {
+    const groq = presetOf("groq");
+    expect(groq.baseUrl).toBe("https://api.groq.com/openai/v1");
+    // whatever goes to api.groq.com goes to the stand-in instead: nothing leaves this machine here
+    const real = globalThis.fetch;
+    const spy = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input instanceof Request ? input.url : input);
+      return real(url.startsWith(groq.baseUrl) ? `${base}/groq/v1${url.slice(groq.baseUrl.length)}` : input, init);
+    });
+    try {
+      const added = await add({ name: "Groq", preset: "groq", baseUrl: groq.baseUrl, models: ["llama-3.3-70b-versatile"], apiKey: SECRET });
+      expect(added.status).toBe(201);
+      const p = added.body.provider as { id: string; baseUrl: string; local: boolean; keySaved: boolean };
+      expect(p).toMatchObject({ baseUrl: groq.baseUrl, local: false, keySaved: true });
+
+      expect((await fetchNames({ providerId: p.id })).body).toEqual({ models: ["stub-a", "stub-b"] });
+      expect(seen.at(-1)).toMatchObject({ method: "GET", url: "/groq/v1/models", auth: `Bearer ${SECRET}` });
+
+      const chosen = await choose({ providerId: p.id, model: "llama-3.3-70b-versatile" });
+      expect(chosen.status).toBe(200);
+      const summary = chosen.body.summary as { configured: boolean; name: string; provider: string; local: boolean; reason: string };
+      expect(summary).toEqual({ configured: true, name: "llama-3.3-70b-versatile", provider: "Groq", local: false, reason: "" });
+      // the remote warning: the chip's tooltip names where the data goes
+      const chip = chipState(summary, true);
+      expect(chip.name).toBe("Model: llama-3.3-70b-versatile (Groq, remote)");
+      expect(chip.title).toBe(
+        "llama-3.3-70b-versatile (Groq): a remote model. Questions, the assessment data they need and relevant /add-on knowledge passages are sent to it.",
+      );
+
+      const res = await question.POST(json("POST", "/api/assistant", { uid: null, question: "Which model are you?" }));
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain("Answered by llama-3.3-70b-versatile.");
+      expect(seen.at(-1)).toMatchObject({ method: "POST", url: "/groq/v1/chat/completions", auth: `Bearer ${SECRET}`, model: "llama-3.3-70b-versatile" });
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

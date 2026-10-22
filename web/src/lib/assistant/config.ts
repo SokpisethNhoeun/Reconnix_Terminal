@@ -2,11 +2,11 @@
    the same convention as the product docs' "Model switching". `checkModel` holds the rules every
    model passes (each one is added with the composer's + Model and saved: models/store.ts; checked
    again on every use: models/resolve.ts): http(s) only, no credentials in the address, a model
-   name of the usual characters, an API key only over https to a remote host, and an address off
-   this machine only when the server runs with LLM_ALLOW_REMOTE=1 (the browser can't turn that
-   on). An endpoint off this machine receives assessment data. "local" means a loopback address:
-   a local proxy may still forward elsewhere (the page says "local endpoint"). The web reads no
-   model from its environment: LLM_ALLOW_REMOTE is its only LLM_* setting. */
+   name of the usual characters and an API key only over https to a remote host. An address off
+   this machine is allowed (the owner's decision: cloud by default), and it receives assessment
+   data: the picker and the assistant say so whenever one is chosen or used. "local" means a
+   loopback address: a local proxy may still forward elsewhere (the page says "local endpoint").
+   The web reads no model, and no LLM_* setting, from its environment. */
 import "server-only";
 
 import { MAX_URL, MODEL_NAME } from "./models/schema";
@@ -27,7 +27,6 @@ export interface Wording {
   key: string; // where the key goes
   keyStart: string; // the key, at the start of a sentence
   model: string;
-  allow: string; // how remote models are allowed
 }
 
 /** The model picker's words. */
@@ -37,7 +36,6 @@ export const FORM_WORDING: Wording = {
   key: "the API key field",
   keyStart: "An API key",
   model: "The model name",
-  allow: "The dashboard allows that only when it was started with LLM_ALLOW_REMOTE=1.",
 };
 
 const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
@@ -52,7 +50,7 @@ export interface ModelInput {
     and trailing slashes, at most MAX_URL characters as written out. */
 export function checkAddress(
   input: Omit<ModelInput, "model">,
-  { allowRemote, words = FORM_WORDING }: { allowRemote: boolean; words?: Wording },
+  { words = FORM_WORDING }: { words?: Wording } = {},
 ): { ok: true; baseUrl: string; local: boolean } | { ok: false; reason: string } {
   let url: URL;
   try {
@@ -63,9 +61,6 @@ export function checkAddress(
   if (url.protocol !== "http:" && url.protocol !== "https:") return { ok: false, reason: `${words.url} must start with http:// or https://.` };
   if (url.username || url.password) return { ok: false, reason: `Put the key in ${words.key}, not in ${words.urlIn}.` };
   const local = LOOPBACK.has(url.hostname);
-  if (!local && !allowRemote) {
-    return { ok: false, reason: `${words.url} is not on this machine: assessment data would be sent there. ${words.allow}` };
-  }
   if (input.apiKey && !local && url.protocol !== "https:") return { ok: false, reason: `${words.keyStart} is only sent over https to a remote model.` };
   url.search = "";
   url.hash = "";
@@ -76,7 +71,7 @@ export function checkAddress(
 }
 
 /** A model against the rules above. */
-export function checkModel(input: ModelInput, options: { allowRemote: boolean; words?: Wording }): ModelSetup {
+export function checkModel(input: ModelInput, options: { words?: Wording } = {}): ModelSetup {
   const address = checkAddress(input, options);
   if (!address.ok) return address;
   if (!MODEL_NAME.test(input.model)) return { ok: false, reason: `${(options.words ?? FORM_WORDING).model} holds characters a model name doesn't use.` };
@@ -91,6 +86,3 @@ export function isLocal(baseUrl: string): boolean {
     return false;
   }
 }
-
-/** Whether this server may send data to a model off this machine (LLM_ALLOW_REMOTE=1). */
-export const remoteAllowed = (env: Record<string, string | undefined> = process.env) => env.LLM_ALLOW_REMOTE?.trim() === "1";

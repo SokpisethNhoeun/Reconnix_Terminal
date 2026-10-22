@@ -74,7 +74,7 @@ function startTerminal() {
   const windows = process.platform === "win32";
   const venv = path.join(repoRoot, ".venv", windows ? "Scripts/python.exe" : "bin/python");
   const python = process.env.RECONIX_PYTHON || (existsSync(venv) ? venv : windows ? "python" : "python3");
-  // the dashboard's LLM_* settings (LLM_ALLOW_REMOTE, or a key someone exported) stay with it
+  // the dashboard's LLM_* settings (a key someone exported, say) stay with it
   const ownEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("LLM_")));
   const proc = spawn(python, ["-m", "reconix.webterm"], {
     cwd: repoRoot,

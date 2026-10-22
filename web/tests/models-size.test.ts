@@ -30,7 +30,6 @@ let dir = "";
 beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), "reconix-models-size-"));
   process.env = { ...saved, RECONIX_WEB_TOKEN: TOKEN, RECONIX_ASSISTANT_DIR: dir };
-  delete process.env.LLM_ALLOW_REMOTE;
   cookie = sessionValue("operator", TOKEN);
 });
 afterEach(() => {

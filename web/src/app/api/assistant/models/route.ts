@@ -1,8 +1,7 @@
 /* The AI Assistant's models (operators only; src/proxy.ts checks the role too). GET: the saved
    providers without their keys (only whether one is saved), the active choice, a summary of the
-   model that answers next, whether this server sends data off this machine (`allowRemote`) and
-   the presets in the model picker's order (each with its key rule and kind: cloud, local or
-   custom). Every model is one saved here: none comes from the environment. POST adds a provider
+   model that answers next and the presets in the model picker's order (each with its key rule
+   and kind: cloud, local or custom). Every model is one saved here: none comes from the environment. POST adds a provider
    ({ name, preset, baseUrl, models, apiKey?, activate? }); it needs the page's own Origin. The
    key is sealed before it is saved and never comes back. Errors are fixed messages, never a
    path. */

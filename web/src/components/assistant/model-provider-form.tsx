@@ -1,7 +1,7 @@
 "use client";
 
 /* The model picker's "Set the provider" (+ Model in the list): Provider, a native select of the
-   presets in order (a cloud one disabled while the server keeps data on this machine, the reason
+   presets in order (it starts on the first local one; a cloud one says where the questions go,
    under it); Base URL (Custom and the local presets only, filled in from the preset); API key
    (model-key-field.tsx: never controlled, never kept); Model (model-name-field.tsx: the list
    Fetch models brings, or a typed name); Cancel / Add model. Choosing a provider empties the key
@@ -30,7 +30,6 @@ import {
   afterFetch,
   afterTest,
   choiceProblem,
-  CLOUD_OFF,
   type Credentials,
   credentialsProblem,
   firstPreset,
@@ -78,8 +77,8 @@ export function ModelProviderForm({ view, models, onCancel, onDone }: Props) {
   const providerField = useRef<HTMLSelectElement>(null);
   const keyField = useRef<HTMLInputElement>(null);
   const typedField = useRef<HTMLInputElement>(null);
-  const [presetId, setPresetId] = useState<PresetId>(() => firstPreset(view).id);
-  const [baseUrl, setBaseUrl] = useState<string>(() => firstPreset(view).baseUrl);
+  const [presetId, setPresetId] = useState<PresetId>(() => firstPreset().id);
+  const [baseUrl, setBaseUrl] = useState<string>(() => firstPreset().baseUrl);
   const [removeKey, setRemoveKey] = useState(false);
   const [keyTyped, setKeyTyped] = useState(false);
   const [list, setList] = useState<ListState>({ status: "none" });
@@ -221,18 +220,13 @@ export function ModelProviderForm({ view, models, onCancel, onDone }: Props) {
             Provider
           </label>
           <select ref={providerField} id={ids.provider} value={presetId} onChange={(e) => choosePreset(e.target.value as PresetId)} aria-describedby={ids.providerHint} className="ai-select">
-            {providerOptions(view).map((o) => (
-              <option key={o.id} value={o.id} disabled={o.disabled !== null}>
+            {providerOptions().map((o) => (
+              <option key={o.id} value={o.id}>
                 {o.label}
               </option>
             ))}
           </select>
           <div id={ids.providerHint} className="flex flex-col gap-1">
-            {!view.allowRemote && (
-              <p className="ai-hint" data-tone="warning">
-                {CLOUD_OFF}
-              </p>
-            )}
             {!showsUrl(preset) && (
               <p className="ai-hint">
                 {preset.label} runs at {host}: your questions, the assessment data they need and relevant /add-on knowledge passages are sent there.
@@ -263,12 +257,10 @@ export function ModelProviderForm({ view, models, onCancel, onDone }: Props) {
               aria-describedby={ids.urlHint}
               className="ai-input ai-mono"
             />
-            <p id={ids.urlHint} className="ai-hint" data-tone={remote && !view.allowRemote ? "warning" : undefined}>
-              {!remote
-                ? "An OpenAI-compatible address, usually ending in /v1."
-                : view.allowRemote
-                  ? "Off this machine: your questions, the assessment data they need and relevant /add-on knowledge passages are sent there."
-                  : "Off this machine: the dashboard uses it only when started with LLM_ALLOW_REMOTE=1."}
+            <p id={ids.urlHint} className="ai-hint">
+              {remote
+                ? "Off this machine: your questions, the assessment data they need and relevant /add-on knowledge passages are sent there."
+                : "An OpenAI-compatible address, usually ending in /v1."}
             </p>
           </div>
         )}

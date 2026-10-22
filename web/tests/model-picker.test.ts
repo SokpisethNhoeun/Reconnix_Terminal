@@ -1,8 +1,8 @@
 /* The model picker's pure rules (components/assistant/): what the composer's chip says
    (model-picker-rules.ts); the list "Model" (every saved model, ✓ on the active one, a remote
-   one disabled with the reason while the server keeps data here) and what removing a row sends
+   one as usable as a local one) and what removing a row sends
    (DELETE the provider with its last model, else PATCH its models) with the confirm's words;
-   "Set the provider" (the presets in order, a cloud one disabled with the reason, the fields it
+   "Set the provider" (the presets in order, every one usable, the fields it
    shows, the saved provider it adds to, what a fetch or a test asks, where a fetch's answer
    leaves the Model field) and the requests "Add model" sends (POST a new provider made active,
    or PATCH the saved one and PUT the switch); a typed model name (model-name-rules.ts); where
@@ -17,7 +17,6 @@ import {
   afterTest,
   chipState,
   choiceProblem,
-  CLOUD_OFF,
   credentialsProblem,
   firstPreset,
   freeName,
@@ -53,7 +52,6 @@ const view = (over: Partial<ModelsView> = {}): ModelsView => ({
   providers: [],
   active: null,
   summary: { configured: false, name: "", provider: "", local: false, reason: "No AI model is set up yet." },
-  allowRemote: false,
   ...over,
 });
 const none = { baseUrl: "", apiKey: "", removeKey: false };
@@ -87,25 +85,24 @@ describe("the list: your models", () => {
   it("lists every saved model in the order saved, ✓ on the active one, with its provider and where it runs", () => {
     const other = provider({ id: ID2, name: "Ollama", preset: "ollama", baseUrl: "http://127.0.0.1:11434/v1", models: ["llama3.2"] });
     const v = view({ providers: [provider({ models: ["stub-model", "stub-model-2"] }), other], active: { providerId: ID, model: "stub-model-2" } });
-    expect(modelRows(v).map((r) => [r.model, r.provider, r.where, r.checked, r.disabled])).toEqual([
-      ["stub-model", "Stub", "local", false, null],
-      ["stub-model-2", "Stub", "local", true, null],
-      ["llama3.2", "Ollama", "local", false, null],
+    expect(modelRows(v).map((r) => [r.model, r.provider, r.where, r.checked])).toEqual([
+      ["stub-model", "Stub", "local", false],
+      ["stub-model-2", "Stub", "local", true],
+      ["llama3.2", "Ollama", "local", false],
     ]);
     expect(modelRows(v)[1].key).toBe(`${ID}/stub-model-2`);
   });
-  it("disables a remote model, with the reason, while the server keeps data here", () => {
+  it("lists a remote model as usable as any other (cloud allowed by default), marked remote", () => {
     const openai = provider({ name: "OpenAI", preset: "openai", baseUrl: "https://api.openai.com/v1", local: false, keySaved: true, models: ["gpt-4o-mini"] });
-    expect(modelRows(view({ providers: [openai] }))[0]).toMatchObject({ where: "remote", disabled: CLOUD_OFF });
-    expect(CLOUD_OFF).toBe("Start the dashboard with LLM_ALLOW_REMOTE=1 to use cloud models");
-    expect(modelRows(view({ allowRemote: true, providers: [openai] }))[0].disabled).toBeNull();
+    const [row] = modelRows(view({ providers: [openai] }));
+    expect(row).toEqual({ key: `${ID}/gpt-4o-mini`, providerId: ID, model: "gpt-4o-mini", provider: "OpenAI", where: "remote", checked: false });
   });
   it("is empty with nothing saved (no Environment row any more)", () => {
     expect(modelRows(view())).toEqual([]);
   });
   it("names a cloud provider saved at another address with its real host", () => {
     const moved = provider({ name: "OpenAI", preset: "openai", baseUrl: "https://llm.other.example/v1", local: false });
-    expect(modelRows(view({ providers: [moved], allowRemote: true }))[0].provider).toBe("OpenAI (llm.other.example)");
+    expect(modelRows(view({ providers: [moved] }))[0].provider).toBe("OpenAI (llm.other.example)");
   });
 });
 
@@ -131,14 +128,11 @@ describe("removing a model", () => {
 });
 
 describe("Set the provider", () => {
-  it("offers the presets in the plan's order, the cloud ones disabled with the reason unless the server allows them", () => {
-    const off = providerOptions(view());
-    expect(off.map((o) => o.label)).toEqual(["OpenAI", "Anthropic", "DeepSeek", "OpenRouter", "Groq", "Ollama (local)", "LM Studio (local)", "Custom (OpenAI-compatible)"]);
-    expect(off.filter((o) => o.disabled).map((o) => o.id)).toEqual(["openai", "anthropic", "deepseek", "openrouter", "groq"]);
-    expect(off.find((o) => o.id === "anthropic")?.disabled).toBe(CLOUD_OFF);
-    expect(providerOptions(view({ allowRemote: true })).some((o) => o.disabled)).toBe(false);
-    expect(firstPreset(view()).id).toBe("ollama");
-    expect(firstPreset(view({ allowRemote: true })).id).toBe("openai");
+  it("offers every preset in the plan's order, the cloud ones included; it starts on the first local one", () => {
+    const options = providerOptions();
+    expect(options.map((o) => o.label)).toEqual(["OpenAI", "Anthropic", "DeepSeek", "OpenRouter", "Groq", "Ollama (local)", "LM Studio (local)", "Custom (OpenAI-compatible)"]);
+    expect(options.every((o) => Object.keys(o).sort().join() === "id,label")).toBe(true); // nothing is disabled
+    expect(firstPreset().id).toBe("ollama");
   });
   it("shows the base URL only for Custom and the local presets; a cloud one's address is fixed", () => {
     expect(PRESETS.filter(showsUrl).map((p) => p.id)).toEqual(["ollama", "lmstudio", "custom"]);

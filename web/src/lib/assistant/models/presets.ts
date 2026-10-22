@@ -1,7 +1,7 @@
 /* The providers the model picker knows by name, in the order it lists them: the cloud ones,
    then the local ones, then Custom. Each has its OpenAI-compatible base URL (Custom leaves it
    to you), whether it takes an API key, and its kind: "cloud" (a fixed address off this
-   machine, usable only when the server runs with LLM_ALLOW_REMOTE=1), "local" (a loopback
+   machine: questions and the data they need are sent there), "local" (a loopback
    address you may change) or "custom" (any OpenAI-compatible address). A cloud preset is tied to
    its address: a provider saved under it must be at its base URL's origin (`fitsPreset`; the
    server refuses anything else, and the picker shows an older one that isn't as Custom). Any

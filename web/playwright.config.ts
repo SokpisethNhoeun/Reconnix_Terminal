@@ -109,8 +109,7 @@ export default defineConfig({
         // the specs ask more than the default 12 questions a minute
         RECONIX_ASSISTANT_RATE_PER_MINUTE: "120",
         // the AI Assistant asks the stand-in, saved as its only model by e2e/global-setup.ts
-        // (e2e/models.ts); cloud models stay off whatever web/.env.local says
-        LLM_ALLOW_REMOTE: "0",
+        // (e2e/models.ts)
       },
       reuseExistingServer: false,
       timeout: 60_000,
