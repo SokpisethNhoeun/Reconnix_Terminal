@@ -63,7 +63,7 @@ export const terminalGuide: GroupContent = {
         </DocSection>
         <DocSection title="6 · Findings and 7 · Finding Detail">
           <p>
-            The list: filter (<Kbd>f</Kbd>), sort (<Kbd>s</Kbd>), triage (<Kbd>t</Kbd>), import tool output (<Kbd>i</Kbd>),
+            The list: filter (<Kbd>f</Kbd>), sort (<Kbd>s</Kbd>), triage (<Kbd>t</Kbd>),
             open one (<Kbd>Enter</Kbd>), chat about the assessment (<Kbd>c</Kbd>). The detail: description, affected URL, evidence (masked), impact, remediation,
             references and CVSS; <Kbd>[</Kbd>/<Kbd>]</Kbd> step to the previous or next finding in the same filter and
             sort, <Kbd>r</Kbd> jumps to the report, <Kbd>c</Kbd> chats about the finding, <Kbd>←</Kbd> goes back to
@@ -75,7 +75,7 @@ export const terminalGuide: GroupContent = {
           <p>
             The executive summary, findings by severity, the key findings and the changes since the last assessment of
             the same target, with the export buttons (<Kbd>p</Kbd> PDF, <Kbd>j</Kbd> JSON, <Kbd>w</Kbd> DOCX) and{" "}
-            <Kbd>b</Kbd> for the web dashboard, and <Kbd>c</Kbd> to chat about the assessment. Exports are
+            <Kbd>c</Kbd> to chat about the assessment (<Mono>/web</Mono> opens the web dashboard). Exports are
             available once the assessment completes. See <DocLink href="/docs/reports/reviewing">Reviewing results</DocLink>.
           </p>
         </DocSection>
@@ -84,7 +84,7 @@ export const terminalGuide: GroupContent = {
             Questions are ↑/↓ menus with numbered choices and a description each; the recommended one is marked. Risky
             choices are unnumbered and default to the safe answer. &quot;Type something.&quot; records what you write as
             feedback (visible in <Mono>/audit</Mono>); &quot;Chat about this&quot; takes you to the prompt. Text input
-            pop-ups (the target login, the scope edit, a step&apos;s parameter, the import path, a provider) have fields,
+            pop-ups (the target login, the scope edit, a step&apos;s parameter, a provider) have fields,
             an error line and Submit / Cancel; a value the store refuses keeps the form open with the reason. The
             contextual help (<Kbd>?</Kbd>) lists the keys of whatever has focus.
           </p>
@@ -145,9 +145,9 @@ export const terminalGuide: GroupContent = {
               { key: "Plan", value: <><Kbd>Enter</Kbd> select; <Kbd>Tab</Kbd> switch between the menu and the steps; <Kbd>Esc</Kbd> back.</> },
               { key: "Approval", value: <><Kbd>Enter</Kbd> select; <Kbd>d</Kbd> details (scope limits, exact request, audit trail); <Kbd>Esc</Kbd> decide later.</> },
               { key: "Execution", value: <><Kbd>Enter</Kbd> continue (open what the run waits for); <Kbd>Ctrl+C</Kbd> stop the run, after a confirmation; <Kbd>End</Kbd> jump to the newest output line and follow it again; <Kbd>Esc</Kbd> back to the plan.</> },
-              { key: "Findings", value: <><Kbd>Enter</Kbd> open the finding; <Kbd>f</Kbd> filter; <Kbd>s</Kbd> cycle the sort; <Kbd>t</Kbd> triage; <Kbd>i</Kbd> import tool output; <Kbd>c</Kbd> chat; <Kbd>Esc</Kbd> back.</> },
+              { key: "Findings", value: <><Kbd>Enter</Kbd> open the finding; <Kbd>f</Kbd> filter; <Kbd>s</Kbd> cycle the sort; <Kbd>t</Kbd> triage; <Kbd>c</Kbd> chat; <Kbd>Esc</Kbd> back.</> },
               { key: "Finding Detail", value: <><Kbd>t</Kbd> triage; <Kbd>r</Kbd> report; <Kbd>c</Kbd> chat about this finding; <Kbd>[</Kbd> / <Kbd>]</Kbd> previous / next finding (same filter and sort); <Kbd>←</Kbd> or <Kbd>Esc</Kbd> back to the list.</> },
-              { key: "Report", value: <><Kbd>p</Kbd> PDF, <Kbd>j</Kbd> JSON, <Kbd>w</Kbd> DOCX, <Kbd>b</Kbd> web dashboard; <Kbd>c</Kbd> chat; <Kbd>Esc</Kbd> back.</> },
+              { key: "Report", value: <><Kbd>p</Kbd> PDF, <Kbd>j</Kbd> JSON, <Kbd>w</Kbd> DOCX; <Kbd>c</Kbd> chat; <Kbd>Esc</Kbd> back.</> },
             ]}
           />
           <Callout>

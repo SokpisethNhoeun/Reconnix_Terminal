@@ -143,10 +143,9 @@ Windows 10+ (there in a ConPTY pseudo console, through `pywinpty`, which
    changes where the action runs (a path, host:port or repository file) before you
    decide: the policy engine checks the new value, the exact request and its hash are
    rebuilt, and the risk stays the same.
-6. **Findings / Detail** — filter, sort, triage (open, fixed, accepted risk, false
-   positive) and import nuclei / nmap / ZAP output.
-7. **Report** — export PDF, JSON or DOCX to `./reports/`,
-   or open the web dashboard.
+6. **Findings / Detail** — filter, sort (severity or validation) and triage (open,
+   fixed, accepted risk, false positive).
+7. **Report** — export PDF, JSON or DOCX to `./reports/` (`/web` opens the web dashboard).
 
 The run keeps playing while you move between screens; when it reaches a gate the app
 opens the screen that decides it. Every assessment of the session is kept:
@@ -173,11 +172,10 @@ command suggestions, and `?` shows the keys for the screen you are on.
 | `Ctrl+O` | expand / collapse the steps Reconix finished, under its spinner line |
 | `End` | Execution: jump to the newest line of the live output and follow it again |
 | `Ctrl+C` | stop the run (on Execution, after a confirmation) |
-| `f` / `s` / `t` / `i` | Findings: filter / cycle the sort / triage / import tool output |
+| `f` / `s` / `t` | Findings: filter / cycle the sort (severity, validation) / triage |
 | `[` / `]` | previous / next finding on Finding Detail (same filter and sort) |
 | `c` | Findings / Finding Detail / Report: chat about this assessment (opens the Start prompt) |
 | `p` `j` `w` | Report: export PDF / JSON / DOCX |
-| `b` | Report: open the web dashboard |
 | `?` | shortcuts for the current screen (on Start: when the prompt is empty) |
 | `Ctrl+Q` | quit |
 
@@ -200,7 +198,6 @@ Type `/`, keep typing to filter, `↑`/`↓` to pick, `Tab` to complete, `Enter`
 | `/export [format]` | export the report; without a format, pick one |
 | `/summary` | the assessment summary (and open the saved report) |
 | `/assessments` | list and reopen this session's assessments (alias `/list`) |
-| `/import` | add findings from a nuclei / nmap / ZAP output file |
 | `/audit` | activity log, audit trail and your feedback (aliases `/activity`, `/log`) |
 | `/provider [set\|update\|test\|unset <id>]` | manage LLM providers; no argument opens a menu (alias `/providers`) |
 | `/model [provider/model]` | pick the active LLM model; no argument opens a menu (alias `/models`) |
@@ -323,7 +320,7 @@ reconix-tui/
         ├── approval.py     # 04 Approval gate
         ├── execution.py    # 05 Live execution
         ├── findings_list.py, finding_detail.py, report.py   # 06–08
-        ├── forms/          # FormScreen: target login, scope edit, action params, import
+        ├── forms/          # FormScreen: target login, scope edit, action params
         ├── choice.py       # ↑/↓ dialog: confirmations, details, pickers
         ├── command_bar.py  # `/` command bar
         └── help.py         # ? contextual shortcuts

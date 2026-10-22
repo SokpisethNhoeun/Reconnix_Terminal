@@ -61,9 +61,8 @@ export const guardrails: GroupContent = {
         </DocSection>
         <DocSection title="Untrusted input stays data">
           <p>
-            Target responses, tool output, imported scan files and the model&apos;s replies are data, never instructions.
-            They are rendered as plain text (never markup), evidence is masked, and imported XML that declares a DTD or
-            entities is refused. Nothing in them can approve, widen the scope or run a tool.
+            Target responses, tool output and the model&apos;s replies are data, never instructions.
+            They are rendered as plain text (never markup) and evidence is masked. Nothing in them can approve, widen the scope or run a tool.
           </p>
         </DocSection>
         <DocSection title="Where the checks run">
@@ -187,7 +186,7 @@ export const guardrails: GroupContent = {
             <li>Supply a number on the dashboard: every count is computed from the saved data.</li>
           </ul>
           <p>
-            Tool output, target data and imported files are untrusted data to the model as well: it is told to summarize
+            Tool output and target data are untrusted data to the model as well: it is told to summarize
             them, never to obey instructions found inside them. A different model never changes what is allowed to run.
           </p>
         </DocSection>
@@ -202,7 +201,7 @@ export const guardrails: GroupContent = {
           <ul>
             <li>
               <strong>The scripted run is a simulation.</strong> Its findings are demo data for the template, not the state
-              of your target. Real findings come from imported tool output or from the AI agent.
+              of your target. Real findings come from the AI agent.
             </li>
             <li>
               <strong>Findings generated with AI can be wrong.</strong> A finding whose validation is not CONFIRMED is

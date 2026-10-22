@@ -18,7 +18,7 @@ export const reports: GroupContent = {
               approved them.
             </li>
             <li>
-              <strong>Findings by severity:</strong> bars for CRITICAL, HIGH, MEDIUM, LOW and INFO.
+              <strong>Findings by severity:</strong> bars for CRITICAL, HIGH, MEDIUM and LOW.
             </li>
             <li>
               <strong>Key findings:</strong> the top four, with id, severity, CVSS, validation, triage status and source.
@@ -54,7 +54,7 @@ export const reports: GroupContent = {
     ),
   },
   "understanding-findings": {
-    lede: "What each field of a finding means, and how to filter, sort, triage and import.",
+    lede: "What each field of a finding means, and how to filter, sort and triage.",
     body: (
       <>
         <DocSection title="The fields">
@@ -62,8 +62,8 @@ export const reports: GroupContent = {
             caption="The fields of a finding"
             head={["Field", "Meaning"]}
             rows={[
-              { key: "Id", value: <>Three digits for the run&apos;s own findings; <Mono>IMP-NNN</Mono> for imported ones, <Mono>AI-NNN</Mono> for the agent&apos;s.</> },
-              { key: "Severity", value: "CRITICAL, HIGH, MEDIUM, LOW or INFO, as detected. An analyst's override wins: the effective severity is what the list, the filters and the report use." },
+              { key: "Id", value: <>Three digits for the run&apos;s own findings; <Mono>AI-NNN</Mono> for the agent&apos;s.</> },
+              { key: "Severity", value: "CRITICAL, HIGH, MEDIUM or LOW, as detected. An analyst's override wins: the effective severity is what the list, the filters and the report use." },
               { key: "Validation", value: "CONFIRMED, UNCONFIRMED or INCONCLUSIVE. Anything but CONFIRMED needs review." },
               { key: "CVSS", value: "A 3.1 score and vector when the finding is scored; 0.0 means not scored." },
               { key: "References", value: "OWASP, CWE and CVE identifiers; the CWE, OWASP and CVE columns are read from them." },
@@ -77,8 +77,8 @@ export const reports: GroupContent = {
         <DocSection title="Filters and sorts">
           <p>
             <Kbd>f</Kbd> on the Findings screen picks a filter, each with its count: All findings, Critical &amp; High,
-            Medium, Low, Info, Confirmed, Needs review, Open (not triaged), Triaged. <Kbd>s</Kbd> cycles the sort:
-            severity, CVSS descending, validation, id. <Kbd>[</Kbd> and <Kbd>]</Kbd> on a finding step through the same
+            Medium, Low, Confirmed, Needs review, Open (not triaged), Triaged. <Kbd>s</Kbd> cycles the sort between
+            severity and validation. <Kbd>[</Kbd> and <Kbd>]</Kbd> on a finding step through the same
             filter and sort.
           </p>
         </DocSection>
@@ -89,30 +89,6 @@ export const reports: GroupContent = {
             recorded too; an override equal to the detected severity clears it. Triage is the analyst&apos;s decision, is
             written to the activity log, and travels into the report and the saved copy (the dashboard leaves false
             positives out of its counts).
-          </p>
-        </DocSection>
-        <DocSection title="Importing tool output">
-          <p>
-            <Kbd>i</Kbd> or <Mono>/import</Mono> asks for the path of a file and recognizes its tool from the content:
-          </p>
-          <ul>
-            <li>
-              <strong>nuclei</strong> JSON lines (<Mono>template-id</Mono>, <Mono>matched-at</Mono>);
-            </li>
-            <li>
-              <strong>nmap</strong> XML (<Mono>&lt;nmaprun&gt;</Mono>): one finding per open port; a file declaring a DTD or
-              entities is refused;
-            </li>
-            <li>
-              <strong>OWASP ZAP</strong> JSON (<Mono>alerts</Mono>).
-            </li>
-          </ul>
-          <p>
-            Files over 5 MB are refused. Messages: &quot;Enter the path to a tool output file.&quot;, &quot;No file at
-            that path.&quot;, &quot;That file is too large to import (over 5 MB).&quot;, &quot;Couldn&apos;t read that
-            file.&quot;, &quot;Unrecognized file — expected nuclei (JSONL), nmap (XML) or ZAP (JSON) output.&quot;, &quot;No
-            nuclei results found in the file.&quot;, &quot;No open ports found in the nmap output.&quot;, &quot;No ZAP
-            alerts found in the file.&quot;, &quot;The XML declares a DTD or entities, which aren&apos;t allowed.&quot;
           </p>
         </DocSection>
       </>
@@ -224,7 +200,7 @@ export const reports: GroupContent = {
               Clear button are shown.
             </li>
             <li>
-              <strong>Set the options:</strong> include the (masked) evidence, include LOW and INFO findings, include the
+              <strong>Set the options:</strong> include the (masked) evidence, include LOW findings, include the
               appendix.
             </li>
             <li>
