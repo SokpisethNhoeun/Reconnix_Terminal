@@ -4,19 +4,23 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 
 import type { FindingRow } from "@/components/dashboard/derive";
+import { plural } from "@/components/dashboard/derive-shared";
 import { FilterChips, FilterSummary, SearchField } from "@/components/dashboard/filter-bar";
 import { FindingDetail } from "@/components/dashboard/finding-detail";
 import { FindingsList } from "@/components/dashboard/findings-list";
 import {
+  falsePositiveChips,
   filterActive,
   filterPatch,
   findingMatches,
   findingsHeadline,
+  listable,
   neighbours,
   pagePatch,
   parseFindingFilter,
   resolveFindingsPage,
   safeFindingKey,
+  SHOW_FALSE_POSITIVES,
   severityChips,
   sortFindings,
   validationChips,
@@ -75,8 +79,13 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
 
   const filter = parseFindingFilter(p);
   const active = filterActive(filter);
+  // False positives are left out of every count on the dashboard, so they are listed only on
+  // request (`?fp=1`): the headline and the chips then agree with the Overview and the Reports.
+  const counted = listable(findings, false);
+  const falsePositives = findings.length - counted.length;
+  const base = listable(findings, filter.fp);
   const sorted = sortFindings(findings.filter((f) => findingMatches(f, filter)));
-  const page = resolveFindingsPage(sorted, findings, p.finding, p.page);
+  const page = resolveFindingsPage(sorted, findings, p.finding, p.page, filter.fp);
   const { prev, next } = neighbours(sorted, page.index);
   const pane = page.explicit ? "detail" : "list";
   const highlight = !page.explicit && lastOpened && page.rows.some((f) => f.key === lastOpened) ? lastOpened : page.current?.key ?? null;
@@ -117,21 +126,22 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
     }
   }, [pane, page.current?.key, lastOpened]);
 
-  const setFilter = (patch: Partial<Record<"sev" | "val" | "q", string>>) => {
+  const setFilter = (patch: Partial<Record<"sev" | "val" | "q" | "fp", string>>) => {
     const nextFilter = parseFindingFilter({ ...p, ...patch });
     update({ ...patch, ...filterPatch(findings, nextFilter, p.finding) });
   };
-  const clearFilters = () => setFilter({ sev: "", val: "", q: "" });
+  const clearFilters = () => setFilter({ sev: "", val: "", q: "", fp: "" });
 
-  const sevChips = severityChips(findings, filter.sev);
-  const valChips = validationChips(findings);
+  const sevChips = severityChips(base, filter.sev);
+  const valChips = validationChips(base);
+  const fpChips = falsePositiveChips(findings);
   // the address's finding is repeated only when it looks like a key (it is untrusted input)
   const named = safeFindingKey(p.finding) ? <span className="font-mono text-foreground">{p.finding}</span> : null;
 
   return (
     <div ref={root} className="dash-view dash-findings" data-pane={pane} data-ready={ready ? "" : undefined}>
       <div className="mb-3">
-        <ViewHeader title="Findings" about={findingsHeadline(findings.length, across)} />
+        <ViewHeader title="Findings" about={findingsHeadline(counted.length, across, falsePositives)} />
       </div>
 
       {findings.length > 0 && (
@@ -147,8 +157,24 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
               selected={filter.val ? [filter.val] : []}
               onChange={([next]) => setFilter({ val: next === p.val ? "" : next })}
             />
+            {falsePositives > 0 && (
+              <FilterChips
+                label="False positives"
+                multi
+                options={fpChips}
+                selected={filter.fp ? [SHOW_FALSE_POSITIVES] : []}
+                onChange={(next) => setFilter({ fp: next.length ? SHOW_FALSE_POSITIVES : "" })}
+              />
+            )}
           </div>
-          <FilterSummary shown={sorted.length} total={findings.length} noun="finding" active={active} onClear={clearFilters} />
+          <FilterSummary
+            shown={sorted.length}
+            total={counted.length}
+            noun="finding"
+            extra={filter.fp && falsePositives ? plural(falsePositives, "false positive") : undefined}
+            active={active}
+            onClear={clearFilters}
+          />
         </div>
       )}
 
@@ -160,12 +186,18 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
         </EmptyNote>
       )}
 
-      {findings.length > 0 && sorted.length === 0 && <EmptyNote>No finding matches these filters.</EmptyNote>}
+      {findings.length > 0 && sorted.length === 0 && (
+        <EmptyNote>
+          {base.length === 0 && !active ? "Every finding here is a false positive: “Show” lists them." : "No finding matches these filters."}
+        </EmptyNote>
+      )}
 
       {page.missing && (
         <p role="status" className="dash-findings-notice mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground">
           <span className="min-w-0 break-all">
-            {page.missing === "filtered" ? (
+            {page.missing === "false-positive" ? (
+              <>{named ?? "The finding this link names"} is marked as a false positive, and false positives are hidden.</>
+            ) : page.missing === "filtered" ? (
               <>{named ?? "The finding this link names"} is hidden by the filters.</>
             ) : named ? (
               <>
@@ -175,8 +207,12 @@ export function FindingsView({ findings, across = null }: { findings: FindingRow
               "This link names a finding that isn't here."
             )}
           </span>
-          {page.missing === "filtered" && (
-            <button type="button" onClick={() => update({ sev: "", val: "", q: "", page: "" })} className="ui-link">
+          {(page.missing === "filtered" || page.missing === "false-positive") && (
+            <button
+              type="button"
+              onClick={() => update({ sev: "", val: "", q: "", page: "", fp: page.missing === "false-positive" || filter.fp ? SHOW_FALSE_POSITIVES : "" })}
+              className="ui-link"
+            >
               Show it
             </button>
           )}

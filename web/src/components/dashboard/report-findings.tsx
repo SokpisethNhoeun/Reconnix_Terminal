@@ -6,7 +6,8 @@ import type { ReportFindingRow } from "@/components/dashboard/report-types";
 import { ViewLink } from "@/components/dashboard/view-link";
 import { SeverityBadge, StatusBadge } from "@/components/ui/status-badge";
 import { DOCS } from "@/lib/docs-nav";
-import { plural } from "@/components/dashboard/derive-shared";
+import { reportFindingsMeta } from "@/components/dashboard/derive-report";
+import { SHOW_FALSE_POSITIVES } from "@/components/dashboard/filters";
 
 export function ReportFindings({ rows }: { rows: ReportFindingRow[] }) {
   return (
@@ -14,7 +15,7 @@ export function ReportFindings({ rows }: { rows: ReportFindingRow[] }) {
       id="report-findings"
       title="Findings"
       docsHref={DOCS.findings}
-      meta={plural(rows.length, "finding")}
+      meta={reportFindingsMeta(rows)}
       className="is-wide"
     >
       {rows.length ? (
@@ -35,7 +36,7 @@ export function ReportFindings({ rows }: { rows: ReportFindingRow[] }) {
               {rows.map((f) => (
                 <tr key={f.key}>
                   <th scope="row" className="font-normal">
-                    <ViewLink view="findings" filters={{ finding: f.key }} label={`Open ${f.id}: ${f.title}`} className="whitespace-nowrap rounded-sm font-mono text-primary underline-offset-2 hover:underline">
+                    <ViewLink view="findings" filters={{ finding: f.key, fp: f.falsePositive ? SHOW_FALSE_POSITIVES : undefined }} label={`Open ${f.id}: ${f.title}`} className="whitespace-nowrap rounded-sm font-mono text-primary underline-offset-2 hover:underline">
                       {f.id}
                     </ViewLink>
                   </th>

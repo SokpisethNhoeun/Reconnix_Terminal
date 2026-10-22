@@ -15,7 +15,7 @@ export type View = (typeof VIEWS)[number];
 /** The Assessments view's own address parameters (its filters, its page). */
 export const ASSESSMENT_KEYS = ["q", "status", "template", "page"] as const;
 /** The Findings view's own address parameters (its filters, the selected finding, its page). */
-export const FINDINGS_KEYS = ["sev", "val", "q", "finding", "page"] as const;
+export const FINDINGS_KEYS = ["sev", "val", "q", "fp", "finding", "page"] as const;
 /** The Report view's own address parameters: the every-run Targets card's page (`tpage`, a key
     of its own, so it never meets a `page`; the runs table keeps its page in state). */
 export const REPORT_KEYS = ["tpage"] as const;

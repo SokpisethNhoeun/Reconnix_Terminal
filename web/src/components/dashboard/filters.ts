@@ -35,9 +35,13 @@ export function reviewLabel(f: FindingRow): string {
   return v === "closed" ? (Object.hasOwn(CLOSED_AS, f.status) ? CLOSED_AS[f.status] : FINDING_REVIEW.closed.label) : FINDING_REVIEW[v].label;
 }
 
-/** The view's first line: how many findings, across how many assessments when every run is shown. */
-export function findingsHeadline(total: number, across: number | null): string {
-  if (total === 0) return across !== null ? "No findings in any saved assessment yet." : "No findings in this assessment yet.";
+/** The view's first line: how many findings (false positives left out, as on every other page),
+    across how many assessments when every run is shown. */
+export function findingsHeadline(total: number, across: number | null, falsePositives = 0): string {
+  if (total === 0) {
+    const where = across !== null ? "any saved assessment" : "this assessment";
+    return falsePositives ? `No findings in ${where}, only ${plural(falsePositives, "false positive")}.` : `No findings in ${where} yet.`;
+  }
   const runs = across !== null ? ` across ${plural(across, "assessment")}` : "";
   return `${plural(total, "finding")}${runs} · select one to see its evidence and remediation.`;
 }
@@ -50,21 +54,34 @@ export interface FindingFilter {
   sev: string[]; // severities to keep (empty: all)
   val: string; // one of VALIDATION, or "" for all
   q: string;
+  /** Whether false positives are listed (`?fp=1`). They are left out by default, as every count
+      on the dashboard leaves them out, so the list's numbers are the Overview's. */
+  fp: boolean;
 }
 
-/** The filter an address names: unknown severities and validation buckets are dropped. */
-export function parseFindingFilter(p: { sev: string; val: string; q: string }): FindingFilter {
+/** The address value that lists the false positives. */
+export const SHOW_FALSE_POSITIVES = "1";
+
+/** The filter an address names: unknown severities and validation buckets are dropped, and only
+    `fp=1` lists the false positives. */
+export function parseFindingFilter(p: { sev: string; val: string; q: string; fp?: string }): FindingFilter {
   return {
     sev: list(p.sev).filter((s) => (SEVERITY_ORDER as readonly string[]).includes(s)),
     val: (VALIDATION as readonly string[]).includes(p.val) ? p.val : "",
     q: p.q,
+    fp: p.fp === SHOW_FALSE_POSITIVES,
   };
 }
 
-/** Whether any filter is on (the "Clear filters" button shows). */
-export const filterActive = (f: FindingFilter) => f.sev.length > 0 || f.val !== "" || f.q.trim() !== "";
+/** Whether any filter is on (the "Clear filters" button shows; it hides the false positives again). */
+export const filterActive = (f: FindingFilter) => f.sev.length > 0 || f.val !== "" || f.q.trim() !== "" || f.fp;
 
-export function findingMatches(f: FindingRow, { sev, val, q }: FindingFilter): boolean {
+/** The findings the chips and the summary count: every one but the false positives, unless they
+    are listed. */
+export const listable = (findings: FindingRow[], fp: boolean) => (fp ? findings : findings.filter((f) => !f.falsePositive));
+
+export function findingMatches(f: FindingRow, { sev, val, q, fp }: FindingFilter): boolean {
+  if (f.falsePositive && !fp) return false;
   if (sev.length && !sev.includes(f.severity)) return false;
   if ((VALIDATION as readonly string[]).includes(val) && validationOf(f) !== val) return false;
   const needle = q.trim().toLowerCase();
@@ -97,6 +114,20 @@ export function severityChips(findings: FindingRow[], selected: readonly string[
       const meaning = SEVERITY_META[c.value as Severity];
       return { ...c, label: c.value.toLowerCase(), color: meaning?.color, hint: meaning ? `${meaning.label}: ${meaning.hint}` : undefined };
     });
+}
+
+/** The one "False positives" chip: how many there are, on while they are listed. */
+export function falsePositiveChips(findings: FindingRow[]): ChipOption[] {
+  const meaning = FINDING_REVIEW.closed;
+  return [
+    {
+      value: SHOW_FALSE_POSITIVES,
+      label: "Show",
+      count: findings.filter((f) => f.falsePositive).length,
+      color: toneColor(meaning.tone),
+      hint: "Findings an analyst marked as false positives in the TUI: left out of every count. Show them to read why.",
+    },
+  ];
 }
 
 /** One chip per validation bucket (lib/status.ts FINDING_REVIEW), every bucket listed. */
@@ -132,13 +163,15 @@ export interface FindingsPage {
   current: FindingRow | null; // the selected finding (null only when `sorted` is empty)
   index: number; // its index in `sorted`, or -1
   explicit: boolean; // the address named it and it is in the list
-  /** The address named a finding that is not in the list: hidden by the filters, or unknown. */
-  missing: "" | "filtered" | "unknown";
+  /** The address named a finding that is not in the list: a false positive while they are
+      hidden, one hidden by the other filters, or an unknown one. */
+  missing: "" | "false-positive" | "filtered" | "unknown";
 }
 
 /** The page to show and the finding to select, for the filtered and sorted list. `all` is the
-    unfiltered list (to tell a filtered-out finding from an unknown one). */
-export function resolveFindingsPage(sorted: FindingRow[], all: FindingRow[], finding: string, page: string): FindingsPage {
+    unfiltered list (to tell a filtered-out finding from an unknown one); `fpShown`, whether the
+    false positives are listed. */
+export function resolveFindingsPage(sorted: FindingRow[], all: FindingRow[], finding: string, page: string, fpShown = true): FindingsPage {
   const index = finding ? sorted.findIndex((f) => f.key === finding) : -1;
   if (index >= 0) {
     const paging = paginate(sorted.length, pageOf(index));
@@ -147,7 +180,8 @@ export function resolveFindingsPage(sorted: FindingRow[], all: FindingRow[], fin
   const paging = paginate(sorted.length, page);
   const rows = slicePage(sorted, paging);
   const current = rows[0] ?? null;
-  const missing = !finding ? "" : all.some((f) => f.key === finding) ? "filtered" : "unknown";
+  const named = finding ? all.find((f) => f.key === finding) : undefined;
+  const missing = !finding ? "" : !named ? "unknown" : named.falsePositive && !fpShown ? "false-positive" : "filtered";
   return { paging, rows, current, index: current ? paging.start : -1, explicit: false, missing };
 }
 

@@ -74,7 +74,7 @@ interface SampleAssessment {
   target: string;
   status: string;
   waiting_for: string;
-  findings: { severity: string; severity_override?: string; effective_severity?: string; validation: string; title: string; status: string; cvss_score: number; triage_note?: string }[];
+  findings: { id: string; severity: string; severity_override?: string; effective_severity?: string; validation: string; title: string; status: string; cvss_score: number; triage_note?: string }[];
   verdicts: { allowed: boolean }[];
   approvals: unknown[];
   created_at: string;

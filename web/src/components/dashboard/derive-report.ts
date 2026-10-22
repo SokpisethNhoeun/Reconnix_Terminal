@@ -71,7 +71,16 @@ function findingRows(rows: FindingRow[]): ReportFindingRow[] {
     tool: f.tool,
     cwe: f.cwe,
     rating: f.rating,
+    falsePositive: f.falsePositive,
   }));
+}
+
+/** The findings table's count: the findings (false positives left out, so it is the strip's
+    number), with the false positives it lists beside it ("7 findings + 1 false positive"). */
+export function reportFindingsMeta(rows: Pick<ReportFindingRow, "falsePositive">[]): string {
+  const fp = rows.filter((r) => r.falsePositive).length;
+  const counted = plural(rows.length - fp, "finding");
+  return fp ? `${counted} + ${plural(fp, "false positive")}` : counted;
 }
 
 // --- one run -------------------------------------------------------------------------------
