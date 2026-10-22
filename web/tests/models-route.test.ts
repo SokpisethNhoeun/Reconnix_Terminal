@@ -1,10 +1,12 @@
-/* The Model menu's routes called directly (e2e/access.spec.ts and e2e/assistant.spec.ts go
+/* The model picker's routes called directly (e2e/access.spec.ts and e2e/assistant.spec.ts go
    through the proxy too): the operator role and the page's Origin on every change, strict
    bodies within a byte cap, remote addresses only when the server allows them, a cloud preset
    only at its own address, an API key that never comes back in any answer, "Test connection"
    and "Fetch models" against a stand-in model server (a server that answers without a list said
-   apart from one that can't be asked, and a redirect, which is refused), and a switch that the
-   next question uses. The saved models go to a temporary folder. */
+   apart from one that can't be asked, and a redirect, which is refused), a switch that the
+   next question uses, and no model from the environment: LLM_BASE_URL / LLM_MODEL /
+   LLM_API_KEY are set here and never read, and "environment" is no provider any route takes.
+   The saved models go to a temporary folder. */
 import { chmodSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -14,6 +16,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { MODELS_FAIL } from "@/lib/assistant/models/errors";
 import { CLOUD_FIXED } from "@/lib/assistant/models/presets";
+import { NO_MODEL } from "@/lib/assistant/models/resolve";
 import { COOKIE, sessionValue } from "@/lib/auth/session";
 
 const TOKEN = "models-route-test-token-0123456789";
@@ -83,9 +86,10 @@ beforeEach(() => {
   vi.setSystemTime((clock += 120_000)); // a new minute for the rate limits
   dir = mkdtempSync(path.join(tmpdir(), "reconix-models-route-"));
   process.env = { ...saved, RECONIX_WEB_TOKEN: TOKEN, RECONIX_DATA_DIR: "sample-data", RECONIX_STALE_AFTER_HOURS: "0", RECONIX_ASSISTANT_DIR: dir };
+  // what used to name the web's model: set, and never read any more
   process.env.LLM_BASE_URL = `${base}/v1`;
   process.env.LLM_MODEL = "env-model";
-  delete process.env.LLM_API_KEY;
+  process.env.LLM_API_KEY = "sk-env-key-never-read";
   delete process.env.LLM_ALLOW_REMOTE;
   cookie = sessionValue("operator", TOKEN);
   seen = [];
@@ -158,29 +162,38 @@ describe("the locks", () => {
     expect((await add(provider({ apiKey: "line\r\nX-Injected: 1" }))).status).toBe(400);
     expect((await add({ ...provider(), pad: "y".repeat(30_000) })).status).toBe(413);
     expect((await patch("not-an-id", { name: "x" })).status).toBe(400);
-    expect((await patch("environment", { name: "x" })).body.detail).toContain("web/.env.local");
     expect((await patch(ID, { apiKey: "k", removeKey: true })).status).toBe(400);
     expect((await remove("../models.key")).status).toBe(400);
-    expect((await choose({ providerId: "environment", model: "other" })).status).toBe(400);
     expect((await choose({ providerId: ID, model: "m", more: 1 })).status).toBe(400);
     expect((await test({ baseUrl: `${base}/v1` })).body.detail).toBe("Name a model to test.");
     expect((await test({ providerId: ID, baseUrl: base })).status).toBe(400);
     expect(seen).toHaveLength(0);
   });
+  it("refuse the old Environment provider everywhere, before anything is read or sent", async () => {
+    const env = { providerId: "environment", model: "env-model" };
+    const chosen = await choose(env);
+    expect(chosen).toEqual({ status: 400, body: { detail: "Send { providerId, model } only: a saved provider's id and one of its models." } });
+    expect((await test({ providerId: "environment" })).status).toBe(400);
+    expect((await fetchNames({ providerId: "environment" })).status).toBe(400);
+    expect((await patch("environment", { name: "x" })).body).toEqual({ detail: "That is not a provider id." });
+    expect((await remove("environment")).status).toBe(400);
+    expect(seen).toHaveLength(0); // the environment's address was never asked
+    expect((await list()).body.active).toBeNull();
+  });
 });
 
 describe("the providers", () => {
-  it("list the Environment first, read-only and active, before anything is saved", async () => {
+  it("list nothing before anything is saved, whatever the environment names", async () => {
     const { status, body } = await list();
     expect(status).toBe(200);
+    expect(Object.keys(body).sort()).toEqual(["active", "allowRemote", "presets", "providers", "summary"]);
     expect(body).toMatchObject({
       providers: [],
-      environment: { name: "Environment", model: "env-model", local: true, reason: "" },
-      active: { providerId: "environment", model: "env-model" },
-      summary: { configured: true, name: "env-model", provider: "Environment" },
+      active: null,
+      summary: { configured: false, name: "", provider: "", local: false, reason: NO_MODEL },
       allowRemote: false,
     });
-    expect(JSON.stringify(body)).not.toContain(base); // the environment's address stays on the server
+    for (const env of ["env-model", "sk-env-key", base]) expect(JSON.stringify(body)).not.toContain(env); // nothing of LLM_*
     // the model picker's rows, in its order, each saying what it needs: a key, and whether its
     // address is a fixed cloud one (usable only with LLM_ALLOW_REMOTE=1), local or any
     const presets = body.presets as { id: string; key: string; kind: string; baseUrl: string }[];
@@ -230,7 +243,8 @@ describe("the providers", () => {
     const gone = await remove(p.id);
     expect(gone.status).toBe(200);
     expect(gone.body.providers).toEqual([]);
-    expect(gone.body.active).toEqual({ providerId: "environment", model: "env-model" });
+    expect(gone.body.active).toBeNull(); // nothing answers in its place
+    expect(gone.body.summary).toMatchObject({ configured: false, reason: NO_MODEL });
     expect((await remove(p.id)).status).toBe(404);
     expect((await patch(p.id, { name: "x" })).status).toBe(404);
   });
@@ -312,7 +326,6 @@ describe("test and fetch", () => {
     const down = await test({ baseUrl: "http://127.0.0.1:9/v1", model: "m" });
     expect(down.body).toEqual({ ok: false, detail: "Could not reach the address. Is the model's server running?" });
     expect(JSON.stringify(down.body)).not.toContain("127.0.0.1:9");
-    expect((await test({ providerId: "environment" })).body).toEqual({ ok: true, detail: "Connected: env-model answered." });
   });
   it("fetch the model names: sorted, once each, only names a model may have", async () => {
     const names = await fetchNames({ baseUrl: `${base}/v1` });
@@ -356,7 +369,7 @@ describe("test and fetch", () => {
 });
 
 describe("switching", () => {
-  it("the next question is asked with the model just chosen", async () => {
+  it("the next question is asked with the model just chosen, and none before one is", async () => {
     const p = (await add(provider())).body.provider as { id: string };
     const ask = async () => {
       const res = await question.POST(json("POST", "/api/assistant", { uid: null, question: "Which model are you?" }));
@@ -365,8 +378,10 @@ describe("switching", () => {
       bodies.push(text);
       return text;
     };
-    expect(await ask()).toContain("Answered by env-model.");
-    expect(seen.at(-1)).toMatchObject({ url: "/v1/chat/completions", model: "env-model", auth: "" });
+    const none = await question.POST(json("POST", "/api/assistant", { uid: null, question: "Which model are you?" }));
+    expect(none.status).toBe(503); // saved but not chosen, and LLM_* is never read
+    expect(((await none.json()) as { detail: string }).detail).toBe(NO_MODEL);
+    expect(seen).toHaveLength(0);
 
     const switched = await choose({ providerId: p.id, model: "stub-b" });
     expect(switched.status).toBe(200);
@@ -376,8 +391,10 @@ describe("switching", () => {
 
     expect((await choose({ providerId: p.id, model: "not-listed" })).status).toBe(400);
     expect((await choose({ providerId: ID, model: "stub-a" })).status).toBe(404);
-    expect((await choose({ providerId: "environment", model: "env-model" })).body.active).toEqual({ providerId: "environment", model: "env-model" });
-    expect(await ask()).toContain("Answered by env-model.");
+    expect((await choose({ providerId: "environment", model: "env-model" })).status).toBe(400);
+    expect((await choose({ providerId: p.id, model: "stub-a" })).body.active).toEqual({ providerId: p.id, model: "stub-a" });
+    expect(await ask()).toContain("Answered by stub-a.");
+    expect(seen.map((s) => s.model).filter(Boolean)).toEqual(["stub-b", "stub-a"]); // never env-model
   });
   it("a chosen model that can't be used any more is reported, not replaced", async () => {
     process.env.LLM_ALLOW_REMOTE = "1";

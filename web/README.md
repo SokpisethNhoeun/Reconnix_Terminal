@@ -138,40 +138,48 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   static once messages exist (scaled text vibrates while reading); reduced motion shows a still
   halo (and a still glow) instead.
 
-- **Model:** any OpenAI-compatible endpoint, as the product docs' "Model switching": set
-  `LLM_BASE_URL` and `LLM_MODEL` in the environment `/web` starts from or in `web/.env.local`
-  (git-ignored). A local Ollama: `LLM_BASE_URL=http://127.0.0.1:11434/v1`, `LLM_MODEL=llama3.2`.
-  An endpoint off this machine also needs `LLM_ALLOW_REMOTE=1` (assessment data goes there; the
-  screen says so) and takes `LLM_API_KEY` over https only. The key stays in the Next.js
-  process: the terminal helper and the TUI it runs never get `LLM_*`. Unset, the screen says how.
+- **Model:** any OpenAI-compatible endpoint, as the product docs' "Model switching", added with
+  the composer's **+ Model** and saved by the dashboard. The web reads no model from its
+  environment (`LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` are not used); until one is added
+  the screen says "No AI model is set up yet. Add one with the model chip under the message box
+  (+ Model)." An endpoint off this machine also needs the dashboard started with
+  `LLM_ALLOW_REMOTE=1` (assessment data goes there; the screen says so; the browser can't turn
+  it on) and takes an API key over https only. The terminal helper and the TUI it runs never
+  get `LLM_*`.
 - **The composer** (`composer.tsx`): a rounded box (radius 16) with the text area on top and a
   row under it: the model chip on the left; on the right "Enter to send · Shift+Enter for new
   line" (hidden on a phone) and the round 32 px send button (Stop while a reply is written).
   Under the box: "Answers use your saved assessment data. Scans and approvals stay in the
   terminal." The header has no model control.
-- **Choosing a model** (`model-chip.tsx`, `model-picker.tsx` and its steps, the rules in
+- **Choosing a model** (`model-chip.tsx`, `model-picker.tsx` with `model-list.tsx` and
+  `model-provider-form.tsx` (+ `model-key-field.tsx`, `model-name-field.tsx`), the rules in
   `model-picker-rules.ts`, `lib/assistant/models/`): the chip says `● <model> ▾` (green) or
   `● Choose a model ▾` (amber, the reason in its tooltip); a viewer sees it disabled ("Choosing a
   model needs the operator role"). It opens a picker upward (a sheet over the composer on a
-  phone), a dialog named after its step; Escape goes back a step, then closes; focus goes to each
-  step's first control and back to the chip. 1 **Choose a model**: *Your models* (the `LLM_*`
-  model as the read-only **Environment**, the default while nothing is chosen, and every saved
-  model; one click switches) and *Add or change a provider* (OpenAI, Anthropic, DeepSeek,
-  OpenRouter, Groq, Ollama (local), LM Studio (local), Custom (OpenAI-compatible); the cloud ones
-  disabled with "Start the dashboard with LLM_ALLOW_REMOTE=1 to use cloud models" unless the
-  server allows it; a saved one has Remove, asked first). 2 **`<Provider>` · credentials**: the
-  API key (never filled in; "Key saved: leave empty to keep it", Remove key) and, for Custom and
-  the local ones only, the base URL; Continue asks `…/models/fetch` (`GET {base}/models`) and,
-  when the server lists none, `…/models/test` (one tiny completion) for a model the provider is
-  known to have; a refusal stays on the step. 3 **`<Provider>` · choose a model**: the listed
-  models or a typed name (tested first); **Use this model** POSTs a new provider (named after its
-  preset, `activate: true`) or PATCHes the saved one and PUTs it active, and the chip follows
-  without a reload. A saved key goes only to its saved address (an unchanged provider is asked by
-  its id). Providers live in `models.json` in the assistant's folder (0600, atomic), the keys
-  AES-256-GCM-sealed with `models.key` (32 bytes, 0600, made once): never sent to the browser or
-  logged. `GET /api/assistant/models` also says whether the server allows remote models
-  (`allowRemote`) and lists the presets in the picker's order with their kind. Every model
-  passes the same rules as the environment's (`config.ts` `checkModel`: http(s), no credentials
+  phone), a dialog named after its step; Escape goes back to the list, then closes; focus goes to
+  each step's first control and back to the chip. **Model**: only your saved models (✓ on the
+  active one, the name in mono, "`<provider>` · local|remote"; a remote one disabled with "Start
+  the dashboard with LLM_ALLOW_REMOTE=1 to use cloud models" unless the server allows it; one
+  click switches, roving focus), each with a bin and an inline confirm "Remove `<model>`
+  (`<provider>`)? …" (No by default; the provider's last model DELETEs the provider, else its
+  list is PATCHed); "No model yet." when empty; **+ Model** at the bottom. **Set the provider**
+  (Back, or Cancel, returns to the list): Provider (a native select of OpenAI, Anthropic,
+  DeepSeek, OpenRouter, Groq, Ollama (local), LM Studio (local), Custom (OpenAI-compatible), the
+  cloud ones disabled with the same reason), Base URL (Custom and the local ones only, from the
+  preset), API key (uncontrolled, never filled in or kept, emptied with another provider; "Key
+  saved: leave empty to keep it" and Remove key for a saved one), Model (a select filled by
+  **Fetch models**, `…/models/fetch` = `GET {base}/models`, also fetched once the provider,
+  address and key are set; or "Type a model name…"; when the server lists none,
+  `…/models/test` for a model the saved provider is known to have). **Add model** tests a typed
+  model (or one not from the list fetched for those values), then POSTs a new provider (named
+  after its preset, `activate: true`) or, for the same preset at the same address, PATCHes the
+  saved one with the model added and PUTs it active; the chip follows without a reload. A
+  refusal stays on the form. A saved key goes only to its saved address (the saved provider is
+  asked by its id). Providers live in `models.json` in the assistant's folder (0600, atomic), the
+  keys AES-256-GCM-sealed with `models.key` (32 bytes, 0600, made once): never sent to the
+  browser or logged. `GET /api/assistant/models` also says whether the server allows remote
+  models (`allowRemote`) and lists the presets in the picker's order with their kind. Every
+  model passes the same rules (`config.ts` `checkModel`: http(s), no credentials
   in the URL, the model name pattern, a key only over https to a remote host, remote only with
   `LLM_ALLOW_REMOTE=1`), again on every use: a chosen model that can't be used says why instead
   of falling back. Outbound tests and fetches refuse redirects, stop after 10 s and never cache.
@@ -234,9 +242,11 @@ combining runs: the selection, the preview frame, one real PDF and DOCX, the 500
 `docs` (group pages with their pages in place, no link off the page, the rail without
 Configuration, Copy, the in-page search, the old addresses on their anchors, the phone menu), `dashboard-fit` (the
 Overview fits the fixed frame with nothing to scroll), `assistant` (with the stand-in model
-`e2e/llm-stub.mjs`; `[stub:markdown]`, `[stub:long]` and `[stub:fail]` pick its answers; the
-composer's model picker against its `GET /v1/models`), `a11y-assistant` (axe on each picker
-step, and the phone's sheet),
+`e2e/llm-stub.mjs`, saved as the provider "Stub" by `e2e/global-setup.ts` through the models
+route, `e2e/models.ts`: the web reads no model from its environment; `[stub:markdown]`,
+`[stub:long]` and `[stub:fail]` pick its answers; the composer's model picker against its
+`GET /v1/models`), `a11y-assistant` (axe on the picker's list, its remove confirm, Set the
+provider with a refusal and a fetched list, and the phone's sheet),
 `assistant-knowledge` (an `/add-on` folder written as the TUI does: "Knowledge used" under the
 answer, kept after a reload), `motion` (directions,
 timing, the globe, history), `scroll` (the wheel and keys at six sizes, no sideways scroll) and
@@ -278,7 +288,7 @@ src/
 │   │                        #   (+ terminalAccess), origin.ts (same-origin check), ticket.ts (terminal tickets)
 │   ├── terminal/            # config.ts (on/off, helper port), paths.ts, protocol.ts (frames, close codes),
 │   │                        #   screen-text.ts (what Copy output copies)
-│   ├── assistant/           # config.ts (the rules every model passes, the Environment model), request.ts
+│   ├── assistant/           # config.ts (the rules every model passes), request.ts
 │   │                        #   (zod), context.ts (what the model sees),
 │   │                        #   prompt.ts, llm.ts + stream.ts + reply.ts (the streamed reply), protocol.ts
 │   │                        #   (NDJSON frames), intent.ts + cards.ts + insights.ts + prompts.ts (cards and

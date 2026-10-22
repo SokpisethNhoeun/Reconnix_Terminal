@@ -21,7 +21,7 @@ import { ensureKey, hasKey, open, readKey, seal } from "./crypto";
 import { folderFault, MODELS_FAIL, ModelsError } from "./errors";
 import { CLOUD_FIXED, fitsPreset, type PresetId, presetOf } from "./presets";
 import type { AddProvider, UpdateProvider } from "./requests";
-import { type Active, EMPTY_MODELS, ENVIRONMENT_NAME, MAX_FILE_BYTES, MAX_NAME, MAX_PROVIDERS, type ModelsFile, ModelsFileSchema, type SavedProvider } from "./schema";
+import { type Active, EMPTY_MODELS, MAX_FILE_BYTES, MAX_NAME, MAX_PROVIDERS, type ModelsFile, ModelsFileSchema, type SavedProvider } from "./schema";
 import type { ProviderView } from "./view";
 
 export const MODELS_FILE = "models.json";
@@ -146,11 +146,10 @@ function change<T>(task: (file: ModelsFile, f: Folder) => Promise<{ file: Models
 const bad = (message: string) => new ModelsError(message, 400);
 const GONE = "That provider is not saved any more.";
 
-/** A provider's name: masked, one line, at most MAX_NAME; unique and never "Environment". */
+/** A provider's name: masked, one line, at most MAX_NAME; unique. */
 function nameFor(raw: string, file: ModelsFile, self: string | null): string {
   const name = cleanTitle(raw, MAX_NAME);
   if (!name) throw bad("Give the provider a name.");
-  if (name.toLowerCase() === ENVIRONMENT_NAME.toLowerCase()) throw bad(`“${ENVIRONMENT_NAME}” is the model from web/.env.local. Give this provider another name.`);
   if (file.providers.some((p) => p.id !== self && p.name.toLowerCase() === name.toLowerCase())) throw bad("A provider with that name is saved already.");
   return name;
 }
@@ -222,7 +221,7 @@ export function updateProvider(id: string, patch: UpdateProvider, env: Env = pro
 }
 
 /** Removes a saved provider and its key (false: there was none). The active choice goes with it
-    (the Environment model answers again, when there is one). */
+    (no model answers until another is chosen). */
 export function removeProvider(id: string): Promise<boolean> {
   return change(async (file) => {
     if (!file.providers.some((p) => p.id === id)) throw new ModelsError(GONE, 404);
@@ -232,15 +231,13 @@ export function removeProvider(id: string): Promise<boolean> {
 }
 
 /** Makes a saved provider's model the one that answers (it must be listed and its address
-    usable now), or, with null, the Environment's. */
-export function setActive(choice: Active | null, env: Env = process.env): Promise<void> {
+    usable now). */
+export function setActive(choice: Active, env: Env = process.env): Promise<void> {
   return change(async (file) => {
-    if (choice) {
-      const p = file.providers.find((x) => x.id === choice.providerId);
-      if (!p) throw new ModelsError(GONE, 404);
-      if (!p.models.includes(choice.model)) throw bad("That model is not in the provider's list.");
-      addressFor(p.baseUrl, Boolean(p.key), env);
-    }
+    const p = file.providers.find((x) => x.id === choice.providerId);
+    if (!p) throw new ModelsError(GONE, 404);
+    if (!p.models.includes(choice.model)) throw bad("That model is not in the provider's list.");
+    addressFor(p.baseUrl, Boolean(p.key), env);
     return { file: { ...file, active: choice }, result: undefined };
   });
 }

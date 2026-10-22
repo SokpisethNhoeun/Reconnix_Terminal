@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import { parseBlocks } from "@/lib/assistant/markdown";
-import { modelSetup } from "@/lib/assistant/config";
+import { checkModel } from "@/lib/assistant/config";
 import { buildContext, clean, CONTEXT_LIMIT } from "@/lib/assistant/context";
 import { fenceTag, systemPrompt } from "@/lib/assistant/prompt";
 import { redact } from "@/lib/assistant/redact";
@@ -39,33 +39,28 @@ describe("ChatRequestSchema", () => {
   });
 });
 
-describe("modelSetup", () => {
-  it("needs an address and a model", () => {
-    expect(modelSetup({}).ok).toBe(false);
-    expect(modelSetup({ LLM_BASE_URL: "http://127.0.0.1:11434/v1" }).ok).toBe(false);
-  });
+describe("checkModel (every saved model, again on each use)", () => {
+  const model = (baseUrl: string, name = "m", apiKey: string | null = null, allowRemote = false) => checkModel({ baseUrl, model: name, apiKey }, { allowRemote });
   it("needs consent before data goes off this machine", () => {
-    const remote = { LLM_BASE_URL: "https://llm.example.com/v1", LLM_MODEL: "m" };
-    const refused = modelSetup(remote);
+    const refused = model("https://llm.example.com/v1");
     expect(refused.ok).toBe(false);
     expect(!refused.ok && refused.reason).toContain("LLM_ALLOW_REMOTE=1");
-    expect(modelSetup({ ...remote, LLM_ALLOW_REMOTE: "1" }).ok).toBe(true);
+    expect(model("https://llm.example.com/v1", "m", null, true).ok).toBe(true);
   });
   it("reads a local endpoint", () => {
-    const setup = modelSetup({ LLM_BASE_URL: "http://127.0.0.1:11434/v1/", LLM_MODEL: "llama3.2" });
-    expect(setup).toEqual({ ok: true, config: { baseUrl: "http://127.0.0.1:11434/v1", model: "llama3.2", apiKey: null, local: true } });
+    expect(model("http://127.0.0.1:11434/v1/", "llama3.2")).toEqual({ ok: true, config: { baseUrl: "http://127.0.0.1:11434/v1", model: "llama3.2", apiKey: null, local: true } });
   });
   it.each([
-    ["not an address", { LLM_BASE_URL: "nope", LLM_MODEL: "m" }],
-    ["another scheme", { LLM_BASE_URL: "file:///etc/passwd", LLM_MODEL: "m" }],
-    ["a key in the address", { LLM_BASE_URL: "https://user:secret@llm.example.com/v1", LLM_MODEL: "m" }],
-    ["a key over plain http to a remote host", { LLM_BASE_URL: "http://llm.example.com/v1", LLM_MODEL: "m", LLM_API_KEY: "k", LLM_ALLOW_REMOTE: "1" }],
-    ["an odd model name", { LLM_BASE_URL: "http://127.0.0.1:1/v1", LLM_MODEL: "a b\nc" }],
-  ])("refuses %s", (_name, env) => {
-    expect(modelSetup(env).ok).toBe(false);
+    ["not an address", () => model("nope")],
+    ["another scheme", () => model("file:///etc/passwd")],
+    ["a key in the address", () => model("https://user:secret@llm.example.com/v1", "m", null, true)],
+    ["a key over plain http to a remote host", () => model("http://llm.example.com/v1", "m", "k", true)],
+    ["an odd model name", () => model("http://127.0.0.1:1/v1", "a b\nc")],
+  ])("refuses %s", (_name, check) => {
+    expect(check().ok).toBe(false);
   });
   it("sends a key to a remote model over https only", () => {
-    const setup = modelSetup({ LLM_BASE_URL: "https://llm.example.com/v1", LLM_MODEL: "m", LLM_API_KEY: "k", LLM_ALLOW_REMOTE: "1" });
+    const setup = model("https://llm.example.com/v1", "m", "k", true);
     expect(setup.ok && setup.config.apiKey).toBe("k");
     expect(setup.ok && setup.config.local).toBe(false);
   });

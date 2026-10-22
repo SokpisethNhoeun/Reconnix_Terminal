@@ -1,6 +1,6 @@
-/* The model list behind the model picker's Continue (operators only; src/proxy.ts checks the
-   role too). POST { providerId } lists a saved provider's models as saved (the Environment too),
-   POST { baseUrl, apiKey? } the picker's unsaved address; a saved key only ever goes to its saved address. The
+/* The model list behind "Fetch models" in the model picker's "Set the provider" (operators only;
+   src/proxy.ts checks the role too). POST { providerId } lists a saved provider's models as
+   saved, POST { baseUrl, apiKey? } the picker's unsaved address; a saved key only ever goes to its saved address. The
    address is checked first, then GET {base}/models (no redirects, ten seconds, no cache, 1 MB
    at most). Answers { models }: the names a model name may be, sorted, at most 200; or, when
    the model's server answered without a list that could be read, { listed: false, detail } (the

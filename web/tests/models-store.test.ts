@@ -2,14 +2,15 @@
    (RECONIX_ASSISTANT_DIR): the sealed keys (AES-256-GCM: a round trip, a changed byte, another
    key, another provider), the file (owner-only modes, atomic writes, links refused, a corrupt
    file refused with a fixed message, never a key in what the routes get), the rules every saved
-   model passes (config.ts) and which model answers (resolve.ts). Never touches ~/.reconix. */
+   model passes (config.ts) and which model answers (resolve.ts: only a saved one, never one
+   from LLM_BASE_URL / LLM_MODEL / LLM_API_KEY). Never touches ~/.reconix. */
 import { randomBytes } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { checkModel, ENV_WORDING, FORM_WORDING, modelSetup } from "@/lib/assistant/config";
+import { checkModel, FORM_WORDING } from "@/lib/assistant/config";
 import { open, seal } from "@/lib/assistant/models/crypto";
 import { MODELS_FAIL, ModelsError } from "@/lib/assistant/models/errors";
 import { CLOUD_FIXED } from "@/lib/assistant/models/presets";
@@ -96,16 +97,9 @@ describe("the rules every model passes", () => {
     await expect(saving).rejects.toMatchObject({ status: 400 }); // said as such, never a 500
     expect(existsSync(path.join(dir, "models.json"))).toBe(false);
   });
-  it("are the environment's rules too, with the same results and messages", () => {
-    const env = (e: Record<string, string>) => {
-      const r = modelSetup(e);
-      return r.ok ? r.config : r.reason;
-    };
-    expect(env({ LLM_BASE_URL: "nope", LLM_MODEL: "m" })).toBe("LLM_BASE_URL is not a valid address.");
-    expect(env({ LLM_BASE_URL: "https://u:p@h.example/v1", LLM_MODEL: "m", LLM_ALLOW_REMOTE: "1" })).toBe("Put the key in LLM_API_KEY, not in LLM_BASE_URL.");
-    expect(env({ LLM_BASE_URL: "http://127.0.0.1:1/v1", LLM_MODEL: "a b" })).toBe("LLM_MODEL holds characters a model name doesn't use.");
-    expect(env({ LLM_BASE_URL: "http://127.0.0.1:1/v1/?x=1#y", LLM_MODEL: "m" })).toEqual({ baseUrl: "http://127.0.0.1:1/v1", model: "m", apiKey: null, local: true });
-    expect(ENV_WORDING.url).toBe("LLM_BASE_URL");
+  it("keep an address as the server keeps it: no query, hash or trailing slashes", () => {
+    const r = checkModel({ baseUrl: "http://127.0.0.1:1/v1/?x=1#y", model: "m", apiKey: null }, { allowRemote: false });
+    expect(r).toEqual({ ok: true, config: { baseUrl: "http://127.0.0.1:1/v1", model: "m", apiKey: null, local: true } });
   });
 });
 
@@ -153,8 +147,8 @@ describe("the saved models", () => {
     const wrongShape = { format: MODELS_FORMAT, providers: [], active: { providerId: "00000000-0000-4000-8000-000000000001", model: "m" } };
     writeFileSync(path.join(dir, "models.json"), JSON.stringify(wrongShape));
     await expect(listProviders()).rejects.toThrow(MODELS_FAIL.read); // the choice names no saved model
-    const resolved = await activeModel({ LLM_BASE_URL: "http://127.0.0.1:1/v1", LLM_MODEL: "env" });
-    expect(resolved.ok).toBe(false); // reported, not replaced by the environment's model
+    const resolved = await activeModel();
+    expect(resolved.ok).toBe(false); // reported, never replaced
     expect(!resolved.ok && resolved.reason).toBe(MODELS_FAIL.read);
   });
   it.runIf(posix)("refuse links: the file, the key and the folder", async () => {
@@ -232,7 +226,9 @@ describe("the saved models", () => {
     const { file, apiKeyOf } = await readSaved();
     expect(file.providers).toHaveLength(MAX_PROVIDERS);
     expect(apiKeyOf(file.providers[MAX_PROVIDERS - 1])).toBe("k".repeat(4_096));
-    expect((await activeModel({ LLM_BASE_URL: "http://127.0.0.1:1/v1", LLM_MODEL: "env" })).ok).toBe(true);
+    const last = file.providers[MAX_PROVIDERS - 1];
+    await setActive({ providerId: last.id, model: last.models[MAX_MODELS - 1] }); // still writable
+    expect((await activeModel()).ok).toBe(true);
   });
   it("leave the conversations alone, and the conversations leave them alone", async () => {
     await addProvider({ ...local, apiKey: SECRET });
@@ -244,10 +240,10 @@ describe("the saved models", () => {
     expect((await listProviders()).providers).toHaveLength(1);
   });
 
-  it("check names: cleaned, unique, never Environment", async () => {
+  it("check names: cleaned and unique (Environment is a name like any other)", async () => {
     await addProvider(local);
     await expect(addProvider({ ...local, name: " local OLLAMA " })).rejects.toThrow("saved already");
-    await expect(addProvider({ ...local, name: "environment" })).rejects.toThrow("web/.env.local");
+    expect((await addProvider({ ...local, name: "Environment" })).name).toBe("Environment");
     await expect(addProvider({ ...local, name: " ​ " })).rejects.toThrow("Give the provider a name.");
     const p = await addProvider({ ...local, name: "Two\nlines\u0007 here" });
     expect(p.name).toBe("Two lines here");
@@ -286,14 +282,19 @@ describe("the saved models", () => {
 });
 
 describe("which model answers", () => {
-  const ENV = { LLM_BASE_URL: "http://127.0.0.1:11434/v1", LLM_MODEL: "env-model" };
-  it("is the environment's while nothing is chosen, as before", async () => {
-    const r = await activeModel(ENV);
-    expect(r).toMatchObject({ ok: true, config: { model: "env-model", local: true }, summary: { configured: true, name: "env-model", provider: "Environment" } });
+  // the web reads no model from its environment: these are ignored everywhere below
+  const ENV = { LLM_BASE_URL: "http://127.0.0.1:11434/v1", LLM_MODEL: "env-model", LLM_API_KEY: "sk-env-key" };
+  it("is none while nothing is chosen, whatever LLM_BASE_URL, LLM_MODEL and LLM_API_KEY say", async () => {
+    for (const env of [ENV, {}]) {
+      const r = await activeModel(env);
+      expect(r).toEqual({ ok: false, reason: NO_MODEL, summary: { configured: false, name: "", provider: "", local: false, reason: NO_MODEL } });
+    }
+    expect(NO_MODEL).toBe("No AI model is set up yet. Add one with the model chip under the message box (+ Model).");
     expect(existsSync(dir)).toBe(false); // reading made no folder
-    const none = await activeModel({});
-    expect(none).toMatchObject({ ok: false, reason: NO_MODEL, summary: { configured: false, name: "" } });
-    expect(NO_MODEL).toContain("Choose a model");
+    const view = await modelsView(ENV);
+    expect(view).toEqual({ providers: [], active: null, summary: (await activeModel()).summary, allowRemote: false });
+    expect(JSON.stringify(view)).not.toMatch(/env-model|sk-env-key|11434/);
+    await expect(probeTarget({ providerId: "00000000-0000-4000-8000-000000000001" }, true, ENV)).rejects.toThrow("not saved any more");
   });
   it("is the saved choice when there is one, with its key", async () => {
     const p = await addProvider({ ...local, apiKey: SECRET, activate: true });
@@ -303,9 +304,10 @@ describe("which model answers", () => {
     expect(JSON.stringify(r.summary)).not.toContain(SECRET);
     const view = await modelsView(ENV);
     expect(view.active).toEqual({ providerId: p.id, model: "qwen2.5:7b" });
-    expect(view.environment).toEqual({ name: "Environment", model: "env-model", local: true, reason: "" });
-    await setActive(null);
-    expect((await modelsView(ENV)).active).toEqual({ providerId: "environment", model: "env-model" });
+    expect(Object.keys(view).sort()).toEqual(["active", "allowRemote", "providers", "summary"]);
+    await removeProvider(p.id);
+    expect((await modelsView(ENV)).active).toBeNull();
+    expect((await activeModel(ENV)).ok).toBe(false); // nothing answers in its place
   });
   it("says why a saved choice can't be used, instead of asking another model", async () => {
     await addProvider({ ...remote, apiKey: SECRET, activate: true }, { LLM_ALLOW_REMOTE: "1" });
@@ -346,6 +348,6 @@ describe("which model answers", () => {
     expect(await probeTarget({ baseUrl: "http://127.0.0.1:9/v1", model: "m" }, true)).toMatchObject({ apiKey: null });
     await expect(probeTarget({ baseUrl: "http://127.0.0.1:9/v1" }, true)).rejects.toThrow("Name a model to test.");
     await expect(probeTarget({ baseUrl: "https://llm.example.com/v1" }, false)).rejects.toThrow("LLM_ALLOW_REMOTE=1");
-    await expect(probeTarget({ providerId: "environment" }, true)).rejects.toThrow("No AI model is set up");
+    await expect(probeTarget({ providerId: "environment" }, true)).rejects.toThrow("not saved any more"); // the routes refuse it before
   });
 });

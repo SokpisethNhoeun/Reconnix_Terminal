@@ -41,9 +41,9 @@ export async function streamReply(config: ModelConfig, turns: Turn[], signal: Ab
     await response.body?.cancel().catch(() => {});
     const hint =
       response.status === 404
-        ? ` Check the model name ("${config.model}") and the base URL in the model picker (or LLM_MODEL and LLM_BASE_URL).`
+        ? ` Check the model name ("${config.model}") and the base URL in the model picker.`
         : response.status === 401 || response.status === 403
-          ? " Check the API key in the model picker (or LLM_API_KEY)."
+          ? " Check the API key in the model picker."
           : "";
     throw new ModelError(`The AI model answered with HTTP ${response.status}.${hint}`, 502);
   }

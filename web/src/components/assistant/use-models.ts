@@ -1,16 +1,17 @@
 "use client";
 
-/* The model picker's data: the saved providers, the Environment model and the active choice,
-   read when the picker opens; switching, saving a model ("Use this model": a new provider, or a
-   change to a saved one and a switch) and removing a provider go to the server, whose answer
-   (the whole view) replaces what the picker shows and tells the assistant which model answers
-   next (setModel), so the chip, the reason above the composer and Ask follow without a reload.
-   One change at a time: `pending` names it (a switch: "<providerId>/<model>"). Operators only. */
+/* The model picker's data: the saved providers and the active choice, read when the picker
+   opens; switching, adding a model ("Add model": a new provider, or a change to a saved one and
+   a switch) and removing one (the provider with its last model, else a change of its list) go to
+   the server, whose answer (the whole view) replaces what the picker shows and tells the
+   assistant which model answers next (setModel), so the chip, the reason above the composer and
+   Ask follow without a reload. One change at a time: `pending` names it (a switch:
+   "<providerId>/<model>", a removal: "remove:<providerId>/<model>"). Operators only. */
 import { useCallback, useRef, useState } from "react";
 
 import * as api from "@/lib/assistant/client";
 import type { ModelsView } from "@/lib/assistant/models/view";
-import type { UseRequests } from "./model-picker-rules";
+import type { AddRequests, RemoveRequest } from "./model-picker-rules";
 import type { ModelSummary } from "./types";
 
 export interface ModelsState {
@@ -68,11 +69,16 @@ export function useModels(operator: boolean, setModel: (model: ModelSummary) => 
   );
 
   const choose = useCallback((providerId: string, model: string) => run(choiceKey(providerId, model), () => api.switchModel({ providerId, model })), [run]);
-  const remove = useCallback((id: string) => run(`remove:${id}`, () => api.removeModelProvider(id)), [run]);
-  /** "Use this model": the new provider (made active as it is added), or the saved one's changes
+  /** Removes one model (`key`: its row): the provider with its last one, else from its list. */
+  const remove = useCallback(
+    (key: string, request: RemoveRequest) =>
+      run(`remove:${key}`, () => (request.kind === "delete" ? api.removeModelProvider(request.id) : api.updateModelProvider(request.id, request.body))),
+    [run],
+  );
+  /** "Add model": the new provider (made active as it is added), or the saved one's changes
       first (their view is shown even when the switch after them is refused) and the switch. */
   const save = useCallback(
-    (requests: UseRequests) =>
+    (requests: AddRequests) =>
       run("save", async () => {
         if (requests.kind === "add") return api.addModelProvider(requests.body);
         if (requests.body) {
