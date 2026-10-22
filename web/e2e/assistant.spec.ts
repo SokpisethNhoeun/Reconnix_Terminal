@@ -4,27 +4,27 @@
    server built from the sample data; conversations the dashboard's server keeps (they survive
    a reload and a new browser; open, rename, delete); Markdown with Copy; Stop and "New
    messages"; Retry; an answer with nothing in it; the composer and its model picker (the chip
-   naming the Environment's model, no Model button in the header, Custom against the stand-in
-   through credentials and the fetched list to asking with the new model, a one-click switch
-   back, removing a provider, a cloud provider disabled with the reason, a refusal kept on its
-   step, Escape a step back and then closed, the arrow keys, a typed API key never in the markup
-   and gone with the picker when the Assistant is left by keyboard or by Back); what a viewer
-   can't do; and the routes' locks.
+   naming the seeded stand-in, "Stub", no Model button in the header and no Environment
+   anywhere; the list of your models with + Model; Set the provider: Custom at the stand-in,
+   Fetch models, stub-model-2 added to Stub and asked with; a typed model saved as a new
+   provider; a one-click switch back; removing a model, and a provider with its last one; cloud
+   providers disabled with the reason; a refusal kept on the form; no model at all; Escape, Back
+   and Cancel; a typed API key never in the markup and gone with the form, with another
+   provider, and with the picker when the Assistant is left by keyboard or by Back); what a
+   viewer can't do; and the routes' locks (the old "environment" refused). The web reads no
+   model from its environment: e2e/global-setup.ts saves the stand-in (e2e/models.ts).
    The chat panel holds still (text never moves), but the welcome's globe and the sidebar's icon
    breathe, so this project runs with reduced motion (playwright.config.ts; the motion itself is
    tested in motion.spec.ts) and clicks need no `force`. The
    stand-in model changes its answer only for explicit [stub:…] tokens. Conversations go to a
    test folder, and the e2e server allows more questions a minute (playwright.config.ts). */
-import { rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
-
 import { type BrowserContext, type Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
 
 import { sessionValue } from "../src/lib/auth/session";
 import { LLM_PORT, PORT, TOKEN } from "../playwright.config";
+import { clearModels, seedModels, STUB_URL } from "./models";
 import { counted, newest, runsWithFindings, sample, signIn, signInFresh } from "./support";
 
 const ORIGIN = `http://127.0.0.1:${PORT}`;
@@ -49,12 +49,6 @@ const forgetAll = async (page: Page) => {
   const res = await page.request.delete("/api/assistant/conversations", { headers: { Origin: ORIGIN } });
   expect(res.status()).toBe(200);
 };
-/** Starts from no saved models (the e2e server's assistant folder, playwright.config.ts): the
-    Environment's stub-model answers. Deleting the conversations never touches these files. */
-const forgetModels = () => {
-  const dir = path.join(tmpdir(), `reconix-e2e-assistant-${PORT}`);
-  for (const name of ["models.json", "models.key"]) rmSync(path.join(dir, name), { force: true });
-};
 /** The Reconix mark's colours as drawn (tile, diamond) and the tokens it should use, resolved the
     same way (ui/reconix-mark.tsx: --surface and --globe-glow, the TUI's cyan). */
 const markColours = (svg: SVGElement | HTMLElement) => {
@@ -75,8 +69,10 @@ const markColours = (svg: SVGElement | HTMLElement) => {
 };
 /** The composer's model chip: "Model: <name> (<provider>, local|remote)", or "Choose a model". */
 const chip = (page: Page) => page.locator(".ai-composer").getByRole("button", { name: /^(Model: |Choose a model$)/ });
-/** The model picker, named after its step ("Choose a model", "Custom · credentials"…). */
+/** The model picker, named after its step ("Model", or "Set the provider"). */
 const picker = (page: Page, step: string) => page.getByRole("dialog", { name: step, exact: true });
+/** The list of your models in the picker. */
+const yours = (page: Page) => picker(page, "Model").getByRole("list", { name: "Your models" });
 /** An API key typed in the picker (the stand-in model takes none: it only has to be typed). */
 const KEY = "sk-e2e-picker-key-0123456789abcdef";
 
@@ -368,14 +364,15 @@ test.describe("when the model fails", () => {
 
 test.describe("the composer and its model picker", () => {
   test.use({ reducedMotion: "reduce" });
-  test.beforeEach(forgetModels);
-  test.afterEach(forgetModels); // the other specs ask the Environment's stub-model
+  // each starts from, and leaves, the seeded stand-in only: the other specs ask its stub-model
+  test.beforeEach(({ request }) => seedModels(request));
+  test.afterEach(({ request }) => seedModels(request));
 
-  test("the composer: the chip names the Environment's model in green, the header has no Model button", async ({ page }) => {
+  test("the composer: the chip names the seeded model in green, the header has no Model button", async ({ page }) => {
     await page.goto("/?view=assistant");
     await assistantShown(page);
     await expect(header(page).getByRole("button", { name: /^Model/ })).toHaveCount(0);
-    await expect(chip(page)).toHaveAccessibleName("Model: stub-model (Environment, local)");
+    await expect(chip(page)).toHaveAccessibleName("Model: stub-model (Stub, local)");
     await expect(chip(page)).toHaveText("stub-model");
     await expect(chip(page)).toHaveAttribute("data-tone", "success");
     await expect(chip(page).locator(".ai-dot")).toHaveAttribute("data-tone", "success");
@@ -392,149 +389,207 @@ test.describe("the composer and its model picker", () => {
     await expect(page.getByText("Answers use your saved assessment data. Scans and approvals stay in the terminal.")).toBeVisible();
   });
 
-  test("Custom against the stand-in: credentials, the fetched list, Use this model, ask with it; one click back to the Environment; remove it", async ({ page }) => {
+  test("the list: only your models, the seeded one checked, + Model at the bottom, no Environment anywhere", async ({ page }) => {
+    await page.goto("/?view=assistant");
+    await chip(page).click();
+    const pick = picker(page, "Model");
+    await expect(pick).toBeVisible();
+    await expect(chip(page)).toHaveAttribute("aria-expanded", "true");
+    const rows = yours(page);
+    await expect(rows.getByRole("listitem")).toHaveCount(1);
+    const stub = rows.getByRole("button", { name: "stub-model Stub · local", exact: true });
+    await expect(stub).toHaveAttribute("aria-current", "true");
+    await expect(stub).toBeFocused(); // the step's first control
+    await expect(rows.getByRole("button", { name: "Remove stub-model (Stub)" })).toBeVisible();
+    const add = pick.getByRole("button", { name: "+ Model" });
+    const [addBox, stubBox] = await Promise.all([add.boundingBox(), stub.boundingBox()]);
+    expect(addBox!.y).toBeGreaterThan(stubBox!.y + stubBox!.height); // at the bottom
+    // no provider rows any more, and nothing of an Environment model
+    await expect(pick.getByText(/OpenAI|Anthropic|Ollama/)).toHaveCount(0);
+    await expect(pick.getByText(/environment/i)).toHaveCount(0);
+    await expect(page.locator(".ai-composer-area").getByText(/environment/i)).toHaveCount(0);
+    expect(await (await page.request.get("/api/assistant/models")).text()).not.toContain("nvironment");
+    // the arrow keys move between the row and its bin, wrapping
+    await page.keyboard.press("ArrowRight");
+    await expect(rows.getByRole("button", { name: "Remove stub-model (Stub)" })).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(stub).toBeFocused();
+    await page.keyboard.press("Enter"); // the checked one: just closes
+    await expect(pick).toBeHidden();
+    await expect(chip(page)).toBeFocused();
+  });
+
+  test("+ Model: Custom at the stand-in, Fetch models, stub-model-2, Add model, ask with it; one click back; remove it", async ({ page }) => {
     await page.goto("/?view=assistant");
     await page.evaluate(() => ((window as unknown as { kept: number }).kept = 3));
     await chip(page).click();
-    const pick = picker(page, "Choose a model");
-    await expect(pick).toBeVisible();
-    await expect(chip(page)).toHaveAttribute("aria-expanded", "true");
-    const yours = pick.getByRole("menu", { name: "Your models" });
-    await expect(yours.getByRole("menuitemradio")).toHaveCount(1);
-    await expect(yours.getByRole("menuitemradio", { name: /^stub-model Environment/ })).toHaveAttribute("aria-checked", "true");
-    await expect(yours.getByRole("menuitemradio", { name: /^stub-model Environment/ })).toBeFocused(); // the step's first control
-    const providers = pick.getByRole("list", { name: "Add or change a provider" });
-    await expect(providers.getByRole("listitem")).toHaveCount(8);
-    await expect(providers.getByRole("button")).toHaveText([/^OpenAI/, /^Anthropic/, /^DeepSeek/, /^OpenRouter/, /^Groq/, /^Ollama \(local\)/, /^LM Studio \(local\)/, /^Custom \(OpenAI-compatible\)/]);
+    await picker(page, "Model").getByRole("button", { name: "+ Model" }).click();
+    const form = picker(page, "Set the provider");
+    const provider = form.getByLabel("Provider", { exact: true });
+    await expect(provider).toBeFocused();
+    await expect(provider).toHaveValue("ollama"); // the first that may be chosen
+    await provider.selectOption({ label: "Custom (OpenAI-compatible)" });
+    const url = form.getByLabel("Base URL", { exact: true });
+    await expect(url).toHaveValue("");
+    await expect(form.getByLabel("API key", { exact: true })).toHaveAttribute("type", "password");
+    await expect(form.getByLabel("API key", { exact: true })).toHaveAttribute("placeholder", "Optional");
+    await form.getByRole("button", { name: "Fetch models" }).click();
+    await expect(form.getByRole("alert")).toHaveText("Give the base URL (it usually ends in /v1)."); // asked first, nothing sent
+    await url.fill(STUB_URL);
+    await expect(form.getByText("Saved as Stub: Add model adds the model to it.")).toBeVisible();
+    await form.getByRole("button", { name: "Fetch models" }).click();
 
-    // step 2: Custom takes a base URL (empty: the preset has none) and an optional key
-    await providers.getByRole("button", { name: /^Custom/ }).click();
-    const creds = picker(page, "Custom · credentials");
-    await expect(creds.getByLabel("Base URL", { exact: true })).toBeFocused();
-    await expect(creds.getByLabel("Base URL", { exact: true })).toHaveValue("");
-    await expect(creds.getByLabel("API key", { exact: true })).toHaveAttribute("type", "password");
-    await creds.getByRole("button", { name: "Continue" }).click();
-    await expect(creds.getByRole("alert")).toHaveText("Give the base URL (it usually ends in /v1)."); // asked first, nothing sent
-    await creds.getByLabel("Base URL", { exact: true }).fill(`http://127.0.0.1:${LLM_PORT}/v1`);
-    await creds.getByRole("button", { name: "Continue" }).click();
-
-    // step 3: the stand-in's list (GET /v1/models), plus a typed name
-    const choose = picker(page, "Custom · choose a model");
-    const radios = choose.getByRole("radiogroup", { name: "Custom models" }).getByRole("radio");
-    await expect(radios).toHaveCount(3);
-    await expect(choose.getByRole("radio", { name: "stub-model", exact: true })).toBeChecked();
-    await expect(choose.getByRole("radio", { name: "stub-model", exact: true })).toBeFocused();
-    await expect(choose.getByRole("radio", { name: "stub-model-2" })).toBeVisible();
-    await choose.getByRole("radio", { name: "Type a model name" }).check();
-    await choose.getByLabel("Model name", { exact: true }).fill("two words");
-    await choose.getByRole("button", { name: "Use this model" }).click();
-    await expect(choose.getByRole("alert")).toContainText("letters, digits");
-    await choose.getByRole("radio", { name: "stub-model-2" }).check();
-    await choose.getByRole("button", { name: "Use this model" }).click();
+    // the stand-in's list (GET /v1/models), plus a typed name; it starts on Stub's active model
+    const model = form.getByLabel("Model", { exact: true });
+    await expect(model.locator("option")).toHaveText(["stub-model", "stub-model-2", "Type a model name…"]);
+    await expect(model).toHaveValue("stub-model");
+    await model.selectOption({ label: "Type a model name…" });
+    await form.getByLabel("Model name", { exact: true }).fill("two words");
+    await form.getByRole("button", { name: "Add model" }).click();
+    await expect(form.getByRole("alert")).toContainText("letters, digits");
+    await model.selectOption("stub-model-2");
+    await form.getByRole("button", { name: "Add model" }).click();
 
     // closed: the chip says the new model, focus is back on it, and the next question goes to it
-    await expect(choose).toBeHidden();
+    await expect(form).toBeHidden();
     await expect(chip(page)).toBeFocused();
-    await expect(chip(page)).toHaveAccessibleName("Model: stub-model-2 (Custom, local)");
+    await expect(chip(page)).toHaveAccessibleName("Model: stub-model-2 (Stub, local)");
     await expect(chip(page)).toHaveText("stub-model-2");
     await ask(page, "Which model answers?");
     await expect(log(page)).toContainText("You asked: Which model answers? Model: stub-model-2.");
     expect(await page.evaluate(() => (window as unknown as { kept?: number }).kept)).toBe(3); // never reloaded
-    const saved = (await (await page.request.get("/api/assistant/models")).json()) as { providers: { name: string; preset: string; models: string[]; keySaved: boolean }[]; active: unknown };
-    expect(saved.providers).toEqual([expect.objectContaining({ name: "Custom", preset: "custom", models: ["stub-model-2"], keySaved: false })]);
+    const saved = (await (await page.request.get("/api/assistant/models")).json()) as { providers: { id: string; name: string; models: string[] }[]; active: unknown };
+    expect(saved.providers).toEqual([expect.objectContaining({ name: "Stub", models: ["stub-model", "stub-model-2"] })]); // added to it (PATCH)
+    expect(saved.active).toEqual({ providerId: saved.providers[0].id, model: "stub-model-2" });
     await page.reload();
-    await expect(chip(page)).toHaveAccessibleName("Model: stub-model-2 (Custom, local)"); // the server's file
+    await expect(chip(page)).toHaveAccessibleName("Model: stub-model-2 (Stub, local)"); // the server's file
 
-    // one click back to the Environment from Your models
+    // one click back to stub-model
     await chip(page).click();
-    await expect(yours.getByRole("menuitemradio")).toHaveCount(2);
-    await expect(yours.getByRole("menuitemradio").first()).toHaveAccessibleName(/^stub-model-2 Custom/); // the active one first
-    await expect(yours.getByRole("menuitemradio").first()).toHaveAttribute("aria-checked", "true");
-    await yours.getByRole("menuitemradio", { name: /^stub-model Environment/ }).click();
-    await expect(pick).toBeHidden();
-    await expect(chip(page)).toHaveAccessibleName("Model: stub-model (Environment, local)");
+    const rows = yours(page);
+    await expect(rows.getByRole("listitem")).toHaveCount(2);
+    await expect(rows.getByRole("button", { name: "stub-model-2 Stub · local", exact: true })).toHaveAttribute("aria-current", "true");
+    await rows.getByRole("button", { name: "stub-model Stub · local", exact: true }).click();
+    await expect(picker(page, "Model")).toBeHidden();
+    await expect(chip(page)).toHaveAccessibleName("Model: stub-model (Stub, local)");
     await expect(chip(page)).toBeFocused();
 
-    // remove the Custom provider: asked first, No by default; Escape keeps it too
+    // remove stub-model-2: asked first, No by default; Escape keeps it too
     await chip(page).click();
-    const custom = providers.getByRole("listitem").filter({ has: page.getByRole("button", { name: /^Custom/ }) });
-    await expect(custom.getByRole("button", { name: /^Custom/ })).toHaveAccessibleName(/local$/);
-    await providers.getByRole("button", { name: "Remove Custom" }).click();
-    const confirm = providers.getByRole("group", { name: "Remove Custom?" });
+    await rows.getByRole("button", { name: "Remove stub-model-2 (Stub)" }).click();
+    const confirm = rows.getByRole("group", { name: "Remove stub-model-2 (Stub)?" });
+    await expect(confirm).toContainText("Remove stub-model-2 (Stub)? Stub keeps its other models.");
     await expect(confirm.getByRole("button", { name: "No" })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(confirm).toHaveCount(0);
-    await expect(pick).toBeVisible(); // only the confirm went
-    await expect(providers.getByRole("button", { name: "Remove Custom" })).toBeFocused();
+    await expect(picker(page, "Model")).toBeVisible(); // only the confirm went
+    await expect(rows.getByRole("button", { name: "Remove stub-model-2 (Stub)" })).toBeFocused();
     await page.keyboard.press("Enter");
-    await providers.getByRole("group", { name: "Remove Custom?" }).getByRole("button", { name: "Remove", exact: true }).click();
-    await expect(providers.getByRole("button", { name: "Remove Custom" })).toHaveCount(0);
-    await expect(providers.getByRole("button", { name: /^Custom \(OpenAI-compatible\)/ })).toBeFocused();
-    await expect(yours.getByRole("menuitemradio")).toHaveCount(1);
-    expect(((await (await page.request.get("/api/assistant/models")).json()) as { providers: unknown[] }).providers).toEqual([]);
+    await rows.getByRole("group", { name: "Remove stub-model-2 (Stub)?" }).getByRole("button", { name: "Remove", exact: true }).click();
+    await expect(rows.getByRole("listitem")).toHaveCount(1);
+    await expect(rows.getByRole("button", { name: "stub-model Stub · local", exact: true })).toBeFocused(); // the row before it
+    const after = (await (await page.request.get("/api/assistant/models")).json()) as { providers: { name: string; models: string[] }[] };
+    expect(after.providers).toEqual([expect.objectContaining({ name: "Stub", models: ["stub-model"] })]); // its list changed (PATCH)
   });
 
-  test("a cloud provider is disabled with the reason while the server keeps data here", async ({ page }) => {
+  test("a new provider: a typed model is tested and saved (POST); removing its last model removes it", async ({ page }) => {
     await page.goto("/?view=assistant");
     await chip(page).click();
-    const pick = picker(page, "Choose a model");
-    const anthropic = pick.getByRole("button", { name: /^Anthropic/ });
-    await expect(anthropic).toBeDisabled(); // aria-disabled: still focusable, so the reason is read
-    await expect(anthropic).toHaveAccessibleDescription("Start the dashboard with LLM_ALLOW_REMOTE=1 to use cloud models");
-    await expect(pick.getByText("Start the dashboard with LLM_ALLOW_REMOTE=1 to use cloud models")).toBeVisible();
-    for (const name of ["OpenAI", "DeepSeek", "OpenRouter", "Groq"]) await expect(pick.getByRole("button", { name: new RegExp(`^${name}`) })).toBeDisabled();
-    await expect(pick.getByRole("button", { name: /^Ollama/ })).toBeEnabled();
-    await anthropic.click({ force: true }); // nothing happens
+    await picker(page, "Model").getByRole("button", { name: "+ Model" }).click();
+    const form = picker(page, "Set the provider");
+    await form.getByLabel("Provider", { exact: true }).selectOption("custom");
+    await form.getByLabel("Base URL", { exact: true }).fill(`http://localhost:${LLM_PORT}/v1`); // another address
+    await form.getByLabel("Model", { exact: true }).selectOption({ label: "Type a model name…" });
+    await form.getByLabel("Model name", { exact: true }).fill("no-such-model-here");
+    await form.getByLabel("Model name", { exact: true }).press("Enter"); // Add model: tested first
+    await expect(chip(page)).toHaveAccessibleName("Model: no-such-model-here (Custom, local)"); // the stand-in answers any name
+    const saved = (await (await page.request.get("/api/assistant/models")).json()) as { providers: { name: string; preset: string; models: string[] }[] };
+    expect(saved.providers.map((p) => [p.name, p.preset, p.models])).toEqual([
+      ["Stub", "custom", ["stub-model"]],
+      ["Custom", "custom", ["no-such-model-here"]],
+    ]);
+
+    await chip(page).click();
+    const rows = yours(page);
+    await rows.getByRole("button", { name: "Remove no-such-model-here (Custom)" }).click();
+    await expect(rows.getByRole("group", { name: "Remove no-such-model-here (Custom)?" })).toContainText(
+      "It is Custom's last model, so Custom is removed too. No model answers until you add or choose one.",
+    );
+    await rows.getByRole("button", { name: "Remove", exact: true }).click();
+    await expect(rows.getByRole("listitem")).toHaveCount(1);
+    await expect(chip(page)).toHaveAccessibleName("Choose a model");
+    const after = (await (await page.request.get("/api/assistant/models")).json()) as { providers: { name: string }[]; active: unknown };
+    expect(after.providers.map((p) => p.name)).toEqual(["Stub"]); // the provider went (DELETE)
+    expect(after.active).toBeNull();
+  });
+
+  test("cloud providers are disabled with the reason while the server keeps data here", async ({ page }) => {
+    await page.goto("/?view=assistant");
+    await chip(page).click();
+    await picker(page, "Model").getByRole("button", { name: "+ Model" }).click();
+    const form = picker(page, "Set the provider");
+    const provider = form.getByLabel("Provider", { exact: true });
+    await expect(provider.locator("option")).toHaveText(["OpenAI", "Anthropic", "DeepSeek", "OpenRouter", "Groq", "Ollama (local)", "LM Studio (local)", "Custom (OpenAI-compatible)"]);
+    for (const name of ["OpenAI", "Anthropic", "DeepSeek", "OpenRouter", "Groq"]) await expect(provider.locator("option", { hasText: new RegExp(`^${name}$`) })).toBeDisabled();
+    for (const name of ["Ollama (local)", "LM Studio (local)", "Custom (OpenAI-compatible)"]) await expect(provider.locator("option", { hasText: name })).toBeEnabled();
+    await expect(form.getByText("Start the dashboard with LLM_ALLOW_REMOTE=1 to use cloud models")).toBeVisible();
+    await expect(provider).toHaveAccessibleDescription(/Start the dashboard with LLM_ALLOW_REMOTE=1 to use cloud models/);
+  });
+
+  test("a refusal stays on the form with the server's words", async ({ page }) => {
+    await page.goto("/?view=assistant");
+    await chip(page).click();
+    await picker(page, "Model").getByRole("button", { name: "+ Model" }).click();
+    const form = picker(page, "Set the provider");
+    await form.getByLabel("Provider", { exact: true }).selectOption("custom");
+    const url = form.getByLabel("Base URL", { exact: true });
+    await url.fill("http://example.com/v1");
+    await expect(form.getByText("Off this machine: the dashboard uses it only when started with LLM_ALLOW_REMOTE=1.")).toBeVisible(); // the hint, before anything is sent
+    await form.getByRole("button", { name: "Fetch models" }).click();
+    await expect(form.getByRole("alert")).toContainText("is not on this machine");
+    await url.fill(`http://user:pw@127.0.0.1:${LLM_PORT}/v1`);
+    await url.press("Enter"); // Fetch models
+    await expect(form.getByRole("alert")).toContainText("not in the base URL");
+    await expect(form.getByRole("alert")).toHaveClass(/ai-picker-refusal/);
+    await expect(form).toBeVisible();
+    const saved = (await (await page.request.get("/api/assistant/models")).json()) as { providers: { name: string }[] };
+    expect(saved.providers.map((p) => p.name)).toEqual(["Stub"]);
+  });
+
+  test("with no model: Choose a model in amber, the message, and an empty list with + Model", async ({ page }) => {
+    clearModels();
+    await page.goto("/?view=assistant");
+    await expect(chip(page)).toHaveAccessibleName("Choose a model");
+    await expect(chip(page)).toHaveAttribute("data-tone", "warning");
+    await expect(page.locator("#ai-composer-reason")).toContainText("No AI model is set up yet. Add one with the model chip under the message box (+ Model).");
+    await expect(composer(page)).toBeDisabled();
+    await chip(page).click();
+    const pick = picker(page, "Model");
+    await expect(pick.getByText("No model yet.")).toBeVisible();
+    await expect(pick.getByRole("button", { name: "+ Model" })).toBeFocused();
+  });
+
+  test("Escape and Back go back to the list, then Escape closes, with focus back on the chip", async ({ page }) => {
+    await page.goto("/?view=assistant");
+    await chip(page).click();
+    const pick = picker(page, "Model");
+    await pick.getByRole("button", { name: "+ Model" }).click();
+    const form = picker(page, "Set the provider");
+    await expect(form.getByLabel("Provider", { exact: true })).toBeFocused();
+    await form.getByLabel("Provider", { exact: true }).selectOption("custom");
+    await form.getByLabel("Base URL", { exact: true }).fill(STUB_URL);
+    await page.keyboard.press("Escape");
     await expect(pick).toBeVisible();
-    await expect(page.getByRole("dialog", { name: "Anthropic · credentials" })).toHaveCount(0);
-  });
-
-  test("a refusal stays on step 2 with the server's words", async ({ page }) => {
-    await page.goto("/?view=assistant");
-    await chip(page).click();
-    await picker(page, "Choose a model").getByRole("button", { name: /^Custom/ }).click();
-    const creds = picker(page, "Custom · credentials");
-    await creds.getByLabel("Base URL", { exact: true }).fill("http://example.com/v1");
-    await expect(creds.getByText("Off this machine: the dashboard uses it only when started with LLM_ALLOW_REMOTE=1.")).toBeVisible(); // the hint, before anything is sent
-    await creds.getByRole("button", { name: "Continue" }).click();
-    await expect(creds.getByRole("alert")).toContainText("is not on this machine");
-    await creds.getByLabel("Base URL", { exact: true }).fill(`http://user:pw@127.0.0.1:${LLM_PORT}/v1`);
-    await creds.getByRole("button", { name: "Continue" }).click();
-    await expect(creds.getByRole("alert")).toContainText("not in the base URL");
-    await expect(creds).toBeVisible();
-    expect(((await (await page.request.get("/api/assistant/models")).json()) as { providers: unknown[] }).providers).toEqual([]);
-  });
-
-  test("Escape goes back a step, then closes, with focus back on the chip; the arrow keys move between rows", async ({ page }) => {
-    await page.goto("/?view=assistant");
-    await chip(page).click();
-    const pick = picker(page, "Choose a model");
-    const ollama = pick.getByRole("button", { name: /^Ollama/ });
-    await ollama.focus();
-    await page.keyboard.press("ArrowDown");
-    await expect(pick.getByRole("button", { name: /^LM Studio/ })).toBeFocused();
-    await page.keyboard.press("ArrowUp");
-    await expect(ollama).toBeFocused();
+    await expect(pick.getByRole("button", { name: "+ Model" })).toBeFocused();
+    // opened again, the form starts afresh
     await page.keyboard.press("Enter");
-    const creds = picker(page, "Ollama · credentials");
-    await expect(creds.getByLabel("Base URL", { exact: true })).toHaveValue("http://127.0.0.1:11434/v1"); // the preset's
-    await expect(creds.getByLabel("Base URL", { exact: true })).toBeFocused();
-    await page.keyboard.press("Escape");
+    await expect(form.getByLabel("Provider", { exact: true })).toHaveValue("ollama");
+    await form.getByRole("button", { name: "Back to your models" }).click();
     await expect(pick).toBeVisible();
-    await expect(ollama).toBeFocused(); // the row it came from
-
-    // Custom → step 3 → Escape keeps what was typed in step 2
-    await pick.getByRole("button", { name: /^Custom/ }).click();
-    const creds2 = picker(page, "Custom · credentials");
-    await creds2.getByLabel("Base URL", { exact: true }).fill(`http://127.0.0.1:${LLM_PORT}/v1`);
-    await creds2.getByLabel("Base URL", { exact: true }).press("Enter"); // Continue
-    const choose = picker(page, "Custom · choose a model");
-    await expect(choose.getByRole("radio", { name: "stub-model", exact: true })).toBeFocused();
-    await page.keyboard.press("Escape");
-    await expect(creds2.getByLabel("Base URL", { exact: true })).toHaveValue(`http://127.0.0.1:${LLM_PORT}/v1`);
-    await expect(creds2.getByLabel("Base URL", { exact: true })).toBeFocused();
-    await page.keyboard.press("Escape");
+    await pick.getByRole("button", { name: "+ Model" }).click();
+    await form.getByRole("button", { name: "Cancel" }).click();
     await expect(pick).toBeVisible();
+    await expect(pick.getByRole("button", { name: "+ Model" })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(pick).toBeHidden();
     await expect(chip(page)).toBeFocused();
@@ -546,22 +601,23 @@ test.describe("the composer and its model picker", () => {
     await expect(pick).toBeHidden();
   });
 
-  /** Opens step 2 for Custom and types KEY in its API key field: masked, never in the markup. */
+  /** Opens Set the provider for Custom and types KEY in its API key field: masked, never in the markup. */
   const typeKey = async (page: Page) => {
     await chip(page).click();
-    await picker(page, "Choose a model").getByRole("button", { name: /^Custom/ }).click();
-    const creds = picker(page, "Custom · credentials");
-    const key = creds.getByLabel("API key", { exact: true });
+    await picker(page, "Model").getByRole("button", { name: "+ Model" }).click();
+    const form = picker(page, "Set the provider");
+    await form.getByLabel("Provider", { exact: true }).selectOption("custom");
+    const key = form.getByLabel("API key", { exact: true });
     await key.pressSequentially(KEY);
     await expect(key).toHaveValue(KEY);
     await expect(key).toHaveAttribute("type", "password");
     // nothing that looks like a sign-in for a password manager to offer to save
     await expect(key).toHaveAttribute("autocomplete", "off");
     for (const flag of ["data-1p-ignore", "data-lpignore", "data-bwignore"]) await expect(key).toHaveAttribute(flag, /.*/);
-    await expect(creds.locator("form")).toHaveCount(0);
+    await expect(form.locator("form")).toHaveCount(0);
     expect(await page.evaluate(() => document.querySelector("input[type=password]")?.getAttribute("value") ?? null)).toBeNull();
     expect(await page.evaluate((k) => document.documentElement.outerHTML.includes(k), KEY)).toBe(false);
-    return creds;
+    return form;
   };
   /** No field on the page holds KEY, as its value or in the markup, and the picker is closed. */
   const keyGone = async (page: Page) => {
@@ -569,14 +625,26 @@ test.describe("the composer and its model picker", () => {
     expect(await page.evaluate((k) => [...document.querySelectorAll("input")].some((i) => i.value === k) || document.documentElement.outerHTML.includes(k), KEY)).toBe(false);
   };
 
+  test("another provider empties the key field, and so does going back to the list", async ({ page }) => {
+    await page.goto("/?view=assistant");
+    const form = await typeKey(page);
+    await form.getByLabel("Provider", { exact: true }).selectOption("lmstudio");
+    await expect(form.getByLabel("API key", { exact: true })).toHaveValue(""); // never sent to another provider
+    await form.getByLabel("Provider", { exact: true }).selectOption("custom");
+    await form.getByLabel("API key", { exact: true }).fill(KEY);
+    await page.keyboard.press("Escape");
+    await expect(picker(page, "Model")).toBeVisible();
+    expect(await page.evaluate((k) => [...document.querySelectorAll("input")].some((i) => i.value === k), KEY)).toBe(false);
+  });
+
   test("leaving the Assistant by keyboard closes the picker and forgets a key typed in it", async ({ page }) => {
     await page.goto("/?view=assistant");
-    const creds = await typeKey(page);
+    const form = await typeKey(page);
     // Shift+Tab out of the picker (focus leaving it closes it), on to Minimize, and Enter
     const back = page.getByRole("button", { name: "Back to the dashboard" });
     for (let i = 0; i < 80 && !(await back.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Shift+Tab");
     await expect(back).toBeFocused();
-    await expect(creds).toHaveCount(0); // closed as focus left it and the chip, the Assistant still shown
+    await expect(form).toHaveCount(0); // closed as focus left it and the chip, the Assistant still shown
     await expect(chip(page)).toHaveAttribute("aria-expanded", "false");
     await page.keyboard.press("Enter");
     await expect(page).not.toHaveURL(/view=assistant/);
@@ -592,8 +660,8 @@ test.describe("the composer and its model picker", () => {
     await page.goto("/");
     await tab(page).click();
     await assistantShown(page);
-    const creds = await typeKey(page);
-    await expect(creds.getByLabel("API key", { exact: true })).toBeFocused(); // still being typed in
+    const form = await typeKey(page);
+    await expect(form.getByLabel("API key", { exact: true })).toBeFocused(); // still being typed in
     await page.goBack();
     await expect(page).not.toHaveURL(/view=assistant/);
     await expect(page.getByRole("heading", { name: "Assessment Operations Center" })).toBeVisible();
@@ -602,10 +670,10 @@ test.describe("the composer and its model picker", () => {
     await assistantShown(page);
     await expect(chip(page)).toHaveAttribute("aria-expanded", "false");
     await keyGone(page);
-    // opened again: step 2 starts empty
+    // opened again: the form starts empty
     await chip(page).click();
-    await picker(page, "Choose a model").getByRole("button", { name: /^Custom/ }).click();
-    await expect(picker(page, "Custom · credentials").getByLabel("API key", { exact: true })).toHaveValue("");
+    await picker(page, "Model").getByRole("button", { name: "+ Model" }).click();
+    await expect(picker(page, "Set the provider").getByLabel("API key", { exact: true })).toHaveValue("");
   });
 });
 
@@ -621,7 +689,8 @@ test("a viewer sees the assistant but can't ask or read conversations", async ({
   await expect(chip(page)).toHaveAttribute("title", "Choosing a model needs the operator role");
   await expect(chip(page)).toHaveAccessibleDescription("Choosing a model needs the operator role");
   await chip(page).click({ force: true });
-  await expect(page.getByRole("dialog", { name: "Choose a model" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Model" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "+ Model" })).toHaveCount(0);
   await expect(page.getByRole("list", { name: "Suggested questions" }).getByRole("button").first()).toBeDisabled();
   const post = await page.request.post("/api/assistant", { headers: { Origin: ORIGIN }, data: { uid: null, question: "hi" } });
   expect(post.status()).toBe(403);
@@ -660,10 +729,13 @@ test("the routes want a signed-in operator, the page's origin and a valid reques
   expect((await page.request.delete(`/api/assistant/conversations/${id}`, { headers: { Origin: "http://evil.example" } })).status()).toBe(403);
   expect((await page.request.delete(`/api/assistant/conversations/${id}`, { headers: { Origin: ORIGIN } })).status()).toBe(200);
 
-  // the Model menu's routes: changes need the page's origin and a strict body
+  // the model picker's routes: changes need the page's origin and a strict body; the old
+  // Environment provider is no provider any more
   const provider = { name: "x", preset: "custom", baseUrl: "http://127.0.0.1:1/v1", models: ["m"] };
   expect((await page.request.post("/api/assistant/models", { headers: { Origin: "http://evil.example" }, data: provider })).status()).toBe(403);
   expect((await page.request.put("/api/assistant/models/active", { headers: { Origin: "http://evil.example" }, data: { providerId: "environment", model: "stub-model" } })).status()).toBe(403);
+  expect((await page.request.put("/api/assistant/models/active", { headers: { Origin: ORIGIN }, data: { providerId: "environment", model: "stub-model" } })).status()).toBe(400);
+  expect((await page.request.post("/api/assistant/models/fetch", { headers: { Origin: ORIGIN }, data: { providerId: "environment" } })).status()).toBe(400);
   expect((await page.request.post("/api/assistant/models", { headers: { Origin: ORIGIN }, data: { ...provider, extra: 1 } })).status()).toBe(400);
   expect((await page.request.delete("/api/assistant/models/not-an-id", { headers: { Origin: ORIGIN } })).status()).toBe(400);
   const models = await page.request.get("/api/assistant/models");

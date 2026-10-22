@@ -99,10 +99,9 @@ export default defineConfig({
         RECONIX_KNOWLEDGE_DIR: KNOWLEDGE_DIR,
         // the specs ask more than the default 12 questions a minute
         RECONIX_ASSISTANT_RATE_PER_MINUTE: "120",
-        // the AI Assistant asks the stand-in, never a real model (these override web/.env.local)
-        LLM_BASE_URL: `http://127.0.0.1:${LLM_PORT}/v1`,
-        LLM_MODEL: "stub-model",
-        LLM_API_KEY: "",
+        // the AI Assistant asks the stand-in, saved as its only model by e2e/global-setup.ts
+        // (e2e/models.ts); cloud models stay off whatever web/.env.local says
+        LLM_ALLOW_REMOTE: "0",
       },
       reuseExistingServer: false,
       timeout: 60_000,
