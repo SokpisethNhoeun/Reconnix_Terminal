@@ -1,10 +1,10 @@
 /* The knowledge ranker (lib/assistant/knowledge/rank.ts) on cases worked out by hand: the
-   tokenizer, BM25 (k1 1.2, b 0.75, idf ln(1 + (N − df + 0.5)/(df + 0.5))), the 1.5 threshold, the
+   tokenizer, BM25 (k1 1.2, b 0.75, idf ln(1 + (N − df + 0.5)/(df + 0.5))), the matched-tokens rule, the
    best 4, ties by source name then passage index, and the 4,000-character budget. The shared
    vectors from the Python side are checked in knowledge-vectors.test.ts. */
 import { describe, expect, it } from "vitest";
 
-import { BUDGET, buildCorpus, idf, MIN_SCORE, queryTokens, rank, scoreAll, STOPWORDS, tokenize, TOP_K, withinBudget } from "@/lib/assistant/knowledge/rank";
+import { BUDGET, buildCorpus, idf, MIN_MATCHED, queryTokens, rank, scoreAll, STOPWORDS, tokenize, TOP_K, withinBudget } from "@/lib/assistant/knowledge/rank";
 
 const scored = (corpus: ReturnType<typeof buildCorpus>, q: string) => scoreAll(corpus, q).map((p) => [p.source, p.index, p.score] as const);
 
@@ -71,12 +71,24 @@ describe("selection", () => {
     { name: "notes.md", chunks: ["rare word here", "common one", "common two", "common three", ...Array.from({ length: 6 }, (_, i) => `filler${i} text`)] },
   ]);
 
-  it(`keeps a passage at a score of ${MIN_SCORE} or more`, () => {
+  it("keeps a passage that holds one token of a one-token question, however low its score", () => {
     // ln(1 + 9.5 / 1.5) × 2.2 / (1 + 1.2 × (0.25 + 0.75 × 3 / 2.1)) = 1.695217
-    expect(rank(corpus, "rare")).toEqual([{ source: "notes.md", index: 0, text: "rare word here", score: expect.closeTo(1.695217, 6) }]);
-    // ln(1 + 7.5 / 3.5) × 2.2 / (1 + 1.2 × (0.25 + 0.75 × 2 / 2.1)) = 1.167883: below the threshold
+    expect(rank(corpus, "rare")).toEqual([{ source: "notes.md", index: 0, text: "rare word here", score: expect.closeTo(1.695217, 6), matched: 1 }]);
+    // ln(1 + 7.5 / 3.5) × 2.2 / (1 + 1.2 × (0.25 + 0.75 × 2 / 2.1)) = 1.167883: still relevant
     expect(scoreAll(corpus, "common")[1].score).toBeCloseTo(1.167883, 6);
-    expect(rank(corpus, "common")).toEqual([]);
+    expect(rank(corpus, "common").map((p) => p.index)).toEqual([1, 2, 3]);
+  });
+
+  it(`needs ${MIN_MATCHED} of the question's distinct tokens in one passage`, () => {
+    expect(rank(corpus, "rare common")).toEqual([]); // each passage holds only one of them
+    expect(rank(corpus, "rare word")).toEqual([expect.objectContaining({ index: 0, matched: 2 })]);
+    expect(rank(corpus, "rare rare rare")).toHaveLength(1); // one distinct token: one is enough
+  });
+
+  it("uses a one-passage source, which a fixed score threshold would leave out", () => {
+    const small = buildCorpus([{ name: "keys.md", chunks: ["Rotate the signing keys every 30 days."] }]);
+    // N = 1: idf = ln(1 + 0.5 / 1.5) = 0.287682, far below any fixed threshold
+    expect(rank(small, "how often do we rotate signing keys")).toEqual([expect.objectContaining({ source: "keys.md", index: 0, matched: 3 })]);
   });
 
   it(`keeps the best ${TOP_K}, ties by source name, then passage index`, () => {
@@ -100,7 +112,7 @@ describe("selection", () => {
     expect(top[0].score).toBeCloseTo(4.462081, 6);
     expect(top[1].score).toBeCloseTo(3.757542, 6);
     expect(top[1].score).toBe(top[3].score);
-    expect(top.every((p) => p.score >= MIN_SCORE)).toBe(true);
+    expect(top.every((p) => p.matched >= MIN_MATCHED)).toBe(true);
   });
 
   it("compares names by code point, as Python does", () => {

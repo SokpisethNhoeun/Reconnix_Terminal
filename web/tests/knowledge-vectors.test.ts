@@ -1,7 +1,8 @@
 /* The shared ranking vectors (tests/knowledge-vectors.json, written from the Python side, the
    TUI's /add-on ranker) checked against this ranker (lib/assistant/knowledge/rank.ts), so both
    tokenize and rank alike: the tokens of each input, and for each query the relevant passages in
-   order (score ≥ 1.5, the best 4, ties by source name then index) with their scores to 4
+   order (at least two of the query's distinct tokens, or all when it has fewer; the best 4,
+   ties by source name then index) with their scores to 4
    decimals. The file arrives with the TUI's branch; until then this says so and skips. */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";

@@ -5,12 +5,15 @@
    Tokens: lower case, runs of [a-z0-9], at least 2 characters, minus the stopwords. BM25 with
    k1 1.2 and b 0.75, idf = ln(1 + (N − df + 0.5) / (df + 0.5)), N and the average length over
    every passage of every source; the question's tokens count once each. A passage is relevant
-   at a score of 1.5 or more; the best 4 are used, ties by source name, then passage index; at
-   most 4,000 characters of them go to a model (withinBudget). Pure. */
+   when it holds at least two of the question's distinct tokens (all of them when the question
+   has fewer than two) and scores above 0, so a small folder still answers (a fixed score
+   threshold left one short file unused: its idf is low); the best 4 are used, ties by source
+   name, then passage index; at most 4,000 characters of them go to a model (withinBudget).
+   Pure. */
 
 export const K1 = 1.2;
 export const B = 0.75;
-export const MIN_SCORE = 1.5;
+export const MIN_MATCHED = 2; // distinct question tokens a passage must hold (fewer if the question has fewer)
 export const TOP_K = 4;
 export const BUDGET = 4_000; // characters of passages sent with one question
 const MIN_PIECE = 200; // a passage cut to fit the budget keeps at least this much, or is left out
@@ -36,6 +39,7 @@ export interface Passage {
 }
 export interface Scored extends Passage {
   score: number;
+  matched: number; // how many of the question's distinct tokens the passage holds
 }
 
 interface Indexed extends Passage {
@@ -81,12 +85,14 @@ export function scoreAll(corpus: Corpus, question: string): Scored[] {
   const n = corpus.passages.length;
   return corpus.passages.map(({ source, index, text, tf, length }) => {
     let score = 0;
+    let matched = 0;
     for (const t of terms) {
       const f = tf.get(t);
       if (!f) continue; // also keeps an empty passage (length 0) out of the division
+      matched += 1;
       score += (idf(n, corpus.df.get(t) ?? 0) * (f * (K1 + 1))) / (f + K1 * (1 - B + (B * length) / corpus.avgdl));
     }
-    return { source, index, text, score };
+    return { source, index, text, score, matched };
   });
 }
 
@@ -102,11 +108,14 @@ function byCodePoint(a: string, b: string): number {
   return x.length - y.length;
 }
 
-/** The relevant passages for `question`: score ≥ MIN_SCORE, best first, ties by source name,
-    then passage index (then corpus order: the sort is stable), at most `top`. */
+/** The relevant passages for `question` (they hold at least min(MIN_MATCHED, the question's
+    token count) of its distinct tokens and score above 0), best first, ties by source name, then
+    passage index (then corpus order: the sort is stable), at most `top`. */
 export function rank(corpus: Corpus, question: string, top: number = TOP_K): Scored[] {
+  const need = Math.min(MIN_MATCHED, queryTokens(question).length);
+  if (need === 0) return [];
   return scoreAll(corpus, question)
-    .filter((p) => p.score >= MIN_SCORE)
+    .filter((p) => p.matched >= need && p.score > 0)
     .sort((a, b) => b.score - a.score || byCodePoint(a.source, b.source) || a.index - b.index)
     .slice(0, top);
 }

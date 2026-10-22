@@ -85,8 +85,14 @@ Owner's decisions:
     where which who why will with would you your`.
   - **Formula:** k1 = 1.2, b = 0.75, `idf = ln(1 + (N − df + 0.5) / (df + 0.5))`, `avgdl` over
     every passage; query tokens are de-duplicated.
-  - **Selection:** a passage is relevant at score ≥ 1.5. The top 4 are used; ties go by source
-    name, then passage index. At most 4,000 characters go to a model.
+  - **Selection:** a passage is relevant when it holds at least two of the question's distinct
+    tokens (all of them when the question has fewer than two) and scores above 0. (The first
+    draft's fixed score threshold, 1.5, left a small folder unused: with a few passages the idf
+    is low.) Relevant passages rank by score; the top 4 are used, and ties go by source name,
+    then passage index.
+  - **Budget:** at most 4,000 characters go to a model. A passage that doesn't fit is cut to
+    `text[:left - 1]` + "…" when at least 200 characters are left, else dropped; nothing after
+    it is sent.
   - **Shared vectors:** `web/tests/knowledge-vectors.json` (corpus, queries, expected ids and
     scores to 4 decimals) checks both sides.
 - **Who uses it:**
