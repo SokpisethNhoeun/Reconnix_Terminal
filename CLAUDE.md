@@ -242,12 +242,13 @@ removals go through `python -m reconix.knowledge`, `reconix/knowledge/`; `lib/as
 passages relevant to the masked question inside the fence framed as untrusted reference material
 and naming their files in `meta` ("Knowledge used: …").
 The model is chosen with the **model chip** in the assistant's composer (`model-chip.tsx` opens
-`model-picker.tsx` upward: choose a model → `<Provider>` · credentials → choose its model; the
-header has no model control; `/api/assistant/models…`, `lib/assistant/models/`; cloud presets
-stay disabled without `LLM_ALLOW_REMOTE=1`): providers and the active choice live in
-`models.json` beside the conversations, API keys AES-256-GCM-sealed with `models.key` (0600) and
-never sent to the browser; every model passes `config.ts`'s `checkModel`, and while nothing is
-chosen the `LLM_*` model (the read-only "Environment") is the default.
+`model-picker.tsx` upward: "Model", your saved models with **+ Model** (`model-list.tsx`), and
+"Set the provider" (`model-provider-form.tsx`: provider, base URL, API key, fetched or typed
+model, Add model); the header has no model control; `/api/assistant/models…`,
+`lib/assistant/models/`; cloud presets stay disabled without `LLM_ALLOW_REMOTE=1`): providers and
+the active choice live in `models.json` beside the conversations, API keys AES-256-GCM-sealed
+with `models.key` (0600) and never sent to the browser; every model passes `config.ts`'s
+`checkModel`, and while nothing is chosen no model answers (there is no Environment model).
 `webterm` drops `LLM_*` from the TUI's env. Exports: a report is saved as PDF, JSON or DOCX,
 in the TUI and the web alike (the report HTML is only the PDF's source and the combined preview,
 never a download): `GET /api/assessments/<uid>/export?format=pdf|json|docx`
