@@ -1,4 +1,4 @@
-import { Callout, Code, DocLink, DocSection, DocTable, Kbd, Mono, Steps } from "@/components/docs-primitives";
+import { Callout, Code, DocRef, DocSection, DocTable, Kbd, Mono, Steps } from "@/components/docs-primitives";
 import type { GroupContent } from "@/content/docs/types";
 
 export const gettingStarted: GroupContent = {
@@ -35,9 +35,9 @@ export const gettingStarted: GroupContent = {
             </li>
             <li>
               <strong>A model is optional.</strong> With a provider configured and a model active (
-              <DocLink href="/docs/ai-models/providers">/provider</DocLink>, <DocLink href="/docs/ai-models/models">/model</DocLink>),
+              <DocRef>/provider</DocRef>, <DocRef>/model</DocRef>),
               the chat lines you type during a run go to that model. With the backend harness installed as well,{" "}
-              <DocLink href="/docs/assessment-guide/ai-agent">/assess</DocLink> hands a real assessment to an AI agent that
+              <DocRef>/assess</DocRef> hands a real assessment to an AI agent that
               runs tools through a Kali MCP server, behind the same scope approval.
             </li>
           </ul>
@@ -56,20 +56,37 @@ export const gettingStarted: GroupContent = {
             ]}
           />
         </DocSection>
+        <DocSection title="Where things are">
+          <ul>
+            <li>
+              The terminal: <Mono>python -m reconix</Mono> (or <Mono>reconix</Mono>, or <Mono>python run.py</Mono>). See{" "}
+              <DocRef>Launching</DocRef> below.
+            </li>
+            <li>
+              Reports: <Mono>./reports/&lt;assessment id&gt;.&lt;ext&gt;</Mono>, in the folder you launched from. See{" "}
+              <DocRef>Exporting</DocRef> in Reports.
+            </li>
+            <li>
+              Saved copies of every run, with secrets removed: <Mono>~/.reconix/assessments/</Mono>; the web dashboard
+              (<Mono>/web</Mono>) reads them. See <DocRef>The web dashboard</DocRef> in Reports.
+            </li>
+            <li>
+              Model settings: <Mono>~/.reconix/llm.db</Mono>, with API keys encrypted. See <DocRef>Configuration</DocRef>{" "}
+              in AI models.
+            </li>
+          </ul>
+        </DocSection>
         <DocSection title="Where to go next">
           <ul>
             <li>
-              <DocLink href="/docs/getting-started/requirements">Requirements</DocLink> and{" "}
-              <DocLink href="/docs/getting-started/installation">Installation</DocLink>, then{" "}
-              <DocLink href="/docs/getting-started/first-steps">First steps</DocLink>.
+              <DocRef>Requirements</DocRef> and <DocRef>Installation</DocRef> below, then <DocRef>First steps</DocRef>.
             </li>
             <li>
-              <DocLink href="/docs/terminal-guide">The terminal guide</DocLink> for the screens and keys, and the{" "}
-              <DocLink href="/docs/commands">command reference</DocLink>.
+              <DocRef>Terminal guide</DocRef> for the screens and keys, and <DocRef>Commands</DocRef> for every slash
+              command.
             </li>
             <li>
-              <DocLink href="/docs/assessment-guide">The security assessment guide</DocLink> for what happens between
-              your request and the findings.
+              <DocRef>Security assessment guide</DocRef> for what happens between your request and the findings.
             </li>
           </ul>
         </DocSection>
@@ -103,8 +120,8 @@ export const gettingStarted: GroupContent = {
             rows={[
               { key: "PDF export", value: <>WeasyPrint (a Python package with system libraries), or a Chrome/Chromium browser on the machine: Reconix looks for google-chrome, google-chrome-stable, chromium, chromium-browser and chrome on the PATH, the usual Linux and macOS install paths, and Chrome or Edge on Windows. <Mono>RECONIX_CHROME</Mono> points at another binary. Without either, the PDF button reads &quot;not installed&quot;.</> },
               { key: "/web dashboard", value: <>Node.js 20 or later with npm. The first <Mono>/web</Mono> runs <Mono>npm install</Mono> in <Mono>web/</Mono>, which takes a few minutes.</> },
-              { key: "A model", value: <>An API key for OpenAI, Anthropic or DeepSeek, a local Ollama, or any OpenAI-compatible endpoint. See <DocLink href="/docs/ai-models">AI models</DocLink>.</> },
-              { key: "/assess (the AI agent)", value: <>A model, the backend harness (<Mono>pip install -e backend</Mono>, which needs <strong>Python 3.10 or later</strong>) and a reachable Kali MCP server configured in <Mono>.env</Mono>. See <DocLink href="/docs/assessment-guide/ai-agent">The AI agent</DocLink>.</> },
+              { key: "A model", value: <>An API key for OpenAI, Anthropic or DeepSeek, a local Ollama, or any OpenAI-compatible endpoint. See <DocRef>AI models</DocRef>.</> },
+              { key: "/assess (the AI agent)", value: <>A model, the backend harness (<Mono>pip install -e backend</Mono>, which needs <strong>Python 3.10 or later</strong>) and a reachable Kali MCP server configured in <Mono>.env</Mono>. See <DocRef>The AI agent</DocRef>.</> },
             ]}
           />
         </DocSection>
@@ -114,7 +131,7 @@ export const gettingStarted: GroupContent = {
             The scripted run enforces the scope you approve. The AI agent is checked against it on every tool call
             (target host, tool set, the time limit, methods and excluded paths on web scopes, ports on network
             scopes), but the per-action approval gates are not applied to it. The authorization itself comes from you or your organization. See{" "}
-            <DocLink href="/docs/guardrails/authorized-use">Authorized use</DocLink>.
+            <DocRef>Authorized use</DocRef>.
           </Callout>
         </DocSection>
       </>
@@ -149,14 +166,14 @@ cp .env.example .env                 # the model and Kali MCP settings (edit it)
           <p>
             <Mono>.env</Mono> is only needed for a model: it seeds the built-in &quot;Reconix&quot; provider and configures the
             agent. API keys are never written to it; they are entered in the terminal with{" "}
-            <DocLink href="/docs/ai-models/providers">/provider</DocLink> and stored encrypted.
+            <DocRef>/provider</DocRef> and stored encrypted.
           </p>
         </DocSection>
         <DocSection title="Check the install">
           <Code>{`python -m reconix`}</Code>
           <p>
             The Start screen opens with the Reconix logo and a prompt. Press <Kbd>Ctrl+Q</Kbd> to quit. Next:{" "}
-            <DocLink href="/docs/getting-started/launching">Launching</DocLink>.
+            <DocRef>Launching</DocRef>.
           </p>
         </DocSection>
       </>
@@ -192,10 +209,10 @@ python run.py         # the launcher in the repository root`}</Code>
               { key: "RECONIX_WEB_URL_FILE", value: <>Where the dashboard leaves its sign-in link for <Mono>/web</Mono> (default <Mono>~/.reconix/web.url</Mono>). Only a loopback http link is accepted.</> },
               { key: "RECONIX_WEB_LOG", value: <>The dashboard&apos;s log when <Mono>/web</Mono> starts it (default <Mono>~/.reconix/web.log</Mono>).</> },
               { key: "RECONIX_CHROME", value: "A Chrome/Chromium binary for the PDF export, when it is not on the PATH." },
-              { key: "LLM_BASE_URL, LLM_MODEL, LLM_TIMEOUT", value: <>The built-in &quot;Reconix&quot; provider&apos;s endpoint, model and timeout, read from <Mono>.env</Mono>. See <DocLink href="/docs/ai-models/configuration">Configuration</DocLink>.</> },
+              { key: "LLM_BASE_URL, LLM_MODEL, LLM_TIMEOUT", value: <>The built-in &quot;Reconix&quot; provider&apos;s endpoint, model and timeout, read from <Mono>.env</Mono>. See <DocRef>Configuration</DocRef>.</> },
               { key: "LLM_DB, LLM_KEY_FILE", value: <>Where providers and the encryption key are kept (defaults <Mono>~/.reconix/llm.db</Mono> and <Mono>~/.reconix/llm.key</Mono>).</> },
               { key: "OLLAMA_BASE_URL", value: <>The default base URL of the Ollama provider (<Mono>http://localhost:11434</Mono>).</> },
-              { key: "KALI_MCP_*, HARNESS_DB_PATH", value: <>The AI agent&apos;s Kali MCP server and database, from <Mono>.env</Mono>. See <DocLink href="/docs/assessment-guide/ai-agent">The AI agent</DocLink>.</> },
+              { key: "KALI_MCP_*, HARNESS_DB_PATH", value: <>The AI agent&apos;s Kali MCP server and database, from <Mono>.env</Mono>. See <DocRef>The AI agent</DocRef>.</> },
             ]}
           />
         </DocSection>
@@ -277,8 +294,8 @@ python run.py         # the launcher in the repository root`}</Code>
             </li>
           </ul>
           <p>
-            Next: <DocLink href="/docs/terminal-guide/screens">The screens</DocLink>, or the full{" "}
-            <DocLink href="/docs/assessment-guide">security assessment guide</DocLink>.
+            Next: <DocRef>The screens</DocRef>, or the full{" "}
+            <DocRef>security assessment guide</DocRef>.
           </p>
         </DocSection>
       </>

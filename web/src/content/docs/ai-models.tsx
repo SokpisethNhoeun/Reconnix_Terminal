@@ -1,4 +1,4 @@
-import { Callout, Code, DocLink, DocSection, DocTable, Mono, Steps } from "@/components/docs-primitives";
+import { Callout, Code, DocRef, DocSection, DocTable, Mono, Steps } from "@/components/docs-primitives";
 import type { GroupContent } from "@/content/docs/types";
 
 export const aiModels: GroupContent = {
@@ -82,7 +82,7 @@ export const aiModels: GroupContent = {
             Saving, testing, activating and removing a provider are written to the activity log and the audit trail
             (<Mono>/audit</Mono>): &quot;LLM provider saved: OpenAI&quot;, &quot;LLM provider OpenAI: reachable (model
             available)&quot;, and so on. The key itself appears nowhere; see{" "}
-            <DocLink href="/docs/ai-models/configuration">Configuration</DocLink>.
+            <DocRef>Configuration</DocRef>.
           </p>
         </DocSection>
       </>
@@ -122,18 +122,18 @@ export const aiModels: GroupContent = {
             <li>
               <strong>The AI agent.</strong> With the backend harness installed, the active model is also the agent&apos;s
               model for <Mono>/assess</Mono>; switching models mid-assessment repoints the agent and keeps its whole
-              conversation. See <DocLink href="/docs/assessment-guide/ai-agent">The AI agent</DocLink>.
+              conversation. See <DocRef>The AI agent</DocRef>.
             </li>
           </ul>
           <Callout variant="warning" title="Never a decision">
             The model proposes text. The scope, the policy checks, the approval gates and the vault are deterministic
             and ignore it; a different model never changes what is allowed to run. See{" "}
-            <DocLink href="/docs/guardrails/llm-data-handling">LLM data handling</DocLink>.
+            <DocRef>LLM data handling</DocRef>.
           </Callout>
         </DocSection>
         <DocSection title="Knowledge add-ons">
           <p>
-            <DocLink href="/docs/commands/add-on"><Mono>/add-on</Mono></DocLink> gives the AI reference documents
+            <DocRef><Mono>/add-on</Mono></DocRef> gives the AI reference documents
             (<Mono>.txt .md .json .yaml .yml .docx .pdf</Mono>, at most 10 MB, no symlinks). Each file is read once,
             <strong> cleaned and redacted at ingest</strong> (secrets never reach disk), split into passages of at most
             1,200 characters and saved under <Mono>~/.reconix/knowledge</Mono> (the folder 0700, files 0600); at most 50
@@ -147,7 +147,7 @@ export const aiModels: GroupContent = {
             a muted <Mono>Knowledge: a.md, b.pdf</Mono> line under the reply), the <Mono>/assess</Mono> agent (through a
             read-only <Mono>search_knowledge</Mono> tool the scope guard allows) and the web AI Assistant (which reads the
             same folder but never writes it). With no active model, no knowledge is used. See{" "}
-            <DocLink href="/docs/commands/add-on">/add-on</DocLink>.
+            <DocRef>/add-on</DocRef>.
           </p>
           <Callout variant="warning" title="Reference, not instructions">
             Knowledge passages are untrusted data: the model summarizes them but never obeys directions found inside
@@ -215,7 +215,7 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
             The AI agent&apos;s settings (<Mono>KALI_MCP_TRANSPORT</Mono>, <Mono>KALI_MCP_URL</Mono>,{" "}
             <Mono>KALI_MCP_AUTH_TOKEN</Mono>, <Mono>KALI_MCP_SSH_HOST</Mono>, <Mono>KALI_MCP_REMOTE_CMD</Mono>,{" "}
             <Mono>HARNESS_DB_PATH</Mono>) sit in the same file; see{" "}
-            <DocLink href="/docs/assessment-guide/ai-agent">The AI agent</DocLink>.
+            <DocRef>The AI agent</DocRef>.
           </p>
           <Callout>
             The web dashboard&apos;s AI Assistant has its own models, chosen in its <strong>Model</strong> menu (below). The
@@ -278,7 +278,7 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
             used only when the dashboard was started with <Mono>LLM_ALLOW_REMOTE=1</Mono> (the browser can&apos;t turn it
             on). The rules are checked again on every question: a chosen model that no longer passes says why in the
             assistant, and nothing else answers in its place. Remote models receive your questions and the assessment data
-            they need; see <DocLink href="/docs/guardrails/llm-data-handling">LLM data handling</DocLink>.
+            they need; see <DocRef>LLM data handling</DocRef>.
           </Callout>
         </DocSection>
         <DocSection title="Knowledge in the web assistant">
@@ -348,7 +348,7 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
             ]}
           />
           <p>
-            More in <DocLink href="/docs/troubleshooting/model-connection">Troubleshooting · Model connection</DocLink>.
+            More in <DocRef>Troubleshooting · Model connection</DocRef>.
           </p>
         </DocSection>
       </>

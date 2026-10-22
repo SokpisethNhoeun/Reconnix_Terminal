@@ -8,6 +8,8 @@
 .docs-prose ol > li { list-style: decimal; }
 .docs-prose li > ul, .docs-prose li > ol { margin-top: 0.25rem; }
 .docs-prose strong { font-weight: 600; color: var(--foreground); }
+/* the name of another part of the docs (DocRef): emphasized in place, never a link */
+.docs-ref { font-style: normal; font-weight: 500; color: var(--foreground); }
 .docs-prose table li { margin-left: 1rem; }
 /* numbered steps (Steps) keep their counter even inside a bulleted context */
 .docs-steps > li { list-style: decimal; }
@@ -27,9 +29,6 @@
   .docs-table td { padding-top: 0.25rem; }
 }
 
-/* ---- The sidebar: the tree scrolls inside the sticky column on desktop (the search stays put) ---- */
-.docs-sidebar nav { scrollbar-width: thin; }
-
-/* ---- The command index: one row per command, the name in a fixed column ---- */
-.docs-command-row { display: grid; grid-template-columns: minmax(7rem, auto) 1fr; gap: 0.25rem 1rem; align-items: baseline; }
-@media (max-width: 480px) { .docs-command-row { grid-template-columns: 1fr; } }
+/* ---- The sidebar and "On this page": each list scrolls inside its sticky column on desktop (the
+   search stays put) ---- */
+.docs-sidebar nav, .docs-toc { scrollbar-width: thin; }

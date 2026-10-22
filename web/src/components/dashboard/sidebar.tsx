@@ -7,7 +7,6 @@ import {
   FileText,
   Layers,
   LayoutGrid,
-  Settings,
   Sparkles,
   TerminalSquare,
   TriangleAlert,
@@ -32,7 +31,6 @@ const VIEWS: NavItem[] = [
 const TERMINAL_HINT = { operator: "Terminal", viewer: "Terminal · operator role needed", off: "Terminal · off" } as const;
 const DOC_ITEMS: DocItem[] = [
   { icon: BookOpen, label: "Documentation", href: DOCS.home },
-  { icon: Settings, label: "Configuration", href: DOCS.configuration },
 ];
 
 // Logo: a 3×3 grid of rounded teal squares, 4 of the 9 dimmed (like the reference mark).
@@ -56,7 +54,7 @@ const NAV_CLASS = "dash-navbtn focus-visible:outline-none focus-visible:ring-2 f
 /**
  * The rail: the views, then the docs. Inside the viewer (`onSelect` given) a view is a button that
  * switches in place; on the docs pages (`active` null) it is a link back to that view at `/`, and
- * the docs item that holds the open page is the one marked.
+ * the Documentation item is the one marked (the docs have no other item: no Settings).
  */
 export function Sidebar({
   active,
@@ -68,9 +66,8 @@ export function Sidebar({
   terminalState: keyof typeof TERMINAL_HINT;
 }) {
   const pathname = usePathname();
-  // the Configuration page is marked on its own; every other docs page marks Documentation
-  const docActive = (href: string) =>
-    href === DOCS.home ? pathname.startsWith(DOCS.home) && pathname !== DOCS.configuration : pathname === href;
+  // every docs page marks Documentation
+  const docActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   return (
     <aside className="dash-sidebar flex items-center border-border">
       <Link href="/" aria-label="Reconix local assessment viewer" className="grid h-16 w-full place-items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">

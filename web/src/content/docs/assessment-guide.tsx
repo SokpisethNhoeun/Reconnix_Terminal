@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { Callout, Code, DocLink, DocSection, DocTable, Kbd, Mono, Steps } from "@/components/docs-primitives";
+import { Callout, Code, DocRef, DocSection, DocTable, Kbd, Mono, Steps } from "@/components/docs-primitives";
 import type { GroupContent } from "@/content/docs/types";
 
 export const assessmentGuide: GroupContent = {
@@ -59,7 +59,7 @@ export const assessmentGuide: GroupContent = {
         <DocSection title="What happens next">
           <p>
             Reconix builds the assessment from the template: its scope manifest, its plan, its gated actions and the
-            findings the run can reveal, then stops at the <DocLink href="/docs/assessment-guide/scope">scope gate</DocLink>.
+            findings the run can reveal, then stops at the <DocRef>scope gate</DocRef>.
           </p>
         </DocSection>
       </>
@@ -125,7 +125,7 @@ export const assessmentGuide: GroupContent = {
         </DocSection>
         <DocSection title="What approval means">
           <p>
-            The approved manifest is the boundary the <DocLink href="/docs/assessment-guide/policy-checks">policy engine</DocLink>{" "}
+            The approved manifest is the boundary the <DocRef>policy engine</DocRef>{" "}
             checks every request against, and it is what the report&apos;s &quot;Approved scope and limitations&quot;
             section prints. It is recorded in the audit trail and in the saved copy the web dashboard shows.
           </p>
@@ -167,7 +167,7 @@ export const assessmentGuide: GroupContent = {
             One login covers them all: the stronger covers the weaker, so a test account also covers the cookie tools. If
             the target asks for a one-time code after the password, that is a second step on its own, right after the
             first; the code is validated and never stored. See{" "}
-            <DocLink href="/docs/guardrails/credential-handling">Credential handling</DocLink>.
+            <DocRef>Credential handling</DocRef>.
           </p>
         </DocSection>
         <DocSection title="The gated steps">
@@ -378,7 +378,7 @@ export const assessmentGuide: GroupContent = {
             </li>
             <li>
               <strong>A gated action.</strong> The Approval screen opens. See{" "}
-              <DocLink href="/docs/assessment-guide/approval-gates">Approval gates</DocLink>.
+              <DocRef>Approval gates</DocRef>.
             </li>
           </ul>
           <p>
@@ -429,8 +429,8 @@ export const assessmentGuide: GroupContent = {
         <DocSection title="What to do with them">
           <p>
             Filter, sort, triage and read them on the Findings and Finding Detail screens; see{" "}
-            <DocLink href="/docs/reports/understanding-findings">Understanding findings</DocLink>. Then export the report:{" "}
-            <DocLink href="/docs/reports/exporting">Exporting</DocLink>.
+            <DocRef>Understanding findings</DocRef>. Then export the report:{" "}
+            <DocRef>Exporting</DocRef>.
           </p>
         </DocSection>
       </>
@@ -454,7 +454,7 @@ export const assessmentGuide: GroupContent = {
               agent&apos;s own SQLite database of targets, scans and findings.
             </li>
             <li>
-              An active model (<DocLink href="/docs/ai-models/models">/model</DocLink>). Without one: &quot;Pick a model
+              An active model (<DocRef>/model</DocRef>). Without one: &quot;Pick a model
               first with /model.&quot;
             </li>
           </Steps>

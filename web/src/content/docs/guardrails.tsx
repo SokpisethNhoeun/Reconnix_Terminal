@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { Callout, DocLink, DocSection, Mono } from "@/components/docs-primitives";
+import { Callout, DocRef, DocSection, Mono } from "@/components/docs-primitives";
 import type { GroupContent } from "@/content/docs/types";
 
 export const guardrails: GroupContent = {
@@ -27,13 +27,13 @@ export const guardrails: GroupContent = {
           <p>
             Without a model and the backend harness, the run is simulated: no scanner runs and nothing is sent to the
             target. The demo uses reserved example domains and fake, masked evidence. See{" "}
-            <DocLink href="/docs/getting-started/introduction">Introduction</DocLink>.
+            <DocRef>Introduction</DocRef>.
           </p>
         </DocSection>
         <DocSection title="What Reconix refuses">
           <p>
             Requests outside the approved scope are blocked by policy and never sent. Lines that name no target do not
-            start anything. See <DocLink href="/docs/guardrails/limitations">Limitations</DocLink>.
+            start anything. See <DocRef>Limitations</DocRef>.
           </p>
         </DocSection>
       </>
@@ -48,7 +48,7 @@ export const guardrails: GroupContent = {
             Every request the run proposes is compared with the approved scope manifest by a deterministic policy
             engine: the method, the host, the port, the path or repository path, the excluded entries and the time
             limit. Out-of-scope requests are blocked and recorded. See{" "}
-            <DocLink href="/docs/assessment-guide/policy-checks">Policy checks</DocLink>.
+            <DocRef>Policy checks</DocRef>.
           </p>
         </DocSection>
         <DocSection title="Canonical targets">
@@ -84,7 +84,7 @@ export const guardrails: GroupContent = {
           <p>
             The Template screen shows the drafted scope manifest. Testing begins only after you approve it and run the
             plan; without that, no tool is started. Rejecting the scope tests nothing. See{" "}
-            <DocLink href="/docs/assessment-guide/scope">Scope manifest</DocLink>.
+            <DocRef>Scope manifest</DocRef>.
           </p>
         </DocSection>
         <DocSection title="Action approval">
@@ -93,7 +93,7 @@ export const guardrails: GroupContent = {
             <Badge variant="accent">HIGH</Badge> needs a double check: a confirmation step with a single-use token, a second
             dialog that defaults to &quot;No, go back&quot;, and the matching request hash. An approval is bound to the exact
             request shown; if the request changes, the approval does not apply. Rejecting stops the assessment. No typed
-            reason is asked for. See <DocLink href="/docs/assessment-guide/approval-gates">Approval gates</DocLink>.
+            reason is asked for. See <DocRef>Approval gates</DocRef>.
           </p>
           <p>
             Editing where an action runs (Edit params, Edit steps) is policy-checked, rebuilds the request and its hash
@@ -127,7 +127,7 @@ export const guardrails: GroupContent = {
             Provider keys entered with <Mono>/provider</Mono> are encrypted (Fernet) before they reach{" "}
             <Mono>~/.reconix/llm.db</Mono> (0600); the key file is 0600; only a hint such as <Mono>sk-…3f9a</Mono> is ever
             shown, and the plaintext is decrypted only for the call that uses it. They are never written to{" "}
-            <Mono>.env</Mono>. See <DocLink href="/docs/ai-models/configuration">Configuration</DocLink>.
+            <Mono>.env</Mono>. See <DocRef>Configuration</DocRef>.
           </p>
         </DocSection>
         <DocSection title="Masking">
@@ -226,7 +226,7 @@ export const guardrails: GroupContent = {
           </ul>
           <p>
             More on fields and validation in{" "}
-            <DocLink href="/docs/reports/understanding-findings">Understanding findings</DocLink>.
+            <DocRef>Understanding findings</DocRef>.
           </p>
         </DocSection>
       </>

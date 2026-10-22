@@ -1,4 +1,4 @@
-import { Callout, Code, DocLink, DocSection, DocTable, Kbd, Mono } from "@/components/docs-primitives";
+import { Callout, Code, DocRef, DocSection, DocTable, Kbd, Mono } from "@/components/docs-primitives";
 import type { GroupContent } from "@/content/docs/types";
 
 export const troubleshooting: GroupContent = {
@@ -85,13 +85,13 @@ export const troubleshooting: GroupContent = {
           <p>
             &quot;The harness backend isn&apos;t installed (pip install -e backend).&quot;: install it from the repository
             root. The agent also needs a reachable Kali MCP server in <Mono>.env</Mono> and an active model; see{" "}
-            <DocLink href="/docs/assessment-guide/ai-agent">The AI agent</DocLink>.
+            <DocRef>The AI agent</DocRef>.
           </p>
         </DocSection>
         <DocSection title="No Node.js">
           <p>
             &quot;The web dashboard needs Node.js (node and npm).&quot;: install Node.js 20 or later, or run the dashboard on
-            another machine. See <DocLink href="/docs/troubleshooting/web-dashboard">The web dashboard</DocLink>.
+            another machine. See <DocRef>The web dashboard</DocRef>.
           </p>
         </DocSection>
       </>
@@ -107,7 +107,7 @@ export const troubleshooting: GroupContent = {
             is the system working: the request was outside the approved scope (another host, an excluded path, a method
             or port not allowed), and it was never sent; once the scope&apos;s time limit is reached the run stops
             altogether. The reasons are listed in{" "}
-            <DocLink href="/docs/assessment-guide/policy-checks">Policy checks</DocLink>; the verdicts are in{" "}
+            <DocRef>Policy checks</DocRef>; the verdicts are in{" "}
             <Mono>/audit</Mono>, the report and the saved copy the dashboard reads. If the block was wrong, the scope was: start
             a new assessment and edit the manifest before approving it.
           </p>
@@ -133,7 +133,7 @@ export const troubleshooting: GroupContent = {
             again.&quot; mean the request on screen is not the one the approval was bound to (for example after Edit
             params): read it again and approve what is shown now. &quot;HIGH-risk actions need the confirmation step
             first.&quot; means the second dialog was left without a Yes. See{" "}
-            <DocLink href="/docs/assessment-guide/approval-gates">Approval gates</DocLink>.
+            <DocRef>Approval gates</DocRef>.
           </p>
         </DocSection>
       </>
@@ -147,7 +147,7 @@ export const troubleshooting: GroupContent = {
           <p>
             &quot;Unknown command /name. Type / to see the list.&quot; (in the command bar: &quot;… — pick one from the
             list.&quot;). The name is not a command or an alias. Type <Mono>/</Mono> and pick from the suggestions, or
-            see the <DocLink href="/docs/commands">command reference</DocLink>. Old names are gone: <Mono>/scope</Mono> is now{" "}
+            see the <DocRef>command reference</DocRef>. Old names are gone: <Mono>/scope</Mono> is now{" "}
             <Mono>/template</Mono>.
           </p>
         </DocSection>
@@ -200,7 +200,7 @@ export const troubleshooting: GroupContent = {
             </li>
             <li>
               <strong>&quot;&lt;Format&gt; reports aren&apos;t in this demo.&quot;</strong> The format&apos;s engine is missing:
-              see <DocLink href="/docs/troubleshooting/missing-tools">Missing tools</DocLink>.
+              see <DocRef>Missing tools</DocRef>.
             </li>
           </ul>
         </DocSection>

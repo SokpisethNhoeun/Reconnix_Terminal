@@ -8,7 +8,7 @@ import { terminalGuide } from "@/content/docs/terminal-guide";
 import { troubleshooting } from "@/content/docs/troubleshooting";
 import type { GroupContent } from "@/content/docs/types";
 
-/** Content of every /docs/<group>/<slug> page, keyed by the DOCS_NAV group id, then slug. */
+/** Content of every page (a part of `/docs/<group>`, at `#<slug>`), keyed by the DOCS_NAV group id, then slug. */
 export const DOCS_CONTENT: Record<string, GroupContent> = {
   "getting-started": gettingStarted,
   "terminal-guide": terminalGuide,

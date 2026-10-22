@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Children, cloneElement, Fragment, isValidElement, type ReactElement, type ReactNode } from "react";
 import { Info, TriangleAlert } from "lucide-react";
 import { CopyButton } from "@/components/ui/copy-button";
 import { ScrollRegion } from "@/components/ui/scroll-region";
@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  * page frame in docs-layout.tsx.
  */
 
-/** `Getting started` -> `getting-started`: the anchor id of a DocSection (and its "On this page" entry). */
+/** `Getting started` -> `getting-started`: a section title's part of its anchor (sectionId). */
 export const slugify = (s: string) =>
   s
     .toLowerCase()
@@ -19,16 +19,42 @@ export const slugify = (s: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-/** A titled section of a docs page; its id is the slug of the title (used by "On this page"). */
-export function DocSection({ title, children }: { title: string; children: React.ReactNode }) {
+/**
+ * The anchor of a section of a page: `<page>-<section>` (`model-purpose`). A group's page shows
+ * all of its pages, so the 19 commands' "Purpose" need the page's slug to stay apart.
+ */
+export const sectionId = (page: string, title: string) => `${page}-${slugify(title)}`;
+
+/**
+ * A titled section of a docs page: an h3 under its page's h2 (the group page is the h1), with
+ * the anchor `sectionId(page, title)` ("On this page" and the search jump to it). `page` is set
+ * by `withPage` when the group page renders the part; the content never passes it.
+ */
+export function DocSection({ title, page, children }: { title: string; page?: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-4">
-      <h2 id={slugify(title)} data-toc className="scroll-mt-6 text-2xl font-semibold tracking-tight">
+    <section className="space-y-3">
+      <h3 id={page ? sectionId(page, title) : slugify(title)} data-toc className="scroll-mt-6 text-xl font-semibold tracking-tight">
         {title}
-      </h2>
+      </h3>
       <div className="docs-prose space-y-3 leading-relaxed text-muted-foreground">{children}</div>
     </section>
   );
+}
+
+/**
+ * A page's body with each of its DocSections told which page it belongs to (their anchors become
+ * `<page>-<section>`). Walks fragments and plain elements only: a section never sits inside a
+ * component of its own. Server-side, before anything renders.
+ */
+export function withPage(body: ReactNode, page: string): ReactNode {
+  return Children.map(body, (child) => {
+    if (!isValidElement<{ children?: ReactNode }>(child)) return child;
+    if (child.type === DocSection) return cloneElement(child as ReactElement<{ page?: string }>, { page });
+    const inner = child.props.children;
+    if (inner == null || typeof inner !== "object") return child;
+    if (child.type !== Fragment && typeof child.type !== "string") return child;
+    return cloneElement(child, undefined, withPage(inner, page));
+  });
 }
 
 /** A code block with a Copy button (the button copies exactly the text shown). A long line
@@ -91,14 +117,11 @@ export function Callout({
   );
 }
 
-/** A link inside docs content: underlined, like the dashboard's links (.ui-link), so it is told
-    apart from the text around it by more than its colour. */
-export function DocLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link href={href} className="ui-link">
-      {children}
-    </Link>
-  );
+/** The name of another part of the docs, inside a sentence ("see Approval gates"): emphasized
+    text, never a link. The docs read in place (docs/WEB_DOCS_INLINE_PLAN.md); the reader finds
+    the part in the docs sidebar. */
+export function DocRef({ children }: { children: React.ReactNode }) {
+  return <em className="docs-ref">{children}</em>;
 }
 
 /** Numbered steps. */

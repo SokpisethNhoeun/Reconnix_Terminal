@@ -60,15 +60,16 @@ test.describe("axe, more states", () => {
     await axe(page, "docs index");
   });
 
-  test("a command page has no violations", async ({ page }) => {
-    await page.goto("/docs/commands/model");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("/model");
-    await axe(page, "command page");
+  test("the Commands page, every command in place, has no violations", async ({ page }) => {
+    await page.goto("/docs/commands#model");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Commands");
+    await expect(page.locator("h2#model")).toBeInViewport();
+    await axe(page, "commands page");
   });
 
   test("the docs search, open with results, has no violations", async ({ page }) => {
-    await page.goto("/docs");
-    await page.getByRole("combobox", { name: "Search the documentation" }).fill("model");
+    await page.goto("/docs/commands");
+    await page.getByRole("combobox", { name: "Search this section" }).fill("model");
     await expect(page.getByRole("listbox", { name: "Search results" }).getByRole("option").first()).toBeVisible();
     await axe(page, "docs search open");
   });
@@ -151,7 +152,7 @@ test.describe("axe, more states", () => {
     });
 
     test("the docs menu, open, has no violations", async ({ page }) => {
-      await page.goto("/docs/commands/provider"); // a page with a code block that scrolls sideways
+      await page.goto("/docs/commands#provider"); // a part with a code block that scrolls sideways
       await page.getByRole("button", { name: "Docs menu" }).click();
       await expect(page.getByRole("navigation", { name: "Documentation", exact: true })).toBeVisible();
       await axe(page, "phone docs menu");
