@@ -23,7 +23,7 @@ import json
 import os
 import stat
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, Tuple
 
@@ -62,10 +62,23 @@ class Extracted:
     bytes: int
     text: str
     cut: str = ""
+    data: bytes = field(default=b"", repr=False, compare=False)   # the file as read
 
 
-def extract(path_text: str) -> Extracted:
-    """Read the file at `path_text` and return its `Extracted` text, or raise."""
+DOC_REFUSAL = "Save it as .docx first (old .doc files aren't supported)."
+
+
+def base_name(name: str) -> str:
+    """The last component of `name` (either separator): a display name never holds a path."""
+    return (name or "").replace("\\", "/").rsplit("/", 1)[-1]
+
+
+def extract(path_text: str, name: str = "") -> Extracted:
+    """Read the file at `path_text` and return its `Extracted` text, or raise.
+
+    `name` (optional) is the display name, whose extension picks the kind: the web saves an
+    upload to a temp file and passes the upload's own base name.
+    """
     text = (path_text or "").strip()
     if not text:
         raise StoreValidationError("Enter the path to a file to add.")
@@ -84,7 +97,11 @@ def extract(path_text: str) -> Extracted:
         raise StoreValidationError("That path is a symlink; add the real file instead.")
     if not stat.S_ISREG(info.st_mode):
         raise StoreValidationError("That isn't a regular file.")
-    kind = _EXT_KIND.get(path.suffix.lower())
+    shown = base_name(name) if (name or "").strip() else path.name
+    suffix = Path(shown).suffix.lower()
+    if suffix == ".doc":
+        raise StoreValidationError(DOC_REFUSAL)
+    kind = _EXT_KIND.get(suffix)
     if kind is None:
         raise StoreValidationError(f"Unsupported file type. Use one of: {SUPPORTED}.")
     if info.st_size > MAX_FILE_BYTES:
@@ -94,8 +111,8 @@ def extract(path_text: str) -> Extracted:
     raw, cut = _run_extractor(kind, data)
     if len(raw) > MAX_TEXT_CHARS:
         raw, cut = raw[:MAX_TEXT_CHARS], CUT_TEXT
-    return Extracted(name=display_name(path.name), kind=kind, bytes=len(data), text=raw,
-                     cut=cut)
+    return Extracted(name=display_name(shown), kind=kind, bytes=len(data), text=raw,
+                     cut=cut, data=data)
 
 
 def display_name(name: str) -> str:
