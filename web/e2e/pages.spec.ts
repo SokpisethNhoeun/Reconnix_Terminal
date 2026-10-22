@@ -1,5 +1,6 @@
-/* The globe dashboard on the sample data: every view, the assessment switcher, the report
-   downloads and the docs. The Terminal view is e2e/terminal.spec.ts (run on its own). */
+/* The globe dashboard on the sample data: every view, Findings by Severity's four rows, the
+   Duration card, the assessment switcher, the report downloads and the docs. The Terminal view is
+   e2e/terminal.spec.ts (run on its own). */
 import { type Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
@@ -17,6 +18,18 @@ const selectedFinding = (page: Page) => page.getByRole("list", { name: "Findings
 const card = (page: Page, label: string) => page.locator(`[data-motion="top"] section[aria-label="${label}"]`);
 const stat = (page: Page, label: string) => card(page, label).locator("[data-countup]").first();
 
+/** Findings by Severity's rows in the open view, and the four it always lists, in order. */
+const severityRows = (page: Page) => page.getByRole("list", { name: "Findings per severity" }).getByRole("listitem");
+const FOUR_LEVELS = [/^Critical/, /^High/, /^Medium/, /^Low/];
+
+/** The open switcher panel's text outside its list and its title link (none is left). */
+const panelExtras = (page: Page) =>
+  page.locator('[role="dialog"]').evaluate((el) => {
+    const copy = el.cloneNode(true) as HTMLElement;
+    copy.querySelectorAll("ul, a").forEach((n) => n.remove());
+    return copy.textContent!.trim();
+  });
+
 test("the overview totals every saved file by default", async ({ page }) => {
   await signIn(page);
   const all = sample();
@@ -32,33 +45,51 @@ test("the overview totals every saved file by default", async ({ page }) => {
   expect(await cards.evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).toEqual(["Findings", "Assessment progress", "Tool execution", "Duration"]);
   await page.click(view("Findings"));
   await expect(findingRows(page)).toHaveCount(Math.min(PER_PAGE, all.reduce((n, a) => n + a.findings.length, 0))); // ten a page
-  // Report and Scope sum up every run too (no run picker): a row per run, a row per target
+  // Reports sums up every run too (no run picker): a row per run
   await page.click(view("Reports"));
   // every run is a row, ten to a page
   expect(all.length).toBeGreaterThan(PER_PAGE);
   await expect(page.getByRole("table", { name: "Saved assessments" }).getByRole("link", { name: /^Open the report of/ })).toHaveCount(PER_PAGE);
   await expect(page.getByRole("navigation", { name: "Saved assessment pages" })).toContainText(`${all.length} results`);
   await expect(page.getByRole("group", { name: "Report summary" }).locator("section")).toHaveCount(4);
-  await page.click(view("Scope"));
-  await expect(page.getByRole("table", { name: "Targets tested" }).getByRole("row")).toHaveCount(new Set(all.map((a) => a.target)).size + 1);
 });
 
-test("every run's Scope and Report open a run in the same view", async ({ page }) => {
+test("Findings by Severity lists Critical, High, Medium and Low, even at 0, and never Info", async ({ page }) => {
+  await signIn(page);
+  const all = sample();
+  const found = all.flatMap(counted);
+  const info = found.filter((f) => f.severity === "INFO").length;
+  expect(info, "the sample data has informational findings").toBeGreaterThan(0);
+  // every run: the four rows; the card's total leaves Info out, the summary strip counts it
+  await expect(severityRows(page)).toHaveText(FOUR_LEVELS);
+  await expect(page.getByRole("region", { name: "Findings by Severity" })).toContainText(`${found.length - info} findings`);
+  await expect(stat(page, "Findings")).toHaveText(String(found.length));
+  // one run with no critical finding (and no info) still lists Critical first, at 0
+  const a = all.find((x) => counted(x).length > 0 && !counted(x).some((f) => f.severity === "CRITICAL" || f.severity === "INFO"))!;
+  await page.goto(`/?uid=${a.uid}`);
+  await expect(severityRows(page)).toHaveText(FOUR_LEVELS);
+  await expect(severityRows(page).first().locator("[data-countup]")).toHaveText("0");
+  // its Report shows the same card
+  await page.click(view("Reports"));
+  await expect(severityRows(page)).toHaveText(FOUR_LEVELS);
+});
+
+test("the Duration card has no line under its value, for one run or every run", async ({ page }) => {
+  await signIn(page);
+  const duration = card(page, "Duration");
+  await expect(duration.locator("[data-countup], .dash-stat-value").first()).toBeVisible();
+  await expect(duration.locator(".dash-stat-note")).toHaveCount(0);
+  await expect(duration).not.toContainText(/in total|longest|of the .*limit|no time limit/);
+  await page.goto(`/?uid=${newest().uid}`);
+  await expect(duration.locator(".dash-stat-value")).toBeVisible();
+  await expect(duration.getByRole("meter", { name: "Time used of the limit" })).toBeVisible();
+  await expect(duration.locator(".dash-stat-note")).toHaveCount(0);
+  await expect(duration).not.toContainText(/in total|longest|of the .*limit|no time limit/);
+});
+
+test("every run's Report opens a run in the same view", async ({ page }) => {
   await signIn(page);
   const a = newest();
-  await page.goto("/?view=scope");
-  await hydrated(page); // the links are client-side navigations
-  const approvals = sample().reduce((n, x) => n + x.approvals.length, 0);
-  await expect(page.getByRole("group", { name: "Scope summary" }).getByRole("region", { name: "Approvals" })).toContainText(String(approvals));
-  // the waiting request comes first
-  const waiting = sample().find((x) => x.status === "Awaiting input")!;
-  const first = page.getByRole("list", { name: "Approval requests" }).getByRole("listitem").first();
-  await expect(first).toContainText("Waiting for approval");
-  await first.getByRole("link").click();
-  await expect(page).toHaveURL(new RegExp(`uid=${waiting.uid}`));
-  await expect(page).toHaveURL(/view=scope/);
-  await expect(page.getByRole("region", { name: "Boundary" })).toBeVisible();
-
   await page.goto("/?view=reports");
   await hydrated(page);
   await page.getByRole("link", { name: new RegExp(`^Open the report of ${a.label}`) }).first().click();
@@ -144,13 +175,13 @@ test("with every run shown, a day lists its runs and a run row opens that run", 
 
 test("the views switch in the page and keep their place in the address", async ({ page }) => {
   await signIn(page);
-  for (const [name, param] of [["Findings", "findings"], ["Reports", "reports"], ["Scope", "scope"]]) {
+  for (const [name, param] of [["Findings", "findings"], ["Reports", "reports"], ["Assessments", "assessments"]]) {
     await page.click(view(name));
     await expect(page).toHaveURL(new RegExp(`view=${param}`));
     await expect(page.locator(view(name))).toHaveAttribute("data-active", "true");
   }
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Scope", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Assessments", level: 1 })).toBeVisible();
 });
 
 test("the switcher opens another assessment and keeps the view", async ({ page }) => {
@@ -164,6 +195,39 @@ test("the switcher opens another assessment and keeps the view", async ({ page }
   await expect(findingRows(page)).toHaveCount(other.findings.length);
 });
 
+test("the switcher is just the list, and the open run's name opens its Overview", async ({ page }) => {
+  await signIn(page);
+  const all = sample();
+  const trigger = page.getByRole("button", { name: "Choose an assessment" });
+  const panel = page.locator('[role="dialog"]');
+  const title = panel.getByRole("link", { name: /^Open the overview of / });
+  // (the rows' own status badges may say "Completed": the old rows are checked by their words)
+  const gone = /^(Status|Started|Duration|Operator|Waiting on you|Every saved assessment)$|Saved assessments ·|saved assessments?$| of \d+ shown$/;
+  // every run: no title, no every-run counts, no folder or count line
+  await trigger.click();
+  await expect(panel.locator("li a")).toHaveCount(all.length + 1); // "All assessments", then every run
+  await expect(title).toHaveCount(0);
+  await expect(panel.getByText(gone)).toHaveCount(0);
+  expect(await panelExtras(page)).toBe("");
+  await page.keyboard.press("Escape");
+
+  // one run: its name first, a link to its Overview (the open view and filters are not carried)
+  const a = all.find((x) => counted(x).length > 1)!;
+  await page.goto(`/?uid=${a.uid}&view=findings&sev=HIGH`);
+  await hydrated(page);
+  await trigger.click();
+  await expect(title).toHaveCount(1);
+  await expect(title).toHaveAttribute("href", `/?uid=${a.uid}`);
+  await expect(panel.locator("li a")).toHaveCount(all.length + 1);
+  await expect(panel.getByText(gone)).toHaveCount(0);
+  expect(await panelExtras(page)).toBe("");
+  await title.click();
+  await page.waitForURL((url) => url.pathname === "/" && url.search === `?uid=${a.uid}`);
+  await expect(panel).toHaveCount(0); // the link closes the panel
+  await expect(page.getByRole("heading", { name: "Assessment Operations Center" })).toBeVisible();
+  await expect(trigger).toContainText(a.label);
+});
+
 test("a waiting run shows its pending approval", async ({ page }) => {
   await signIn(page);
   const waiting = sample().find((a) => a.status === "Awaiting input")!;
@@ -173,9 +237,6 @@ test("a waiting run shows its pending approval", async ({ page }) => {
   await page.getByRole("button", { name: /waiting on you/ }).click();
   await expect(page.getByText("This run waits on you")).toBeVisible();
   await expect(page.getByText(/awaiting approval/).first()).toBeVisible();
-  await page.click(view("Scope"));
-  const requests = page.getByRole("region", { name: "Approval requests" });
-  await expect(requests.getByText("Waiting for approval", { exact: true })).toBeVisible();
 });
 
 test("the report links every export format and each one downloads the newest run", async ({ page }) => {
@@ -212,10 +273,14 @@ test("a card opens its documentation", async ({ page }) => {
   expect((await page.request.get(page.url())).status()).toBe(200);
 });
 
-test("the removed Audit log address opens the Overview", async ({ page }) => {
-  await page.goto("/?view=audit");
-  await expect(page.getByRole("heading", { name: "Assessment Operations Center" })).toBeVisible();
-  await expect(page.locator('nav[aria-label="Views"] button[aria-label="Audit log"]')).toHaveCount(0);
+test("the removed Audit log and Scope addresses open the Overview", async ({ page }) => {
+  for (const [param, label] of [["audit", "Audit log"], ["scope", "Scope"]]) {
+    await page.goto(`/?view=${param}`);
+    await expect(page.getByRole("heading", { name: "Assessment Operations Center" })).toBeVisible();
+    await expect(page.locator('nav[aria-label="Views"] button[aria-label="Overview"]')).toHaveAttribute("aria-current", "page");
+    await expect(page.locator(`nav[aria-label="Views"] [aria-label="${label}"]`)).toHaveCount(0);
+  }
+  await expect(page.locator('[data-view-pane="scope"]')).toHaveCount(0);
 });
 
 test("an unknown assessment opens every run, and an unknown page is a 404", async ({ page }) => {

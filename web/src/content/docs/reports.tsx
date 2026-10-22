@@ -192,8 +192,9 @@ export const reports: GroupContent = {
             <Mono>/web</Mono> (or <Kbd>b</Kbd> on the Report screen) starts the dashboard in the background the first time
             (<Mono>npm run dev</Mono> in <Mono>web/</Mono>, installing its packages first if needed) and opens your browser
             on it; later calls just open it. It reads the saved copies in <Mono>~/.reconix/assessments</Mono>, so every
-            started assessment of every session is there, with secrets removed. Its views: Overview, Findings, Reports,
-            Scope, Terminal, AI Assistant. Nothing in the dashboard writes to or decides anything the terminal reads.
+            started assessment of every session is there, with secrets removed. Its views: Overview, Assessments,
+            Findings, Reports, Terminal, AI Assistant. Nothing in the dashboard writes to or decides anything the
+            terminal reads.
           </p>
         </DocSection>
         <DocSection title="One run's report">

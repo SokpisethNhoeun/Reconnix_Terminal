@@ -24,8 +24,8 @@ const SIZES = [
   { width: 390, height: 844 },
 ];
 const fixedFrame = (s: { width: number; height: number }) => s.width >= 1280 && s.height >= 760;
-const RUN = newest().uid; // Reports and Scope for one run, as well as for every run
-const VIEWS = ["overview", "findings", "assessments", "reports", "scope", `reports&uid=${RUN}`, `scope&uid=${RUN}`];
+const RUN = newest().uid; // Reports for one run, as well as for every run
+const VIEWS = ["overview", "findings", "assessments", "reports", `reports&uid=${RUN}`];
 const viewName = (v: string) => (v.includes("&uid=") ? `${v.split("&")[0]} (one run)` : v);
 
 // the wheel and touch tests run with motion on (the project's default is reduced, for speed)
@@ -244,8 +244,8 @@ test.describe("on the fixed frame (1366×768)", () => {
 
   test("PageDown, Space, the arrows, End and Home scroll the content once it has focus", async ({ page }) => {
     await signIn(page);
-    await open(page, "scope"); // every run's Scope: about a screen of range here, so each key is tried from the top
-    await page.getByRole("heading", { name: "Scope", level: 1 }).click(); // focus lands in the content
+    await open(page, "reports"); // every run's Reports: more than a screen of range here; each key is tried from the top
+    await page.getByRole("heading", { name: "Report", level: 1 }).click(); // focus lands in the content
     const top = async () => (await scrollState(page)).top;
     for (const [key, least] of [["PageDown", 200], ["Space", 200], ["ArrowDown", 1]] as const) {
       await page.keyboard.press(key);

@@ -2,7 +2,7 @@
    and switching runs keep and drop. Pure, so no window. */
 import { describe, expect, it } from "vitest";
 
-import { runHref, viewSearch } from "@/components/dashboard/view-url";
+import { parseView, runHref, VIEWS, viewSearch } from "@/components/dashboard/view-url";
 
 const params = (s: string) => Object.fromEntries(new URLSearchParams(s));
 
@@ -24,6 +24,14 @@ describe("viewSearch", () => {
     expect(viewSearch("view=findings&sev=HIGH&uid=run-1", "overview")).toBe("uid=run-1");
     expect(params(viewSearch("view=audit&sev=HIGH", "findings"))).toEqual({ view: "findings", sev: "HIGH" }); // nothing to clear: the overview has no filters
     expect(viewSearch("", "overview")).toBe("");
+  });
+
+  it("opens the Overview for the removed Audit log and Scope views", () => {
+    expect(parseView("audit")).toBe("overview");
+    expect(parseView("scope")).toBe("overview");
+    expect(VIEWS).not.toContain("scope");
+    expect(viewSearch("uid=run-1&view=scope", "overview")).toBe("uid=run-1");
+    expect(params(viewSearch("view=scope&sev=HIGH", "findings"))).toEqual({ view: "findings", sev: "HIGH" });
   });
 });
 

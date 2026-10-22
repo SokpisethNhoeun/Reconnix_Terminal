@@ -36,6 +36,10 @@ const completed = samples.find(
   (a) => a.status === "Completed" && a.template.name === "Web URL" && a.findings.length > 0 && a.findings.every((f) => !["CRITICAL", "INFO"].includes(f.severity) && f.status !== "false-positive"),
 )!;
 const everySeverity = samples.find((a) => a.uid === "20260929-112000-8c51_RCX-DEMO-001")!;
+// a run with informational findings that are not false positives
+const withInfo = samples.find((a) => a.findings.some((f) => f.severity === "INFO" && f.status !== "false-positive"))!;
+/** The levels Findings by Severity lists, in its order. */
+const CARD = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
 const activityOf = (a: Assessment) => deriveDashboard(assessmentView(a)).cards.activity as Extract<ActivityCard, { mode: "events" }>;
 const executionOf = (a: Assessment) => deriveDashboard(assessmentView(a)).cards.execution as Extract<ExecutionCard, { mode: "phases" }>;
 const inAxis = (p: number) => p >= 0 && p <= 1;
@@ -168,13 +172,16 @@ describe("deriveDashboard", () => {
   it.each(samples.map((a) => [a.uid, a] as [string, Assessment]))("%s: numbers agree with the file", (_uid, a) => {
     const d = deriveDashboard(assessmentView(a));
     const real = a.findings.filter((f) => f.status !== "false-positive");
+    // Findings by Severity counts the four levels; the summary strip counts INFO too
+    const onCard = assessmentView(a).findings.filter((f) => !f.falsePositive && f.severity !== "INFO");
     const activity = a.timeline.filter((e) => e.type === "activity");
     const { summary, findings } = d.cards;
     expect(d.cards.mode).toBe("run");
     expect(d.findingTotal).toBe(real.length);
     expect(summary.findings.total).toBe(real.length);
-    expect(findings.severity.reduce((n, s) => n + s.count, 0)).toBe(real.length);
-    expect(findings.review.confirmed + findings.review.needsReview + findings.review.closed).toBe(real.length);
+    expect(findings.total).toBe(onCard.length);
+    expect(findings.severity.reduce((n, s) => n + s.count, 0)).toBe(onCard.length);
+    expect(findings.review.confirmed + findings.review.needsReview + findings.review.closed).toBe(onCard.length);
     expect(summary.tools.steps).toBe(tools(a).length);
     expect(summary.tools.requests).toBe(a.run.requests);
     expect(summary.progress.pct).toBe(d.assessment.progress);
@@ -296,7 +303,7 @@ describe("deriveDashboard", () => {
     expect(d.cards.summary.progress.caption).toBe("No plan yet");
     expect(d.cards.summary.tools.tools).toEqual([]);
     expect(d.cards.summary.duration.meter).toBeNull();
-    expect(d.cards.summary.duration.caption).toBe("no time limit");
+    expect(d.cards.summary.duration).not.toHaveProperty("caption"); // the value, a meter, a badge: no line under them
     expect(d.cards.ask.scope.ok).toBe(false);
     expect(d.cards.findings.total).toBe(0);
     expect(d.cards.findings.severity.every((x) => x.frac === 0)).toBe(true);
@@ -311,8 +318,8 @@ describe("deriveDashboard", () => {
     expect(scores).toEqual([...scores].sort((a, b) => b - a));
   });
 
-  // Findings by Severity lists HIGH, MEDIUM and LOW always; CRITICAL and INFO only when present.
-  // Every level stays in `severity` (the bar, the total and the accessible name count them all).
+  // Findings by Severity always lists CRITICAL, HIGH, MEDIUM and LOW, in that order, each even at
+  // 0; INFO is never on the card (the bar, its accessible name and the total count the four).
   describe("severity rows", () => {
     const rows = (a: Assessment) => deriveDashboard(assessmentView(a)).cards.findings;
     const levels = (f: ReturnType<typeof rows>) => f.severity.map((s) => s.level);
@@ -322,35 +329,60 @@ describe("deriveDashboard", () => {
       return { ...completed, findings: completed.findings.map((x, i) => (i === at ? { ...x, severity: level, effective_severity: level } : x)) };
     };
 
-    it("hides the CRITICAL and INFO rows of a run without such findings", () => {
+    it("lists the four levels, Critical first, with a zero where a run has none", () => {
       const f = rows(completed);
       expect(completed.findings.some((x) => x.severity === "CRITICAL" || x.severity === "INFO")).toBe(false);
-      expect(levels(f)).toEqual(["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]);
-      expect(f.severity.filter((s) => s.hidden).map((s) => s.level)).toEqual(["CRITICAL", "INFO"]);
-      expect(f.severity.filter((s) => !s.hidden).map((s) => s.level)).toEqual(["HIGH", "MEDIUM", "LOW"]);
-      expect(f.words).toBe(`0 critical, ${f.severity[1].count} high, ${f.severity[2].count} medium, ${f.severity[3].count} low, 0 info`);
+      expect(levels(f)).toEqual(CARD);
+      expect(f.severity[0]).toMatchObject({ level: "CRITICAL", count: 0, share: 0 });
+      expect(f.words).toBe(`0 critical, ${f.severity[1].count} high, ${f.severity[2].count} medium, ${f.severity[3].count} low`);
     });
 
-    it("shows the CRITICAL row once a finding is critical, and INFO once one is informational", () => {
+    it("counts a critical finding on its row, and never an informational one", () => {
       const f = rows(withOne("CRITICAL"));
-      expect(f.severity.find((s) => s.level === "CRITICAL")).toMatchObject({ count: 1, hidden: false });
-      expect(f.severity.find((s) => s.level === "INFO")).toMatchObject({ count: 0, hidden: true });
-      expect(f.severity.filter((s) => !s.hidden).map((s) => s.level)).toEqual(["CRITICAL", "HIGH", "MEDIUM", "LOW"]);
-      expect(f.severity.reduce((n, s) => n + s.count, 0)).toBe(f.total); // the bar still counts every level
+      expect(levels(f)).toEqual(CARD);
+      expect(f.severity[0]).toMatchObject({ level: "CRITICAL", count: 1 });
+      expect(f.severity.reduce((n, s) => n + s.count, 0)).toBe(f.total);
       expect(f.words.startsWith("1 critical, ")).toBe(true);
 
-      expect(rows(withOne("INFO")).severity.filter((s) => !s.hidden).map((s) => s.level)).toEqual(["HIGH", "MEDIUM", "LOW", "INFO"]);
+      const info = withOne("INFO");
+      const g = rows(info);
+      const d = deriveDashboard(assessmentView(info));
+      expect(levels(g)).toEqual(CARD);
+      expect(g.total).toBe(rows(completed).total - 1); // the finding moved to INFO left the card
+      expect(g.severity.reduce((n, s) => n + s.count, 0)).toBe(g.total);
+      expect(g.words).not.toMatch(/info/);
+      expect(d.cards.summary.findings.total).toBe(g.total + 1); // the summary strip still counts it
     });
 
-    it("keeps the HIGH, MEDIUM and LOW rows even at zero (a run without findings too)", () => {
+    it("keeps the four rows at zero for a run without findings", () => {
       const none = { ...completed, findings: [] };
       const f = rows(none);
       expect(f.total).toBe(0);
-      expect(f.severity.filter((s) => !s.hidden).map((s) => s.level)).toEqual(["HIGH", "MEDIUM", "LOW"]);
-      expect(f.severity.filter((s) => !s.hidden).every((s) => s.count === 0)).toBe(true);
-      // a false positive does not bring its level's row back
-      const fp = { ...completed, findings: [{ ...completed.findings[0], severity: "CRITICAL" as const, status: "false-positive" }] };
-      expect(rows(fp).severity.find((s) => s.level === "CRITICAL")).toMatchObject({ count: 0, hidden: true });
+      expect(levels(f)).toEqual(CARD);
+      expect(f.severity.every((s) => s.count === 0 && s.share === 0 && s.frac === 0)).toBe(true);
+      // a false positive is counted nowhere
+      const fp = { ...completed, findings: [{ ...completed.findings[0], severity: "CRITICAL" as const, effective_severity: "CRITICAL" as const, status: "false-positive" }] };
+      expect(rows(fp).severity[0]).toMatchObject({ level: "CRITICAL", count: 0 });
+      expect(deriveDashboard(assessmentView(fp)).cards.summary.findings).toMatchObject({ total: 0, worst: null });
+    });
+
+    it("leaves INFO to the summary strip, which names it the worst severity when it is the only one", () => {
+      const only = { ...completed, findings: completed.findings.slice(0, 2).map((x) => ({ ...x, severity: "INFO" as const, effective_severity: "INFO" as const, status: "open" })) };
+      const d = deriveDashboard(assessmentView(only));
+      expect(d.cards.findings.total).toBe(0);
+      expect(levels(d.cards.findings)).toEqual(CARD);
+      expect(d.cards.summary.findings).toMatchObject({ total: 2, worst: { level: "INFO", count: 2 } });
+      expect(d.findingTotal).toBe(2);
+    });
+
+    it("counts a sample run's informational findings in the strip and the Findings list only", () => {
+      const v = assessmentView(withInfo);
+      const d = deriveDashboard(v);
+      const info = v.findings.filter((f) => !f.falsePositive && f.severity === "INFO").length;
+      expect(info).toBeGreaterThan(0);
+      expect(d.cards.summary.findings.total).toBe(d.cards.findings.total + info);
+      expect(d.findings.filter((f) => f.severity === "INFO")).toHaveLength(info);
+      expect(d.cards.summary.findings.worst?.level).toBe(d.cards.findings.severity.find((s) => s.count > 0)?.level);
     });
   });
 });
@@ -369,14 +401,24 @@ describe("deriveOverall", () => {
     expect(all.cards.mode).toBe("all");
     expect(all.runs).toBe(samples.length);
     expect(summary.findings.total).toBe(real.length);
-    expect(all.cards.findings.severity.reduce((n, s) => n + s.count, 0)).toBe(real.length);
-    // every level is listed; a row is hidden only when it is an optional level with no finding
-    expect(all.cards.findings.severity.map((s) => s.level)).toEqual(["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]);
-    for (const s of all.cards.findings.severity) expect(s.hidden).toBe(s.count === 0 && (s.level === "CRITICAL" || s.level === "INFO"));
+    expect(all.findingTotal).toBe(real.length);
+    // the card: the four levels in order, INFO left out of its rows, its bar and its total
+    const onCard = views.flatMap((v) => v.findings).filter((f) => !f.falsePositive && f.severity !== "INFO");
+    expect(real.some((f) => f.severity === "INFO")).toBe(true);
+    expect(all.cards.findings.severity.map((s) => s.level)).toEqual(CARD);
+    expect(all.cards.findings.total).toBe(onCard.length);
+    expect(all.cards.findings.severity.reduce((n, s) => n + s.count, 0)).toBe(onCard.length);
     expect(summary.tools.steps).toBe(samples.reduce((n, a) => n + tools(a).length, 0));
     expect(summary.tools.requests).toBe(samples.reduce((n, a) => n + a.run.requests, 0));
     expect(all.waiting).toBe(samples.filter((a) => a.status === "Awaiting input").length);
     expect(all.statuses.reduce((n, s) => n + s.count, 0)).toBe(samples.length);
+  });
+
+  it("puts no line under the Duration: the total, the longest run's meter and the runs over", () => {
+    const { duration } = all.cards.summary;
+    expect(duration).not.toHaveProperty("caption");
+    expect(duration.value).toBeTruthy();
+    expect(duration.over).toBe(views.filter((v) => v.scope && v.durationSec > v.scope.windowMinutes * 60).length);
   });
 
   it("shows the share of runs completed", () => {
@@ -465,12 +507,13 @@ describe("the run with every severity and a false positive", () => {
   const d = deriveDashboard(assessmentView(everySeverity));
   const rows = d.cards.findings;
 
-  it("shows the CRITICAL and INFO rows, and leaves the false positive out of the total", () => {
+  it("shows the four rows with Critical first, and leaves the false positive out of the total", () => {
     expect(everySeverity.findings.some((f) => f.status === "false-positive")).toBe(true);
     expect(d.findingTotal).toBe(everySeverity.findings.length - 1);
-    // the only INFO finding is the false positive: that row stays hidden, CRITICAL shows
-    expect(rows.severity.filter((s) => s.hidden).map((s) => s.level)).toEqual(["INFO"]);
-    expect(rows.severity.find((s) => s.level === "CRITICAL")!.count).toBe(1);
+    // the only INFO finding is the false positive: the card and the strip count the same findings
+    expect(rows.severity.map((s) => s.level)).toEqual(CARD);
+    expect(rows.severity[0]).toMatchObject({ level: "CRITICAL", count: 1 });
     expect(rows.severity.reduce((n, s) => n + s.count, 0)).toBe(d.findingTotal);
+    expect(d.cards.summary.findings.worst).toEqual({ level: "CRITICAL", count: 1 });
   });
 });

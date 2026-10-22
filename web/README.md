@@ -3,18 +3,20 @@
 A local dashboard for what the Reconix terminal app did, opened from the TUI with `/web`. It
 reads the assessments the TUI saves to `~/.reconix/assessments/` and shows them as the
 **Assessment Operations Center** (the globe UI from the reconix-web-ui site), with Assessments,
-Findings, Reports, Scope, Terminal and AI Assistant views, all switched in-page (`?view=`;
-each view's own address keys and every run link live in `components/dashboard/view-url.ts`).
-By default the Overview totals **every saved run** (`derive-overall.ts`) and Findings lists
-them all, each naming its run; the Assessment switcher in the top bar opens one run instead
-(`?uid=`) and searches every saved run. Scope belongs to one run, so with every run shown it
-asks you to pick one; Reports then lists every run and combines them. The page re-reads the
-files every 10 s (`RECONIX_LIVE_REFRESH_MS`; `0` turns it off).
+Findings, Reports, Terminal and AI Assistant views, all switched in-page (`?view=`; each view's
+own address keys and every run link live in `components/dashboard/view-url.ts`). By default the
+Overview totals **every saved run** (`derive-overall.ts`) and Findings lists them all, each
+naming its run; the Assessment switcher in the top bar opens one run instead (`?uid=`) and
+searches every saved run. With every run shown, Reports lists every run and combines them. The
+page re-reads the files every 10 s (`RECONIX_LIVE_REFRESH_MS`; `0` turns it off). (The Scope
+view was removed: an old `?view=scope` opens the Overview; the scope stays in the saved files,
+the reports and the TUI.)
 
 - **Overview:** a summary strip (Findings with the worst severity, Assessment progress with its
-  state, Tool execution, Duration against the time limit) over the globe hero with the Ask bar;
-  three panels: **Findings by Severity** (a stacked bar, one row per severity, review state,
-  top CVSS findings), the **Activity Timeline** (lanes by kind with clustered marks that expand,
+  state, Tool execution, Duration with a meter against the time limit) over the globe hero with
+  the Ask bar; three panels: **Findings by Severity** (a stacked bar and four rows, Critical,
+  High, Medium, Low, each even at 0; Info is never on the card, the summary strip and Findings
+  count it; review state, top CVSS findings), the **Activity Timeline** (lanes by kind with clustered marks that expand,
   masked text; with every run shown, runs per day stacked by status) and the **Execution
   Timeline** (a row per plan step, a shared tool track and the waiting gate; with every run
   shown, the newest 8 runs).
@@ -34,7 +36,9 @@ files every 10 s (`RECONIX_LIVE_REFRESH_MS`; `0` turns it off).
 - **Drill-down:** the Findings card opens every finding, a severity row opens Findings filtered
   to it, a top finding opens itself.
 - **The bell** lists what the open run waits on and every other saved run that waits on a
-  decision; the switcher says when a saved file was skipped and why. Those views never change
+  decision. **The switcher** is just the list: the open run's name (a link to its Overview),
+  a search past six runs, "All assessments", one row per run, and a warning when a saved file
+  was skipped and why. Those views never change
   anything. The **Terminal** view runs the TUI itself in the browser, so every gate and
   decision still goes through the TUI's store. `/docs` holds the project's documentation
   (`lib/docs-nav.ts` over `content/docs/`: getting started, the terminal guide, AI models, one

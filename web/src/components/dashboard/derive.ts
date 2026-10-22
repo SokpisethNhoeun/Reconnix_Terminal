@@ -55,7 +55,7 @@ export interface Dashboard {
     window: string | null;
   };
   phases: PhaseView[];
-  findingTotal: number;
+  findingTotal: number; // every finding, INFO too (false positives left out)
   severity: FindingsSlice["severity"];
   requests: number;
   minutes: { used: number; max: number | null; over: boolean };
@@ -80,20 +80,18 @@ export function findingRow(f: FindingView, run: FindingRow["run"] = null): Findi
   return { ...f, icon: findingIcon(f), key: run ? `${run.uid}~${f.id}` : f.id, run };
 }
 
-/** The severity rows the card always lists; the others (CRITICAL, INFO) get a row only when a
-    finding has that level. Nothing is merged: the bar, the total and the accessible name count
-    every level. */
-const ALWAYS_SHOWN: readonly Severity[] = ["HIGH", "MEDIUM", "LOW"];
+/** The levels Findings by Severity lists, Critical first: always these four, each even at 0.
+    INFO is never on the card (the Findings view and the summary strip still count it). */
+export const CARD_LEVELS: readonly Severity[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
 
-/** Findings by Severity: counts and shares by severity, review state and the top CVSS
-    scores. False positives are left out of every count. */
+/** Findings by Severity, over the four CARD_LEVELS: counts and shares by severity, review state
+    and the top CVSS scores. False positives are left out of every count. */
 export function findingsSlice(rows: FindingRow[]): FindingsSlice {
-  const counted = rows.filter((f) => !f.falsePositive);
+  const counted = rows.filter((f) => !f.falsePositive && CARD_LEVELS.includes(f.severity));
   const total = counted.length;
-  const severity = SEVERITIES.map((level) => {
+  const severity = CARD_LEVELS.map((level) => {
     const count = counted.filter((f) => f.severity === level).length;
-    const hidden = count === 0 && !ALWAYS_SHOWN.includes(level);
-    return { level, count, share: total ? Math.round((count / total) * 100) : 0, frac: total ? count / total : 0, hidden };
+    return { level, count, share: total ? Math.round((count / total) * 100) : 0, frac: total ? count / total : 0 };
   });
   const top = counted
     .filter((f): f is FindingRow & { score: number } => f.score !== null && f.status !== "fixed")
@@ -111,13 +109,15 @@ export function findingsSlice(rows: FindingRow[]): FindingsSlice {
   };
 }
 
-/** The summary strip's Findings card: the total and the worst severity present. */
-export function findingsSummary(slice: FindingsSlice): SummaryStrip["findings"] {
-  const worst = slice.severity.find((s) => s.count > 0) ?? null;
+/** The summary strip's Findings card: every finding (INFO too; false positives left out), the
+    worst severity present and how many need review. */
+export function findingsSummary(rows: Pick<FindingView, "severity" | "falsePositive" | "needsReview">[]): SummaryStrip["findings"] {
+  const counted = rows.filter((f) => !f.falsePositive);
+  const worst = SEVERITIES.find((level) => counted.some((f) => f.severity === level)) ?? null;
   return {
-    total: slice.total,
-    worst: worst ? { level: worst.level, count: worst.count } : null,
-    needsReview: slice.review.needsReview,
+    total: counted.length,
+    worst: worst ? { level: worst, count: counted.filter((f) => f.severity === worst).length } : null,
+    needsReview: counted.filter((f) => f.needsReview).length,
     link: { view: "findings", filters: {}, label: "Open all findings" },
   };
 }
@@ -167,7 +167,7 @@ export function deriveDashboard(v: AssessmentView): Dashboard {
   const tools = v.scope?.tools ?? [];
   const durationText = duration(v.durationSec);
   const summary: SummaryStrip = {
-    findings: findingsSummary(findingCards),
+    findings: findingsSummary(findings),
     progress: {
       pct: v.progress,
       caption: planSteps.total ? `${planSteps.done} of ${plural(planSteps.total, "plan step")} done` : "No plan yet",
@@ -184,7 +184,6 @@ export function deriveDashboard(v: AssessmentView): Dashboard {
     duration: {
       value: durationText,
       countup: true,
-      caption: windowLimit ? `of the ${windowLimit} limit` : "no time limit",
       meter: maxMinutes ? { frac: Math.min(1, v.durationSec / (maxMinutes * 60)), over } : null,
       over: over ? 1 : 0,
     },
@@ -210,7 +209,7 @@ export function deriveDashboard(v: AssessmentView): Dashboard {
       window: windowLimit,
     },
     phases: v.phases,
-    findingTotal: findingCards.total,
+    findingTotal: summary.findings.total,
     severity: findingCards.severity,
     requests: v.requests,
     minutes,

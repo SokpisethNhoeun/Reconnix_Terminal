@@ -1,6 +1,6 @@
-/* The pieces of a summary-strip card, shared by the Overview's SummaryStrip and the Scope and
-   Report views' StatStrip: the labelled card, its big number (data-countup for the intro's
-   count-up) and its meter. A meter reads as progress (teal) until it is past its limit (red):
+/* The pieces of a summary-strip card, shared by the Overview's SummaryStrip and the Report
+   view's StatStrip: the labelled card, its big number (data-countup for the intro's count-up)
+   and its meter. A meter reads as progress (teal) until it is past its limit (red):
    the tones of lib/status.ts, chosen here and nowhere else. */
 import type { LucideIcon } from "lucide-react";
 

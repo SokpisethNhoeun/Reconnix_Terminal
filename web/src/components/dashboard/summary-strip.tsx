@@ -98,7 +98,6 @@ export function SummaryStrip({ data }: { data: Summary }) {
         {duration.meter && (
           <StatMeter frac={duration.meter.frac} over={duration.meter.over} label="Time used of the limit" />
         )}
-        <p className="dash-stat-note">{duration.caption}</p>
       </StatCard>
     </div>
   );

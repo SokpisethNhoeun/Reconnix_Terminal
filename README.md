@@ -9,7 +9,7 @@ approved.
 
 Flow: **Start → Template → Plan → Approval → Execution → Findings → Finding Detail →
 Report**. A **web dashboard** (`web/`) shows the saved assessments (Overview, Assessments,
-Findings, Reports, Scope and an AI Assistant, with the documentation under `/docs`), and its
+Findings, Reports and an AI Assistant, with the documentation under `/docs`), and its
 **Terminal** view runs this same TUI in the browser.
 
 ## Run it

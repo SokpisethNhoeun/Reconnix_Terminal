@@ -9,7 +9,6 @@ import {
   LayoutGrid,
   Settings,
   Sparkles,
-  Target,
   TerminalSquare,
   TriangleAlert,
   type LucideIcon,
@@ -26,7 +25,6 @@ const VIEWS: NavItem[] = [
   { icon: Layers, label: "Assessments", view: "assessments" },
   { icon: TriangleAlert, label: "Findings", view: "findings" },
   { icon: FileText, label: "Reports", view: "reports" },
-  { icon: Target, label: "Scope", view: "scope" },
   { icon: TerminalSquare, label: "Terminal", view: "terminal" },
 ];
 // The Terminal item always opens its view; when this browser can't use the terminal, the

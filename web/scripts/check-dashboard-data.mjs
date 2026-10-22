@@ -19,7 +19,7 @@ const summary = (s) => {
   line("Findings", `${s.findings.total} · worst ${s.findings.worst ? `${s.findings.worst.level} ×${s.findings.worst.count}` : "none"} · ${s.findings.needsReview} need review`);
   line("Assessment progress", `${s.progress.pct}% · ${s.progress.caption}${s.progress.status ? ` · ${s.progress.status}` : ""}${s.progress.other ? ` · ${s.progress.other.count} ${s.progress.other.status}` : ""}`);
   line("Tool execution", `${s.tools.steps} steps · tools ${s.tools.tools.join(", ") || "none"} · ${s.tools.caption}${s.tools.running ? " · running" : ""}`);
-  line("Duration", `${s.duration.value} · ${s.duration.caption}${s.duration.over ? ` · ${s.duration.over} over the limit` : ""}`);
+  line("Duration", `${s.duration.value}${s.duration.meter ? ` · ${Math.round(s.duration.meter.frac * 100)}% of the limit` : " · no limit"}${s.duration.over ? ` · ${s.duration.over} over the limit` : ""}`);
 };
 
 if (process.argv[2] === "--all") {

@@ -1,5 +1,6 @@
 /* Accessibility (docs/WEB_REDESIGN_V2_PLAN.md §6.5): an axe-core check (WCAG 2.2 A/AA rules) of
-   the Overview, Findings, Scope and Reports (one run and every run) and the AI Assistant; the keyboard's path through the
+   the Overview, Findings and Reports (one run and every run), the Assessments view, the Assessment
+   switcher and the AI Assistant; the keyboard's path through the
    frame with a visible focus mark at every stop; where focus goes when the assistant opens and
    closes; and the contrast of the meaning colours on the cards and in their badges. The assistant
    states that write a conversation are in e2e/a11y-assistant.spec.ts (run on their own). */
@@ -22,10 +23,9 @@ test.describe("axe", () => {
     ["one run's overview", `/?uid=${RUN}`],
     ["findings", "/?view=findings"],
     ["one finding", `/?uid=${RUN}&view=findings&finding=F-001`],
-    ["scope", `/?uid=${RUN}&view=scope`],
     ["reports", `/?uid=${RUN}&view=reports`],
-    ["every run's scope", "/?view=scope"],
     ["every run's report", "/?view=reports"],
+    ["assessments", "/?view=assessments"],
     ["assistant", "/?view=assistant"],
   ];
   for (const [name, url] of PAGES) {
@@ -34,6 +34,14 @@ test.describe("axe", () => {
       await axe(page, name);
     });
   }
+
+  // the panel opened, with a run open: its name is the first link
+  test("the assessment switcher has no violations", async ({ page }) => {
+    await show(page, `/?uid=${RUN}`);
+    await page.getByRole("button", { name: "Choose an assessment" }).click();
+    await expect(page.getByRole("link", { name: /^Open the overview of / })).toBeVisible();
+    await axe(page, "the assessment switcher");
+  });
 
 });
 
@@ -210,10 +218,9 @@ test.describe("the keyboard", () => {
   for (const [name, url] of [
     ["overview", "/"],
     ["findings", "/?view=findings"],
-    ["scope", `/?uid=${RUN}&view=scope`],
     ["reports", `/?uid=${RUN}&view=reports`],
-    ["every run's scope", "/?view=scope"],
     ["every run's report", "/?view=reports"],
+    ["assessments", "/?view=assessments"],
   ]) {
     test(`Tab walks the ${name} sidebar → top bar → view, each stop visibly marked`, async ({ page }) => {
       await show(page, url);
