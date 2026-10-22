@@ -1,6 +1,5 @@
 /* Runs before every page and route: refuses foreign Host headers, requires a session (except
-   for the sign-in page and route; there are no roles: signed in, everything opens), keeps the
-   Terminal's page and routes shut while this dashboard doesn't host the terminal, and sets the
+   for the sign-in page and route; there are no roles: signed in, everything opens), and sets the
    strict Content-Security-Policy from lib/auth/csp.ts with a fresh script nonce (not on a
    knowledge file's original, which sets a stricter one). */
 import { type NextRequest, NextResponse } from "next/server";
@@ -8,8 +7,6 @@ import { type NextRequest, NextResponse } from "next/server";
 import { contentSecurityPolicy } from "@/lib/auth/csp";
 import { COOKIE, allowedHosts, launchToken, readSession } from "@/lib/auth/session";
 import { isKnowledgeOriginalPath } from "@/lib/knowledge/paths";
-import { terminalEnabled } from "@/lib/terminal/config";
-import { TERMINAL_OFF, isTerminalPath } from "@/lib/terminal/paths";
 
 const PUBLIC_PATHS = new Set(["/login", "/api/session"]);
 
@@ -26,10 +23,6 @@ export function proxy(request: NextRequest) {
   if (!PUBLIC_PATHS.has(pathname) && !readSession(request.cookies.get(COOKIE)?.value, token)) {
     if (pathname.startsWith("/api/")) return NextResponse.json({ detail: "Sign in first." }, { status: 401 });
     return NextResponse.redirect(new URL("/login", request.url));
-  }
-  if (isTerminalPath(pathname) && !terminalEnabled()) {
-    if (pathname.startsWith("/api/")) return NextResponse.json({ detail: TERMINAL_OFF }, { status: 403 });
-    return NextResponse.redirect(new URL("/", request.url));
   }
   // a knowledge file's original carries its own policy (a sandbox with nothing allowed): the
   // page's policy set here would replace it

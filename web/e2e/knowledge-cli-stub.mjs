@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* A stand-in for `python -m reconix.knowledge` (the CLI the Security knowledge routes run,
    web/src/lib/knowledge/cli.ts), for the unit and e2e tests only: the dashboard runs it when
-   RECONIX_TERM_TEST=1 and RECONIX_KNOWLEDGE_CLI names this file. It keeps the same contract
+   RECONIX_KNOWLEDGE_CLI_TEST=1 and RECONIX_KNOWLEDGE_CLI names this file. It keeps the same contract
    (docs/WEB_KNOWLEDGE_PAGE_AND_MODELS_PLAN.md, "The CLI contract") over RECONIX_KNOWLEDGE_DIR,
    written as the TUI writes it (a 0700 folder, 0600 files replaced atomically), so the page and
    the AI Assistant read what it adds; only the text extraction and the encryption are left out

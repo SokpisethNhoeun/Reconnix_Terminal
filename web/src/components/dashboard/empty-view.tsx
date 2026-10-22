@@ -25,7 +25,7 @@ export function EmptyView({ dir, problems, compact = false }: { dir: string; pro
         </h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
           This viewer reads the assessments the Reconix TUI saves to <code className={CODE}>{dir}</code>. Run one with{" "}
-          <code className={CODE}>python -m reconix</code> in the reconix-tui folder, or in the Terminal view, and it shows up here
+          <code className={CODE}>python -m reconix</code> in the reconix-tui folder, and it shows up here
           within 10 seconds.
         </p>
         <p className="text-sm leading-relaxed text-muted-foreground">

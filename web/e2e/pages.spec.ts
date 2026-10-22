@@ -1,6 +1,6 @@
 /* The globe dashboard on the sample data: every view, Findings by Severity's four rows, the
-   Duration card, the assessment switcher, the report downloads and the docs. The Terminal view is
-   e2e/terminal.spec.ts (run on its own). */
+   Duration card, the assessment switcher, the report downloads and the docs; the frame has no
+   Terminal item, no logo and no bell. */
 import { type Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
@@ -237,9 +237,6 @@ test("a waiting run shows its pending approval", async ({ page }) => {
   await page.goto(`/?uid=${waiting.uid}`);
   await expect(card(page, "Assessment progress").getByText("Waiting for you")).toBeVisible();
   await expect(page.getByRole("region", { name: "Execution Timeline" }).getByText("Waiting for approval").first()).toBeVisible();
-  await page.getByRole("button", { name: /waiting on you/ }).click();
-  await expect(page.getByText("This run waits on you")).toBeVisible();
-  await expect(page.getByText(/awaiting approval/).first()).toBeVisible();
 });
 
 test("the report links every export format and each one downloads the newest run", async ({ page }) => {
@@ -370,16 +367,25 @@ test("the overview drills into filtered views", async ({ page }) => {
   await expect(selectedFinding(page)).toHaveCount(1);
 });
 
-test("the switcher searches every saved run, and the bell lists other waiting runs", async ({ page }) => {
+test("the sidebar has no Terminal item and no logo, and the top bar no bell", async ({ page }) => {
   await signIn(page);
-  const waiting = sample().find((x) => x.status === "Awaiting input")!;
-  const other = sample().find((x) => x.uid !== waiting.uid)!;
-  await page.goto(`/?uid=${other.uid}`);
-  await page.getByRole("button", { name: /waiting on you/ }).click();
-  await expect(page.getByText(/other run waits on a decision|other runs wait on a decision/)).toBeVisible();
-  await page.locator(`a[href*="uid=${waiting.uid}"]`).first().click();
-  await expect(page).toHaveURL(new RegExp(`uid=${waiting.uid}`));
+  for (const url of ["/", `/?uid=${sample().find((x) => x.status === "Awaiting input")!.uid}`, "/docs"]) {
+    await page.goto(url);
+    const rail = page.locator("aside.dash-sidebar");
+    await expect(rail.getByRole("button", { name: "Overview" }).or(rail.getByRole("link", { name: "Overview" }))).toBeVisible();
+    await expect(rail.locator('[data-view="terminal"]')).toHaveCount(0);
+    await expect(rail.getByText("Terminal", { exact: true })).toHaveCount(0);
+    // the views come first: no logo link above them
+    await expect(rail.locator(":scope > a")).toHaveCount(0);
+    await expect(rail.getByRole("link", { name: "Reconix local assessment viewer" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /waiting on you|Nothing waits on you/ })).toHaveCount(0);
+  }
+});
 
+test("the switcher searches every saved run", async ({ page }) => {
+  await signIn(page);
+  const other = sample().find((x) => x.status !== "Awaiting input")!;
+  await page.goto(`/?uid=${other.uid}`);
   await page.getByRole("button", { name: "Choose an assessment" }).click();
   const list = page.locator('[role="dialog"] li a');
   await expect(list).toHaveCount(sample().length + 1); // "All assessments", then every run

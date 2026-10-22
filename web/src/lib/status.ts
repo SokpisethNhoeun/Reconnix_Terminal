@@ -69,7 +69,7 @@ export const STEP_STATUS: Record<"pending" | "active" | "done", Meaning> = {
 export const APPROVAL_STATE: Record<"APPROVED" | "REJECTED" | "PENDING" | "NOT REACHED", Meaning> = {
   APPROVED: { label: "Approved", tone: "success", icon: "approved", hint: "The operator approved this action in the TUI." },
   REJECTED: { label: "Rejected", tone: "danger", icon: "rejected", hint: "The operator rejected this action; it did not run." },
-  PENDING: { label: "Waiting for approval", tone: "warning", icon: "pending", hint: "Decide in the TUI (or its Terminal view)." },
+  PENDING: { label: "Waiting for approval", tone: "warning", icon: "pending", hint: "Decide in the TUI." },
   "NOT REACHED": { label: "Not reached", tone: "info", icon: "unreached", hint: "The run ended before it got here." },
 };
 

@@ -6,8 +6,6 @@ requires-python = ">=3.9"
 dependencies = [
     "textual>=8.2,<9",
     "rich>=13.7",
-    "websockets>=13",
-    "pywinpty>=2.0.14; sys_platform == 'win32'",
     "litellm>=1.40",          # flexible LLM: unified model interface
     "cryptography>=42",       # flexible LLM: Fernet-encrypted API keys
     "python-dotenv>=1.0",     # flexible LLM: load .env
@@ -28,7 +26,7 @@ packages = [
     "reconix", "reconix.commands", "reconix.flow", "reconix.knowledge", "reconix.llm",
     "reconix.models",
     "reconix.screens", "reconix.screens.forms", "reconix.shell", "reconix.store",
-    "reconix.store.knowledge", "reconix.store.templates", "reconix.webterm", "reconix.widgets",
+    "reconix.store.knowledge", "reconix.store.templates", "reconix.widgets",
 ]
 
 [tool.setuptools.package-data]

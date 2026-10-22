@@ -9,8 +9,8 @@ approved.
 
 Flow: **Start → Template → Plan → Approval → Execution → Findings → Finding Detail →
 Report**. A **web dashboard** (`web/`) shows the saved assessments (Overview, Assessments,
-Findings, Reports and an AI Assistant, with the documentation under `/docs`), and its
-**Terminal** view runs this same TUI in the browser.
+Findings, Reports and an AI Assistant, with the documentation under `/docs`); assessments
+run and are decided here, in the TUI.
 
 ## Run it
 
@@ -89,24 +89,19 @@ Web dashboard (Next.js, reads `~/.reconix/assessments`). Type `/web` in the TUI:
 time it installs the dashboard's packages and starts it in the background (`npm run dev`,
 output in `~/.reconix/web.log`), then your browser opens on it. A dashboard the TUI
 started stops when you quit. To run it on its own (from the repository folder, with the
-`.venv` above created: the Terminal page runs the TUI with it):
+`.venv` above created: the Security knowledge page runs Python from it):
 
 ```bash
 cd web && npm install && npm run dev    # prints a sign-in link; /web opens the same one
 RECONIX_DATA_DIR=sample-data npm run dev   # or browse the bundled sample assessments
-npm run dev -- --no-terminal            # without the Terminal page: the dashboard only reads
+npm run dev -- --no-open                # don't open a browser
 ```
 
 On Windows (PowerShell) the sample data is `$env:RECONIX_DATA_DIR = "sample-data"; npm run dev`.
 
-**Terminal page.** The dashboard's sidebar has a **Terminal** link that runs the Reconix TUI
-in the browser, with the same screens, commands and gates. Each browser tab gets its own
-session (`python -m reconix` in a pseudo-terminal, started by `python -m reconix.webterm`
-on `127.0.0.1:3101`). It keeps running while you look at the other pages and ends when you
-close the tab; what it saves shows up on the other pages. It runs on Linux, macOS and
-Windows 10+ (there in a ConPTY pseudo console, through `pywinpty`, which
-`requirements.txt` installs on Windows only). See `docs/WEB_TERMINAL_PLAN.md` and
-`docs/WEB_WINDOWS_PLAN.md`.
+The dashboard has no terminal of its own: run assessments and decide their gates in the TUI
+(`python -m reconix`); what it saves shows up on the dashboard's pages
+(`docs/WEB_NO_TERMINAL_BELL_LOGO_PLAN.md`).
 
 > Requires Python 3.9+. For the intended look, use a terminal with a
 > **JetBrains Mono** (or any Nerd/▮ box-drawing) font and a dark background.
@@ -312,9 +307,8 @@ each of the AI agent's tool calls too — target, tool set, methods, excluded pa
 the time limit; the per-action approval gates above do not cover the agent, see Agent
 mode). Target logins live in memory for the session only; one-time codes are never stored; evidence
 is masked; saved copies for the web dashboard (`~/.reconix/assessments`, 0600) never
-contain a secret. The browser terminal only opens for the dashboard's own page with a
-single-use ticket that only an operator gets, on 127.0.0.1; the helper proves itself before
-the page sends a keystroke, never logs what is typed, and takes its TUIs down with it.
+contain a secret. The web dashboard answers on 127.0.0.1 only, behind a sign-in link, and
+runs or approves nothing: decisions stay in the TUI.
 
 ## Project layout
 
@@ -327,7 +321,7 @@ reconix-tui/
 ├── scripts/                # export_tokens.py (web colors), export_commands.py (the docs'
 │                           #   command reference), make_sample_data.py (web/sample-data)
 ├── web/                    # Next.js dashboard: read-only views, the AI Assistant, single and
-│                           #   combined report exports, the docs, the Terminal page
+│                           #   combined report exports, the docs, Security knowledge
 ├── tests/                  # pytest + Textual Pilot
 └── reconix/
     ├── app.py              # ReconixApp: bindings and the command runner
@@ -349,8 +343,6 @@ reconix-tui/
     ├── reconix.tcss        # Textual stylesheet
     ├── browser.py          # open a URL / saved report without disturbing the TUI
     ├── web_server.py       # /web starts and stops the dashboard (npm run dev in web/)
-    ├── webterm/            # the Terminal page's server: tickets, origin check, sessions
-    │                       #   (a pty on Linux/macOS, ConPTY on Windows)
     ├── widgets/            # session bar + flow line, menus, prompt, question, run log,
     │                       #   scope manifest view, spinner + activity line, finding cells
     └── screens/

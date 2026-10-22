@@ -1,10 +1,10 @@
-/* The launch token, the signed session cookie (no roles), the Host allowlist and the terminal key. */
+/* The launch token, the signed session cookie (no roles) and the Host allowlist. */
 import { createHmac } from "node:crypto";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import { isSameOrigin } from "@/lib/auth/origin";
-import { allowedHosts, launchToken, readSession, readTerminalKey, sessionValue, terminalKeyValue, tokenMatches } from "@/lib/auth/session";
+import { allowedHosts, launchToken, readSession, sessionValue, tokenMatches } from "@/lib/auth/session";
 
 const TOKEN = "unit-token-0123456789abcdef";
 const env = { ...process.env };
@@ -70,25 +70,6 @@ describe("session cookie", () => {
 
   it("stops working when the dashboard restarts with a new token", () => {
     expect(readSession(sessionValue(TOKEN), "another-token-0123456789")).toBe(false);
-  });
-});
-
-describe("terminal key", () => {
-  it("round-trips, and stops working with a new token or after 12 hours", () => {
-    const issued = Date.parse("2026-10-05T08:00:00Z");
-    const key = terminalKeyValue(TOKEN, issued);
-    expect(readTerminalKey(key, TOKEN, issued)).toBe(true);
-    expect(readTerminalKey(key, "another-token-0123456789", issued)).toBe(false);
-    expect(readTerminalKey(key, TOKEN, issued + 13 * 3_600_000)).toBe(false);
-  });
-
-  it("can't be made from a session cookie, nor the other way round (same shape, signed differently)", () => {
-    expect(readTerminalKey(sessionValue(TOKEN), TOKEN)).toBe(false);
-    expect(readSession(terminalKeyValue(TOKEN), TOKEN)).toBe(false);
-  });
-
-  it.each([undefined, "", "123", "123.", "abc.def", "1.2.3"])("refuses %s", (value) => {
-    expect(readTerminalKey(value, TOKEN)).toBe(false);
   });
 });
 

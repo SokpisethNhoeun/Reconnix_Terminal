@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { AssistantProvider } from "@/components/assistant/assistant-provider";
 import { AssistantStage } from "@/components/assistant/assistant-stage";
 import type { AssistantInfo } from "@/components/assistant/types";
-import type { TerminalAccess } from "@/lib/auth/guard";
 import { CardCursorLight } from "@/components/dashboard/card-cursor-light";
 import { HydratedMark } from "@/components/dashboard/hydrated-mark";
 import { Intro } from "@/components/dashboard/intro";
@@ -16,7 +15,7 @@ export type { View };
 
 /**
  * Local Assessment Viewer shell: sidebar + top bar around a content area that switches between
- * the Overview dashboard, Assessments, Findings (list + evidence), Reports, Terminal and
+ * the Overview dashboard, Assessments, Findings (list + evidence), Reports and
  * Security knowledge (opened from the assistant's header), plus the AI Assistant,
  * which opens over the top bar and content (AssistantStage). The views are
  * server-rendered and passed in as props; all stay mounted and are toggled with `hidden` so the
@@ -26,9 +25,8 @@ export type { View };
  * while the assistant animates in or out. While the assistant is shown, the Overview stays laid
  * out underneath as its backdrop (unseen and inert, data-assistant-backdrop in motion.css): its
  * globe is carried into the assistant, and closing grows straight back into it with its scroll
- * position kept. The Terminal view is mounted on its first visit (that starts the session) and
- * then only hidden, so the TUI keeps running; Security knowledge too (its first visit reads the
- * list). The assistant's conversation lives in AssistantProvider, above every view.
+ * position kept. Security knowledge is mounted on its first visit (that reads the list) and then
+ * only hidden. The assistant's conversation lives in AssistantProvider, above every view.
  */
 export function Viewer({
   topBar,
@@ -36,8 +34,6 @@ export function Viewer({
   assessments,
   findings,
   reports,
-  terminal,
-  terminalState,
   knowledge,
   assistant,
 }: {
@@ -46,16 +42,12 @@ export function Viewer({
   assessments: React.ReactNode;
   findings: React.ReactNode;
   reports: React.ReactNode;
-  terminal: React.ReactNode;
-  terminalState: TerminalAccess;
   /** The Security knowledge page. */
   knowledge: React.ReactNode;
   assistant: AssistantInfo;
 }) {
   const view = parseView(useSearchParams().get("view"));
   const [shown, setShown] = useState<View>(view);
-  const [terminalOpened, setTerminalOpened] = useState(view === "terminal");
-  if (view === "terminal" && !terminalOpened) setTerminalOpened(true); // first visit: start the session
   const [knowledgeOpened, setKnowledgeOpened] = useState(view === "knowledge");
   if (view === "knowledge" && !knowledgeOpened) setKnowledgeOpened(true); // first visit: read the list
   const backdrop = shown === "assistant"; // the Overview under the open assistant
@@ -78,7 +70,7 @@ export function Viewer({
         <CardCursorLight />
         <Intro />
         <div className="dash-frame" data-assistant-open={shown === "assistant" ? "" : undefined}>
-          <Sidebar active={view} onSelect={select} terminalState={terminalState} />
+          <Sidebar active={view} onSelect={select} />
           {topBar}
           {/* tabIndex -1: focusable by script and click, so the keys scroll it (no tab stop) */}
           <main className="dash-content" tabIndex={-1}>
@@ -94,7 +86,6 @@ export function Viewer({
             <div data-view-pane="assessments" hidden={shown !== "assessments"}>{assessments}</div>
             <div data-view-pane="findings" hidden={shown !== "findings"}>{findings}</div>
             <div data-view-pane="reports" hidden={shown !== "reports"}>{reports}</div>
-            <div data-view-pane="terminal" hidden={shown !== "terminal"}>{terminalOpened && terminal}</div>
             <div data-view-pane="knowledge" hidden={shown !== "knowledge"}>{knowledgeOpened && knowledge}</div>
           </main>
           <AssistantStage view={view} shown={shown} setShown={setShown} />

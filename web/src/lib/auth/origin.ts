@@ -1,4 +1,4 @@
-/* Requests that hand something out (the session cookie, a terminal ticket) must come from
+/* Requests that hand something out (the session cookie) or change something must come from
    the dashboard's own pages: their Origin header has to match the Host they were sent to. */
 
 export function isSameOrigin(request: Request): boolean {

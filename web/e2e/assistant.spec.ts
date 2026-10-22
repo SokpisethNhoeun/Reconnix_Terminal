@@ -289,11 +289,13 @@ test.describe("with reduced motion", () => {
     await expect(log(page)).not.toContainText("Paragraph 6");
   });
 
-  test("approvals and planning stay in the TUI: guidance and Open Terminal, never a plan", async ({ page }) => {
+  test("approvals and planning stay in the TUI: guidance only, never a plan or a button", async ({ page }) => {
     await page.goto("/?view=assistant");
     await page.getByRole("button", { name: /Plan a security assessment/ }).click();
     const plan = log(page).getByRole("region", { name: "Plan a new assessment in the TUI" });
     await expect(plan).toContainText("no plan has been made");
+    await expect(plan).toContainText("python -m reconix");
+    await expect(plan.getByRole("button")).toHaveCount(0); // no Open Terminal: there is no web terminal
     await expect(log(page)).toContainText("You asked: Plan a security assessment");
     await ask(page, "Explain the top finding");
     const top = log(page).getByRole("region", { name: /^Finding / });
@@ -315,8 +317,7 @@ test.describe("with reduced motion", () => {
     await expect(log(page)).toContainText("You asked: Generate a report");
     await expect(log(page)).toContainText("You asked: Plan a security assessment");
     await expect(page.getByText(/This conversation is about All assessments/)).toBeVisible();
-    await plan.getByRole("button", { name: "Open Terminal" }).click();
-    await expect(page).toHaveURL(/view=terminal/);
+    await expect(page.getByRole("button", { name: "Open Terminal" })).toHaveCount(0);
   });
 });
 

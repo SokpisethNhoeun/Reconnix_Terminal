@@ -2,9 +2,9 @@
 
 /* Re-reads the saved assessments every `everyMs` (10 s by default; the server reads
    RECONIX_LIVE_REFRESH_MS through lib/live-refresh.ts, 0 turns it off, as the e2e server does) while the tab is visible, so
-   a run going on in the TUI (or in the Terminal view) shows up without a reload. Click to pause.
-   The refresh re-renders the server views and keeps client state, so an open terminal session
-   and the chosen view survive it. */
+   a run going on in the TUI shows up without a reload. Click to pause.
+   The refresh re-renders the server views and keeps client state, so an open conversation and
+   the chosen view survive it. */
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 

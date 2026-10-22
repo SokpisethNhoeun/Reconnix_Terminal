@@ -1,45 +1,36 @@
 #!/usr/bin/env node
 /* Start the dashboard on 127.0.0.1 with a fresh launch token, then print (and open) the
-   sign-in link. Next to it, start the terminal helper (python -m reconix.webterm) that
-   the Terminal page talks to.
+   sign-in link.
 
      npm start                     # next start  (after npm run build)
      npm run dev                   # next dev    (hot reload)
      npm start -- --no-open        # don't open a browser
-     npm start -- --no-terminal    # no Terminal page: the dashboard only reads
 
-   Env: RECONIX_WEB_PORT (3100), RECONIX_TERM_PORT (3101), RECONIX_DATA_DIR
-        (~/.reconix/assessments), RECONIX_PYTHON (the repo's .venv, else python3; python on
-        Windows),
-        RECONIX_WEB_TOKEN (only for tests; normally a new random token each start). */
+   Env: RECONIX_WEB_PORT (3100), RECONIX_DATA_DIR (~/.reconix/assessments), RECONIX_PYTHON
+        (the Python the Security knowledge page runs: the repo's .venv, else python3; python
+        on Windows), RECONIX_WEB_TOKEN (only for tests; normally a new random token each start). */
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import net from "node:net";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const mode = process.argv[2] === "dev" ? "dev" : "start";
 const openBrowser = !process.argv.includes("--no-open");
-const terminal = !process.argv.includes("--no-terminal");
 const port = process.env.RECONIX_WEB_PORT || "3100";
-const termPort = process.env.RECONIX_TERM_PORT || "3101";
 const token = process.env.RECONIX_WEB_TOKEN || randomBytes(24).toString("base64url");
 const link = `http://127.0.0.1:${port}/login#token=${token}`;
 const dataDir = process.env.RECONIX_DATA_DIR || "~/.reconix/assessments";
-const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 
-/* Never start next to another dashboard on the same ports: Next.js and the helper would both
-   fail, and nothing of the running one (its link file in particular) may be touched. */
-const busy = [];
-for (const p of terminal ? [port, termPort] : [port]) if (await portInUse(p)) busy.push(p);
-if (busy.length) {
+/* Never start next to another dashboard on the same port: Next.js would fail, and nothing of
+   the running one (its link file in particular) may be touched. */
+if (await portInUse(port)) {
   console.error(
-    `[web] 127.0.0.1:${busy.join(" and ")} ${busy.length > 1 ? "are" : "is"} already in use, probably by another ` +
-      "Reconix dashboard. Stop it (or set RECONIX_WEB_PORT / RECONIX_TERM_PORT), then start again.",
+    `[web] 127.0.0.1:${port} is already in use, probably by another Reconix dashboard. ` +
+      "Stop it (or set RECONIX_WEB_PORT), then start again.",
   );
   process.exit(2);
 }
@@ -53,59 +44,14 @@ function portInUse(p) {
   });
 }
 
-const helper = terminal ? startTerminal() : null;
-
 const child = spawn(process.execPath, [require.resolve("next/dist/bin/next"), mode, "-H", "127.0.0.1", "-p", port], {
   stdio: ["inherit", "pipe", "inherit"],
   env: {
     ...process.env,
     RECONIX_WEB_TOKEN: token,
     RECONIX_WEB_PORT: port,
-    RECONIX_WEB_TERMINAL: terminal ? "1" : "0",
-    RECONIX_TERM_PORT: termPort,
   },
 });
-
-/* The terminal helper runs from the repo root (so `reconix` imports without an install)
-   with the same token, which signs the Terminal page's tickets. It keeps reading its stdin
-   and stops when that closes, so it never outlives this launcher. If it can't start, the
-   dashboard still runs; the Terminal page says it can't connect. */
-function startTerminal() {
-  const windows = process.platform === "win32";
-  const venv = path.join(repoRoot, ".venv", windows ? "Scripts/python.exe" : "bin/python");
-  const python = process.env.RECONIX_PYTHON || (existsSync(venv) ? venv : windows ? "python" : "python3");
-  // the dashboard's LLM_* settings (a key someone exported, say) stay with it
-  const ownEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("LLM_")));
-  const proc = spawn(python, ["-m", "reconix.webterm"], {
-    cwd: repoRoot,
-    stdio: ["pipe", "inherit", "inherit"],
-    env: {
-      ...ownEnv,
-      RECONIX_WEB_TOKEN: token,
-      RECONIX_WEB_PORT: port,
-      RECONIX_TERM_PORT: termPort,
-      RECONIX_TERM_WATCH_STDIN: "1",
-    },
-  });
-  proc.on("error", (error) => {
-    console.error(`[terminal] The Terminal page is unavailable: couldn't run ${python} (${error.message}). Set RECONIX_PYTHON.`);
-  });
-  proc.on("exit", (code, signal) => {
-    if (!stopping) console.error(`[terminal] The terminal helper stopped (${signal ?? `exit code ${code}`}); the Terminal page can't connect.`);
-  });
-  return proc;
-}
-
-let stopping = false;
-
-/* On Windows, kill() is a hard kill, so the helper is told by closing its stdin instead:
-   it then closes its sessions (and their TUIs) itself. */
-function stopTerminal() {
-  stopping = true;
-  if (!helper || helper.exitCode !== null || helper.signalCode !== null) return;
-  if (process.platform === "win32") helper.stdin.end();
-  else helper.kill("SIGTERM");
-}
 
 let announced = false;
 child.stdout.on("data", (chunk) => {
@@ -116,7 +62,6 @@ child.stdout.on("data", (chunk) => {
   process.stdout.write(
     `\n  Reconix analysis dashboard\n` +
       `  Data     ${dataDir}\n` +
-      `  Terminal ${terminal ? `the Terminal page (helper on ws://127.0.0.1:${termPort})` : "off (--no-terminal): read-only"}\n` +
       `  Sign in  ${signInLine()}\n` +
       `  The link changes every time the dashboard starts. Press Ctrl+C to stop.\n` +
       `  From the TUI, run /web to open it.\n\n`,
@@ -124,7 +69,7 @@ child.stdout.on("data", (chunk) => {
   if (openBrowser) open(link);
 });
 
-/* The link signs in with full control of the Terminal page, so it is printed only to a
+/* The link signs in (the AI Assistant, the Security knowledge page), so it is printed only to a
    terminal, never into a log (started by the TUI, our output goes to ~/.reconix/web.log). */
 function signInLine() {
   return process.stdout.isTTY ? link : `the link is in ${linkFile} (/web in the TUI opens it)`;
@@ -181,12 +126,8 @@ function cleanup() {
 }
 
 for (const signal of ["SIGINT", "SIGTERM"])
-  process.on(signal, () => {
-    stopTerminal();
-    child.kill(signal);
-  });
+  process.on(signal, () => child.kill(signal));
 child.on("exit", (code) => {
-  stopTerminal();
   cleanup();
   removeLink();
   process.exit(code ?? 0);

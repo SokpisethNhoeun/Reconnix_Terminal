@@ -2,13 +2,12 @@
 
 /* Where a card's links go. A finding or the Reports of the run the dashboard already shows
    open in place (the address changes, nothing reloads); another run's open through a normal
-   link to that run. The Terminal (while it is on) is left to through the assistant's own
-   history entry. Every address is built here from a checked run uid (protocol.ts), never
+   link to that run. Every address is built here from a checked run uid (protocol.ts), never
    taken from the card's text. */
 import Link from "next/link";
-import { ArrowUpRight, SquareTerminal } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { leaveAssistant, showView, type View, type ViewParams } from "@/components/dashboard/view-url";
+import { showView, type View, type ViewParams } from "@/components/dashboard/view-url";
 import { RUN_UID } from "@/lib/assistant/protocol";
 import { useAssistant } from "../assistant-provider";
 
@@ -66,17 +65,5 @@ export function FindingLink({ uid, id, children, className }: { uid: string; id:
     <ViewLinkOut uid={uid} view="findings" params={{ finding: id }} allParams={{ finding: `${uid}~${id}` }} label={`Open ${id} in Findings`} className={className}>
       {children ?? "Open in Findings"}
     </ViewLinkOut>
-  );
-}
-
-/** Opens the Terminal view (the TUI): only when this dashboard hosts it. */
-export function TerminalButton({ className }: { className?: string }) {
-  const { info } = useAssistant();
-  if (!info.terminal) return null;
-  return (
-    <button type="button" onClick={() => leaveAssistant("terminal")} className={cn("ai-btn ai-btn-small ai-btn-outline", className)}>
-      <SquareTerminal className="size-3.5" aria-hidden />
-      Open Terminal
-    </button>
   );
 }

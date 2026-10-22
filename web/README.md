@@ -3,7 +3,7 @@
 A local dashboard for what the Reconix terminal app did, opened from the TUI with `/web`. It
 reads the assessments the TUI saves to `~/.reconix/assessments/` and shows them as the
 **Assessment Operations Center** (the globe UI from the reconix-web-ui site), with Assessments,
-Findings, Reports, Terminal, AI Assistant and Security knowledge views, all
+Findings, Reports, AI Assistant and Security knowledge views, all
 switched in-page (`?view=`; each view's
 own address keys and every run link live in `components/dashboard/view-url.ts`). By default the
 Overview totals **every saved run** (`derive-overall.ts`) and Findings lists them all, each
@@ -47,15 +47,17 @@ the reports and the TUI.)
   the card nor the pager at its foot.
 - **Drill-down:** the Findings card opens every finding, a severity row opens Findings filtered
   to it, a top finding opens itself.
-- **The bell** lists what the open run waits on and every other saved run that waits on a
-  decision. **The switcher** is just the list: the open run's name (a link to its Overview),
+- **The top bar** holds the live-refresh pill, the switcher, the run's (or every run's) chips
+  and the docs search; it has no bell (`../docs/WEB_NO_TERMINAL_BELL_LOGO_PLAN.md`). **The
+  sidebar** is the views rail with Documentation at its foot, and no logo. **The switcher** is
+  just the list: the open run's name (a link to its Overview),
   a search past six runs, "All assessments", one row per run, and a warning when a saved file
   was skipped and why. Those views never change
-  anything. The **Terminal** view runs the TUI itself in the browser, so every gate and
-  decision still goes through the TUI's store. `/docs` holds the project's documentation, read
+  anything; there is no Terminal view: assessments run and are decided in the TUI
+  (`python -m reconix`). `/docs` holds the project's documentation, read
   in place (`../docs/WEB_DOCS_INLINE_PLAN.md`): one page per group (`lib/docs-nav.ts` over
-  `content/docs/`: getting started, the terminal guide, AI models, the commands, the assessment
-  guide, reports, troubleshooting, guardrails), each showing all of its pages as parts anchored
+  `content/docs/`: getting started, the terminal guide (the TUI's screens and keys), AI models,
+  the commands, the assessment guide, reports, troubleshooting, guardrails), each showing all of its pages as parts anchored
   `#<page>` (their sections `#<page>-<section>`); `/docs` itself shows Getting started. Nothing
   in the docs links off the page but the docs sidebar's groups; the search looks through the
   group shown and jumps within the page. Every old address, a page's own `/docs/<group>/<page>`
@@ -76,7 +78,6 @@ npm run build
 npm start                          # http://127.0.0.1:3100, prints and opens the sign-in link
 RECONIX_DATA_DIR=sample-data npm start   # the sample assessments instead of your own
 npm start -- --no-open             # don't open a browser
-npm start -- --no-terminal         # no Terminal page (the Terminal view says it is off)
 ```
 
 | Variable | Default | Meaning |
@@ -86,41 +87,19 @@ npm start -- --no-terminal         # no Terminal page (the Terminal view says it
 | `RECONIX_LIVE_REFRESH_MS` | `10000` | how often the page re-reads the saved files; `0` turns the live refresh off (the e2e server does) |
 | `RECONIX_CHROME` | the usual names on PATH, then the common install paths | the Chrome/Chromium that prints the PDF exports; without one the PDF routes answer 501 |
 | `RECONIX_WEB_PORT` | `3100` | port on 127.0.0.1 |
-| `RECONIX_TERM_PORT` | `3101` | the terminal helper's port on 127.0.0.1 |
-| `RECONIX_PYTHON` | repo `.venv`, else `python3` (`python` on Windows) | the Python that runs the terminal helper, the TUI and the knowledge CLI |
+| `RECONIX_PYTHON` | repo `.venv`, else `python3` (`python` on Windows) | the Python that runs the knowledge CLI |
 | `RECONIX_KNOWLEDGE_DIR` | `~/.reconix/knowledge` | the knowledge folder (the TUI's `/add-on` and the Security knowledge page) |
 | `RECONIX_KNOWLEDGE_KEY_FILE` | `~/.reconix/knowledge.key` | the key the knowledge CLI encrypts the kept originals with (passed on to it) |
 | `RECONIX_WEB_TOKEN` | random per start | only for tests; normally `scripts/serve.mjs` makes one |
 
-## Terminal page
+## Sign-in
 
-`scripts/serve.mjs` starts `python -m reconix.webterm` (from the repo root) next to Next.js.
-The page asks `POST /api/terminal/ticket` for a single-use ticket valid for 60 s, then opens
-`ws://127.0.0.1:3101/?ticket=…`.
-
-- **Ticket route:** same origin, the session cookie, the terminal on **and** the terminal key
-  cookie (`reconix_term`, `Path=/api/terminal`, signed differently and set at sign-in only
-  while the terminal is on, so a session cookie seen by another server on 127.0.0.1 can't mint
-  tickets). It returns the ticket, the
-  socket URL and the `proof` the real helper will send.
-- **Helper:** checks the `Host` (loopback), the `Origin` (this dashboard) and the ticket
-  (signed with the launch token, used once). Its first frame is `{"type":"hello","proof"}`;
-  the page sends nothing and shows nothing until it matches, so another program holding
-  port 3101 gets no keystrokes. Then it runs `python -m reconix` on a pseudo-terminal that
-  is the TUI's controlling terminal: if the helper dies, so does the TUI. On Windows it is
-  a ConPTY pseudo console (`pywinpty`) the helper owns; closing it ends the TUI.
-- **Frames:** binary for terminal bytes (pastes split into 32 KiB), text for
-  `{"type":"resize","cols","rows"}` (at most 256 characters).
-- **Limits:** 2 sessions at once; one closes after 30 minutes without typing. The Terminal
-  view is mounted on its first visit and then only hidden (`components/dashboard/viewer.tsx`),
-  so the session keeps running while you switch views and through the live refresh; closing
-  the tab stops that TUI. Nothing typed is logged.
-- **Controls:** copy (the selection, else the terminal's text), clear (wipes the screen;
-  a same-size resize message has the TUI repaint it), restart (asks first while a session
-  is live), expand (fills the browser window, so Esc still reaches the TUI), and "↓ Latest"
-  while scrolled up. None of them sends keystrokes.
-- **The sign-in link** grants full control (there are no roles), so `serve.mjs` prints it only to a
-  terminal; started by the TUI, it is only in `~/.reconix/web.url` (0600).
+`scripts/serve.mjs` starts Next.js on 127.0.0.1 with a fresh launch token and prints the
+sign-in link; the sign-in route trades it for the session cookie. There is no terminal in the
+dashboard (no `/terminal`, no `/api/terminal/*`, no terminal key cookie or ticket): the TUI
+runs in your own terminal. **The sign-in link** grants everything (there are no roles), so
+`serve.mjs` prints it only to a terminal; started by the TUI, it is only in
+`~/.reconix/web.url` (0600).
 
 ## AI Assistant
 
@@ -153,7 +132,7 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   (+ Model)." Cloud providers and any address off this machine work by default
   (the owner's decision, 2026-10-22; no server switch): assessment data goes there, and the
   picker says so when one is chosen, the chip's tooltip while it answers. A remote endpoint
-  takes an API key over https only. The terminal helper and the TUI it runs never get `LLM_*`.
+  takes an API key over https only.
 - **The composer** (`composer.tsx`): a rounded box (radius 16) with the text area on top and a
   row under it: the model chip on the left; on the right "Enter to send · Shift+Enter for new
   line" (hidden on a phone) and the round 32 px send button (Stop while a reply is written).
@@ -211,8 +190,7 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
 - **Cards the server picks** (`lib/assistant/cards.ts`, `intent.ts`): findings, a finding,
   progress, approvals, policy blocks, tools used, report downloads and notices, built from the
   saved data only; the model writes the explanation and never the numbers. Nothing can be run
-  or approved from the chat: approvals say "Decide in the TUI", with Open Terminal
-  while the terminal is on. Questions are masked with the TUI's secret patterns (`lib/assistant/redact.ts`,
+  or approved from the chat: approvals say "Decide in the TUI" (no button). Questions are masked with the TUI's secret patterns (`lib/assistant/redact.ts`,
   vectors shared with `reconix/store/redact.py` in `tests/redact-vectors.json`).
 - **Saved conversations** (`lib/assistant/history-store.ts`): one `<uuid>.json` per
   conversation in `~/.reconix/assistant/` (`RECONIX_ASSISTANT_DIR`; the folder `0700`, files
@@ -266,7 +244,7 @@ or the launch token), a 60 s limit and a cap on its output; what it prints is ne
 is done, 2 a refusal shown to the operator, anything else a fixed message. Adds and removals run
 one after another (`lib/knowledge/gate.ts`). The text is masked and split exactly as in the
 terminal, the original is kept encrypted, and the AI still only ever sees the masked passages.
-Tests only: with `RECONIX_TERM_TEST=1`, `RECONIX_KNOWLEDGE_CLI` names a stand-in that keeps the same
+Tests only: with `RECONIX_KNOWLEDGE_CLI_TEST=1`, `RECONIX_KNOWLEDGE_CLI` names a stand-in that keeps the same
 contract over a temp folder (`e2e/knowledge-cli-stub.mjs`; it also refuses an environment holding
 anything else and an upload copy that isn't private). The e2e server uses it; remove that line
 from `playwright.config.ts` to run the e2e against the real CLI.
@@ -283,12 +261,12 @@ npm run globe:points # rebuild public/globe/land.bin (dev only; the build doesn'
 npm run lint && npm run typecheck   # typecheck needs `npx next typegen` (or a build) first
 npm run build && npm run e2e        # Playwright on sample-data (npx playwright install chromium,
                                     #   or CHROMIUM_PATH=/usr/bin/chromium); E2E_PORT moves its
-                                    #   ports (default 3199, plus 3198 and 3195)
+                                    #   ports (default 3199, plus 3197 and 3195)
 ```
 
-The e2e specs: `access` (sign-in, no roles, an old role cookie refused, the terminal's locks,
-origin, headers), `pages` (views, switcher, downloads, the docs,
-the Terminal view with a stand-in program), `assessments` (ten a page, the pager, chips, search,
+The e2e specs: `access` (sign-in, no roles, an old role cookie refused, no terminal routes,
+origin, headers), `pages` (views, switcher, downloads, the docs, no Terminal item, bell or
+logo), `assessments` (ten a page, the pager, chips, search,
 the address), `findings` (paging, deep links, Previous / Next across a page end, the notice for
 a hidden finding, the list scroller and its hidden scrollbars, the phone's list → detail →
 Back), `reports` (the top 3 CVSS, the targets 7 a page at the height of Findings by Severity;
@@ -320,18 +298,16 @@ counts from it (`e2e/support.ts`), never from literals.
 
 ```
 src/
-├── proxy.ts                 # Host allowlist, a session on every route (no roles), the terminal only
-│                            #   while it is on, nonce CSP
+├── proxy.ts                 # Host allowlist, a session on every route (no roles), nonce CSP
 ├── app/
 │   ├── layout.tsx           # fonts (Inter, JetBrains Mono), metadata (no smooth-scroll library: everything scrolls natively)
 │   ├── page.tsx             # the viewer: loads the saved runs, every run or ?uid=, derives the dashboard
 │   ├── docs/                # documentation in the dashboard frame (layout checks the session): /docs and
 │   │                        #   /docs/[group], one page per group (content in src/content/docs/)
-│   ├── terminal/            # /terminal → /?view=terminal (while the terminal is on)
 │   ├── assistant/           # /assistant → /?view=assistant
 │   ├── login/               # sign-in (token from the link's #fragment) → the Overview
 │   └── api/                 # session (sign-in), assessments/[uid] (JSON), assessments/[uid]/export,
-│                            #   reports/combined (1–5 runs as one PDF / DOCX), terminal/ticket,
+│                            #   reports/combined (1–5 runs as one PDF / DOCX),
 │                            #   assistant, assistant/conversations and assistant/models (+ [id], active,
 │                            #   test, fetch: the model picker), knowledge (+ [id], [id]/original: the
 │                            #   Security knowledge page)
@@ -342,10 +318,8 @@ src/
 │   │                        #   combined/ (query.ts validates ?uids=&format=&evidence=&low=&appendix=,
 │   │                        #   select.ts merges the runs, html.ts renders, options.ts names the file),
 │   │                        #   docx/ (zip.ts, ooxml.ts, report.ts and combined.ts: the Word documents)
-│   ├── auth/                # session.ts (launch token, signed cookie, hosts), csp.ts, guard.ts
-│   │                        #   (+ terminalAccess), origin.ts (same-origin check), ticket.ts (terminal tickets)
-│   ├── terminal/            # config.ts (on/off, helper port), paths.ts, protocol.ts (frames, close codes),
-│   │                        #   screen-text.ts (what Copy output copies)
+│   ├── auth/                # session.ts (launch token, signed cookie, hosts), csp.ts, guard.ts,
+│   │                        #   origin.ts (same-origin check)
 │   ├── assistant/           # config.ts (the rules every model passes), request.ts
 │   │                        #   (zod), context.ts (what the model sees),
 │   │                        #   prompt.ts, llm.ts + stream.ts + reply.ts (the streamed reply), protocol.ts
@@ -392,8 +366,6 @@ src/
 │   │                        #   use-fit-above.ts)
 │   ├── knowledge/           # KnowledgeView, FileTable / FileGrid, FileActions (Open, Remove), LayoutSwitch,
 │   │                        #   UploadDialog, KindIcon, use-knowledge.ts, use-layout.ts
-│   ├── terminal/            # TerminalView, TerminalPanel, TerminalToolbar, RestartButton, TerminalNotice,
-│   │                        #   ScrollToLatest, useXterm, useTerminalSession, useTerminalView, useLeaveWarning
 │   ├── ui/                  # Button, Badge, StatusBadge / SeverityBadge, IconButton, Checkbox, CopyButton,
 │   │                        #   Pagination, ListDetail, EmptyNote (cva + cn; styles/ui.css)
 │   └── docs-*.tsx           # the docs' group page, page frame, part, sidebar, search, "On this page", top bar,
@@ -403,7 +375,7 @@ src/
 │                            #   tests/test_export_commands.py and tests/docs-nav.test.ts check it)
 └── styles/                  # tokens.css (GENERATED from reconix/theme.py by scripts/export_tokens.py), then one
                              #   file per area, imported in this order from app/globals.css: frame (page and
-                             #   scrolling), dashboard, motion, terminal, site, assistant, ui (shared controls),
+                             #   scrolling), dashboard, motion, site, assistant, ui (shared controls),
                              #   findings, assessments, reports, knowledge, docs
 public/globe/land.bin        # the globe's land dots (scripts/build-globe-points.mjs)
 ```
@@ -434,9 +406,7 @@ once, with each run as an occurrence; what a run lacks is listed under Limitatio
 ## Rules
 
 - **Read-only for assessments.** No route writes, deletes or starts anything the TUI reads;
-  decisions belong in the TUI. Two exceptions: the Terminal page runs the TUI itself (its
-  ticket route only hands out a ticket; the helper starts the session), and the AI Assistant
-  writes **its own conversation files** and its saved models (`models.json`, `models.key`) in
+  decisions belong in the TUI. One exception: the AI Assistant writes **its own conversation files** and its saved models (`models.json`, `models.key`) in
   `~/.reconix/assistant` (and nothing else). The Security knowledge page adds and removes
   knowledge files, never itself: it starts the Python knowledge CLI (the same code as `/add-on`)
   for each change and for each original it opens (the knowledge folder is not assessment data). The assistant's route is also the one place saved
@@ -448,9 +418,9 @@ once, with each run as an occurrence; what a run lacks is listed under Limitatio
   Change `schema.ts` together with `reconix/store/snapshot.py`.
 - **Access.** No roles: one local user. Every page and route but the sign-in page and route
   needs a session (the cookie `<issued>.<signature>`, 12 h; an old role-prefixed one no longer
-  reads), and signed in everything is open. `/terminal` and `/api/terminal/*` also need the
-  dashboard to host the terminal, and a ticket the terminal key cookie too (`proxy.ts`, and pages
-  / handlers check again). Every change checks the page's Origin. The dashboard binds to 127.0.0.1 and refuses other Host headers; so does the terminal helper.
+  reads), and signed in everything is open (`proxy.ts`, and pages / handlers check again). Every
+  change checks the page's Origin. The dashboard binds to 127.0.0.1 and refuses other Host
+  headers. There is no terminal: nothing in the dashboard runs the TUI.
 - **Text is text.** Saved values (targets, evidence, chat) and the model's replies are
   rendered by React as text (`MessageText` turns a small markdown subset into elements);
   never use `dangerouslySetInnerHTML`.

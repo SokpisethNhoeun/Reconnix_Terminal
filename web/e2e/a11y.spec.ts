@@ -230,7 +230,8 @@ test.describe("the keyboard", () => {
       const regions = stops.map((s) => order.indexOf(s.region));
       expect(regions.every((r) => r >= 0), `stops outside the frame: ${JSON.stringify(stops.filter((s) => !order.includes(s.region)))}`).toBe(true);
       expect(regions, "the order goes back on itself").toEqual([...regions].sort((a, b) => a - b));
-      expect(stops.filter((s) => s.region === "sidebar").map((s) => s.name).slice(1, 3)).toEqual(["Overview", "AI Assistant"]);
+      // no logo link first: the rail starts with its views
+      expect(stops.filter((s) => s.region === "sidebar").map((s) => s.name).slice(0, 2)).toEqual(["Overview", "AI Assistant"]);
       expect(stops.some((s) => s.region === "content"), "Tab reaches the view").toBe(true);
       expect(stops.filter((s) => !s.marked).map((s) => s.name), "stops with no visible focus").toEqual([]);
       expect(stops.filter((s) => !s.seen).map((s) => s.name), "stops off screen").toEqual([]);

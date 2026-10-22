@@ -1,7 +1,7 @@
 import { HydratedMark } from "@/components/dashboard/hydrated-mark";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { DocsTopBar } from "@/components/docs-top-bar";
-import { requireSignedIn, terminalAccess } from "@/lib/auth/guard";
+import { requireSignedIn } from "@/lib/auth/guard";
 
 /**
  * Chrome for every /docs/** route: the dashboard's own frame (the same sidebar, a top bar and
@@ -15,12 +15,12 @@ import { requireSignedIn, terminalAccess } from "@/lib/auth/guard";
  * intro reveal (the docs have no intro) and turns on smooth hash links (dashboard.css).
  */
 export default async function DocsLayout({ children }: { children: React.ReactNode }) {
-  const [, access] = await Promise.all([requireSignedIn(), terminalAccess()]);
+  await requireSignedIn();
   return (
     <div className="dash-page" data-docs="">
       <HydratedMark />
       <div className="dash-frame">
-        <Sidebar active={null} terminalState={access} />
+        <Sidebar active={null} />
         <DocsTopBar />
         {/* tabIndex -1: focusable by script and click, so the keys scroll it (no tab stop) */}
         <main className="dash-content" tabIndex={-1}>
