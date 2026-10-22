@@ -29,6 +29,7 @@ class FindingDetailScreen(ReconixScreen):
     BINDINGS = [
         Binding("t", "triage", "triage"),
         Binding("r", "report", "report"),
+        Binding("c", "chat", "chat"),
         Binding("left_square_bracket", "step(-1)", "previous finding", show=False),
         Binding("right_square_bracket", "step(1)", "next finding", show=False),
         Binding("left", "to_list", "back to list"),
@@ -130,6 +131,11 @@ class FindingDetailScreen(ReconixScreen):
     def action_triage(self) -> None:
         if self._finding() is not None:
             self.app.triage_finding(self.app.selected_finding)
+
+    def action_chat(self) -> None:
+        """Chat about the open finding; the draft names it (plain text, never markup)."""
+        finding = self._finding()
+        self.chat_about(f"About {finding.fid} {finding.title}: " if finding else "")
 
     def action_report(self) -> None:
         self.app.goto("report")

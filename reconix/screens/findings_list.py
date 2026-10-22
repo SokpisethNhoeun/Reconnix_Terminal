@@ -35,6 +35,7 @@ class FindingsListScreen(ReconixScreen):
         Binding("s", "sort", "sort"),
         Binding("t", "triage", "triage"),
         Binding("i", "import", "import"),
+        Binding("c", "chat", "chat"),
         Binding("escape", "back", "back", show=False),
     ]
 
