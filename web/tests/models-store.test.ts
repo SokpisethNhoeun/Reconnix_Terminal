@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { checkModel, ENV_WORDING, FORM_WORDING, modelSetup } from "@/lib/assistant/config";
 import { open, seal } from "@/lib/assistant/models/crypto";
 import { MODELS_FAIL, ModelsError } from "@/lib/assistant/models/errors";
+import { CLOUD_FIXED } from "@/lib/assistant/models/presets";
 import { activeModel, activeModelSummary, modelsView, NO_MODEL, probeTarget } from "@/lib/assistant/models/resolve";
 import { MAX_FILE_BYTES, MAX_MODELS, MAX_NAME, MAX_PROVIDERS, MAX_URL, MODELS_FORMAT } from "@/lib/assistant/models/schema";
 import { addProvider, listProviders, MODELS_TEMP, modelsTempName, readSaved, removeProvider, setActive, updateProvider } from "@/lib/assistant/models/store";
@@ -263,7 +264,9 @@ describe("the saved models", () => {
     const p = await addProvider({ ...remote, apiKey: SECRET }, env);
     await expect(updateProvider(p.id, { baseUrl: "https://evil.example/v1" }, env)).rejects.toThrow("enter the API key again");
     expect((await updateProvider(p.id, { baseUrl: "https://openrouter.ai/api/v2" }, env))?.keySaved).toBe(true);
-    expect((await updateProvider(p.id, { baseUrl: "https://other.example/v1", apiKey: "new-key" }, env))?.keySaved).toBe(true);
+    // another host: a cloud preset's name stays with its own address; as Custom it may move
+    await expect(updateProvider(p.id, { baseUrl: "https://other.example/v1", apiKey: "new-key" }, env)).rejects.toMatchObject({ message: CLOUD_FIXED, status: 400 });
+    expect((await updateProvider(p.id, { preset: "custom", baseUrl: "https://other.example/v1", apiKey: "new-key" }, env))?.keySaved).toBe(true);
     expect((await updateProvider(p.id, { removeKey: true }, env))?.keySaved).toBe(false);
     const { file, apiKeyOf } = await readSaved();
     expect(apiKeyOf(file.providers[0])).toBeNull();

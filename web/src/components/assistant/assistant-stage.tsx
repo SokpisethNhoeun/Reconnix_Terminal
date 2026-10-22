@@ -51,6 +51,7 @@ import {
   spotBox,
   unseatGlobe,
 } from "./motion-globe";
+import { AssistantShown } from "./use-assistant-shown";
 import { holdGlobe, setGlobeAmbient, sharedGlobe } from "./use-globe";
 import { useGlobeAim } from "./use-globe-aim";
 import { useReturnFocus } from "./use-return-focus";
@@ -369,7 +370,9 @@ export function AssistantStage({ view, shown, setShown }: { view: View; shown: V
       </div>
       <div ref={front} className="dash-assistant-front">
         <div className="dash-assistant-panel">
-          <AssistantView ref={composer} onMinimize={() => leaveAssistant()} />
+          <AssistantShown value={on && view === "assistant"}>
+            <AssistantView ref={composer} onMinimize={() => leaveAssistant()} />
+          </AssistantShown>
         </div>
       </div>
     </div>

@@ -1,7 +1,9 @@
 /* The model picker's pure rules (components/assistant/): what the composer's chip says
    (model-picker-rules.ts), the rows of step 1 (your models; the providers in their order, a
-   cloud one disabled with the reason while the server keeps data here), which fields step 2
-   shows and what Continue asks, where Continue goes with the fetch's and the test's answers, the
+   cloud one disabled with the reason while the server keeps data here, a saved one's state from
+   its address, a cloud preset saved at another address shown as Custom with its host), which
+   fields step 2 shows and what Continue asks, where Continue goes with the fetch's and the test's
+   answers (only "not listed" falls back to a test or a typed name), the
    requests "Use this model" sends (POST a new provider, or PATCH the saved one and PUT the
    switch), a typed model name (model-name-rules.ts), where the arrow keys move (roving.ts) and
    which word on the model the assistant shows after a switch (model-switch.ts).
@@ -18,7 +20,9 @@ import {
   credentialsProblem,
   freeName,
   initialChoice,
+  presetFor,
   probeOf,
+  providerName,
   providerRows,
   requestsForUse,
   showsUrl,
@@ -30,7 +34,7 @@ import {
 import { liveSwitch, switchOver } from "@/components/assistant/model-switch";
 import { rovingIndex } from "@/components/assistant/roving";
 import type { ModelSummary } from "@/components/assistant/types";
-import { presetOf, PRESETS } from "@/lib/assistant/models/presets";
+import { fitsPreset, presetOf, PRESETS } from "@/lib/assistant/models/presets";
 import { MAX_MODELS } from "@/lib/assistant/models/schema";
 import type { ModelsView, ProviderView } from "@/lib/assistant/models/view";
 
@@ -122,6 +126,48 @@ describe("step 1: the providers", () => {
     expect(custom[0].provider).toBe(saved);
     expect(rows).toHaveLength(PRESETS.length + 1);
   });
+  it("say where a saved provider is from its address, never from its preset's kind", () => {
+    const remoteOllama = provider({ name: "Ollama", preset: "ollama", baseUrl: "https://ollama.example.com/v1", local: false });
+    const row = providerRows(view({ providers: [remoteOllama] })).find((r) => r.provider === remoteOllama);
+    expect(row).toMatchObject({ label: "Ollama", state: "remote", disabled: null });
+    expect(row?.label).not.toContain("(local)");
+    const withKey = provider({ name: "Ollama", preset: "ollama", baseUrl: "https://ollama.example.com/v1", local: false, keySaved: true });
+    expect(providerRows(view({ providers: [withKey] })).find((r) => r.provider === withKey)?.state).toBe("key saved");
+    const here = provider({ name: "Ollama", preset: "ollama", baseUrl: "http://127.0.0.1:11434/v1" });
+    expect(providerRows(view({ providers: [here] })).find((r) => r.provider === here)).toMatchObject({ label: "Ollama (local)", state: "local" });
+    const vllm = provider({ name: "vLLM box", baseUrl: "https://vllm.example.com/v1", local: false }); // once "saved"
+    expect(providerRows(view({ providers: [vllm] })).find((r) => r.provider === vllm)?.state).toBe("remote");
+  });
+  it("tie a cloud preset to its own address: one saved elsewhere before that rule is Custom, with its host", () => {
+    const openai = presetOf("openai");
+    expect(fitsPreset(openai, "https://api.openai.com/v1")).toBe(true);
+    expect(fitsPreset(openai, "https://API.openai.com:443/v2")).toBe(true); // the same origin
+    for (const other of ["http://api.openai.com/v1", "https://api.openai.com:8443/v1", "https://api.openai.com.evil.example/v1", "https://other.example/v1", "nope"]) {
+      expect(fitsPreset(openai, other)).toBe(false);
+    }
+    expect(fitsPreset(presetOf("custom"), "https://other.example/v1")).toBe(true);
+    expect(fitsPreset(presetOf("ollama"), "https://ollama.example.com/v1")).toBe(true);
+
+    const real = provider({ id: ID2, name: "OpenAI", preset: "openai", baseUrl: "https://api.openai.com/v1", local: false, keySaved: true });
+    const moved = provider({ name: "OpenAI", preset: "openai", baseUrl: "https://llm.other.example/v1", local: false, keySaved: true });
+    expect(presetFor(real).id).toBe("openai");
+    expect(presetFor(moved).id).toBe("custom");
+    const rows = providerRows(view({ providers: [real, moved] }));
+    expect(rows.filter((r) => r.preset.id === "openai").map((r) => [r.key, r.label, r.disabled])).toEqual([[ID2, "OpenAI", CLOUD_OFF]]);
+    const shown = rows.find((r) => r.provider === moved)!;
+    expect(shown).toMatchObject({ label: "OpenAI (llm.other.example)", state: "key saved", disabled: null });
+    expect(shown.preset.id).toBe("custom");
+    expect(showsUrl(shown.preset)).toBe(true); // its address in the field
+    expect(startCredentials(shown.preset, moved).baseUrl).toBe("https://llm.other.example/v1");
+    expect(providerName(shown.preset, moved)).toBe("OpenAI (llm.other.example)");
+    const yours = yourModels(view({ allowRemote: true, providers: [real, moved] }));
+    expect(yours.filter((e) => e.providerId !== "environment").map((e) => e.provider)).toEqual(["OpenAI", "OpenAI (llm.other.example)"]);
+    // a change saves it as Custom (the server refuses the cloud's name at another address)
+    const used = requestsForUse(shown.preset, moved, view({ providers: [real, moved] }), startCredentials(shown.preset, moved), "stub-model");
+    expect(used.ok && used.requests.kind === "update" && used.requests.body).toEqual({ preset: "custom" });
+    const same = requestsForUse(presetOf("openai"), real, view({ providers: [real] }), startCredentials(presetOf("openai"), real), "stub-model");
+    expect(same.ok && same.requests.kind === "update" && same.requests.body).toBeNull();
+  });
 });
 
 describe("step 2: credentials", () => {
@@ -165,13 +211,25 @@ describe("Continue", () => {
     // an empty list: a typed name, tested before it is saved
     expect(afterFetch({ ok: true, models: [] }, [])).toMatchObject({ next: "choose", models: [], verify: true });
   });
-  it("stays on a refusal, with the server's words", () => {
+  it("stays on a refusal or a failure, with the server's words, and never falls back", () => {
     const refused = { ok: false as const, status: 400, detail: "The base URL is not on this machine: assessment data would be sent there." };
     expect(afterFetch(refused, ["m"])).toEqual({ next: "stay", error: refused.detail, typeInstead: false });
     expect(afterFetch({ ok: false, status: 429, detail: "Too many requests at once." }, [])).toMatchObject({ next: "stay", typeInstead: false });
+    // the model's server never reached, a redirect, a refused key, its limit, a list too large:
+    // fixed here first (no test of a known model, no typed name)
+    for (const detail of [
+      "Could not reach the address. Is the model's server running?",
+      "The address did not answer within 10 seconds.",
+      "The address answered with a redirect, which is not followed. Use the final address.",
+      "The model's server answered HTTP 401: check the API key.",
+      "The model's server answered HTTP 429: too many requests, or no credit left.",
+      "The model list is too large.",
+    ]) {
+      expect(afterFetch({ ok: false, status: 502, detail }, ["llama3.2"])).toEqual({ next: "stay", error: detail, typeInstead: false });
+    }
   });
-  it("tests a known model when the model's server gives no list, else offers to type one", () => {
-    const unlisted = { ok: false as const, status: 502, detail: "The model's server answered HTTP 404: check the model name and the base URL." };
+  it("tests a known model when the model's server answered without a list, else offers to type one", () => {
+    const unlisted = { ok: true as const, listed: false as const, detail: "The model's server answered HTTP 404: check the model name and the base URL." };
     expect(afterFetch(unlisted, ["llama3.2", "qwen"])).toEqual({ next: "test", model: "llama3.2" });
     expect(afterFetch(unlisted, [])).toEqual({ next: "stay", error: unlisted.detail, typeInstead: true });
     expect(afterTest({ ok: true, result: { ok: true, detail: "Connected: llama3.2 answered." } }, ["llama3.2", "qwen"])).toMatchObject({ next: "choose", models: ["llama3.2", "qwen"], verify: false });

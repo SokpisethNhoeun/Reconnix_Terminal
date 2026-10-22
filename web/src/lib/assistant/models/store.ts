@@ -6,7 +6,8 @@
    call the model. A file that doesn't parse, or whose active choice names no saved model, is
    refused with a fixed error (never silently replaced). Every change re-checks its values:
    names cleaned, addresses through config.ts's rules (an address off this machine only with
-   LLM_ALLOW_REMOTE=1), a saved key kept only while the address stays on the same host. */
+   LLM_ALLOW_REMOTE=1), a cloud preset only at its own address (presets.ts `fitsPreset`), a saved
+   key kept only while the address stays on the same host. */
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -18,6 +19,7 @@ import { cleanTitle } from "../history-schema";
 import { assistantDir, code, type Folder, inFolder, openFolder, readText, serial, tempSuffix, writeAtomic } from "../secure-fs";
 import { ensureKey, hasKey, open, readKey, seal } from "./crypto";
 import { folderFault, MODELS_FAIL, ModelsError } from "./errors";
+import { CLOUD_FIXED, fitsPreset, type PresetId, presetOf } from "./presets";
 import type { AddProvider, UpdateProvider } from "./requests";
 import { type Active, EMPTY_MODELS, ENVIRONMENT_NAME, MAX_FILE_BYTES, MAX_NAME, MAX_PROVIDERS, type ModelsFile, ModelsFileSchema, type SavedProvider } from "./schema";
 import type { ProviderView } from "./view";
@@ -160,6 +162,12 @@ function addressFor(baseUrl: string, withKey: boolean, env: Env): string {
   return checked.baseUrl;
 }
 
+/** A cloud preset names its own address only (the origin of its base URL): another address is
+    saved as Custom. */
+function checkPreset(preset: PresetId, baseUrl: string): void {
+  if (!fitsPreset(presetOf(preset), baseUrl)) throw bad(CLOUD_FIXED);
+}
+
 const hostOf = (url: string) => {
   try {
     return new URL(url).origin;
@@ -174,6 +182,7 @@ export function addProvider(input: AddProvider, env: Env = process.env): Promise
     if (file.providers.length >= MAX_PROVIDERS) throw bad(`At most ${MAX_PROVIDERS} providers can be saved. Remove one first.`);
     const name = nameFor(input.name, file, null);
     const baseUrl = addressFor(input.baseUrl, Boolean(input.apiKey), env);
+    checkPreset(input.preset, baseUrl);
     const id = randomUUID();
     const provider: SavedProvider = { id, name, preset: input.preset, baseUrl, models: input.models };
     if (input.apiKey) provider.key = seal(input.apiKey, await ensureKey(f, folderFault), id);
@@ -183,8 +192,10 @@ export function addProvider(input: AddProvider, env: Env = process.env): Promise
 }
 
 /** Changes a saved provider (null: there is none). No `apiKey` keeps the saved key, unless the
-    address moves to another host: then it must be entered again (or removed). When the active
-    model leaves the list, the provider's first model takes its place. */
+    address moves to another host: then it must be entered again (or removed). A change of the
+    preset or the address is checked against the preset (a cloud one at its own address only; a
+    provider saved before that rule keeps working until either changes). When the active model
+    leaves the list, the provider's first model takes its place. */
 export function updateProvider(id: string, patch: UpdateProvider, env: Env = process.env): Promise<ProviderView | null> {
   return change(async (file, f) => {
     const at = file.providers.findIndex((p) => p.id === id);
@@ -200,6 +211,7 @@ export function updateProvider(id: string, patch: UpdateProvider, env: Env = pro
       baseUrl: addressFor(nextUrl, keep || Boolean(patch.apiKey), env),
       models: patch.models ?? old.models,
     };
+    if (patch.preset !== undefined || patch.baseUrl !== undefined) checkPreset(provider.preset, provider.baseUrl);
     if (patch.apiKey) provider.key = seal(patch.apiKey, await ensureKey(f, folderFault), id);
     else if (keep) provider.key = old.key;
     let active = file.active;

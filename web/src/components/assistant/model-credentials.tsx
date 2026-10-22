@@ -8,8 +8,13 @@
    a list, tests a model it is known to have; then step 3. What the server refuses (its fixed
    words: an address off this machine, a bad URL, a key over http…) stays here, in the error
    style; when the model's server only failed to list its models, "Type a model name instead"
-   goes on without the list. Back (or Escape) returns to step 1. */
-import { useEffect, useId, useRef, useState } from "react";
+   goes on without the list. Back (or Escape) returns to step 1.
+   The key field is uncontrolled: its value is never React state, so React never writes it into
+   the DOM's `value` attribute. It is read on Continue (the picker keeps it for step 3, and puts
+   it back as the field's property after Back from there), and emptied when the step goes. Not a
+   <form>, and every field tells password managers to stay away: nothing here looks like a
+   sign-in to be saved. Enter in a field is Continue. */
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Loader } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,22 +27,26 @@ import {
   afterFetch,
   afterTest,
   type ChooseList,
-  type Credentials,
   credentialsProblem,
+  type Fields,
   probeOf,
   providerName,
   showsUrl,
   typeInstead,
+  withKey,
 } from "./model-picker-rules";
 
 interface Props {
   preset: Preset;
   provider: ProviderView | null;
   view: ModelsView;
-  value: Credentials;
-  onChange: (value: Credentials) => void;
+  value: Fields;
+  onChange: (value: Fields) => void;
+  /** The key read on an earlier Continue (Back from step 3), or "". */
+  keptKey: () => string;
   onBack: () => void;
-  onNext: (list: ChooseList) => void;
+  /** On to step 3 with the list and the key read from the field. */
+  onNext: (list: ChooseList, apiKey: string) => void;
 }
 
 const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
@@ -49,10 +58,14 @@ const hostOf = (url: string) => {
   }
 };
 
-export function ModelCredentials({ preset, provider, view, value, onChange, onBack, onNext }: Props) {
+/** What keeps password managers off a field (1Password, LastPass, Bitwarden). */
+const NOT_A_LOGIN = { autoComplete: "off", "data-1p-ignore": true, "data-lpignore": "true", "data-bwignore": true } as const;
+
+export function ModelCredentials({ preset, provider, view, value, onChange, keptKey, onBack, onNext }: Props) {
   const id = useId();
   const ids = { url: `${id}-url`, urlHint: `${id}-url-hint`, key: `${id}-key`, keyHint: `${id}-key-hint` };
-  const first = useRef<HTMLInputElement>(null);
+  const urlField = useRef<HTMLInputElement>(null);
+  const keyField = useRef<HTMLInputElement>(null);
   const alive = useRef(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ text: string; typeInstead: boolean } | null>(null);
@@ -60,53 +73,72 @@ export function ModelCredentials({ preset, provider, view, value, onChange, onBa
   const host = hostOf(addressOf(preset, provider, value));
   const remote = host !== null && !LOOPBACK.has(host);
   const keySaved = Boolean(provider?.keySaved);
+  const url = showsUrl(preset);
 
   useEffect(() => {
-    first.current?.focus({ preventScroll: true });
+    (url ? urlField : keyField).current?.focus({ preventScroll: true });
     alive.current = true;
     return () => {
       alive.current = false; // left (Back, Escape, closed) while asking: the answer is dropped
     };
-  }, []);
+  }, [url]);
 
-  const set = (change: Partial<Credentials>) => {
+  // the key typed before step 3 comes back (as the field's property, never an attribute); when
+  // the step goes, the field is emptied while it is still in the page
+  useLayoutEffect(() => {
+    const field = keyField.current;
+    if (field) field.value = keptKey();
+    return () => {
+      if (field) field.value = "";
+    };
+  }, [keptKey]);
+
+  const set = (change: Partial<Fields>) => {
     onChange({ ...value, ...change });
     setError(null);
   };
+  const typedKey = () => keyField.current?.value ?? "";
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async () => {
     if (busy) return;
-    const problem = credentialsProblem(preset, provider, value);
+    const apiKey = typedKey();
+    const c = withKey(value, apiKey);
+    const problem = credentialsProblem(preset, provider, c);
     if (problem) return setError({ text: problem, typeInstead: false });
     setBusy(true);
     setError(null);
     const known = provider?.models ?? [];
-    let next = afterFetch(await api.fetchModelNames(probeOf(preset, provider, value)), known);
-    if (next.next === "test") next = afterTest(await api.testModel(probeOf(preset, provider, value, next.model)), known);
+    let next = afterFetch(await api.fetchModelNames(probeOf(preset, provider, c)), known);
+    if (next.next === "test") next = afterTest(await api.testModel(probeOf(preset, provider, c, next.model)), known);
     if (!alive.current) return;
     setBusy(false);
-    if (next.next === "choose") onNext(next);
+    if (next.next === "choose") onNext(next, apiKey);
     else if (next.next === "stay") setError({ text: next.error, typeInstead: next.typeInstead });
+  };
+  const onEnter = (e: React.KeyboardEvent) => {
+    if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+    e.preventDefault();
+    void submit();
   };
 
   return (
-    <form onSubmit={submit} noValidate className="ai-picker-form">
+    <div className="ai-picker-form">
       <div className="ai-picker-body ai-picker-fields">
-        {showsUrl(preset) ? (
+        {url ? (
           <div className="ai-field">
             <label htmlFor={ids.url} className="ai-label">
               Base URL
             </label>
             <input
-              ref={first}
+              ref={urlField}
               id={ids.url}
               value={value.baseUrl}
               onChange={(e) => set({ baseUrl: e.target.value })}
+              onKeyDown={onEnter}
               maxLength={MAX_URL}
               inputMode="url"
               spellCheck={false}
-              autoComplete="off"
+              {...NOT_A_LOGIN}
               placeholder="http://127.0.0.1:8000/v1"
               aria-describedby={ids.urlHint}
               className="ai-input ai-mono"
@@ -129,22 +161,24 @@ export function ModelCredentials({ preset, provider, view, value, onChange, onBa
             API key
           </label>
           <input
-            ref={showsUrl(preset) ? undefined : first}
+            ref={keyField}
             id={ids.key}
             type="password"
-            value={value.apiKey}
-            onChange={(e) => set({ apiKey: e.target.value })}
-            autoComplete="new-password"
+            onChange={(e) => set({ keyTyped: e.target.value !== "" })}
+            onKeyDown={onEnter}
             spellCheck={false}
+            {...NOT_A_LOGIN}
             placeholder={keySaved && !value.removeKey ? "Key saved" : preset.key === "required" ? `Needed by ${name}` : "Optional"}
             aria-describedby={ids.keyHint}
             className="ai-input"
           />
           <p id={ids.keyHint} className="ai-hint">
             {keySaved
-              ? value.removeKey
-                ? "The saved key is removed when you use a model (a key typed here replaces it)."
-                : "Key saved: leave empty to keep it"
+              ? value.keyTyped
+                ? "The key typed here replaces the saved one."
+                : value.removeKey
+                  ? "The saved key is removed when you use a model (a key typed here replaces it)."
+                  : "Key saved: leave empty to keep it"
               : `${preset.key === "required" ? "Needed." : "Optional."} Kept encrypted on this computer and never shown again.`}
           </p>
           {keySaved && <Checkbox label="Remove key" checked={value.removeKey} onChange={(e) => set({ removeKey: e.target.checked })} />}
@@ -153,7 +187,7 @@ export function ModelCredentials({ preset, provider, view, value, onChange, onBa
           <div className="ai-picker-refusal" role="alert">
             <p>{error.text}</p>
             {error.typeInstead && (
-              <button type="button" onClick={() => onNext(typeInstead())} className="ai-btn ai-btn-small ai-btn-outline mt-2">
+              <button type="button" onClick={() => onNext(typeInstead(), typedKey())} className="ai-btn ai-btn-small ai-btn-outline mt-2">
                 Type a model name instead
               </button>
             )}
@@ -164,11 +198,11 @@ export function ModelCredentials({ preset, provider, view, value, onChange, onBa
         <button type="button" onClick={onBack} className="ai-btn ai-btn-small ai-btn-outline">
           Back
         </button>
-        <button type="submit" disabled={busy} className="ai-btn ai-btn-small ai-btn-primary">
+        <button type="button" onClick={() => void submit()} disabled={busy} className="ai-btn ai-btn-small ai-btn-primary">
           {busy && <Loader className="size-3.5 animate-spin" aria-hidden />}
           Continue
         </button>
       </div>
-    </form>
+    </div>
   );
 }

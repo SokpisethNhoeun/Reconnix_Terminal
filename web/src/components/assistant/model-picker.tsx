@@ -4,11 +4,14 @@
    sheet over the composer's width), in three steps: 1 "Choose a model" (your models, switched in
    one click, and the providers to add or change; model-pick.tsx), 2 "<Provider> · credentials"
    (model-credentials.tsx) and 3 "<Provider> · choose a model" (model-choose.tsx). A dialog named
-   after its step; Escape goes back a step, then closes; a click outside closes it. Focus goes to
-   each step's first control and back to the chip when it closes (model-chip.tsx). Its height
-   fits the room above the composer (use-fit-above.ts). What was typed in step 2 lives here only
-   while it is open, so Back keeps it and closing forgets it. */
-import { useEffect, useRef, useState } from "react";
+   after its step; Escape goes back a step, then closes; a click outside, or focus moving on to
+   something else on the page, closes it (so does hiding the Assistant: model-chip.tsx). Focus
+   goes to each step's first control and back to the chip when it closes (model-chip.tsx). Its
+   height fits the room above the composer (use-fit-above.ts). What was typed in step 2 lives
+   here only while it is open, so Back keeps it and closing forgets it. The API key is never
+   React state nor a DOM attribute: step 2 reads it from its field on Continue, and it is kept
+   here (a ref) for step 3 only. */
+import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 
 import { IconButton } from "@/components/ui/icon-button";
@@ -16,7 +19,7 @@ import { type PresetId, presetOf } from "@/lib/assistant/models/presets";
 import { ModelChoose } from "./model-choose";
 import { ModelCredentials } from "./model-credentials";
 import { ModelPick } from "./model-pick";
-import { type ChooseList, type Credentials, type ProviderRow, providerName, startCredentials } from "./model-picker-rules";
+import { type ChooseList, type Fields, type ProviderRow, providerName, startFields, withKey } from "./model-picker-rules";
 import { useFitAbove } from "./use-fit-above";
 import type { Models } from "./use-models";
 
@@ -36,7 +39,9 @@ interface Props {
 export function ModelPicker({ id, models, chip, onClose }: Props) {
   const panel = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState<Step>({ kind: "pick", returnTo: null });
-  const [credentials, setCredentials] = useState<Credentials>({ baseUrl: "", apiKey: "", removeKey: false });
+  const [fields, setFields] = useState<Fields>({ baseUrl: "", removeKey: false, keyTyped: false });
+  const typedKey = useRef(""); // the key step 2 read on Continue, for step 3 (and Back to step 2)
+  const keptKey = useCallback(() => typedKey.current, []);
   useFitAbove(panel, step.kind);
   const view = models.state.view;
   const preset = step.kind === "pick" ? null : presetOf(step.presetId);
@@ -46,31 +51,42 @@ export function ModelPicker({ id, models, chip, onClose }: Props) {
 
   const back = () => {
     if (step.kind === "choose") setStep({ kind: "credentials", row: step.row, presetId: step.presetId, providerId: step.providerId });
-    else if (step.kind === "credentials") setStep({ kind: "pick", returnTo: step.row });
-    else onClose(true);
+    else if (step.kind === "credentials") {
+      typedKey.current = "";
+      setStep({ kind: "pick", returnTo: step.row });
+    } else onClose(true);
   };
 
-  // a click outside closes it; so does Escape while focus is outside it (on the chip)
+  // a click outside closes it; so does Escape while focus is outside it (on the chip), and focus
+  // moving on to anything else on the page (Tab past it, say). Focus that goes nowhere (another
+  // window, or a control of its own that a step change took away) leaves it open.
   useEffect(() => {
+    const inside = (n: Node) => Boolean(panel.current?.contains(n) || chip.current?.contains(n));
     const onDown = (e: PointerEvent) => {
-      const t = e.target as Node;
-      if (!panel.current?.contains(t) && !chip.current?.contains(t)) onClose(false);
+      if (!inside(e.target as Node)) onClose(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       e.preventDefault();
       onClose(true);
     };
+    const onFocusOut = (e: FocusEvent) => {
+      const next = e.relatedTarget;
+      if (next instanceof Node && inside(e.target as Node) && !inside(next)) onClose(false);
+    };
     document.addEventListener("pointerdown", onDown);
     document.addEventListener("keydown", onKey);
+    document.addEventListener("focusout", onFocusOut);
     return () => {
       document.removeEventListener("pointerdown", onDown);
       document.removeEventListener("keydown", onKey);
+      document.removeEventListener("focusout", onFocusOut);
     };
   }, [chip, onClose]);
 
   const chooseProvider = (row: ProviderRow) => {
-    setCredentials(startCredentials(row.preset, row.provider));
+    typedKey.current = "";
+    setFields(startFields(row.preset, row.provider));
     setStep({ kind: "credentials", row: row.key, presetId: row.preset.id, providerId: row.provider?.id ?? null });
   };
 
@@ -102,17 +118,21 @@ export function ModelPicker({ id, models, chip, onClose }: Props) {
           preset={preset}
           provider={provider}
           view={view}
-          value={credentials}
-          onChange={setCredentials}
+          value={fields}
+          onChange={setFields}
+          keptKey={keptKey}
           onBack={back}
-          onNext={(list) => setStep({ ...step, kind: "choose", list })}
+          onNext={(list, apiKey) => {
+            typedKey.current = apiKey;
+            setStep({ ...step, kind: "choose", list });
+          }}
         />
       ) : (
         <ModelChoose
           preset={preset}
           provider={provider}
           view={view}
-          credentials={credentials}
+          credentials={() => withKey(fields, typedKey.current)}
           list={step.list}
           models={models}
           onBack={back}

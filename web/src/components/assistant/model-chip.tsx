@@ -6,13 +6,16 @@
    state, never the colour alone). It opens the model picker above the composer
    (model-picker.tsx), whose data it keeps between opens (use-models.ts) and reloads on each.
    Operators only: a viewer sees it disabled, with the reason. It stays usable while the message
-   box is disabled for want of a model: it is how one is chosen. */
+   box is disabled for want of a model: it is how one is chosen. The picker closes when the
+   Assistant is hidden (Minimize, Back, another view: use-assistant-shown.ts), so nothing typed in
+   it stays behind the inert stage. */
 import { useCallback, useId, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { useAssistant } from "./assistant-provider";
 import { chipState, VIEWER_REASON } from "./model-picker-rules";
 import { ModelPicker } from "./model-picker";
+import { useAssistantShown } from "./use-assistant-shown";
 import { useModels } from "./use-models";
 
 export function ModelChip() {
@@ -22,6 +25,14 @@ export function ModelChip() {
   const chip = useRef<HTMLButtonElement>(null);
   const id = useId();
   const state = chipState(info.model, info.operator);
+
+  // the Assistant hidden: the picker closes with it (and what was typed in it goes)
+  const shown = useAssistantShown();
+  const [wasShown, setWasShown] = useState(shown);
+  if (shown !== wasShown) {
+    setWasShown(shown);
+    if (!shown) setOpen(false);
+  }
 
   const close = useCallback((refocus: boolean) => {
     setOpen(false);
@@ -60,8 +71,8 @@ export function ModelChip() {
           models.load();
         }}
         aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? id : undefined}
+        aria-expanded={open && shown}
+        aria-controls={open && shown ? id : undefined}
         aria-label={state.name}
         title={state.title}
         data-tone={state.tone}
@@ -69,7 +80,7 @@ export function ModelChip() {
       >
         {content}
       </button>
-      {open && <ModelPicker id={id} models={models} chip={chip} onClose={close} />}
+      {open && shown && <ModelPicker id={id} models={models} chip={chip} onClose={close} />}
     </>
   );
 }

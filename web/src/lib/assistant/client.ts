@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { type Conversation, ConversationSchema, type ConversationSummary, ConversationSummarySchema } from "./history-schema";
 import type { AddProvider, Probe, SetActive, UpdateProvider } from "./models/requests";
-import { FetchResultSchema, type ModelsView, ModelsViewSchema, type ProbeResult, ProbeResultSchema } from "./models/view";
+import { type FetchResult, FetchResultSchema, type ModelsView, ModelsViewSchema, type ProbeResult, ProbeResultSchema } from "./models/view";
 import {
   ASSISTANT_ROUTE,
   conversationRoute,
@@ -179,7 +179,8 @@ export async function testModel(body: Probe): Promise<{ ok: true; result: ProbeR
   return result.ok ? { ok: true, result: result.value } : result;
 }
 
-export async function fetchModelNames(body: Probe): Promise<{ ok: true; models: string[] } | Failure> {
+/** The names the model's server lists, or `listed: false` (it answered without a list). */
+export async function fetchModelNames(body: Probe): Promise<({ ok: true } & FetchResult) | Failure> {
   const result = await call(MODELS_FETCH_ROUTE, send("POST", body), FetchResultSchema);
-  return result.ok ? { ok: true, models: result.value.models } : result;
+  return result.ok ? { ok: true, ...result.value } : result;
 }
