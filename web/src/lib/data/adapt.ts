@@ -182,6 +182,9 @@ export function assessmentView(a: Assessment): AssessmentView {
     log: lines,
     findings: a.findings.map(findingView),
     scope: scopeView(a),
+    apiSpec: a.api_spec
+      ? { label: [a.api_spec.title, a.api_spec.version].filter(Boolean).join(" "), endpoints: a.api_spec.endpoints }
+      : null,
     approvals: approvalViews(a),
     checks: { total: a.verdicts.length, allowed, blocked: a.verdicts.length - allowed },
     requests: a.run.requests,

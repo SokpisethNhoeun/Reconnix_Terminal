@@ -112,6 +112,9 @@ export function reportCards(v: AssessmentView, findings: FindingRow[], slice: Fi
       { label: "Assessment", value: v.id, badge: null },
       { label: "Target", value: redact(v.target), badge: null },
       { label: "Template", value: v.template, badge: null },
+      ...(v.apiSpec
+        ? [{ label: "API spec", value: `${v.apiSpec.label} · ${v.apiSpec.endpoints} endpoints`, badge: null }]
+        : []),
       { label: "Status", value: "", badge: { type: "status", meaning: RUN_STATUS[v.status] } },
       { label: "Started", value: v.startedAt, badge: null },
       { label: "Duration", value: window ? `${duration(v.durationSec)} of ${window}` : duration(v.durationSec), badge: null },

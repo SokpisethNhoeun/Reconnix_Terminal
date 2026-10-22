@@ -93,6 +93,16 @@ export const assessmentGuide: GroupContent = {
               authorizes the AI agent to start.
             </li>
             <li>
+              <strong>Attach OpenAPI spec</strong> (API template only; <strong>Replace OpenAPI spec</strong> once one is
+              attached) reads a <Mono>.json</Mono>, <Mono>.yaml</Mono> or <Mono>.yml</Mono> OpenAPI 3 or Swagger 2 file of
+              at most 5 MB. The file is only read, never run, and a symbolic link is refused. The manifest then shows the
+              spec&apos;s title, version, endpoint count and methods; the discovery step and the plan use the real
+              endpoint count; and the allowed methods start from the spec&apos;s methods (you can still edit them). The
+              spec never widens the scope: a server on another host is listed as out of scope and not added. Only a
+              summary is saved (title, version, endpoint count, methods, in-scope servers), never the file, and the Report
+              view&apos;s Assessment card shows an API spec row. It can be attached until the scope is approved.
+            </li>
+            <li>
               <strong>Edit manifest</strong> opens a form for the allowed methods, the excluded paths, the ports (network),
               the tools and the time limit, as comma-separated values. The store validates each field:
               &quot;Keep at least one allowed method.&quot;, &quot;Not an HTTP method: …&quot;, &quot;Excluded paths

@@ -93,6 +93,7 @@ export interface AssessmentView {
   log: LogLine[];
   findings: FindingView[];
   scope: ScopeView | null;
+  apiSpec: { label: string; endpoints: number } | null; // the attached OpenAPI file, if any
   approvals: ApprovalView[];
   checks: { total: number; allowed: number; blocked: number };
   requests: number;

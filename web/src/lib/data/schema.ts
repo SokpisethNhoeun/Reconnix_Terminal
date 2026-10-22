@@ -52,6 +52,16 @@ const ScopeSchema = z.object({
   tools: z.array(text),
 });
 
+/** The OpenAPI file an operator attached to an API run: a summary, never the file. */
+const ApiSpecSchema = z.object({
+  title: text,
+  version: text,
+  spec_version: text,
+  endpoints: z.number(),
+  methods: z.array(text),
+  servers: z.array(text),
+});
+
 const TimelineEntrySchema = z.object({
   seq: z.number(),
   at: isoTime.nullable(),
@@ -73,6 +83,7 @@ const SavedAssessmentSchema = z.object({
   target_url: text,
   target_kind: text,
   template: z.object({ id: text, name: text, confirmed: z.boolean() }),
+  api_spec: ApiSpecSchema.nullish(),
   operator: text,
   client: text.default(""),
   mode: text.default(""),
