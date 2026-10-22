@@ -157,6 +157,8 @@ export const guardrails: GroupContent = {
             ids, severities and titles, the approval decisions) and the last 40 chat turns. Every piece of text is
             cleaned and redacted first. The model gets no tools. Its reply is stripped of control characters, redacted and
             capped at 8,000 characters before it is shown.
+            The passages of your <Mono>/add-on</Mono> files relevant to the line (up to 4,000 characters) go with it,
+            fenced as untrusted reference material, to the active model, local or remote.
           </p>
           <p>
             With the backend harness, the AI agent behind <Mono>/assess</Mono> sees the target, the tool output it
