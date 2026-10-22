@@ -23,7 +23,7 @@ export const slugify = (s: string) =>
 export function DocSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-4">
-      <h2 id={slugify(title)} data-toc className="scroll-mt-24 text-2xl font-semibold tracking-tight">
+      <h2 id={slugify(title)} data-toc className="scroll-mt-6 text-2xl font-semibold tracking-tight">
         {title}
       </h2>
       <div className="docs-prose space-y-3 leading-relaxed text-muted-foreground">{children}</div>

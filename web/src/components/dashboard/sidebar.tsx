@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   BookOpen,
   FileText,
@@ -49,15 +50,29 @@ function Logo() {
   );
 }
 
+/** A view's own address, for the sidebar outside the viewer (the docs): a plain link to `/`. */
+const viewHref = (view: View): string => (view === "overview" ? "/" : `/?view=${view}`);
+
+const NAV_CLASS = "dash-navbtn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+/**
+ * The rail: the views, then the docs. Inside the viewer (`onSelect` given) a view is a button that
+ * switches in place; on the docs pages (`active` null) it is a link back to that view at `/`, and
+ * the docs item that holds the open page is the one marked.
+ */
 export function Sidebar({
   active,
   onSelect,
   terminalState,
 }: {
-  active: View;
-  onSelect: (v: View) => void;
+  active: View | null;
+  onSelect?: (v: View) => void;
   terminalState: keyof typeof TERMINAL_HINT;
 }) {
+  const pathname = usePathname();
+  // the Configuration page is marked on its own; every other docs page marks Documentation
+  const docActive = (href: string) =>
+    href === DOCS.home ? pathname.startsWith(DOCS.home) && pathname !== DOCS.configuration : pathname === href;
   return (
     <aside className="dash-sidebar flex items-center border-border">
       <Link href="/" aria-label="Reconix local assessment viewer" className="grid h-16 w-full place-items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -67,19 +82,8 @@ export function Sidebar({
         {VIEWS.map((item) => {
           const Icon = item.icon;
           const label = item.view === "terminal" ? TERMINAL_HINT[terminalState] : item.label;
-          return (
-            <button
-              key={item.view}
-              type="button"
-              onClick={() => onSelect(item.view)}
-              data-view={item.view}
-              // the active marker (.dash-navbtn::after, motion.css) slides in once on this
-              // attribute: no loop, nothing on the icon or the label
-              data-active={active === item.view ? "true" : undefined}
-              aria-current={active === item.view ? "page" : undefined}
-              aria-label={label}
-              className="dash-navbtn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
+          const content = (
+            <>
               {item.view === "assistant" ? (
                 // breathes with the open assistant (breath.ts); only the icon scales, the button
                 // and its click area stay put
@@ -93,19 +97,42 @@ export function Sidebar({
               <span role="tooltip" className="dash-tip">
                 {label}
               </span>
+            </>
+          );
+          return onSelect ? (
+            <button
+              key={item.view}
+              type="button"
+              onClick={() => onSelect(item.view)}
+              data-view={item.view}
+              // the active marker (.dash-navbtn::after, motion.css) slides in once on this
+              // attribute: no loop, nothing on the icon or the label
+              data-active={active === item.view ? "true" : undefined}
+              aria-current={active === item.view ? "page" : undefined}
+              aria-label={label}
+              className={NAV_CLASS}
+            >
+              {content}
             </button>
+          ) : (
+            <Link key={item.view} href={viewHref(item.view)} data-view={item.view} aria-label={label} className={NAV_CLASS}>
+              {content}
+            </Link>
           );
         })}
       </nav>
       <div className="flex flex-col items-center gap-2 pb-3">
         {DOC_ITEMS.map((item) => {
           const Icon = item.icon;
+          const here = active === null && docActive(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
               aria-label={item.label}
-              className="dash-navbtn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              data-active={here ? "true" : undefined}
+              aria-current={here ? "page" : undefined}
+              className={NAV_CLASS}
             >
               <Icon className="size-[18px]" strokeWidth={1.6} aria-hidden />
               <span role="tooltip" className="dash-tip">

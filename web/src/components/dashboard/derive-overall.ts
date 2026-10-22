@@ -19,7 +19,6 @@ import {
   findingRow,
   findingsSlice,
   findingsSummary,
-  initials,
   MAX_QUESTIONS,
   plural,
   runEntry,
@@ -54,7 +53,6 @@ export interface Overall {
   findingTotal: number;
   operator: string; // the newest run's operator
   operators: string[];
-  operatorInitials: string;
   targets: CountRow[];
   templates: CountRow[];
   statuses: CountRow[];
@@ -211,7 +209,6 @@ export function deriveOverall(views: AssessmentView[]): Overall {
     findingTotal: findingCards.total,
     operator,
     operators,
-    operatorInitials: initials(operator),
     targets,
     templates: countRows(views.map((v) => v.template)),
     statuses: STATUSES.map((s) => ({ name: s, count: views.filter((v) => v.status === s).length })).filter((s) => s.count > 0),

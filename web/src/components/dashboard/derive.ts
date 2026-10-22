@@ -54,7 +54,6 @@ export interface Dashboard {
     scopeApproved: boolean;
     window: string | null;
   };
-  operatorInitials: string;
   phases: PhaseView[];
   findingTotal: number;
   severity: FindingsSlice["severity"];
@@ -68,15 +67,6 @@ export interface Dashboard {
 }
 
 // --- shared helpers (derive-overall.ts uses them too) ------------------------------------
-
-export const initials = (name: string) =>
-  name
-    .split(/[.\s@_-]+/)
-    .filter(Boolean)
-    .map((p) => p[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() || "—";
 
 function findingIcon(f: FindingView): FindingIcon {
   const about = `${f.category} ${f.title}`;
@@ -219,7 +209,6 @@ export function deriveDashboard(v: AssessmentView): Dashboard {
       scopeApproved,
       window: windowLimit,
     },
-    operatorInitials: initials(v.operator),
     phases: v.phases,
     findingTotal: findingCards.total,
     severity: findingCards.severity,

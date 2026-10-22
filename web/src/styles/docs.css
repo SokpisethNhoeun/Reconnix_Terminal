@@ -1,5 +1,6 @@
-/* The docs view. Owner: the docs workstream (docs/WEB_REDESIGN_V3_PLAN.md). Colours only from the
-   tokens (tokens.css); meanings from lib/status.ts. The page frame, sidebar, search and content
+/* The docs view. Owner: the docs workstream (docs/WEB_DOCS_AND_MODELS_PLAN.md). The docs sit in the
+   dashboard's frame (frame.css) and use its cards (.dash-card, dashboard.css). Colours only from
+   the tokens (tokens.css); meanings from lib/status.ts. The page frame, sidebar, search and content
    primitives are in components/docs-*.tsx; everything else about them is Tailwind utilities. */
 
 /* ---- Prose inside a DocSection: lists, emphasis, nested lists ---- */
@@ -29,48 +30,6 @@
 /* ---- The sidebar: the tree scrolls inside the sticky column on desktop (the search stays put) ---- */
 .docs-sidebar nav { scrollbar-width: thin; }
 
-/* ---- Group cards on the docs overview ---- */
-.docs-card {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  border-color: var(--border);
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--card), var(--primary) 3%),
-    color-mix(in oklab, var(--card) 70%, transparent)
-  );
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-}
-.docs-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--primary) 70%, transparent), transparent);
-  opacity: 0.35;
-  transition: opacity 0.3s ease;
-}
-.docs-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: radial-gradient(60% 50% at 0% 0%, color-mix(in oklab, var(--primary) 10%, transparent), transparent 70%);
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-.docs-card:hover {
-  border-color: color-mix(in oklab, var(--primary) 30%, var(--border));
-  box-shadow: 0 18px 40px -24px color-mix(in oklab, var(--primary) 40%, transparent);
-}
-.docs-card:hover::before,
-.docs-card:hover::after { opacity: 1; }
-
 /* ---- The command index: one row per command, the name in a fixed column ---- */
 .docs-command-row { display: grid; grid-template-columns: minmax(7rem, auto) 1fr; gap: 0.25rem 1rem; align-items: baseline; }
 @media (max-width: 480px) { .docs-command-row { grid-template-columns: 1fr; } }
-
-@media (prefers-reduced-motion: reduce) {
-  .docs-card, .docs-card::before, .docs-card::after { transition: none; }
-}

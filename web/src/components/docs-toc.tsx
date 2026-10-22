@@ -9,7 +9,8 @@ type Heading = { id: string; title: string };
 /**
  * "On this page" (xl only): lists the page's DocSection headings (`h2[data-toc]` inside
  * `[data-docs-content]`) and highlights the one being read. The links are same-page hash
- * links, so smooth-scroll.tsx scrolls to them with Lenis (honouring the heading's scroll-mt).
+ * links: the browser scrolls the content area (or the window) to them, smoothly where motion is
+ * allowed (dashboard.css), honouring the heading's scroll-mt.
  */
 export function DocsToc() {
   const pathname = usePathname();
@@ -28,7 +29,7 @@ export function DocsToc() {
         const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
         if (visible[0]) setActive(visible[0].target.id);
       },
-      { rootMargin: "-90px 0px -65% 0px" }
+      { rootMargin: "-100px 0px -65% 0px" }
     );
     els.forEach((el) => io.observe(el));
     return () => io.disconnect();
@@ -37,7 +38,7 @@ export function DocsToc() {
   if (headings.length < 2) return <div className="hidden xl:block" />;
 
   return (
-    <nav aria-label="On this page" className="hidden xl:sticky xl:top-24 xl:block xl:self-start">
+    <nav aria-label="On this page" className="hidden xl:sticky xl:top-4 xl:block xl:self-start">
       <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">On this page</p>
       <ul className="space-y-1 border-l border-border">
         {headings.map((h) => (

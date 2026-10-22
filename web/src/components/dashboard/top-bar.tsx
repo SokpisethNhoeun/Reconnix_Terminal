@@ -1,6 +1,6 @@
 /* The top bar: the live-refresh pill, the Assessment switcher (every width), the Target /
    Template / Status chips (wide screens; for the open run, or counts across every run), docs
-   search, the "needs you" bell and the operator. A server component: each client piece gets
+   search and the "needs you" bell. A server component: each client piece gets
    only the fields it shows (never the whole Dashboard or Overall, which would put every saved
    value into the page). */
 import { type AllSummary, AssessmentSwitcher } from "@/components/dashboard/assessment-switcher";
@@ -51,11 +51,6 @@ export function TopBar({
   terminal: boolean;
 }) {
   const a = dash?.assessment ?? null;
-  const operator = dash
-    ? { name: dash.assessment.operator, initials: dash.operatorInitials }
-    : overall
-      ? { name: overall.operators.join(", ") || "—", initials: overall.operatorInitials }
-      : null;
   return (
     <header className="dash-topbar relative z-30 flex min-w-0 items-center gap-2 border-b border-border px-3 sm:gap-3 sm:px-4">
       <LiveRefresh renderedAt={renderedAt} dir={dir} everyMs={liveRefreshMs()} />
@@ -72,15 +67,6 @@ export function TopBar({
       <div className="dash-reveal ml-auto flex shrink-0 items-center gap-2 xl:ml-3">
         <DocsSearch />
         <AttentionBell gate={dash?.gate ?? null} currentUid={a?.uid ?? null} items={items} terminal={terminal} />
-        {operator && (
-          <span
-            aria-label={`Operator ${operator.name}`}
-            title={`Operator ${operator.name}`}
-            className="hidden size-10 place-items-center rounded-[10px] bg-surface text-[13px] font-medium text-primary sm:grid"
-          >
-            {operator.initials}
-          </span>
-        )}
       </div>
     </header>
   );

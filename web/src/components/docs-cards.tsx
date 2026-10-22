@@ -27,13 +27,13 @@ export function DocGroupCards({ groups }: { groups: DocGroup[] }) {
       {groups.map((g) => {
         const Icon = g.icon;
         return (
-          <li key={g.id} className="docs-card flex flex-col gap-4 rounded-2xl border p-5">
+          <li key={g.id} className="dash-card flex flex-col gap-4">
             <Link href={g.href} className="group flex items-start gap-4">
               <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
                 <Icon className="size-5" strokeWidth={1.75} aria-hidden />
               </span>
               <span className="min-w-0">
-                <span className="flex items-center gap-1.5 font-display text-lg font-semibold text-foreground group-hover:text-primary">
+                <span className="flex items-center gap-1.5 font-display text-base font-semibold text-foreground group-hover:text-primary">
                   {g.title}
                   <ArrowRight className="size-4 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
                 </span>
@@ -73,7 +73,7 @@ export function DocPageCards({ pages }: { pages: DocPage[] }) {
         <li key={p.href}>
           <Link
             href={p.href}
-            className="group flex h-full flex-col rounded-xl border border-border bg-card/60 p-4 transition-colors hover:border-primary/50"
+            className="dash-card group flex h-full flex-col"
           >
             <span className="flex items-center justify-between gap-2 font-display font-semibold text-foreground group-hover:text-primary">
               {p.title}

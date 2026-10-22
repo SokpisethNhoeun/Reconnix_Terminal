@@ -42,7 +42,7 @@ files every 10 s (`RECONIX_LIVE_REFRESH_MS`; `0` turns it off).
   addresses of the previous structure redirect, 308, through `lib/docs-redirects.ts`).
   (The Audit log view was removed; the audit data stays in the saved files and the TUI.)
 
-Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind v4 · GSAP · Lenis ·
+Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind v4 · GSAP ·
 three.js · zod · lucide-react. Dark only. See `../docs/WEB_GLOBE_UI_PLAN.md` for how it
 replaced the earlier pages, `../docs/WEB_REDESIGN_V2_PLAN.md` for the v2 redesign and
 `../docs/WEB_REDESIGN_V3_PLAN.md` for v3 (Assessments, paging, the combined report, the docs;
@@ -189,9 +189,9 @@ counts from it (`e2e/support.ts`), never from literals.
 src/
 ├── proxy.ts                 # Host allowlist, viewer role on every route, operator for the terminal, nonce CSP
 ├── app/
-│   ├── layout.tsx           # fonts (Inter, JetBrains Mono), metadata (no Lenis: the dashboard scrolls natively)
+│   ├── layout.tsx           # fonts (Inter, JetBrains Mono), metadata (no smooth-scroll library: everything scrolls natively)
 │   ├── page.tsx             # the viewer: loads the saved runs, every run or ?uid=, derives the dashboard
-│   ├── docs/                # documentation (layout checks the viewer role, mounts Lenis; content in src/content/docs/)
+│   ├── docs/                # documentation in the dashboard frame (layout checks the viewer role; content in src/content/docs/)
 │   ├── terminal/            # /terminal → /?view=terminal (operators)
 │   ├── assistant/           # /assistant → /?view=assistant
 │   ├── login/               # sign-in (token from the link's #fragment) → the Overview
@@ -240,7 +240,7 @@ src/
 │   │                        #   ScrollToLatest, useXterm, useTerminalSession, useTerminalView, useLeaveWarning
 │   ├── ui/                  # Button, Badge, StatusBadge / SeverityBadge, IconButton, Checkbox, CopyButton,
 │   │                        #   Pagination, ListDetail, EmptyNote (cva + cn; styles/ui.css)
-│   └── docs-*.tsx, site-nav.tsx, site-footer.tsx, nav-*.ts(x)   # the docs' chrome
+│   └── docs-*.tsx           # the docs' page frame, sidebar, search, top bar (the rail: dashboard/sidebar.tsx)
 ├── content/docs/            # the documentation pages, one file per group; commands.json is GENERATED from
 │                            #   reconix/commands/builtin.py by scripts/export_commands.py (never edit it:
 │                            #   tests/test_export_commands.py and tests/docs-nav.test.ts check it)
@@ -294,8 +294,7 @@ once, with each run as an occurrence; what a run lacks is listed under Limitatio
   and re-run `scripts/export_tokens.py`. No stylesheet holds colour literals. Meanings come
   from `lib/status.ts` (teal = AI and progress, green = done, amber = waiting or to review,
   red = errors and blocked, slate = informational; severity on the TUI's scale).
-- **Scrolling.** Lenis smooth scrolling only on the docs pages; the dashboard scrolls
-  natively. On the fixed desktop frame (≥1280×760) `.dash-content` is the one scroller,
+- **Scrolling.** The dashboard and the docs (which share its frame) scroll natively. On the fixed desktop frame (≥1280×760) `.dash-content` is the one scroller,
   elsewhere the window; never `overflow: hidden` on the page to fix scrolling.
 - **Numbers come from the saved run.** Every value on the dashboard is computed in
   `components/dashboard/derive*.ts` from `lib/data/adapt.ts`, and every number on an assistant

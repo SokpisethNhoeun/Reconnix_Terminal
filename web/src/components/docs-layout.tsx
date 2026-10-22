@@ -34,7 +34,8 @@ export function DocsLayout({
   if (entry && !entry.isGroup) crumbs.push({ label: entry.title, href: entry.href });
 
   return (
-    <main className="docs-main mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-12 lg:py-14 xl:grid-cols-[240px_minmax(0,1fr)_200px]">
+    // inside the dashboard frame's content area (app/docs/layout.tsx), which is the <main>
+    <div className="docs-main mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-10 lg:py-8 xl:grid-cols-[240px_minmax(0,1fr)_200px]">
       <DocsSidebar index={docsSearchIndex()} />
 
       <article className="min-w-0 max-w-3xl">
@@ -57,19 +58,19 @@ export function DocsLayout({
           </ol>
         </nav>
 
-        <h1 className="break-words text-4xl font-semibold tracking-tight sm:text-5xl">{heading}</h1>
-        <p className="mt-4 text-lg leading-relaxed text-foreground/85 sm:text-xl">{lede}</p>
+        <h1 className="break-words text-3xl font-semibold tracking-tight sm:text-[2rem]">{heading}</h1>
+        <p className="mt-3 text-base leading-relaxed text-muted-foreground sm:text-lg">{lede}</p>
 
-        <div data-docs-content className="mt-10 space-y-12">
+        <div data-docs-content className="mt-8 space-y-10">
           {children}
         </div>
 
         {(prev || next) && (
-          <nav aria-label="Previous and next page" className="mt-16 grid gap-4 border-t border-border pt-8 sm:grid-cols-2">
+          <nav aria-label="Previous and next page" className="mt-12 grid gap-4 border-t border-border pt-6 sm:grid-cols-2">
             {prev ? (
               <Link
                 href={prev.href}
-                className="group rounded-xl border border-border bg-card/60 p-4 transition-colors hover:border-primary/50"
+                className="dash-card group transition-colors hover:border-primary/50"
               >
                 <span className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                   <ArrowLeft className="size-3.5" aria-hidden /> Previous
@@ -84,7 +85,7 @@ export function DocsLayout({
             {next && (
               <Link
                 href={next.href}
-                className="group rounded-xl border border-border bg-card/60 p-4 text-right transition-colors hover:border-primary/50"
+                className="dash-card group text-right transition-colors hover:border-primary/50"
               >
                 <span className="flex items-center justify-end gap-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                   Next <ArrowRight className="size-3.5" aria-hidden />
@@ -99,6 +100,6 @@ export function DocsLayout({
       </article>
 
       <DocsToc />
-    </main>
+    </div>
   );
 }
