@@ -1,61 +1,63 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useDocsHeadings } from "@/components/docs-headings";
 import { cn } from "@/lib/utils";
 
-type Heading = { id: string; title: string };
-
 /**
- * "On this page" (xl only): lists the page's DocSection headings (`h2[data-toc]` inside
- * `[data-docs-content]`) and highlights the one being read. The links are same-page hash
- * links: the browser scrolls the content area (or the window) to them, smoothly where motion is
- * allowed (dashboard.css), honouring the heading's scroll-mt.
+ * "On this page" (xl only): the group page's pages (its parts) and, under the part being read,
+ * its sections, with the heading being read marked. Every entry is a same-page hash link: the
+ * browser scrolls the content area (or the window) to it, smoothly where motion is allowed
+ * (dashboard.css), honouring the heading's scroll-mt. The list scrolls inside its sticky column
+ * when a group has many pages (Commands).
  */
 export function DocsToc() {
-  const pathname = usePathname();
-  const [headings, setHeadings] = useState<Heading[]>([]);
-  const [active, setActive] = useState<string | null>(null);
-
-  useEffect(() => {
-    const els = [...document.querySelectorAll<HTMLElement>("[data-docs-content] h2[data-toc]")];
-    // reading the DOM after render is the point of this effect
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHeadings(els.map((el) => ({ id: el.id, title: el.textContent ?? "" })));
-    setActive(els[0]?.id ?? null); // until the observer reports, the first section is "current"
-    if (!els.length) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible[0]) setActive(visible[0].target.id);
-      },
-      { rootMargin: "-100px 0px -65% 0px" }
-    );
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, [pathname]);
+  const { headings, active, activePart } = useDocsHeadings();
 
   if (headings.length < 2) return <div className="hidden xl:block" />;
+  const parts = headings.filter((h) => h.level === 2);
 
   return (
-    <nav aria-label="On this page" className="hidden xl:sticky xl:top-4 xl:block xl:self-start">
+    <nav
+      aria-label="On this page"
+      className="docs-toc hidden xl:sticky xl:top-4 xl:block xl:max-h-[calc(100dvh-9rem)] xl:self-start xl:overflow-y-auto"
+    >
       <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">On this page</p>
       <ul className="space-y-1 border-l border-border">
-        {headings.map((h) => (
-          <li key={h.id}>
-            <a
-              href={`#${h.id}`}
-              className={cn(
-                "-ml-px block border-l py-1 pl-3 text-[13px] leading-snug transition-colors",
-                active === h.id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+        {parts.map((p) => {
+          const open = p.id === activePart;
+          const sections = open ? headings.filter((h) => h.level === 3 && h.part === p.id) : [];
+          return (
+            <li key={p.id}>
+              <a
+                href={`#${p.id}`}
+                aria-current={open ? "location" : undefined}
+                className={cn(
+                  "-ml-px block border-l py-1 pl-3 text-[13px] leading-snug transition-colors",
+                  open ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {p.title}
+              </a>
+              {sections.length > 0 && (
+                <ul className="mb-1">
+                  {sections.map((s) => (
+                    <li key={s.id}>
+                      <a
+                        href={`#${s.id}`}
+                        className={cn(
+                          "block py-1 pl-6 text-[12px] leading-snug transition-colors", // 24 px tall: a full touch target
+                          active === s.id ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {s.title}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
               )}
-            >
-              {h.title}
-            </a>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
     </nav>
   );

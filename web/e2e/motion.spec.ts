@@ -409,7 +409,8 @@ test("leaving the dashboard with the assistant open leaves the next globe drawin
   await expect(canvas(page)).toHaveAttribute("data-globe", "paused"); // faded behind the chat
   await page.locator('a[href="/docs"]').first().click();
   await expect(page).toHaveURL(/\/docs/);
-  await page.locator('header a[href="/"]').first().click(); // back in the same page (no reload)
+  // back through the rail's Overview (the docs top bar holds no link): the same page, no reload
+  await page.locator('nav[aria-label="Views"] a[data-view="overview"]').click();
   await expect(page.getByRole("heading", { name: "Assessment Operations Center" })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { kept?: number }).kept)).toBe(7);
   await expect(canvas(page)).toHaveAttribute("data-globe", "running");

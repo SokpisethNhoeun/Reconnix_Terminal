@@ -265,9 +265,10 @@ test("the report links every export format and each one downloads the newest run
 test("a card opens its documentation", async ({ page }) => {
   await signIn(page);
   await page.getByRole("link", { name: "Open Findings by Severity documentation" }).click();
-  // the card still links the old address; the docs redirect it to the page that replaced it
-  await expect(page).toHaveURL(/\/docs\/reports\/understanding-findings$/);
-  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+  // the card links the part of the Reports page that explains it, and the page opens there
+  await expect(page).toHaveURL(/\/docs\/reports#understanding-findings$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Reports");
+  await expect(page.locator("h2#understanding-findings")).toBeInViewport();
   expect((await page.request.get(page.url())).status()).toBe(200);
 });
 

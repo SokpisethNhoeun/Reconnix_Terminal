@@ -98,7 +98,7 @@ export const AssistantView = forwardRef<HTMLTextAreaElement, { onMinimize: () =>
           {reason ? (
             <Reason id="ai-composer-reason">
               {reason}{" "}
-              <Link href="/docs/guardrails/llm-data-handling" className="ai-link">
+              <Link href="/docs/guardrails#llm-data-handling" className="ai-link">
                 What the model sees
               </Link>
             </Reason>

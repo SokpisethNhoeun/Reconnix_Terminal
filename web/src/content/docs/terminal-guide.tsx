@@ -1,4 +1,4 @@
-import { Callout, Code, DocLink, DocSection, DocTable, Kbd, KeyTable, Mono } from "@/components/docs-primitives";
+import { Callout, Code, DocRef, DocSection, DocTable, Kbd, KeyTable, Mono } from "@/components/docs-primitives";
 import type { GroupContent } from "@/content/docs/types";
 
 export const terminalGuide: GroupContent = {
@@ -23,7 +23,7 @@ export const terminalGuide: GroupContent = {
             The welcome: the logo, a three-step quickstart and the prompt. After your first line it becomes the
             conversation: your latest line on top, then Reconix&apos;s answer, or one spinner line while the run heads
             for its first gate (<Kbd>Ctrl+O</Kbd> expands the steps it finished). Slash-command suggestions appear inline
-            above the prompt. What a typed line does is on <DocLink href="/docs/terminal-guide/prompt">The prompt</DocLink>.
+            above the prompt. What a typed line does is on <DocRef>The prompt</DocRef>.
           </p>
         </DocSection>
         <DocSection title="2 · Template">
@@ -33,7 +33,7 @@ export const terminalGuide: GroupContent = {
             its shape, and asks only when a bare hostname could be several. The manifest lists what will be tested, what
             may be done, what is excluded, the tools and the time limit; the menu offers Approve scope, Edit manifest and
             Reject, and on the API template Attach OpenAPI spec (a .json or .yaml file, read and never run). Once approved the manifest is locked and the screen points to the plan. See{" "}
-            <DocLink href="/docs/assessment-guide/scope">Scope manifest</DocLink>.
+            <DocRef>Scope manifest</DocRef>.
           </p>
         </DocSection>
         <DocSection title="3 · Plan">
@@ -41,7 +41,7 @@ export const terminalGuide: GroupContent = {
             Every phase, the target login the tools may need, and each risky action with its exact request. The menu
             offers Run plan, Edit steps (change where a gated step runs) and Cancel; <Kbd>Tab</Kbd> moves between the menu
             and the step list. Testing starts only when you run the plan. See{" "}
-            <DocLink href="/docs/assessment-guide/plan">Plan and tools</DocLink>.
+            <DocRef>Plan and tools</DocRef>.
           </p>
         </DocSection>
         <DocSection title="4 · Approval">
@@ -49,7 +49,7 @@ export const terminalGuide: GroupContent = {
             One gated action at a time: its purpose, impact and exact request. MEDIUM risk asks once; HIGH risk asks, then
             double-checks the exact request with &quot;No, go back&quot; selected. <strong>View details</strong> is
             highlighted first so a stray Enter is harmless; <Kbd>d</Kbd> opens it directly; <Kbd>Esc</Kbd> decides later.
-            See <DocLink href="/docs/assessment-guide/approval-gates">Approval gates</DocLink>.
+            See <DocRef>Approval gates</DocRef>.
           </p>
         </DocSection>
         <DocSection title="5 · Execution">
@@ -58,7 +58,7 @@ export const terminalGuide: GroupContent = {
             and for how long, and the live output (time · who · message). The output follows new lines while you are at
             the bottom; scroll up to read and it stays put until <Kbd>End</Kbd>. <Kbd>Enter</Kbd> opens what the run waits
             for (a login form or an approval); <Kbd>Ctrl+C</Kbd> asks before stopping the run. See{" "}
-            <DocLink href="/docs/assessment-guide/execution">Execution</DocLink>.
+            <DocRef>Execution</DocRef>.
           </p>
         </DocSection>
         <DocSection title="6 · Findings and 7 · Finding Detail">
@@ -68,7 +68,7 @@ export const terminalGuide: GroupContent = {
             references and CVSS; <Kbd>[</Kbd>/<Kbd>]</Kbd> step to the previous or next finding in the same filter and
             sort, <Kbd>r</Kbd> jumps to the report, <Kbd>c</Kbd> chats about the finding, <Kbd>←</Kbd> goes back to
             the list. See{" "}
-            <DocLink href="/docs/reports/understanding-findings">Understanding findings</DocLink>.
+            <DocRef>Understanding findings</DocRef>.
           </p>
         </DocSection>
         <DocSection title="8 · Report">
@@ -76,7 +76,7 @@ export const terminalGuide: GroupContent = {
             The executive summary, findings by severity, the key findings and the changes since the last assessment of
             the same target, with the export buttons (<Kbd>p</Kbd> PDF, <Kbd>j</Kbd> JSON, <Kbd>w</Kbd> DOCX) and{" "}
             <Kbd>c</Kbd> to chat about the assessment (<Mono>/web</Mono> opens the web dashboard). Exports are
-            available once the assessment completes. See <DocLink href="/docs/reports/reviewing">Reviewing results</DocLink>.
+            available once the assessment completes. See <DocRef>Reviewing results</DocRef>.
           </p>
         </DocSection>
         <DocSection title="Dialogs and forms">
@@ -207,14 +207,14 @@ export const terminalGuide: GroupContent = {
             A name that is not a command shows &quot;Unknown command /name. Type / to see the list.&quot; (in the bar:
             &quot;… — pick one from the list.&quot;). One exception: a line whose name contains a slash, such as{" "}
             <Mono>/home/me/app</Mono>, is a local path, which is a target, not a command. See{" "}
-            <DocLink href="/docs/troubleshooting/unknown-commands">Unknown commands</DocLink>.
+            <DocRef>Unknown commands</DocRef>.
           </p>
           <Code>{`/export pdf        # export the report as PDF
 /finding 001       # open finding 001
 /provider test ollama
 /model openai/gpt-4o-mini`}</Code>
           <p>
-            Every command is described in the <DocLink href="/docs/commands">command reference</DocLink>.
+            Every command is described in the <DocRef>command reference</DocRef>.
           </p>
         </DocSection>
       </>
@@ -250,7 +250,7 @@ export const terminalGuide: GroupContent = {
           <ul>
             <li>
               A line goes to the assistant: the active model when one is set (see{" "}
-              <DocLink href="/docs/ai-models/models">Models</DocLink>), otherwise the built-in reply. The reply shows under
+              <DocRef>Models</DocRef>), otherwise the built-in reply. The reply shows under
               your line.
             </li>
             <li>
@@ -277,7 +277,7 @@ export const terminalGuide: GroupContent = {
           <p>
             When a model is active and the backend harness is installed, the AI agent handles the prompt: a target
             enters the Template screen in agent mode (approving the scope hands the assessment to the agent), and plain
-            text is a chat turn with the agent. See <DocLink href="/docs/assessment-guide/ai-agent">The AI agent</DocLink>.
+            text is a chat turn with the agent. See <DocRef>The AI agent</DocRef>.
           </p>
         </DocSection>
         <DocSection title="Paths and commands">

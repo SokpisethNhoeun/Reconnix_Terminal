@@ -1,4 +1,4 @@
-import { Callout, Code, DocLink, DocSection, DocTable, Kbd, Mono, Steps } from "@/components/docs-primitives";
+import { Callout, Code, DocRef, DocSection, DocTable, Kbd, Mono, Steps } from "@/components/docs-primitives";
 import type { GroupContent } from "@/content/docs/types";
 import { DOCX_MAX_MIB } from "@/lib/report/formats";
 
@@ -103,7 +103,7 @@ export const reports: GroupContent = {
             caption="The report formats the terminal exports"
             head={["Format (file)", "What it is and what it needs"]}
             rows={[
-              { key: "PDF (.pdf)", value: <>The styled report, page 1 the executive summary, printed to PDF by WeasyPrint when installed, otherwise by a headless Chrome/Chromium on the machine. Shown as &quot;not installed&quot; without either. See <DocLink href="/docs/getting-started/requirements">Requirements</DocLink>.</> },
+              { key: "PDF (.pdf)", value: <>The styled report, page 1 the executive summary, printed to PDF by WeasyPrint when installed, otherwise by a headless Chrome/Chromium on the machine. Shown as &quot;not installed&quot; without either. See <DocRef>Requirements</DocRef>.</> },
               { key: "JSON (.json)", value: "The complete report data, machine-readable." },
               { key: "DOCX (.docx)", value: <>The same report as an editable Word document, every section included. Uses the <Mono>python-docx</Mono> package (installed with Reconix).</> },
             ]}
@@ -153,7 +153,7 @@ export const reports: GroupContent = {
             ]}
           />
           <p>
-            More in <DocLink href="/docs/troubleshooting/report-failures">Troubleshooting · Report failures</DocLink>.
+            More in <DocRef>Troubleshooting · Report failures</DocRef>.
           </p>
         </DocSection>
       </>
@@ -223,7 +223,7 @@ export const reports: GroupContent = {
           </p>
           <Callout>
             The dashboard needs Node.js 20 or later; the PDF needs a Chrome/Chromium on the machine. See{" "}
-            <DocLink href="/docs/troubleshooting/web-dashboard">Troubleshooting · The web dashboard</DocLink>.
+            <DocRef>Troubleshooting · The web dashboard</DocRef>.
           </Callout>
         </DocSection>
       </>

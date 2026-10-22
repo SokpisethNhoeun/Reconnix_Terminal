@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
-import { Code, DocLink, DocSection, DocTable, Facts, Kbd, Mono } from "@/components/docs-primitives";
+import { Code, DocRef, DocSection, DocTable, Facts, Kbd, Mono } from "@/components/docs-primitives";
 import type { GroupContent } from "@/content/docs/types";
-import { COMMAND_GROUPS, COMMANDS, commandHref, type CommandEntry } from "@/lib/docs-nav";
+import { COMMAND_GROUPS, COMMANDS, type CommandEntry } from "@/lib/docs-nav";
 
 /**
  * The hand-written part of each command's page. The facts (name, aliases, description, whether
@@ -37,7 +37,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
         An overlay lists &quot;This screen&quot; (the focused widget&apos;s keys, then the screen&apos;s own) and
         &quot;Everywhere&quot; (<Kbd>←</Kbd>/<Kbd>→</Kbd>, <Kbd>1</Kbd>…<Kbd>8</Kbd>, <Kbd>/</Kbd>, <Kbd>?</Kbd>,{" "}
         <Kbd>Ctrl+O</Kbd>, <Kbd>Ctrl+Q</Kbd>). <Kbd>?</Kbd> or <Kbd>Esc</Kbd> closes it. The full list is on{" "}
-        <DocLink href="/docs/terminal-guide/keys">Keys</DocLink>.
+        <DocRef>Keys</DocRef>.
       </>
     ),
     errors: [],
@@ -57,7 +57,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
         The current run stops playing, a fresh assessment is loaded (the earlier ones stay listed; the audit trail and
         the prompt history are kept), the findings filter resets and the Start screen opens. With a target, the line is
         submitted as if you had typed it at the prompt: a target starts the run (a bare hostname waits at the Template
-        screen), anything else gets a short answer. See <DocLink href="/docs/terminal-guide/prompt">The prompt</DocLink>.
+        screen), anything else gets a short answer. See <DocRef>The prompt</DocRef>.
       </>
     ),
     errors: [
@@ -82,7 +82,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
         target prompt. The ids are only suggested, never asked for. If the current assessment is already past the
         scope (approved or stopped), a new one starts first: &quot;Started a new assessment. The previous one is under
         /assessments.&quot; The typed target must fit the template. See{" "}
-        <DocLink href="/docs/assessment-guide/request">Request and template</DocLink>.
+        <DocRef>Request and template</DocRef>.
       </>
     ),
     errors: [
@@ -101,7 +101,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
         The screen reflects the run&apos;s state: no plan yet (pick a template first), scope still a draft (&quot;Approve
         the scope first — the plan runs only inside it.&quot;), preparing, ready (Run plan / Edit steps / Cancel), running
         (View execution, and View findings once it finished) or stopped (Start a new assessment). <Kbd>Tab</Kbd> browses
-        the steps. See <DocLink href="/docs/assessment-guide/plan">Plan and tools</DocLink>.
+        the steps. See <DocRef>Plan and tools</DocRef>.
       </>
     ),
     errors: [
@@ -124,7 +124,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
         Shows the waiting action with Approve &amp; run, Reject, Edit params and View details (highlighted first; <Kbd>d</Kbd>{" "}
         opens it). A HIGH-risk approval opens the second confirmation with &quot;No, go back&quot; selected. When nothing
         waits, the screen offers Back to execution or Review the plan. See{" "}
-        <DocLink href="/docs/assessment-guide/approval-gates">Approval gates</DocLink>.
+        <DocRef>Approval gates</DocRef>.
       </>
     ),
     errors: [
@@ -146,7 +146,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
         Same as <Kbd>5</Kbd> or <Kbd>→</Kbd> from the Approval screen. The screen exists only once the plan has run;
         before that the command only shows a notice. On it, <Kbd>Enter</Kbd> opens what the run waits for, <Kbd>End</Kbd>{" "}
         follows the newest output and <Kbd>Ctrl+C</Kbd> asks before stopping. See{" "}
-        <DocLink href="/docs/assessment-guide/execution">Execution</DocLink>.
+        <DocRef>Execution</DocRef>.
       </>
     ),
     errors: [
@@ -162,7 +162,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
       <>
         The list of revealed findings under the current filter and sort: <Kbd>Enter</Kbd> opens one, <Kbd>f</Kbd> filter,{" "}
         <Kbd>s</Kbd> sort, <Kbd>t</Kbd> triage, <Kbd>c</Kbd> chat. The filter and sort are kept while you move around.
-        See <DocLink href="/docs/reports/understanding-findings">Understanding findings</DocLink>.
+        See <DocRef>Understanding findings</DocRef>.
       </>
     ),
     errors: [],
@@ -194,7 +194,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
       <>
         Same as <Kbd>8</Kbd>. The buttons <Kbd>p</Kbd> PDF, <Kbd>j</Kbd> JSON and <Kbd>w</Kbd> DOCX are enabled once
         the run completed; <Mono>/web</Mono> opens the web dashboard. See{" "}
-        <DocLink href="/docs/reports/reviewing">Reviewing results</DocLink>.
+        <DocRef>Reviewing results</DocRef>.
       </>
     ),
     errors: [],
@@ -210,7 +210,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
         Reconix was launched) and a dialog &quot;Saved … Open it now?&quot; offers to open it in the browser or the
         default app. Without a format, a menu &quot;Export the report as…&quot; lists the three formats; PDF is dimmed
         without a PDF engine, DOCX without python-docx. The path is kept on the Report screen and in <Mono>/summary</Mono>. See{" "}
-        <DocLink href="/docs/reports/exporting">Exporting</DocLink>.
+        <DocRef>Exporting</DocRef>.
       </>
     ),
     errors: [
@@ -277,7 +277,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
         screen: its plan as task rows, its tool calls in the live output, its findings as <Mono>AI-NNN</Mono> findings.
         It asks for decisions and logins through dialogs; a chat line continues it; <Mono>/model</Mono> switches its model
         mid-run. A running assessment&apos;s playback pauses and it stays listed under <Mono>/assessments</Mono>. See{" "}
-        <DocLink href="/docs/assessment-guide/ai-agent">The AI agent</DocLink>.
+        <DocRef>The AI agent</DocRef>.
       </>
     ),
     errors: [
@@ -312,7 +312,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
         at most 10 MB, a regular file (no symlink); at most 50 sources. The text is cleaned and
         <strong> redacted at ingest</strong> (secrets never reach disk), split into passages (≤ 1,200 characters)
         and saved under <Mono>~/.reconix/knowledge</Mono> (0700, files 0600). See{" "}
-        <DocLink href="/docs/ai-models/models">Models</DocLink>.
+        <DocRef>Models</DocRef>.
       </>
     ),
     errors: [
@@ -339,7 +339,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
         openai_compatible) with status, key hint and models. <Mono>/provider &lt;id&gt;</Mono> opens that provider&apos;s
         submenu: Set up / Update, Test connection, Use a model, Unset. <Mono>set</Mono> and <Mono>update</Mono> open the
         form; <Mono>test</Mono> runs the reachability test in the background and saves the result; <Mono>unset</Mono> asks
-        before deleting the saved key and settings. See <DocLink href="/docs/ai-models/providers">Providers</DocLink>.
+        before deleting the saved key and settings. See <DocRef>Providers</DocRef>.
       </>
     ),
     errors: [
@@ -348,7 +348,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
       { message: "The base URL must start with http:// or https://. / Put the API key in the key field, not in the base URL.", meaning: "The base URL is not a plain http(s) URL." },
       { message: "<Provider> holds a single model. / Reconix's base URL comes from .env and can't be changed.", meaning: "That provider's rules; see the catalog." },
       { message: "<Provider> is not configured (yet).", meaning: "Test, use or unset before set." },
-      { message: "<Provider>: UNREACHABLE — <detail>", meaning: <>The test failed; see <DocLink href="/docs/ai-models/errors">Common errors</DocLink>.</> },
+      { message: "<Provider>: UNREACHABLE — <detail>", meaning: <>The test failed; see <DocRef>Common errors</DocRef>.</> },
     ],
   },
   model: {
@@ -362,7 +362,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
         Reachable). With <Mono>provider/model</Mono>, that model becomes active at once: the top bar shows{" "}
         <Mono>llm: &lt;provider label&gt; · &lt;model&gt; ●</Mono>, the chat notes the switch, and a running agent is repointed
         with its history kept. The run, findings and approvals are untouched. See{" "}
-        <DocLink href="/docs/ai-models/models">Models</DocLink>.
+        <DocRef>Models</DocRef>.
       </>
     ),
     errors: [
@@ -383,14 +383,14 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
         If a dashboard is listening at the saved sign-in link, the browser opens it. Otherwise the first call installs
         the dashboard&apos;s packages if needed, starts <Mono>npm run dev</Mono> in <Mono>web/</Mono> quietly (log:{" "}
         <Mono>~/.reconix/web.log</Mono>) and the dashboard opens the browser when ready; it stops when you quit. The
-        Report screen has no button for it: type <Mono>/web</Mono> there too. See <DocLink href="/docs/reports/dashboard">The web dashboard</DocLink>.
+        Report screen has no button for it: type <Mono>/web</Mono> there too. See <DocRef>The web dashboard</DocRef>.
       </>
     ),
     errors: [
       { message: "The web dashboard folder (web/) isn't next to this install.", meaning: "Run from the cloned repository." },
       { message: "The web dashboard needs Node.js (node and npm).", meaning: "Install Node.js 20 or later." },
       { message: "Another web dashboard already uses its port on 127.0.0.1 (an older one left running?). Stop it, then run /web again.", meaning: "The launcher exited with code 2: its port is taken." },
-      { message: "Couldn't install the web dashboard's packages. / The web dashboard stopped while starting. / The web dashboard is taking a while to start.", meaning: <>Read the log; see <DocLink href="/docs/troubleshooting/web-dashboard">Troubleshooting</DocLink>.</> },
+      { message: "Couldn't install the web dashboard's packages. / The web dashboard stopped while starting. / The web dashboard is taking a while to start.", meaning: <>Read the log; see <DocRef>Troubleshooting</DocRef>.</> },
       { message: "Open it in your browser: <link>", meaning: "The dashboard runs but no browser could be launched here." },
       { message: "You're already in the web dashboard: this is its Terminal page.", meaning: "Not an error." },
     ],
@@ -487,5 +487,3 @@ export const UNDOCUMENTED_COMMANDS = COMMANDS.filter((c) => !COMMAND_DOCS[c.name
 
 /** Hand-written pages for commands that no longer exist (must be empty: checked by the tests). */
 export const STALE_COMMAND_DOCS = Object.keys(COMMAND_DOCS).filter((name) => !COMMANDS.some((c) => c.name === name));
-
-export { commandHref };

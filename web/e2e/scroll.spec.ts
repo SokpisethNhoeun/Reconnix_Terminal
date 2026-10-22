@@ -1,7 +1,7 @@
 /* Scrolling and the responsive frame (docs/WEB_REDESIGN_V2_PLAN.md §6). The dashboard scrolls
    natively at every size: on the fixed desktop frame (≥1280×760) its content area is the one
    scroller, elsewhere the window is. Real wheel, keyboard and touch input move it; nothing
-   overflows sideways or hangs out of reach; and the docs still glide with Lenis. The wheel tests
+   overflows sideways or hangs out of reach; and the docs scroll the same way. The wheel tests
    run with motion on, because the old bug (Lenis taking the wheel on the dashboard) only existed
    with motion on. The assistant's own scroller is e2e/scroll-assistant.spec.ts (run on its own:
    it writes conversations).
@@ -214,8 +214,9 @@ for (const size of SIZES) {
       expect((await sideways(page)).page).toBe(0);
 
       // a docs page: the window scrolls to its foot and nothing hangs out sideways
-      await page.goto("/docs/commands/add-on");
+      await page.goto("/docs/commands#add-on"); // the longest group page, opened at a part
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(page.locator("h2#add-on")).toBeInViewport();
       await page.evaluate(() => window.scrollTo(0, document.scrollingElement!.scrollHeight));
       await expect
         .poll(() => page.evaluate(() => Math.round(document.scrollingElement!.scrollHeight - scrollY - innerHeight)), { message: "the docs page reaches its foot" })
@@ -295,7 +296,7 @@ test.describe("the docs", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   test("scroll in the content area, follow their own hash links, and lead back to the dashboard", async ({ page }) => {
-    await page.goto("/docs/architecture");
+    await page.goto("/docs/getting-started");
     await expect(page.locator("html[data-hydrated]")).toHaveCount(1);
     await page.mouse.move(900, 500);
     await page.mouse.wheel(0, 600);
@@ -304,9 +305,10 @@ test.describe("the docs", () => {
     expect(await page.evaluate(() => scrollY)).toBe(0);
 
     await page.locator(".dash-content").evaluate((el) => el.scrollTo(0, 0));
-    const toc = page.getByRole("navigation", { name: "On this page" }).getByRole("link");
-    const target = toc.nth(2);
+    // "On this page" lists the group's pages: one further down the same page
+    const target = page.getByRole("navigation", { name: "On this page" }).getByRole("link", { name: "Installation", exact: true });
     const hash = (await target.getAttribute("href"))!;
+    expect(hash).toBe("#installation");
     await target.click();
     await expect(page).toHaveURL(new RegExp(`${hash}$`));
     // the heading lands near the top of the content area (below the top bar), at its scroll-margin-top
