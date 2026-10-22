@@ -1,6 +1,7 @@
 /* Paging rules shared by the lists that show 10 rows at a time (Findings, Assessments, the
-   runs of a report). Pure: the views keep the page in the address (`?page=`), so anything
-   unknown is clamped rather than trusted. */
+   runs of a report) and the report's targets (7 a page, `?tpage=`: report-targets-paging.ts).
+   Pure: the views keep the page in the address (`?page=`), so anything unknown is clamped
+   rather than trusted. */
 
 export const PER_PAGE = 10;
 

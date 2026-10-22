@@ -4,17 +4,19 @@
    downloads one real PDF and Generate DOCX one Word document (both only after the preview), the
    failure paths (a 500 on the preview offers Retry, a 501 on the PDF offers the Word document, a
    413 on the DOCX says why), every run's row offers PDF, JSON and DOCX, and the panel works at
-   phone size. */
+   phone size. Also the cards above it: Findings by Severity lists the top 3 CVSS findings (one
+   run and every run), and the Targets card shows 7 targets a page (`?tpage=`) beside it, the
+   same height as it on every page, with the pager in one place. */
 import { readFileSync } from "node:fs";
 
-import { type Page } from "@playwright/test";
+import { type Locator, type Page } from "@playwright/test";
 
 import { unzip } from "../tests/unzip";
 import { expect, test } from "./fixtures";
 
 import { combinedHref } from "../src/lib/report/combined/options";
 import { DOCX_TOO_LARGE } from "../src/lib/report/formats";
-import { hydrated, sample } from "./support";
+import { counted, hydrated, sample } from "./support";
 
 const COMBINE_MAX = 5;
 const pick = (page: Page) => page.getByRole("checkbox", { name: /^Combine / });
@@ -283,6 +285,143 @@ test("a PDF request that is cut off shows the dashboard could not be reached", a
   await expect(generate(page)).toHaveText("Generate PDF");
 });
 
+// ---- Findings by Severity's top 3 and the Targets card (7 a page) --------------------------
+
+const reportPane = (page: Page) => page.locator('[data-view-pane="reports"]');
+const severityCard = (page: Page) => reportPane(page).getByRole("region", { name: "Findings by Severity" });
+const topRows = (card: Locator) => card.locator(".dash-top-finding");
+const targetsCard = (page: Page) => reportPane(page).getByRole("region", { name: "Targets" });
+const targetRows = (page: Page) => targetsCard(page).getByRole("list", { name: "Targets" }).getByRole("listitem");
+const targetPager = (page: Page) => targetsCard(page).getByRole("navigation", { name: "Target pages" });
+/** The targets a page lists, by the name each row's link gives. */
+const targetNames = (page: Page) =>
+  targetsCard(page)
+    .getByRole("link", { name: /^Open the newest report for / })
+    .evaluateAll((links) => links.map((a) => /^Open the newest report for (.+) \(/.exec(a.getAttribute("aria-label") ?? "")?.[1] ?? ""));
+/** Findings the top list can hold: scored, counted, not fixed (derive.ts findingsSlice). */
+const scored = (a: ReturnType<typeof sample>[number]) => counted(a).filter((f) => f.cvss_score > 0 && f.status !== "fixed");
+const TOP = 3;
+const PER_TARGETS_PAGE = 7;
+const TARGETS = new Set(sample().map((a) => a.target || "—")).size;
+const TARGET_PAGES = Math.ceil(TARGETS / PER_TARGETS_PAGE);
+
+test("the Report's Findings by Severity lists the top 3 CVSS findings; the Overview keeps more", async ({ page }) => {
+  const all = sample();
+  const scoredAll = all.flatMap(scored).length;
+  expect(scoredAll, "the sample data scores more than three findings").toBeGreaterThan(TOP);
+  await page.goto("/?view=reports");
+  await hydrated(page);
+  // every run: the three highest scores, worst first
+  const card = severityCard(page);
+  await expect(card).toBeVisible();
+  await expect(topRows(card)).toHaveCount(TOP);
+  for (let i = 0; i < TOP; i++) await expect(topRows(card).nth(i)).toBeVisible();
+  const scores = (await topRows(card).locator("[title^='CVSS']").allTextContents()).map(Number);
+  expect(scores).toEqual([...scores].sort((a, b) => b - a));
+  expect(scores[0]).toBe(Math.max(...all.flatMap(scored).map((f) => f.cvss_score)));
+  // the Overview's card (the same data, its pane hidden here) still lists more than three
+  const overview = page.locator('[data-view-pane="overview"] section[aria-labelledby="findings-card"]');
+  expect(await topRows(overview).count()).toBeGreaterThan(TOP);
+
+  // one run: at most three too, and fewer when the run scores fewer
+  const most = [...all].sort((a, b) => scored(b).length - scored(a).length)[0];
+  const fewest = all.filter((a) => scored(a).length > 0).sort((a, b) => scored(a).length - scored(b).length)[0];
+  for (const a of [most, fewest]) {
+    await page.goto(`/?uid=${a.uid}&view=reports`);
+    await hydrated(page);
+    await expect(topRows(severityCard(page))).toHaveCount(Math.min(TOP, scored(a).length));
+  }
+});
+
+/** The two cards side by side, the targets list and its pager (bounding boxes). */
+async function targetBoxes(page: Page) {
+  const box = async (l: Locator) => (await l.boundingBox())!;
+  return {
+    severity: await box(severityCard(page)),
+    targets: await box(targetsCard(page)),
+    list: await box(targetsCard(page).getByRole("list", { name: "Targets" })),
+    pager: await box(targetPager(page)),
+  };
+}
+
+/** Nothing inside the two cards is cut off: neither a card nor its body scrolls or clips. */
+const unclipped = (page: Page) =>
+  reportPane(page).evaluate((pane) =>
+    ["report-severity", "report-targets"].flatMap((id) => {
+      const card = pane.querySelector(`#${id}`)!.closest("section")!;
+      return [card, card.lastElementChild as HTMLElement].map((el) => el.scrollHeight - el.clientHeight);
+    }),
+  );
+
+for (const size of [
+  { width: 1440, height: 900 },
+  { width: 1366, height: 768 },
+]) {
+  test.describe(`the Targets card at ${size.width}×${size.height}`, () => {
+    test.use({ viewport: size });
+
+    test("shows 7 targets a page beside Findings by Severity, the same height on every page, the pager in one place", async ({ page }) => {
+      expect(TARGETS, "the sample data has more than a page of targets").toBeGreaterThan(PER_TARGETS_PAGE);
+      await page.goto("/?view=reports");
+      await hydrated(page);
+      await expect(targetRows(page)).toHaveCount(PER_TARGETS_PAGE);
+      await expect(targetsCard(page)).toContainText(`${TARGETS} targets`);
+      await expect(targetPager(page)).toContainText(`Page 1 of ${TARGET_PAGES} · ${TARGETS} results`);
+      await expect(targetPager(page).getByRole("button", { name: "Previous page" })).toBeDisabled();
+      const first = await targetBoxes(page);
+      const firstNames = await targetNames(page);
+      // side by side in one row, the same height (both stretch; neither clips)
+      expect(Math.abs(first.targets.y - first.severity.y)).toBeLessThanOrEqual(1);
+      expect(first.targets.x).toBeGreaterThan(first.severity.x + first.severity.width - 1);
+      expect(Math.abs(first.targets.height - first.severity.height)).toBeLessThanOrEqual(1);
+      expect(await unclipped(page)).toEqual([0, 0, 0, 0]);
+      // the pager sits inside the card, under the list
+      expect(first.pager.y).toBeGreaterThanOrEqual(first.list.y + first.list.height - 1);
+      expect(first.pager.y + first.pager.height).toBeLessThanOrEqual(first.targets.y + first.targets.height);
+
+      // the next page: the rest, in the same card height, the pager where it was
+      await targetPager(page).getByRole("button", { name: "Next page" }).click();
+      await expect(page).toHaveURL(/[?&]tpage=2(&|$)/);
+      await expect(targetPager(page)).toContainText(`Page 2 of ${TARGET_PAGES} · ${TARGETS} results`);
+      const rest = Math.min(PER_TARGETS_PAGE, TARGETS - PER_TARGETS_PAGE);
+      await expect(targetRows(page)).toHaveCount(rest);
+      const second = await targetBoxes(page);
+      const secondNames = await targetNames(page);
+      expect(secondNames.filter((n) => firstNames.includes(n)), "no target on both pages").toEqual([]);
+      for (const key of ["targets", "severity", "list", "pager"] as const) {
+        expect(Math.abs(second[key].height - first[key].height), `${key}: the same height on page 2`).toBeLessThanOrEqual(1);
+        expect(Math.abs(second[key].y - first[key].y), `${key}: in the same place on page 2`).toBeLessThanOrEqual(1);
+      }
+      expect(Math.abs(second.targets.height - second.severity.height)).toBeLessThanOrEqual(1);
+      expect(await unclipped(page)).toEqual([0, 0, 0, 0]);
+      if (TARGET_PAGES === 2) {
+        expect(new Set([...firstNames, ...secondNames]).size).toBe(TARGETS); // every target, once
+        await expect(targetPager(page).getByRole("button", { name: "Next page" })).toBeDisabled();
+      }
+
+      // the page is in the address: a reload lands on it; Previous goes back to the plain address
+      await page.reload();
+      await hydrated(page);
+      await expect(targetRows(page)).toHaveCount(rest);
+      await targetPager(page).getByRole("button", { name: "Previous page" }).click();
+      await expect(targetRows(page)).toHaveCount(PER_TARGETS_PAGE);
+      expect(new URL(page.url()).searchParams.has("tpage")).toBe(false);
+      // and the runs table's own pager is untouched by the targets' page
+      await expect(page.getByRole("navigation", { name: "Saved assessment pages" })).toContainText("Page 1 of");
+    });
+  });
+}
+
+test("an out-of-range or unknown tpage lands on a page that exists", async ({ page }) => {
+  await page.goto("/?view=reports&tpage=99");
+  await hydrated(page);
+  await expect(targetPager(page)).toContainText(`Page ${TARGET_PAGES} of ${TARGET_PAGES}`);
+  await page.goto("/?view=reports&tpage=zzz");
+  await hydrated(page);
+  await expect(targetPager(page)).toContainText(`Page 1 of ${TARGET_PAGES}`);
+  await expect(targetRows(page)).toHaveCount(PER_TARGETS_PAGE);
+});
+
 test.describe("at phone size", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -300,6 +439,22 @@ test.describe("at phone size", () => {
     expect(box.height).toBeGreaterThanOrEqual(320);
     expect(box.height).toBeLessThanOrEqual(600);
     // no sideways page scroll
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  });
+
+  test("Findings by Severity and Targets stack, nothing clipped, 7 targets a page", async ({ page }) => {
+    await page.goto("/?view=reports&tpage=2");
+    await hydrated(page);
+    await expect(targetRows(page)).toHaveCount(Math.min(PER_TARGETS_PAGE, TARGETS - PER_TARGETS_PAGE));
+    let boxes = await targetBoxes(page);
+    expect(boxes.targets.y, "stacked under Findings by Severity").toBeGreaterThanOrEqual(boxes.severity.y + boxes.severity.height);
+    expect(boxes.pager.y + boxes.pager.height).toBeLessThanOrEqual(boxes.targets.y + boxes.targets.height);
+    expect(await unclipped(page)).toEqual([0, 0, 0, 0]);
+    await targetPager(page).getByRole("button", { name: "Previous page" }).tap();
+    await expect(targetRows(page)).toHaveCount(PER_TARGETS_PAGE);
+    boxes = await targetBoxes(page);
+    expect(boxes.targets.width).toBeLessThanOrEqual(390);
+    expect(await unclipped(page)).toEqual([0, 0, 0, 0]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   });
 });

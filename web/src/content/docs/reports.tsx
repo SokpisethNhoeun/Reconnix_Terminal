@@ -176,7 +176,8 @@ export const reports: GroupContent = {
         <DocSection title="One run's report">
           <p>
             In the Reports view, with a run chosen, the summary strip shows its findings, plan steps, requests sent and
-            masked evidence, and the findings table lists every finding. The download links offer:
+            masked evidence, Findings by Severity lists the top three findings by CVSS, and the findings table lists
+            every finding. The download links offer:
           </p>
           <DocTable
             caption="The dashboard's export formats for one run"
@@ -188,8 +189,10 @@ export const reports: GroupContent = {
             ]}
           />
           <p>
-            Every format is a download. With no run chosen, the Reports view sums up every saved run and lists them in a
-            table; each row opens that run&apos;s report and offers the same three downloads.
+            Every format is a download. With no run chosen, the Reports view sums up every saved run: Findings by
+            Severity (the top three by CVSS) beside the Targets card, which lists every target, the most findings first,
+            seven a page with Previous and Next (a target opens its newest run&apos;s report), and a table of the runs;
+            each row opens that run&apos;s report and offers the same three downloads.
           </p>
         </DocSection>
         <DocSection title="The combined report">

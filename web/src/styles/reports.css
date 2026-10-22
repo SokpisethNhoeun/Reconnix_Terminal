@@ -1,7 +1,18 @@
-/* The Report view: combining saved runs (report-selection.tsx), the runs table's checkboxes
-   (report-runs.tsx) and the preview frame (report-preview.tsx). Its buttons are the shared
+/* The Report view: the every-run Targets card (report-targets.tsx), combining saved runs
+   (report-selection.tsx), the runs table's checkboxes (report-runs.tsx) and the preview frame
+   (report-preview.tsx). Its buttons are the shared
    Button (components/ui/button.tsx) and its links .ui-link (ui.css). Colours only from the
    tokens (tokens.css); meanings from lib/status.ts. */
+
+/* ---- Targets (report-targets.tsx): seven a page beside Findings by Severity ----
+   Both cards stretch to their grid row (.dash-panels), so they are the same height and neither
+   clips: the taller content sets the row. The list keeps room for a whole page (--slots rows;
+   1fr rows in an auto-height grid are each as tall as the tallest row shown, so an empty slot
+   is a row's height), and the pager sits at the card's foot: on every page the list and the
+   pager hold still. */
+.rep-targets-body { display: flex; flex-direction: column; gap: 10px; }
+.rep-targets-list { flex: none; display: grid; grid-template-rows: repeat(var(--slots, 1), 1fr); gap: 1px; }
+.rep-targets-pager { flex: none; margin-top: auto; }
 
 /* ---- Selection panel ---- */
 .rep-select { display: grid; gap: 12px; }
