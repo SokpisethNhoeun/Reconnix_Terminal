@@ -1,4 +1,4 @@
-/* What the Model menu's routes answer (and the page tells the assistant): the saved providers
+/* What the model picker's routes answer (and the page tells the assistant): the saved providers
    without their keys (only whether one is saved), the read-only Environment model, the active
    choice and a summary of the model that answers next. Never an API key. Pure: browser and
    server (the browser checks every answer against these before it uses it). */

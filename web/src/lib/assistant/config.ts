@@ -1,6 +1,6 @@
 /* The rules for the AI model the assistant asks (server only): any OpenAI-compatible endpoint,
    the same convention as the product docs' "Model switching". `checkModel` holds the rules every
-   model passes, wherever it comes from (the environment, or one saved in the Model menu:
+   model passes, wherever it comes from (the environment, or one saved in the model picker:
    models/resolve.ts): http(s) only, no credentials in the address, a model name of the usual
    characters, an API key only over https to a remote host, and an address off this machine
    only when the server runs with LLM_ALLOW_REMOTE=1 (the browser can't turn that on). An
@@ -42,7 +42,7 @@ export const ENV_WORDING: Wording = {
   allow: "Set LLM_ALLOW_REMOTE=1 to allow that.",
 };
 
-/** The Model menu's words. */
+/** The model picker's words. */
 export const FORM_WORDING: Wording = {
   url: "The base URL",
   urlIn: "the base URL",

@@ -1,6 +1,6 @@
 /* The page's side of the AI Assistant's routes (browser only): ask a question and read the
    NDJSON answer frame by frame, list, read, rename and delete saved conversations, turn a
-   saved conversation into the messages the page shows, and the Model menu's calls (list, add,
+   saved conversation into the messages the page shows, and the model picker's calls (list, add,
    change, remove, switch, test, fetch). Every answer is checked against the shared schemas
    before the page uses it. */
 import { z } from "zod";
@@ -156,9 +156,9 @@ export async function deleteAllConversations(): Promise<{ ok: true; deleted: num
   return result.ok ? { ok: true, deleted: result.value.deleted } : result;
 }
 
-// --- the Model menu ------------------------------------------------------------------------------
+// --- the model picker ----------------------------------------------------------------------------
 
-// The routes add fields the menu doesn't use (the presets, the changed provider): dropped here.
+// The routes add fields the picker doesn't use (the presets, the changed provider): dropped here.
 const ViewAnswer = ModelsViewSchema.strip();
 export type ModelsAnswer = { ok: true; view: ModelsView } | Failure;
 

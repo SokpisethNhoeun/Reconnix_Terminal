@@ -1,15 +1,16 @@
 "use client";
 
-/* The Model menu's data: the saved providers, the Environment model and the active choice,
-   read when the menu opens; switching, adding, changing and removing go to the server, whose
-   answer (the whole view) replaces what the menu shows and tells the assistant which model
-   answers next (setModel), so the header and Ask follow without a reload. One change at a time:
-   `pending` names it (a switch: "<providerId>/<model>"). Operators only. */
+/* The model picker's data: the saved providers, the Environment model and the active choice,
+   read when the picker opens; switching, saving a model ("Use this model": a new provider, or a
+   change to a saved one and a switch) and removing a provider go to the server, whose answer
+   (the whole view) replaces what the picker shows and tells the assistant which model answers
+   next (setModel), so the chip, the reason above the composer and Ask follow without a reload.
+   One change at a time: `pending` names it (a switch: "<providerId>/<model>"). Operators only. */
 import { useCallback, useRef, useState } from "react";
 
 import * as api from "@/lib/assistant/client";
-import type { AddProvider, UpdateProvider } from "@/lib/assistant/models/requests";
 import type { ModelsView } from "@/lib/assistant/models/view";
+import type { UseRequests } from "./model-picker-rules";
 import type { ModelSummary } from "./types";
 
 export interface ModelsState {
@@ -18,7 +19,7 @@ export interface ModelsState {
   error: string | null;
 }
 
-/** The key of one model choice (a switch in flight, a radio's identity). */
+/** The key of one model choice (a switch in flight). */
 export const choiceKey = (providerId: string, model: string) => `${providerId}/${model}`;
 
 export function useModels(operator: boolean, setModel: (model: ModelSummary) => void) {
@@ -44,7 +45,7 @@ export function useModels(operator: boolean, setModel: (model: ModelSummary) => 
   }, [operator, take]);
 
   /** Runs one change; resolves to null when it worked, or what went wrong. A provider that is
-      gone (404: removed in another tab) reloads the list, so the menu stops offering it. */
+      gone (404: removed in another tab) reloads the list, so the picker stops offering it. */
   const run = useCallback(
     async (label: string, call: () => Promise<api.ModelsAnswer>): Promise<string | null> => {
       if (busy.current) return "Another change is still being saved.";
@@ -67,11 +68,24 @@ export function useModels(operator: boolean, setModel: (model: ModelSummary) => 
   );
 
   const choose = useCallback((providerId: string, model: string) => run(choiceKey(providerId, model), () => api.switchModel({ providerId, model })), [run]);
-  const add = useCallback((body: AddProvider) => run("save", () => api.addModelProvider(body)), [run]);
-  const update = useCallback((id: string, body: UpdateProvider) => run("save", () => api.updateModelProvider(id, body)), [run]);
   const remove = useCallback((id: string) => run(`remove:${id}`, () => api.removeModelProvider(id)), [run]);
+  /** "Use this model": the new provider (made active as it is added), or the saved one's changes
+      first (their view is shown even when the switch after them is refused) and the switch. */
+  const save = useCallback(
+    (requests: UseRequests) =>
+      run("save", async () => {
+        if (requests.kind === "add") return api.addModelProvider(requests.body);
+        if (requests.body) {
+          const changed = await api.updateModelProvider(requests.id, requests.body);
+          if (!changed.ok) return changed;
+          take(changed.view);
+        }
+        return api.switchModel(requests.activate);
+      }),
+    [run, take],
+  );
 
-  return { state, pending, load, choose, add, update, remove };
+  return { state, pending, load, choose, remove, save };
 }
 
 export type Models = ReturnType<typeof useModels>;

@@ -1,5 +1,5 @@
-/* The Model menu's two questions to a model's address (server only): "Test connection" sends a
-   tiny chat completion, "Fetch models" reads GET {base}/models. Both refuse redirects, give up
+/* The model picker's two questions to a model's address (server only): the test sends a tiny
+   chat completion, the fetch reads GET {base}/models. Both refuse redirects, give up
    after ten seconds, never cache, read at most 1 MB, and answer in fixed words: never the
    address, the key or what the server said (only its HTTP status). The address was checked
    first (resolve.ts `probeTarget`). */

@@ -290,7 +290,7 @@ describe("which model answers", () => {
     expect(existsSync(dir)).toBe(false); // reading made no folder
     const none = await activeModel({});
     expect(none).toMatchObject({ ok: false, reason: NO_MODEL, summary: { configured: false, name: "" } });
-    expect(NO_MODEL).toContain("Model menu");
+    expect(NO_MODEL).toContain("Choose a model");
   });
   it("is the saved choice when there is one, with its key", async () => {
     const p = await addProvider({ ...local, apiKey: SECRET, activate: true });

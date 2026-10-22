@@ -1,4 +1,4 @@
-/* The Model menu's routes' shared answers (server only): a refused change as its fixed message
+/* The model picker's routes' shared answers (server only): a refused change as its fixed message
    and status, and a body read within its byte cap and checked against its strict shape. */
 import "server-only";
 

@@ -3,10 +3,12 @@
    is written; answers streamed by the stand-in model (e2e/llm-stub.mjs) with the cards the
    server built from the sample data; conversations the dashboard's server keeps (they survive
    a reload and a new browser; open, rename, delete); Markdown with Copy; Stop and "New
-   messages"; Retry; an answer with nothing in it; the Model menu (the Environment's model, + Add
-   model against the stand-in, focus and the arrow keys, switching, asking with the new model,
-   editing, removing, a model name typed but not added, a provider removed in another tab); what
-   a viewer can't do; and the routes' locks.
+   messages"; Retry; an answer with nothing in it; the composer and its model picker (the chip
+   naming the Environment's model, no Model button in the header, Custom against the stand-in
+   through credentials and the fetched list to asking with the new model, a one-click switch
+   back, removing a provider, a cloud provider disabled with the reason, a refusal kept on its
+   step, Escape a step back and then closed, the arrow keys); what a viewer can't do; and the
+   routes' locks.
    The chat panel holds still (text never moves), but the welcome's globe and the sidebar's icon
    breathe, so this project runs with reduced motion (playwright.config.ts; the motion itself is
    tested in motion.spec.ts) and clicks need no `force`. The
@@ -70,8 +72,10 @@ const markColours = (svg: SVGElement | HTMLElement) => {
     cyan: resolve("--globe-glow"),
   };
 };
-const modelButton = (page: Page) => page.getByRole("button", { name: /^Model:/ });
-const modelMenu = (page: Page) => page.getByRole("dialog", { name: "Models" });
+/** The composer's model chip: "Model: <name> (<provider>, local|remote)", or "Choose a model". */
+const chip = (page: Page) => page.locator(".ai-composer").getByRole("button", { name: /^(Model: |Choose a model$)/ });
+/** The model picker, named after its step ("Choose a model", "Custom · credentials"…). */
+const picker = (page: Page, step: string) => page.getByRole("dialog", { name: step, exact: true });
 
 test("the Ask bar and the sidebar open the same assistant in place, and Back returns", async ({ page }) => {
   await signIn(page);
@@ -359,184 +363,184 @@ test.describe("when the model fails", () => {
   });
 });
 
-test.describe("the Model menu", () => {
+test.describe("the composer and its model picker", () => {
   test.use({ reducedMotion: "reduce" });
   test.beforeEach(forgetModels);
   test.afterEach(forgetModels); // the other specs ask the Environment's stub-model
 
-  test("lists the Environment, adds a model, switches in one click, asks with it, edits and removes it", async ({ page }) => {
+  test("the composer: the chip names the Environment's model in green, the header has no Model button", async ({ page }) => {
     await page.goto("/?view=assistant");
-    await expect(modelButton(page)).toHaveAccessibleName("Model: stub-model · local");
-    await modelButton(page).click();
-    const menu = modelMenu(page);
-    await expect(menu).toBeVisible();
-    const env = menu.getByRole("menu", { name: /^Environment/ });
-    await expect(env.getByRole("menuitemradio", { name: "stub-model" })).toHaveAttribute("aria-checked", "true");
-    await expect(env.getByRole("menuitemradio", { name: "stub-model" })).toBeFocused(); // once the list loaded (not Close)
-    await expect(menu).toContainText("read-only");
-    await expect(menu.getByRole("button", { name: /^Edit Environment/ })).toHaveCount(0);
+    await assistantShown(page);
+    await expect(header(page).getByRole("button", { name: /^Model/ })).toHaveCount(0);
+    await expect(chip(page)).toHaveAccessibleName("Model: stub-model (Environment, local)");
+    await expect(chip(page)).toHaveText("stub-model");
+    await expect(chip(page)).toHaveAttribute("data-tone", "success");
+    await expect(chip(page).locator(".ai-dot")).toHaveAttribute("data-tone", "success");
+    await expect(chip(page)).toHaveAttribute("aria-expanded", "false");
+    // the box: the text area on top, the chip bottom left, the hint and the send button on the right
+    await expect(composer(page)).toHaveAttribute("placeholder", "Ask anything about your assessments…");
+    const box = page.locator(".ai-composer");
+    await expect(box.getByText("Enter to send · Shift+Enter for new line")).toBeVisible();
+    await expect(box.getByRole("button", { name: "Send" })).toBeVisible();
+    const [field, chipBox, send] = await Promise.all([composer(page).boundingBox(), chip(page).boundingBox(), box.getByRole("button", { name: "Send" }).boundingBox()]);
+    expect(chipBox!.y).toBeGreaterThan(field!.y + field!.height - 2); // under the text area
+    expect(send!.x).toBeGreaterThan(chipBox!.x + chipBox!.width); // to its right
+    expect(Math.round(send!.width)).toBe(32);
+    await expect(page.getByText("Answers use your saved assessment data. Scans and approvals stay in the terminal.")).toBeVisible();
+  });
 
-    // + Add model: Custom, pointing at the stand-in; Fetch models picks from its list
-    await menu.getByRole("button", { name: "Add model" }).click();
-    const form = menu.getByRole("form", { name: "Add a model" });
-    await expect(form.getByLabel("Provider", { exact: true })).toBeFocused();
-    await form.getByLabel("Provider", { exact: true }).selectOption("custom");
-    await form.getByLabel("Name", { exact: true }).fill("Stand-in");
-    await form.getByLabel("Base URL", { exact: true }).fill(`http://127.0.0.1:${LLM_PORT}/v1`);
-    await form.getByLabel("API key", { exact: true }).fill("stub-secret-key-0123");
-    await form.getByRole("button", { name: "Fetch models" }).click();
-    await expect(form).toContainText("The server lists 2 models");
-    await form.getByRole("checkbox", { name: "stub-model", exact: true }).check();
-    await form.getByRole("checkbox", { name: "stub-model-2", exact: true }).check();
-    await expect(form.getByRole("list", { name: "Models of this provider" }).getByRole("listitem")).toHaveCount(2);
-    await form.getByRole("checkbox", { name: "Use it for the next question" }).uncheck();
-    await form.getByRole("button", { name: "Test connection" }).click();
-    await expect(form.getByRole("status")).toHaveText("Connected: stub-model answered.");
-    await form.getByRole("button", { name: "Save" }).click();
-    await expect(form).toBeHidden();
-    const saved = menu.getByRole("menu", { name: "Stand-in" });
-    await expect(saved.getByRole("menuitemradio")).toHaveCount(2);
-    await expect(menu).toContainText("key saved");
-    await expect(env.getByRole("menuitemradio")).toHaveAttribute("aria-checked", "true"); // not switched yet
-
-    // the arrow keys, Home and End only move focus (one tab stop per provider); nothing is chosen
-    const first = saved.getByRole("menuitemradio", { name: "stub-model", exact: true });
-    const second = saved.getByRole("menuitemradio", { name: "stub-model-2" });
-    await first.focus();
-    await page.keyboard.press("ArrowDown");
-    await expect(second).toBeFocused();
-    await expect(second).toHaveAttribute("tabindex", "0");
-    await expect(first).toHaveAttribute("tabindex", "-1");
-    await page.keyboard.press("ArrowDown"); // wraps
-    await expect(first).toBeFocused();
-    await page.keyboard.press("End");
-    await expect(second).toBeFocused();
-    await page.keyboard.press("Shift+Tab"); // out of the group, and back to where focus was
-    await page.keyboard.press("Tab");
-    await expect(second).toBeFocused();
-    await expect(second).toHaveAttribute("aria-checked", "false");
-    await expect(env.getByRole("menuitemradio")).toHaveAttribute("aria-checked", "true");
-
-    // one click switches; the header follows without a reload
+  test("Custom against the stand-in: credentials, the fetched list, Use this model, ask with it; one click back to the Environment; remove it", async ({ page }) => {
+    await page.goto("/?view=assistant");
     await page.evaluate(() => ((window as unknown as { kept: number }).kept = 3));
-    await saved.getByRole("menuitemradio", { name: "stub-model-2" }).click();
-    await expect(saved.getByRole("menuitemradio", { name: "stub-model-2" })).toHaveAttribute("aria-checked", "true");
-    await expect(env.getByRole("menuitemradio")).toHaveAttribute("aria-checked", "false");
-    await expect(modelButton(page)).toHaveAccessibleName("Model: stub-model-2 · local");
-    await page.keyboard.press("Escape");
-    await expect(menu).toBeHidden();
-    await expect(modelButton(page)).toBeFocused();
+    await chip(page).click();
+    const pick = picker(page, "Choose a model");
+    await expect(pick).toBeVisible();
+    await expect(chip(page)).toHaveAttribute("aria-expanded", "true");
+    const yours = pick.getByRole("menu", { name: "Your models" });
+    await expect(yours.getByRole("menuitemradio")).toHaveCount(1);
+    await expect(yours.getByRole("menuitemradio", { name: /^stub-model Environment/ })).toHaveAttribute("aria-checked", "true");
+    await expect(yours.getByRole("menuitemradio", { name: /^stub-model Environment/ })).toBeFocused(); // the step's first control
+    const providers = pick.getByRole("list", { name: "Add or change a provider" });
+    await expect(providers.getByRole("listitem")).toHaveCount(8);
+    await expect(providers.getByRole("button")).toHaveText([/^OpenAI/, /^Anthropic/, /^DeepSeek/, /^OpenRouter/, /^Groq/, /^Ollama \(local\)/, /^LM Studio \(local\)/, /^Custom \(OpenAI-compatible\)/]);
 
-    // the next question goes to it (the stand-in names any model but stub-model)
+    // step 2: Custom takes a base URL (empty: the preset has none) and an optional key
+    await providers.getByRole("button", { name: /^Custom/ }).click();
+    const creds = picker(page, "Custom · credentials");
+    await expect(creds.getByLabel("Base URL", { exact: true })).toBeFocused();
+    await expect(creds.getByLabel("Base URL", { exact: true })).toHaveValue("");
+    await expect(creds.getByLabel("API key", { exact: true })).toHaveAttribute("type", "password");
+    await creds.getByRole("button", { name: "Continue" }).click();
+    await expect(creds.getByRole("alert")).toHaveText("Give the base URL (it usually ends in /v1)."); // asked first, nothing sent
+    await creds.getByLabel("Base URL", { exact: true }).fill(`http://127.0.0.1:${LLM_PORT}/v1`);
+    await creds.getByRole("button", { name: "Continue" }).click();
+
+    // step 3: the stand-in's list (GET /v1/models), plus a typed name
+    const choose = picker(page, "Custom · choose a model");
+    const radios = choose.getByRole("radiogroup", { name: "Custom models" }).getByRole("radio");
+    await expect(radios).toHaveCount(3);
+    await expect(choose.getByRole("radio", { name: "stub-model", exact: true })).toBeChecked();
+    await expect(choose.getByRole("radio", { name: "stub-model", exact: true })).toBeFocused();
+    await expect(choose.getByRole("radio", { name: "stub-model-2" })).toBeVisible();
+    await choose.getByRole("radio", { name: "Type a model name" }).check();
+    await choose.getByLabel("Model name", { exact: true }).fill("two words");
+    await choose.getByRole("button", { name: "Use this model" }).click();
+    await expect(choose.getByRole("alert")).toContainText("letters, digits");
+    await choose.getByRole("radio", { name: "stub-model-2" }).check();
+    await choose.getByRole("button", { name: "Use this model" }).click();
+
+    // closed: the chip says the new model, focus is back on it, and the next question goes to it
+    await expect(choose).toBeHidden();
+    await expect(chip(page)).toBeFocused();
+    await expect(chip(page)).toHaveAccessibleName("Model: stub-model-2 (Custom, local)");
+    await expect(chip(page)).toHaveText("stub-model-2");
     await ask(page, "Which model answers?");
     await expect(log(page)).toContainText("You asked: Which model answers? Model: stub-model-2.");
     expect(await page.evaluate(() => (window as unknown as { kept?: number }).kept)).toBe(3); // never reloaded
-    const listed = await page.request.get("/api/assistant/models");
-    expect(listed.status()).toBe(200);
-    expect(await listed.text()).not.toContain("stub-secret-key-0123"); // the key never comes back
-
-    // a reload keeps the choice (the server's file)
+    const saved = (await (await page.request.get("/api/assistant/models")).json()) as { providers: { name: string; preset: string; models: string[]; keySaved: boolean }[]; active: unknown };
+    expect(saved.providers).toEqual([expect.objectContaining({ name: "Custom", preset: "custom", models: ["stub-model-2"], keySaved: false })]);
     await page.reload();
-    await expect(modelButton(page)).toHaveAccessibleName("Model: stub-model-2 · local");
+    await expect(chip(page)).toHaveAccessibleName("Model: stub-model-2 (Custom, local)"); // the server's file
 
-    // edit: Escape leaves the form first; the key field is never filled in
-    await modelButton(page).click();
-    await menu.getByRole("button", { name: "Edit Stand-in" }).click();
-    const edit = menu.getByRole("form", { name: "Edit Stand-in" });
-    await expect(edit.getByLabel("API key", { exact: true })).toHaveValue("");
-    await expect(edit).toContainText("A key is saved");
-    await edit.getByLabel("Name", { exact: true }).press("Escape");
-    await expect(edit).toBeHidden();
-    await expect(menu).toBeVisible();
-    await menu.getByRole("button", { name: "Edit Stand-in" }).click();
-    await edit.getByLabel("Name", { exact: true }).fill("Stub server");
-    await edit.getByRole("button", { name: "Remove stub-model-2 from the list" }).click();
-    await edit.getByRole("button", { name: "Save" }).click();
-    await expect(edit).toBeHidden();
-    const renamed = menu.getByRole("menu", { name: "Stub server" });
-    await expect(renamed.getByRole("menuitemradio")).toHaveCount(1);
-    await expect(renamed.getByRole("menuitemradio", { name: "stub-model" })).toHaveAttribute("aria-checked", "true"); // the active one left: its first model
-    await expect(modelButton(page)).toHaveAccessibleName("Model: stub-model · local");
+    // one click back to the Environment from Your models
+    await chip(page).click();
+    await expect(yours.getByRole("menuitemradio")).toHaveCount(2);
+    await expect(yours.getByRole("menuitemradio").first()).toHaveAccessibleName(/^stub-model-2 Custom/); // the active one first
+    await expect(yours.getByRole("menuitemradio").first()).toHaveAttribute("aria-checked", "true");
+    await yours.getByRole("menuitemradio", { name: /^stub-model Environment/ }).click();
+    await expect(pick).toBeHidden();
+    await expect(chip(page)).toHaveAccessibleName("Model: stub-model (Environment, local)");
+    await expect(chip(page)).toBeFocused();
 
-    // remove, asked first: the Environment answers again
-    await menu.getByRole("button", { name: "Remove Stub server" }).click();
-    await menu.getByRole("button", { name: "Remove", exact: true }).click();
-    await expect(renamed).toHaveCount(0);
-    await expect(env.getByRole("menuitemradio")).toHaveAttribute("aria-checked", "true");
+    // remove the Custom provider: asked first, No by default; Escape keeps it too
+    await chip(page).click();
+    const custom = providers.getByRole("listitem").filter({ has: page.getByRole("button", { name: /^Custom/ }) });
+    await expect(custom.getByRole("button", { name: /^Custom/ })).toHaveAccessibleName(/local$/);
+    await providers.getByRole("button", { name: "Remove Custom" }).click();
+    const confirm = providers.getByRole("group", { name: "Remove Custom?" });
+    await expect(confirm.getByRole("button", { name: "No" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(confirm).toHaveCount(0);
+    await expect(pick).toBeVisible(); // only the confirm went
+    await expect(providers.getByRole("button", { name: "Remove Custom" })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await providers.getByRole("group", { name: "Remove Custom?" }).getByRole("button", { name: "Remove", exact: true }).click();
+    await expect(providers.getByRole("button", { name: "Remove Custom" })).toHaveCount(0);
+    await expect(providers.getByRole("button", { name: /^Custom \(OpenAI-compatible\)/ })).toBeFocused();
+    await expect(yours.getByRole("menuitemradio")).toHaveCount(1);
+    expect(((await (await page.request.get("/api/assistant/models")).json()) as { providers: unknown[] }).providers).toEqual([]);
   });
 
-  test("what the server refuses stays in the form, said under it", async ({ page }) => {
+  test("a cloud provider is disabled with the reason while the server keeps data here", async ({ page }) => {
     await page.goto("/?view=assistant");
-    await modelButton(page).click();
-    await modelMenu(page).getByRole("button", { name: "Add model" }).click();
-    const form = modelMenu(page).getByRole("form", { name: "Add a model" });
-    await form.getByLabel("Provider", { exact: true }).selectOption("openai");
-    await expect(form.getByLabel("Base URL", { exact: true })).toHaveValue("https://api.openai.com/v1");
-    await expect(form).toContainText("LLM_ALLOW_REMOTE=1"); // the hint, before anything is sent
-    await form.getByLabel("A model name to add").fill("gpt-4o-mini");
-    await form.getByLabel("A model name to add").press("Enter");
-    await form.getByRole("button", { name: "Save" }).click();
-    await expect(form.getByRole("alert")).toContainText("not on this machine");
-    await expect(form).toBeVisible();
-    await form.getByRole("button", { name: "Cancel" }).click();
-    await expect(modelMenu(page).getByRole("menu")).toHaveCount(1); // only the Environment
+    await chip(page).click();
+    const pick = picker(page, "Choose a model");
+    const anthropic = pick.getByRole("button", { name: /^Anthropic/ });
+    await expect(anthropic).toBeDisabled(); // aria-disabled: still focusable, so the reason is read
+    await expect(anthropic).toHaveAccessibleDescription("Start the dashboard with LLM_ALLOW_REMOTE=1 to use cloud models");
+    await expect(pick.getByText("Start the dashboard with LLM_ALLOW_REMOTE=1 to use cloud models")).toBeVisible();
+    for (const name of ["OpenAI", "DeepSeek", "OpenRouter", "Groq"]) await expect(pick.getByRole("button", { name: new RegExp(`^${name}`) })).toBeDisabled();
+    await expect(pick.getByRole("button", { name: /^Ollama/ })).toBeEnabled();
+    await anthropic.click({ force: true }); // nothing happens
+    await expect(pick).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Anthropic · credentials" })).toHaveCount(0);
   });
 
-  test("a model name typed but not added is saved too, or stops the save with the reason", async ({ page }) => {
+  test("a refusal stays on step 2 with the server's words", async ({ page }) => {
     await page.goto("/?view=assistant");
-    await modelButton(page).click();
-    const menu = modelMenu(page);
-    await menu.getByRole("button", { name: "Add model" }).click();
-    const form = menu.getByRole("form", { name: "Add a model" });
-    await form.getByLabel("Provider", { exact: true }).selectOption("custom");
-    await form.getByLabel("Name", { exact: true }).fill("Typed");
-    await form.getByLabel("Base URL", { exact: true }).fill(`http://127.0.0.1:${LLM_PORT}/v1`);
-    await form.getByRole("checkbox", { name: "Use it for the next question" }).uncheck();
-    const field = form.getByLabel("A model name to add");
-    await field.fill("two words"); // can't be a model name: said, and nothing is saved
-    await form.getByRole("button", { name: "Save" }).click();
-    await expect(form.getByRole("alert")).toContainText("The model name you typed isn't in the list yet");
-    await expect(form).toBeVisible();
-    await field.fill("stub-model"); // typed, never added with Enter or Add
-    await form.getByRole("button", { name: "Save" }).click();
-    await expect(form).toBeHidden();
-    const typed = menu.getByRole("menu", { name: "Typed" });
-    await expect(typed.getByRole("menuitemradio")).toHaveText(["stub-model"]);
-
-    // editing: the same, after the names already there
-    await menu.getByRole("button", { name: "Edit Typed" }).click();
-    const edit = menu.getByRole("form", { name: "Edit Typed" });
-    await edit.getByLabel("A model name to add").fill("stub-model-2");
-    await edit.getByRole("button", { name: "Save" }).click();
-    await expect(edit).toBeHidden();
-    await expect(typed.getByRole("menuitemradio")).toHaveText(["stub-model", "stub-model-2"]);
+    await chip(page).click();
+    await picker(page, "Choose a model").getByRole("button", { name: /^Custom/ }).click();
+    const creds = picker(page, "Custom · credentials");
+    await creds.getByLabel("Base URL", { exact: true }).fill("http://example.com/v1");
+    await expect(creds.getByText("Off this machine: the dashboard uses it only when started with LLM_ALLOW_REMOTE=1.")).toBeVisible(); // the hint, before anything is sent
+    await creds.getByRole("button", { name: "Continue" }).click();
+    await expect(creds.getByRole("alert")).toContainText("is not on this machine");
+    await creds.getByLabel("Base URL", { exact: true }).fill(`http://user:pw@127.0.0.1:${LLM_PORT}/v1`);
+    await creds.getByRole("button", { name: "Continue" }).click();
+    await expect(creds.getByRole("alert")).toContainText("not in the base URL");
+    await expect(creds).toBeVisible();
+    expect(((await (await page.request.get("/api/assistant/models")).json()) as { providers: unknown[] }).providers).toEqual([]);
   });
 
-  test("a provider removed meanwhile (another tab) is never saved again from its edit form", async ({ page }) => {
+  test("Escape goes back a step, then closes, with focus back on the chip; the arrow keys move between rows", async ({ page }) => {
     await page.goto("/?view=assistant");
-    const made = await page.request.post("/api/assistant/models", {
-      headers: { Origin: ORIGIN },
-      data: { name: "Short-lived", preset: "custom", baseUrl: `http://127.0.0.1:${LLM_PORT}/v1`, models: ["stub-model"] },
-    });
-    expect(made.status()).toBe(201);
-    const { provider } = (await made.json()) as { provider: { id: string } };
-    await modelButton(page).click();
-    const menu = modelMenu(page);
-    await menu.getByRole("button", { name: "Edit Short-lived" }).click();
-    const edit = menu.getByRole("form", { name: "Edit Short-lived" });
-    await edit.getByLabel("Name", { exact: true }).fill("Renamed");
-    // another tab removes it
-    expect((await page.request.delete(`/api/assistant/models/${provider.id}`, { headers: { Origin: ORIGIN } })).status()).toBe(200);
-    await edit.getByRole("button", { name: "Save" }).click();
-    // the form gives way to the list, which says so (with focus, so it is read out)
-    await expect(edit).toBeHidden();
-    const notice = menu.getByRole("alert");
-    await expect(notice).toContainText("That provider was removed meanwhile");
-    await expect(notice).toBeFocused();
-    await expect(menu.getByRole("form")).toHaveCount(0);
-    await expect(menu.getByRole("menu")).toHaveCount(1); // only the Environment
-    const listed = (await (await page.request.get("/api/assistant/models")).json()) as { providers: unknown[] };
-    expect(listed.providers).toEqual([]); // nothing saved in its place
+    await chip(page).click();
+    const pick = picker(page, "Choose a model");
+    const ollama = pick.getByRole("button", { name: /^Ollama/ });
+    await ollama.focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(pick.getByRole("button", { name: /^LM Studio/ })).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await expect(ollama).toBeFocused();
+    await page.keyboard.press("Enter");
+    const creds = picker(page, "Ollama · credentials");
+    await expect(creds.getByLabel("Base URL", { exact: true })).toHaveValue("http://127.0.0.1:11434/v1"); // the preset's
+    await expect(creds.getByLabel("Base URL", { exact: true })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(pick).toBeVisible();
+    await expect(ollama).toBeFocused(); // the row it came from
+
+    // Custom → step 3 → Escape keeps what was typed in step 2
+    await pick.getByRole("button", { name: /^Custom/ }).click();
+    const creds2 = picker(page, "Custom · credentials");
+    await creds2.getByLabel("Base URL", { exact: true }).fill(`http://127.0.0.1:${LLM_PORT}/v1`);
+    await creds2.getByLabel("Base URL", { exact: true }).press("Enter"); // Continue
+    const choose = picker(page, "Custom · choose a model");
+    await expect(choose.getByRole("radio", { name: "stub-model", exact: true })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(creds2.getByLabel("Base URL", { exact: true })).toHaveValue(`http://127.0.0.1:${LLM_PORT}/v1`);
+    await expect(creds2.getByLabel("Base URL", { exact: true })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(pick).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(pick).toBeHidden();
+    await expect(chip(page)).toBeFocused();
+    await expect(chip(page)).toHaveAttribute("aria-expanded", "false");
+    // a click outside closes it too
+    await chip(page).click();
+    await expect(pick).toBeVisible();
+    await log(page).click({ position: { x: 20, y: 20 } });
+    await expect(pick).toBeHidden();
   });
 });
 
@@ -547,7 +551,12 @@ test("a viewer sees the assistant but can't ask or read conversations", async ({
   await expect(page.getByText(/needs the operator role/).first()).toBeVisible();
   await expect(composer(page)).toBeDisabled();
   await expect(page.getByRole("button", { name: /^History/ })).toBeDisabled();
-  await expect(modelButton(page)).toBeDisabled();
+  // the model chip names the model, but choosing one is the operator's: disabled, with the reason
+  await expect(chip(page)).toBeDisabled();
+  await expect(chip(page)).toHaveAttribute("title", "Choosing a model needs the operator role");
+  await expect(chip(page)).toHaveAccessibleDescription("Choosing a model needs the operator role");
+  await chip(page).click({ force: true });
+  await expect(page.getByRole("dialog", { name: "Choose a model" })).toHaveCount(0);
   await expect(page.getByRole("list", { name: "Suggested questions" }).getByRole("button").first()).toBeDisabled();
   const post = await page.request.post("/api/assistant", { headers: { Origin: ORIGIN }, data: { uid: null, question: "hi" } });
   expect(post.status()).toBe(403);

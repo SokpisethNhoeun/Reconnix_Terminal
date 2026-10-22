@@ -1,4 +1,4 @@
-/* What the browser may send to the Model menu's routes (/api/assistant/models…), checked on the
+/* What the browser may send to the model picker's routes (/api/assistant/models…), checked on the
    server before anything is read: strict shapes, so an unknown field is refused. The server
    cleans and checks the values again (models/store.ts, config.ts); these only bound them.
    Pure: browser and server. */

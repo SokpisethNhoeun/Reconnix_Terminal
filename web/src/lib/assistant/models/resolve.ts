@@ -1,10 +1,10 @@
-/* Which model answers (server only). A model chosen in the Model menu (models.json's active
+/* Which model answers (server only). A model chosen in the model picker (models.json's active
    provider and model) wins, checked again on every use by config.ts's rules with this server's
    LLM_ALLOW_REMOTE: if it can't be used any more, the reason is reported and nothing else
    answers in its place. With nothing chosen, the Environment's model (LLM_BASE_URL / LLM_MODEL
    in web/.env.local) answers, as before the menu existed. The page needs only the summary
    (`activeModelSummary`, which reads no API key); asking needs the whole model (`activeModel`).
-   Also what the Model menu's routes answer (`modelsView`) and the model a test or a fetch talks
+   Also what the model picker's routes answer (`modelsView`) and the model a test or a fetch talks
    to (`probeTarget`): a saved key only ever goes to its provider's saved address. */
 import "server-only";
 
@@ -20,7 +20,7 @@ type Env = Record<string, string | undefined>;
 export type ActiveModel = { ok: true; config: ModelConfig; summary: ModelSummary } | { ok: false; reason: string; summary: ModelSummary };
 
 export const NO_MODEL =
-  "No AI model is set up. Add one with + Add model in the assistant's Model menu, or set LLM_BASE_URL and LLM_MODEL (for a local Ollama: http://127.0.0.1:11434/v1 and llama3.2) in web/.env.local and restart /web.";
+  "No AI model is set up. Choose one with the model chip under the message box (Choose a model), or set LLM_BASE_URL and LLM_MODEL (for a local Ollama: http://127.0.0.1:11434/v1 and llama3.2) in web/.env.local and restart /web.";
 
 const cut = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
@@ -76,7 +76,7 @@ const UNOPENED = "unopened";
 /** Only the summary of activeModel, for the page (every render, and the live refresh): the same
     rules and reasons, but no API key is read or opened (models.key is checked without reading
     it). A sealed key that no longer opens with an intact models.key shows up when a question is
-    asked, and in the Model menu. Never throws. */
+    asked, and in the model picker. Never throws. */
 export async function activeModelSummary(env: Env = process.env): Promise<ModelSummary> {
   let choice: { file: ModelsFile; keyFile: boolean };
   try {
@@ -92,7 +92,7 @@ export async function activeModelSummary(env: Env = process.env): Promise<ModelS
   return resolveFrom(choice.file, keyOf, env).summary;
 }
 
-/** What the Model menu shows: the saved providers (no keys), the Environment, the choice and the
+/** What the model picker shows: the saved providers (no keys), the Environment, the choice and the
     summary. Throws a ModelsError when the saved models can't be read. */
 export async function modelsView(env: Env = process.env): Promise<ModelsView> {
   const saved = await readSaved();
