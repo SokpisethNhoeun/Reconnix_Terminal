@@ -152,6 +152,13 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   `<`/`>` or invisible characters, cut, ≈14,000 characters at most) inside a fence with a new
   random tag per question, framed as untrusted data. The reply streams as NDJSON frames
   (`lib/assistant/protocol.ts`: `meta`, `card`, `text`, `error`, `done`).
+- **Knowledge** (`lib/assistant/knowledge/`): the route also reads, never writes, the files the
+  TUI's `/add-on` keeps in `~/.reconix/knowledge` (`RECONIX_KNOWLEDGE_DIR`; a folder or file that
+  is a link, someone else's, writable by others or too big is skipped), ranks their passages
+  against the masked question with the TUI's BM25 (`tests/knowledge-vectors.json` checks both),
+  and puts the relevant ones (score ≥ 1.5, the best 4, 4,000 characters, masked and cleaned again)
+  inside the fence as untrusted reference material, while `meta` names their files for the
+  muted "Knowledge used: a.md, b.pdf" under the answer (kept with the saved reply).
 - **Cards the server picks** (`lib/assistant/cards.ts`, `intent.ts`): findings, a finding,
   progress, approvals, policy blocks, tools used, report downloads and notices, built from the
   saved data only; the model writes the explanation and never the numbers. Nothing can be run
@@ -191,7 +198,9 @@ a hidden finding, the list scroller, the phone's list → detail → Back), `rep
 runs: the selection, the preview frame, one real PDF and DOCX, the 500 / 501 / 413 paths),
 `docs` (groups, command pages, Copy, search, redirects, the phone menu), `dashboard-fit` (the
 Overview fits the fixed frame with nothing to scroll), `assistant` (with the stand-in model
-`e2e/llm-stub.mjs`; `[stub:markdown]`, `[stub:long]` and `[stub:fail]` pick its answers), `motion` (directions,
+`e2e/llm-stub.mjs`; `[stub:markdown]`, `[stub:long]` and `[stub:fail]` pick its answers),
+`assistant-knowledge` (an `/add-on` folder written as the TUI does: "Knowledge used" under the
+answer, kept after a reload), `motion` (directions,
 timing, the globe, history), `scroll` (the wheel and keys at six sizes, no sideways scroll) and
 `a11y` (axe via `@axe-core/playwright`, focus order). Known faults are listed in the specs as
 expected failures that fail with "remove this entry" once fixed. The specs wait for
@@ -239,7 +248,9 @@ src/
 │   │                        #   markdown.ts, rate.ts, access.ts, client.ts;
 │   │                        #   models/ (the Model menu: presets.ts, schema.ts, requests.ts, view.ts, crypto.ts
 │   │                        #   (AES-256-GCM keys), store.ts (models.json), resolve.ts (which model answers),
-│   │                        #   remote.ts (test, fetch), respond.ts, errors.ts)
+│   │                        #   remote.ts (test, fetch), respond.ts, errors.ts);
+│   │                        #   knowledge/ (the TUI's /add-on files, read-only: paths.ts, schema.ts,
+│   │                        #   read.ts, rank.ts (BM25), index.ts searchKnowledge)
 │   ├── scroll/              # stick-rules.ts + stick-controller.ts (the conversation follows its end)
 │   ├── scroll.ts            # scrolling a row into view by hand (never scrollIntoView, which moves the page)
 │   ├── paging.ts            # ten rows a page: the page clamped from the address, the label

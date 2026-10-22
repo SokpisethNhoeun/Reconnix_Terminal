@@ -226,6 +226,10 @@ vectors in `web/tests/redact-vectors.json` check both), streams NDJSON frames wi
 server builds from the saved data (`lib/assistant/cards.ts`; the model never supplies numbers,
 and nothing is run or approved from the chat), and keeps conversations on disk
 (`lib/assistant/history-store.ts`, `~/.reconix/assistant`, 0700/0600, 30-day retention).
+It also reads, never writes, the knowledge the TUI's `/add-on` keeps in `~/.reconix/knowledge`
+(`lib/assistant/knowledge/`: no-follow, owner and size checks, the TUI's BM25), putting the
+passages relevant to the masked question inside the fence framed as untrusted reference material
+and naming their files in `meta` ("Knowledge used: …").
 The model comes from the assistant's **Model** menu (`components/assistant/model-menu.tsx`,
 `/api/assistant/models…`, `lib/assistant/models/`): providers and the active choice live in
 `models.json` beside the conversations, API keys AES-256-GCM-sealed with `models.key` (0600) and

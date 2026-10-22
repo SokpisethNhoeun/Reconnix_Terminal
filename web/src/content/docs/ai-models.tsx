@@ -258,6 +258,15 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
             they need; see <DocLink href="/docs/guardrails/llm-data-handling">LLM data handling</DocLink>.
           </Callout>
         </DocSection>
+        <DocSection title="Knowledge in the web assistant">
+          <p>
+            The web assistant also uses the files you added with <Mono>/add-on</Mono> in the terminal. It reads{" "}
+            <Mono>~/.reconix/knowledge</Mono> and never changes it; with each question it sends only the passages that
+            match it (at most four, 4,000 characters, secrets masked) as reference material the model must not take orders
+            from, and the answer ends with a muted <strong>Knowledge used: a.md, b.pdf</strong> line. A file removed with{" "}
+            <Mono>/add-on</Mono> is no longer used from the next question on.
+          </p>
+        </DocSection>
       </>
     ),
   },
