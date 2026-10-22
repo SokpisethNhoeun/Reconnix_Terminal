@@ -8,7 +8,7 @@ decision function (`approve`, `reject`, `approve_scope`, `edit_scope`).
 
 ## What it does
 
-- Chat lines typed **during a run** go to a real LLM, with the fixed safety prompt, the
+- Chat lines typed **during and after a run** go to a real LLM, with the fixed safety prompt, the
   assessment state as context, and the full chat history. Everything else stays scripted.
 - The operator can add / update / remove / test providers and pick a model, and can switch
   provider or model **mid-run** — the run, findings, approvals and guardrails are untouched.

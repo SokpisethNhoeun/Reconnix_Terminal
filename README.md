@@ -212,7 +212,7 @@ Type `/`, keep typing to filter, `↑`/`↓` to pick, `Tab` to complete, `Enter`
 
 ## LLM providers (flexible model integration)
 
-Chat lines typed **during a run** go to a real LLM; everything else stays scripted. Set a
+Chat lines typed **during and after a run** go to a real LLM; everything else stays scripted. Set a
 provider with `/provider`, test it, then `/model` to make one active — the top bar shows
 `llm: <provider> · <model> ●`. You can switch provider or model mid-run; the run, findings
 and approvals are unchanged, and the model never decides a gate. Reconix, Ollama and OpenAI
