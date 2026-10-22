@@ -35,8 +35,8 @@ def _generator():
     return module
 
 
-def test_the_format_has_the_three_sections():
-    assert set(_data()) == {"tokens", "corpus", "queries"}
+def test_the_format_has_the_four_sections():
+    assert set(_data()) == {"tokens", "corpus", "queries", "budget"}
 
 
 def test_tokens_match():
@@ -51,6 +51,27 @@ def test_queries_match_to_four_decimals():
         hits = rank.rank(docs, case["query"])
         got = [{"source": h.source, "index": h.index, "score": round(h.score, 4)} for h in hits]
         assert got == case["expected"], case["query"]
+
+
+def test_budget_cases_match():
+    for case in _data()["budget"]:
+        passages = [rank.Passage("source.md", i, text, 1.0)
+                    for i, text in enumerate(case["passages"])]
+        got = [p.text for p in rank.fit_budget(passages, case["budget"])]
+        assert got == case["expected"], case["budget"]
+
+
+def test_the_cases_cover_ties_repeats_stopwords_and_non_ascii():
+    data = _data()
+    by_query = {case["query"]: case["expected"] for case in data["queries"]}
+    ties = by_query["kerberos ticket"]
+    assert len({e["score"] for e in ties}) == 1 and len(ties) == 3
+    assert [(e["source"], e["index"]) for e in ties] == [("Beta.md", 0), ("Beta.md", 1),
+                                                         ("alpha.md", 0)]
+    assert by_query["firewall firewall DNS dns"] == by_query["firewall dns"]
+    assert by_query["what is the and of"] == []
+    assert by_query["vpn gateway"][0]["source"] == "gateway-short.md"
+    assert any("🚀" in text for case in data["budget"] for text in case["expected"])
 
 
 def test_file_is_what_the_generator_writes():

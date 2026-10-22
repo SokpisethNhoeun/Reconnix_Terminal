@@ -3,6 +3,12 @@
 Styled like `ChoiceScreen` (the `.dialog` box with a chip). A subclass lists its fields and
 implements `submit(values)`, which calls the store and returns the result to dismiss with;
 a `StoreValidationError` it raises is shown under the fields and the form stays open.
+
+Work too slow for the UI thread (reading a long PDF) goes to a worker: `submit()` starts it
+and returns `PENDING`, and the form stays open and busy (fields and Submit disabled,
+`busy_note()` under the fields) until the worker's result reaches `finish(result)`, which
+closes it, or `fail(message)`, which shows the error and lets the operator try again. Esc
+still closes it.
 """
 
 from dataclasses import dataclass
@@ -17,6 +23,9 @@ from textual.widgets import Button, Input, Label, Static
 
 from ... import store, theme
 from ...widgets import SecretInput
+
+
+PENDING = "__pending__"          # submit() started a worker; finish() / fail() come later
 
 
 @dataclass(frozen=True)
@@ -58,6 +67,10 @@ class FormScreen(ModalScreen[Optional[str]]):
 
     def on_close(self) -> None:
         """Called before the form closes either way (forms with secrets clear them)."""
+
+    def busy_note(self) -> str:
+        """The note shown while a `PENDING` submit runs (plain text)."""
+        return "Working…"
 
     # --- layout ----------------------------------------------------------------------------
     def compose(self) -> ComposeResult:
@@ -104,12 +117,43 @@ class FormScreen(ModalScreen[Optional[str]]):
         self.query_one("#form-error", Static).update(Text(message, style=theme.CRITICAL))
 
     def _submit(self) -> None:
+        if self.is_busy:
+            return
         try:
             result = self.submit(self.values())
         except store.StoreValidationError as exc:
             self.show_error(str(exc))
             return
+        if result == PENDING:
+            self._set_busy(True)
+            return
         self._close(result)
+
+    # --- a submit running in a worker -------------------------------------------------------
+    @property
+    def is_busy(self) -> bool:
+        return getattr(self, "_busy", False)
+
+    def _set_busy(self, busy: bool) -> None:
+        self._busy = busy
+        for widget in self._inputs():
+            widget.disabled = busy
+        self.query_one("#submit", Button).disabled = busy
+        note = Text(self.busy_note(), style=theme.MUTED) if busy else ""
+        self.query_one("#form-error", Static).update(note)
+
+    def finish(self, result: Optional[str]) -> None:
+        """The worker succeeded: close with `result`."""
+        self._set_busy(False)
+        self._close(result)
+
+    def fail(self, message: str) -> None:
+        """The worker was refused: show why and let the operator edit and submit again."""
+        self._set_busy(False)
+        self.show_error(message)
+        inputs = list(self._inputs())
+        if inputs:
+            inputs[0].focus()
 
     def _close(self, result: Optional[str]) -> None:
         self.on_close()

@@ -14,5 +14,13 @@
   ["authorization=Bearer sk_live_51Habcdefghij", "authorization=Bearer ••••"],
   ["Authorization: 3f9a1c7e2b8d4f60a1b2c3d4", "Authorization: ••••"],
   ["Cookie: theme=dark; sid=S3CRET-value", "Cookie: ••••"],
-  ["set-cookie: sid=abc; Path=/; HttpOnly", "set-cookie: ••••"]
+  ["set-cookie: sid=abc; Path=/; HttpOnly", "set-cookie: ••••"],
+  ["see.https://admin:hunter2@app.example.com/x", "see.https://••••@app.example.com/x"],
+  ["(https://admin:hunter2@app.example.com)", "(https://••••@app.example.com)"],
+  ["HTTPS://Admin:Hunter2@APP.example.com", "HTTPS://••••@APP.example.com"],
+  ["a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a://", "a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a://"],
+  ["eyJ-eyJ-eyJ-eyJ-eyJ-eyJ-eyJ-eyJ-", "eyJ-eyJ-eyJ-eyJ-eyJ-eyJ-eyJ-eyJ-"],
+  ["jwt=\"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2lnbmF0dXJlLXZhbHVl\"", "jwt=\"•••• (JWT)\""],
+  ["Location: /cb#id_token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2lnbmF0dXJlLXZhbHVl;state=1", "Location: /cb#id_token=•••• (JWT);state=1"],
+  ["a+b-c.d+e-f.g+h-i.j", "a+b-c.d+e-f.g+h-i.j"]
 ]

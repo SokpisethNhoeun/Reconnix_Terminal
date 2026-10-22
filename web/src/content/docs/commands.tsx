@@ -306,9 +306,13 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
       <>
         Without a path, a menu lists <strong>Add a file…</strong>, each saved source (
         <Mono>name · kind · N passages</Mono>, picking one offers <strong>Remove</strong>) and
-        <strong>Remove all</strong> (both confirms default to No); when empty it explains what add-ons are.
-        <strong> Add a file…</strong> opens a form with one path field. With a path, the file is added straight
-        away and a notification gives the passage count. Supported: <Mono>.txt .md .json .yaml .yml .docx .pdf</Mono>,
+        <strong>Remove all</strong> (both confirms default to No); when empty it explains what add-ons are; when the
+        index can&apos;t be read it offers only <strong>Remove all</strong>.
+        <strong> Add a file…</strong> opens a form with one path field, busy while the file is read in the
+        background. With a path, the file is added straight away and a notification gives the passage count (and
+        says when a file was cut to its first 2,000 passages). The relevant passages are sent to the active model with
+        your questions, local or remote; the notification says so when the model is remote.
+        Supported: <Mono>.txt .md .json .yaml .yml .docx .pdf</Mono>,
         at most 10 MB, a regular file (no symlink); at most 50 sources. The text is cleaned and
         <strong> redacted at ingest</strong> (secrets never reach disk), split into passages (≤ 1,200 characters)
         and saved under <Mono>~/.reconix/knowledge</Mono> (0700, files 0600). See{" "}
@@ -326,6 +330,9 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
       { message: "That file has no readable text to add.", meaning: "Nothing was left after extraction." },
       { message: "The knowledge limit is 50 files. Remove one first.", meaning: "At most 50 sources are kept." },
       { message: "The knowledge index is corrupt. Remove it with /add-on, then add files again.", meaning: "The saved index on disk is unreadable; Remove all and re-add." },
+      { message: "That YAML file can't be added: YAML anchors (&name) aren't supported.", meaning: "Anchors, aliases, merge keys and nesting over 100 levels are refused (they can expand a small file hugely)." },
+      { message: "That Word file unpacks to over 50 MB; add a smaller copy. / That Word file has too many parts to read.", meaning: "The .docx is a zip whose contents are too large or too many." },
+      { message: "Couldn't add that file; nothing was saved.", meaning: "Reading the file failed unexpectedly; nothing changed on disk." },
     ],
   },
   provider: {

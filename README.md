@@ -268,18 +268,23 @@ offline.
 
 Give the AI reference material from your own documents. `/add-on` opens a menu (add a file,
 remove one, remove all); `/add-on <path>` adds one straight away. Supported files are
-`.txt .md .json .yaml .yml .docx .pdf` (at most 10 MB, no symlinks); PDFs use `pypdf`, Word
-files `python-docx`. Each file is read once, **cleaned and redacted at ingest** (so a secret in
-the document never reaches disk), split into passages of at most 1,200 characters, and saved
-under `~/.reconix/knowledge` (`RECONIX_KNOWLEDGE_DIR`; the folder is `0700`, files `0600`, atomic
-writes); at most 50 sources are kept. The files are only ever read — nothing in them is run.
+`.txt .md .json .yaml .yml .docx .pdf` (at most 10 MB, no symlinks); PDFs use `pypdf` (at most
+2,000 pages), Word files `python-docx` (at most 50 MB unzipped), and YAML anchors, aliases and
+merge keys are refused. Each file is read once in the background, **cleaned and redacted at
+ingest** (so a secret in the document, or in its file name, never reaches disk), split into
+passages of at most 1,200 characters (at most 2,000; the notice says when a file was cut short),
+and saved under `~/.reconix/knowledge` (`RECONIX_KNOWLEDGE_DIR`; the folder is `0700`, files
+`0600`, atomic writes); at most 50 sources are kept. The files are only ever read — nothing in
+them is run. If the index can't be read, `/add-on` offers only to remove everything.
 
 When you ask a question, the passages that share your words are found with BM25 (at least two
 matching terms, or the whole query when it is shorter; the best four, up to 4,000 characters)
-and added to the context as **untrusted reference material**, never instructions. The terminal
-chat then shows a muted `Knowledge: a.md, b.pdf` line under the reply; the `/assess` agent gets
-a read-only `search_knowledge` tool (allowed by the scope guard); and the web AI Assistant reads
-the same folder (it never writes it). With no active model, no knowledge is used.
+and added to the context as **untrusted reference material**, never instructions. **Those
+passages are sent to the active model with your question, local or remote**; adding a file while
+a remote model is active says so. The terminal chat then shows a muted `Knowledge: a.md, b.pdf`
+line under the reply; the `/assess` agent gets a read-only `search_knowledge` tool (allowed by
+the scope guard, kept to the same 4,000 characters, logged only as a count); and the web AI
+Assistant reads the same folder (it never writes it). With no active model, no knowledge is used.
 
 ## Safety model
 
@@ -323,7 +328,8 @@ reconix-tui/
     │   ├── templates/      # web_url, network, api, source: scope, plan, findings, steps
     │   ├── scope.py, policy.py, approvals.py, vault.py
     │   ├── scope_view.py     # the scope manifest in plain words
-    │   ├── findings.py, findings_view.py, importers/, retest.py
+    │   ├── findings.py, findings_view.py, retest.py
+    │   ├── knowledge/      # /add-on files: extract, chunk, BM25 rank, the folder (web reads it)
     │   ├── plan.py, progress.py      # the Plan screen's rows, the flow line's states
     │   └── report*.py, snapshot.py, persist.py   # exports; saved copies for the web
     ├── theme.py            # color tokens (the stylesheet's $variables come from here)

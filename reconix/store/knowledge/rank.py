@@ -20,6 +20,7 @@ MIN_MATCHED = 2                # a passage needs this many distinct query tokens
 TOP_K = 4                      # how many relevant passages are used
 BUDGET_CHARS = 4000            # at most this many characters of passage text go to a model
 MIN_PIECE = 200                # a passage is cut to the remainder only if at least this is left
+TRIM = " \t\n\r"               # what a cut passage loses from its end before the "…"
 
 # Lowercase, `[a-z0-9]+`, length >= 2, minus these stopwords.
 STOPWORDS = frozenset(
@@ -83,7 +84,9 @@ def rank(docs: Sequence[Tuple[str, int, str]], query: str, *, top: int = TOP_K) 
             if freq == 0:
                 continue
             matched += 1
-            denom = freq + K1 * (1 - B + B * ((dl / avgdl) if avgdl else 0.0))
+            # (B * dl) / avgdl, in the web port's order, so both round alike. avgdl > 0 here:
+            # this passage holds a token.
+            denom = freq + K1 * (1 - B + (B * dl) / avgdl)
             score += idf[term] * (freq * (K1 + 1)) / denom
         if matched >= need and score > 0:
             results.append(Passage(source, index, text, score))
@@ -96,9 +99,11 @@ def fit_budget(passages: Sequence[Passage], limit: int = BUDGET_CHARS) -> List[P
     """The ranked passages trimmed to `limit` characters of text in total.
 
     Passages that fit whole are kept in rank order. The first one that overflows is cut to the
-    characters that remain — `text[:left - 1].rstrip() + "…"` — but only when at least
+    characters that remain — `text[:left - 1].rstrip(TRIM) + "…"` — but only when at least
     `MIN_PIECE` remain; otherwise it (and everything after it) is dropped. Nothing follows a cut
-    passage. This mirrors the web port exactly.
+    passage. Lengths count code points (Python's `len`; the web counts the same way), and only
+    `TRIM` is trimmed (not every Unicode space), so both sides cut alike. This mirrors the web
+    port exactly; the vectors' `budget` section checks it.
     """
     kept: List[Passage] = []
     left = limit
@@ -109,7 +114,7 @@ def fit_budget(passages: Sequence[Passage], limit: int = BUDGET_CHARS) -> List[P
             left -= length
             continue
         if left >= MIN_PIECE:
-            piece = passage.text[:left - 1].rstrip() + "…"
+            piece = passage.text[:left - 1].rstrip(TRIM) + "…"
             kept.append(Passage(passage.source, passage.index, piece, passage.score))
         break
     return kept

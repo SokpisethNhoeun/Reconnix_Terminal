@@ -138,6 +138,8 @@ export const aiModels: GroupContent = {
             <strong> cleaned and redacted at ingest</strong> (secrets never reach disk), split into passages of at most
             1,200 characters and saved under <Mono>~/.reconix/knowledge</Mono> (the folder 0700, files 0600); at most 50
             sources are kept. The files are only ever read — nothing in them is run.
+            The relevant passages are sent to the active model with each question, whether it runs locally or remotely;
+            adding a file while a remote model is active says so.
           </p>
           <p>
             For a question, the relevant passages are found with BM25 (a passage must share at least two of your words,

@@ -58,6 +58,8 @@ class Target:
 @dataclass
 class Finding:
     scan_id: int
+    # Always a reportable Severity: Info, unknown and empty values are dropped where findings
+    # are made or read (Severity.coerce in the parsers, the agent's http_poc and Database).
     severity: Severity
     title: str
     description: str = ""

@@ -6,6 +6,7 @@ plaintext to `client` only for a live call and never logs it. Everything the det
 core guards — scope, approvals, the vault — is untouched: a model can only be displayed.
 """
 
+import ipaddress
 import json
 from typing import List, Optional
 from urllib.parse import urlsplit
@@ -256,6 +257,37 @@ def active_model() -> Optional[ActiveModel]:
     label = entry.label if entry else active["provider_id"]
     return ActiveModel(active["provider_id"], active["model"], label,
                        active["activated_at"] or "")
+
+
+def is_local_url(url: str) -> bool:
+    """Whether `url` names this computer: `localhost` or a loopback address."""
+    try:
+        host = (urlsplit(url).hostname or "").lower()
+    except ValueError:
+        return False
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def active_remote_label() -> Optional[str]:
+    """The active provider's label when the active model runs off this computer (a provider's
+    own API, or an endpoint that isn't loopback), else None (a local model, or none active).
+
+    What the operator is told before reference text goes out with their questions.
+    """
+    active = db.get_active()
+    if active is None:
+        return None
+    row = db.get_provider_row(active["provider_id"])
+    base = (row["base_url"] if row else "") or ""   # empty: the provider's own (remote) API
+    if base and is_local_url(base):
+        return None
+    entry = catalog.get(active["provider_id"])
+    return entry.label if entry else active["provider_id"]
 
 
 def _current_assessment():

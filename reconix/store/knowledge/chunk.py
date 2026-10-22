@@ -3,11 +3,11 @@
 A passage is at most 1,200 characters and passages overlap by about 150 characters, so a
 sentence split across a boundary is still searchable from either side. Paragraphs (runs of
 text between blank lines) are the unit; one longer than a passage is windowed on whitespace.
-At most 2,000 passages are produced.
+At most 2,000 passages are produced; `split()` also says whether text was left over.
 """
 
 import re
-from typing import List
+from typing import List, Tuple
 
 MAX_CHARS = 1200
 OVERLAP = 150
@@ -19,6 +19,12 @@ _WS = re.compile(r"\s")
 
 def chunk(text: str) -> List[str]:
     """Return the passages for `text` (at most `MAX_PASSAGES`)."""
+    return split(text)[0]
+
+
+def split(text: str) -> Tuple[List[str], bool]:
+    """`(passages, cut)`: the passages for `text` (at most `MAX_PASSAGES`), and True when the
+    cap left text out."""
     units = _units(text)
     passages: List[str] = []
     current = ""
@@ -30,15 +36,17 @@ def chunk(text: str) -> List[str]:
         if current:
             passages.append(current)
             if len(passages) >= MAX_PASSAGES:
-                return passages
+                return passages, True               # `unit` (at least) is left out
             tail = _overlap_tail(current)
             start = f"{tail}\n\n{unit}" if tail else unit
             current = start if len(start) <= MAX_CHARS else unit
         else:
             current = unit
-    if current and len(passages) < MAX_PASSAGES:
+    if current:
+        if len(passages) >= MAX_PASSAGES:
+            return passages, True
         passages.append(current)
-    return passages[:MAX_PASSAGES]
+    return passages, False
 
 
 def _units(text: str) -> List[str]:
