@@ -183,3 +183,17 @@ async def run_ui_to(app, pilot, target: Optional[str], request: Optional[str] = 
     while store.waiting_gate() and store.waiting_gate() != target and not store.is_finished():
         await pass_gate(app, pilot)
     assert store.waiting_gate() == (target or "") or (target is None and store.is_finished())
+
+
+# --- a finding that did not come from the scripted run ---------------------------------------
+def add_finding(title: str, path: str = "/x", *, severity: str = "LOW", description: str = "",
+                evidence: Optional[List[str]] = None) -> None:
+    """Add one revealed finding the way the AI agent does (`AI-NNN`), for tests that need
+    odd text in a finding (control bytes, secrets) without a scripted template."""
+    from reconix.models import Finding
+    from reconix.store.findings import ingest_external
+
+    ingest_external([Finding(
+        fid="", severity=severity, title=title, path=path, validation="UNCONFIRMED",
+        description=description, affected_url=path, impact="", remediation="", tool="agent",
+        evidence=list(evidence or []), category="Web App")])

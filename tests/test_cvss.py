@@ -20,7 +20,7 @@ def test_base_score(vector, score):
 
 @pytest.mark.parametrize("score, name", [
     (9.0, "CRITICAL"), (8.9, "HIGH"), (7.0, "HIGH"), (6.9, "MEDIUM"), (4.0, "MEDIUM"),
-    (3.9, "LOW"), (0.1, "LOW"), (0.0, "INFO"),
+    (3.9, "LOW"), (0.1, "LOW"), (0.0, "NONE"),
 ])
 def test_band(score, name):
     assert band(score) == name

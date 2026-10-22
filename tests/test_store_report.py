@@ -12,7 +12,7 @@ from reconix.store import lists, report
 from reconix.store.report_docx import write_docx
 from reconix.store.report_html import render_html
 
-from .support import TEST_PASSWORD, run_to
+from .support import TEST_PASSWORD, add_finding, run_to
 
 # What XML 1.0 can't hold (tab, LF and CR are fine)
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
@@ -131,16 +131,12 @@ def test_docx_report_has_every_section(reports_dir, monkeypatch):
 
 @pytest.mark.skipif(not report.HAS_DOCX, reason="python-docx not installed")
 def test_control_characters_never_stop_the_docx_report(reports_dir, tmp_path):
-    """An imported finding and a blocked request holding ESC / NUL: the report is still
+    """An agent finding and a blocked request holding ESC / NUL: the report is still
     written, and none of those characters reaches it (or the JSON)."""
     run_to(None)
-    source = tmp_path / "nuclei.jsonl"
-    source.write_text(json.dumps({
-        "template-id": "banner", "matched-at": "https://staging.example.com/\u001b[2J",
-        "info": {"name": "Banner \u001b[31mred\u001b[0m\u0000 leak", "severity": "low",
-                 "description": "NUL \u0000 and BEL \u0007 here"},
-        "extracted-results": ["Server: \u001b[2Jnginx\u0000"]}) + "\n")
-    store.import_findings(str(source))
+    add_finding("Banner \u001b[31mred\u001b[0m\u0000 leak", "/\u001b[2J",
+                description="NUL \u0000 and BEL \u0007 here",
+                evidence=["Server: \u001b[2Jnginx\u0000"])
     lists.current().verdicts.append(
         PolicyVerdict("GET", "/a\x00b", False, "Path \x1b[1moutside\x00 approved scope"))
     store.generate_report("docx")

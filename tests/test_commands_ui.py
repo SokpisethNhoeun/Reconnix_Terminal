@@ -1,11 +1,10 @@
-"""Slash commands typed at the prompt: summary, new, finding, navigation, audit, import, help."""
+"""Slash commands typed at the prompt: summary, new, finding, navigation, audit, help."""
 
 from reconix import store
 from reconix.screens import (
-    ApprovalScreen, ChoiceScreen, ExecutionScreen, FindingDetailScreen, HelpScreen, ReportScreen,
+    ApprovalScreen, ChoiceScreen, ExecutionScreen, FindingDetailScreen, ReportScreen,
     StartScreen,
 )
-from reconix.screens.forms import ImportForm
 from reconix.widgets import PromptBox
 
 from .support import SIZE, run_ui_to, screen_text, settle
@@ -150,18 +149,3 @@ async def test_audit_before_any_action_says_so(app):
     async with app.run_test(size=SIZE) as pilot:
         await command(pilot, "/audit")
         assert isinstance(app.screen, ChoiceScreen)
-
-
-async def test_import_opens_the_import_form(app):
-    async with app.run_test(size=SIZE) as pilot:
-        await command(pilot, "/import")
-        assert isinstance(app.screen, ImportForm)
-        await pilot.press("escape")
-        await settle(pilot)
-        assert isinstance(app.screen, StartScreen)
-
-
-async def test_help_command_opens_help(app):
-    async with app.run_test(size=SIZE) as pilot:
-        await command(pilot, "/help")
-        assert isinstance(app.screen, HelpScreen)

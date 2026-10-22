@@ -86,9 +86,14 @@ def test_ingest_scan_findings_maps_harness_to_store():
     hf1 = HFinding(scan_id=1, severity=Severity.HIGH, title="SQL injection in q",
                    description="injectable", evidence="q=1' OR '1'='1", location="/search",
                    verified=True, id=1)
-    hf2 = HFinding(scan_id=1, severity=Severity.INFO, title="OWASP Juice Shop",
+    hf2 = HFinding(scan_id=1, severity=Severity.LOW, title="OWASP Juice Shop",
                    description="", evidence="", location="/", verified=False, id=2)
-    stub = SimpleNamespace(db=SimpleNamespace(findings_for_target=lambda tid: [hf1, hf2]))
+    # Info, unknown and empty severities (an old row, a foreign value) are never stored.
+    skipped = [HFinding(scan_id=1, severity=sev, title=f"skipped {sev!r}", description="",
+                        evidence="", location="/x", verified=False, id=10 + i)
+               for i, sev in enumerate(["info", "bogus", "", None])]
+    stub = SimpleNamespace(db=SimpleNamespace(
+        findings_for_target=lambda tid: [hf1, hf2] + skipped))
     agent_run._agents[uid_for(store.get_assessment())] = stub
 
     added = agent_run.ingest_scan_findings({"target": {"id": 1}})
@@ -98,6 +103,8 @@ def test_ingest_scan_findings_maps_harness_to_store():
     assert by_title["SQL injection in q"].validation == "CONFIRMED"
     assert by_title["SQL injection in q"].fid.startswith("AI-")
     assert by_title["OWASP Juice Shop"].validation == "UNCONFIRMED"
+    assert not any(t.startswith("skipped") for t in by_title)
+    assert {f.severity for f in store.list_findings()} <= set(store.SEVERITY_ORDER)
     assert agent_run.ingest_scan_findings({"target": {"id": 1}}) == 0   # deduped
 
 

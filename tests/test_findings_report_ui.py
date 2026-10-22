@@ -1,10 +1,8 @@
-"""Findings (filter, sort, triage, import), the detail view, and the report: exports and the
-web dashboard button."""
+"""Findings (filter, sort, triage), the detail view, and the report: exports."""
 
-import json
 
 import pytest
-from textual.widgets import Button, DataTable, Input, Static
+from textual.widgets import Button, DataTable, Static
 
 from reconix import store
 from reconix.models.scope import PolicyVerdict
@@ -12,13 +10,8 @@ from reconix.store import lists, report, report_docx
 from reconix.screens import (
     ChoiceScreen, FindingDetailScreen, FindingsListScreen, ReportScreen,
 )
-from reconix.screens.forms import ImportForm
 
-from .support import SIZE, run_to, run_ui_to, settle, show
-
-NUCLEI = json.dumps({"template-id": "missing-hsts", "matched-at": "https://staging.example.com/",
-                     "info": {"name": "HSTS header missing", "severity": "low"}})
-
+from .support import SIZE, add_finding, run_to, run_ui_to, screen_text, settle, show
 
 def row_ids(app) -> list:
     table = app.screen.query_one("#findings-table", DataTable)
@@ -29,7 +22,8 @@ async def test_findings_appear_as_the_run_reveals_them(app):
     async with app.run_test(size=SIZE) as pilot:
         await show(app, pilot, "findings")
         assert not app.screen.query_one("#findings-table").display     # none yet
-        assert "import" in str(app.screen.query_one("#findings-empty", Static).render())
+        empty = str(app.screen.query_one("#findings-empty", Static).render())
+        assert "No findings yet" in empty and "import" not in empty.lower()
         run_to(None)
         app.refresh_view()
         await settle(pilot)
@@ -47,10 +41,21 @@ async def test_filter_and_sort(app):
         await settle(pilot)
         assert row_ids(app) == ["001", "002"]
         app.findings_filter = "all"
-        await pilot.press("s")                                         # → CVSS
+        await pilot.press("s")                                         # severity → validation
         await settle(pilot)
-        assert app.findings_sort == "cvss"
+        assert app.findings_sort == "validation"
         assert row_ids(app) == ["001", "002", "003"]
+        await pilot.press("s")                                         # and back
+        await settle(pilot)
+        assert app.findings_sort == "severity"
+
+
+async def test_the_findings_screen_has_no_import_key_or_hint(app):
+    run_to(None)
+    async with app.run_test(size=SIZE) as pilot:
+        await show(app, pilot, "findings")
+        assert "i" not in {b.key for b in app.screen.BINDINGS}
+        assert "import" not in screen_text(app.screen).lower()
 
 
 async def test_triage_from_the_list_and_the_detail(app):
@@ -74,22 +79,6 @@ async def test_triage_from_the_list_and_the_detail(app):
         await settle(pilot)
         assert store.get_finding("002").status == "fixed"
         assert isinstance(app.screen, FindingDetailScreen)
-
-
-async def test_import_adds_findings(app, tmp_path):
-    run_to(None)
-    scan = tmp_path / "nuclei.jsonl"
-    scan.write_text(NUCLEI)
-    async with app.run_test(size=SIZE) as pilot:
-        await show(app, pilot, "findings")
-        await pilot.press("i")
-        await settle(pilot)
-        assert isinstance(app.screen, ImportForm)
-        app.screen.query_one("#path", Input).value = str(scan)
-        await pilot.press("enter")
-        await settle(pilot)
-        assert isinstance(app.screen, FindingsListScreen)
-        assert "IMP-001" in row_ids(app)
 
 
 async def test_detail_steps_through_the_list_order(app):
@@ -121,7 +110,6 @@ async def test_exports_wait_for_a_completed_assessment(app):
         await show(app, pilot, "report")
         assert all(app.screen.query_one(f"#{fid}", Button).disabled
                    for fid in ("pdf", "json", "docx"))
-        assert not app.screen.query_one("#web", Button).disabled
         await pilot.press("j")
         await settle(pilot)
         assert store.get_run().report_path == ""
@@ -132,7 +120,7 @@ async def test_the_report_offers_pdf_json_and_docx_only(app):
     async with app.run_test(size=SIZE) as pilot:
         await show(app, pilot, "report")
         ids = [b.id for b in app.screen.query(".actions Button")]
-        assert ids == ["pdf", "json", "docx", "web"]
+        assert ids == ["pdf", "json", "docx"]
 
 
 async def test_export_json_then_open_it(app, opened):
@@ -168,13 +156,8 @@ async def test_export_command_offers_pdf_json_and_docx(app):
 
 
 def _control_characters_in_the_run(tmp_path) -> None:
-    """An imported nuclei finding and a blocked request holding ESC and NUL bytes."""
-    source = tmp_path / "nuclei.jsonl"
-    source.write_text(json.dumps({
-        "template-id": "banner", "matched-at": "https://staging.example.com/",
-        "info": {"name": "Banner \u001b[31mred\u0000", "severity": "low"},
-        "extracted-results": ["Server: \u001b[2Jnginx\u0000"]}) + "\n")
-    store.import_findings(str(source))
+    """An agent finding and a blocked request holding ESC and NUL bytes."""
+    add_finding("Banner \u001b[31mred\u0000", "/", evidence=["Server: \u001b[2Jnginx\u0000"])
     lists.current().verdicts.append(PolicyVerdict("GET", "/x\x00", False, "outside \x1b[1m"))
 
 
@@ -207,17 +190,6 @@ async def test_a_docx_the_writer_refuses_is_a_warning_not_a_crash(app, monkeypat
         assert any("couldn't be written" in str(n.message) for n in app._notifications)
 
 
-async def test_web_button_without_a_running_dashboard_starts_it(app, opened, web_launches):
-    async with app.run_test(size=SIZE) as pilot:
-        await show(app, pilot, "report")
-        app.screen.query_one("#web", Button).press()
-        await settle(pilot)
-        assert len(web_launches) == 1                 # npm run dev, in the background
-        assert opened == []                           # the dashboard opens the browser itself
-        assert any("Starting the web dashboard" in str(n.message)
-                   for n in app._notifications)
-
-
 async def test_web_opens_the_running_dashboard(app, opened, web_launches, monkeypatch):
     from reconix import web_server
     from reconix.store import persist
@@ -228,10 +200,27 @@ async def test_web_opens_the_running_dashboard(app, opened, web_launches, monkey
         app.run_command_line("/web")
         await settle(pilot)
         assert opened == ["http://127.0.0.1:3100/login#token=abc"]
-        await show(app, pilot, "report")
-        await pilot.press("b")
+        app.run_command_line("/dashboard")
         await settle(pilot)
         assert len(opened) == 2 and web_launches == []
+
+
+async def test_web_without_a_running_dashboard_starts_it(app, opened, web_launches):
+    async with app.run_test(size=SIZE) as pilot:
+        app.run_command_line("/web")
+        await settle(pilot)
+        assert len(web_launches) == 1                 # npm run dev, in the background
+        assert opened == []                           # the dashboard opens the browser itself
+        assert any("Starting the web dashboard" in str(n.message)
+                   for n in app._notifications)
+
+
+async def test_the_report_has_no_web_button_or_key(app):
+    run_to(None)
+    async with app.run_test(size=SIZE) as pilot:
+        await show(app, pilot, "report")
+        assert not app.screen.query("#web")
+        assert "b" not in {b.key for b in app.screen.BINDINGS}
 
 
 async def test_web_refuses_a_link_that_is_not_local(app, opened):

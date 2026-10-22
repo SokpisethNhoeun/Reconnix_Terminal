@@ -15,7 +15,7 @@ from typing import Any, Dict, List
 from . import report_view as view
 
 # The colored pill class of each severity, validation state and triage status.
-SEV_CLASS = {"CRITICAL": "crit", "HIGH": "high", "MEDIUM": "med", "LOW": "low", "INFO": "info"}
+SEV_CLASS = {"CRITICAL": "crit", "HIGH": "high", "MEDIUM": "med", "LOW": "low"}
 VALIDATION_CLASS = {"CONFIRMED": "confirmed", "UNCONFIRMED": "unconfirmed",
                     "INCONCLUSIVE": "inconclusive"}
 STATUS_CLASS = {"open": "open", "fixed": "fixed", "accepted": "accepted",
@@ -138,13 +138,12 @@ a{color:var(--accent); text-decoration:none}
   color:var(--muted)}
 .tile.crit .n{color:var(--crit)} .tile.high .n{color:var(--high)}
 .tile.med .n{color:var(--med)} .tile.low .n{color:var(--low)}
-.tile.info .n{color:var(--info)} .tile.tot .n{color:var(--accent)} .tile.ok .n{color:var(--ok)}
+.tile.tot .n{color:var(--accent)} .tile.ok .n{color:var(--ok)}
 .dist{display:flex; height:22px; border-radius:6px; overflow:hidden; border:1px solid var(--line)}
 .dist i{display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px;
   font-weight:600; font-family:"IBM Plex Mono"}
 .dist .crit{background:var(--crit)} .dist .high{background:var(--high)}
 .dist .med{background:var(--med)} .dist .low{background:var(--low)}
-.dist .info{background:var(--info)}
 .legend{display:flex; flex-wrap:wrap; gap:5px; margin-top:9px}
 
 .tw{overflow-x:auto; border:1px solid var(--line); border-radius:10px}

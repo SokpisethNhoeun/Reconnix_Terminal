@@ -52,4 +52,4 @@ def band(score: float) -> str:
         return "MEDIUM"
     if score > 0:
         return "LOW"
-    return "INFO"
+    return "NONE"          # a 0.0 score has no severity

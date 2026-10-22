@@ -1,6 +1,6 @@
 {
   "source": "reconix/commands/builtin.py",
-  "count": 19,
+  "count": 18,
   "groups": [
     {
       "id": "start",
@@ -135,15 +135,6 @@
             "list"
           ],
           "description": "List and reopen assessments",
-          "takes_argument": false,
-          "ask": false,
-          "question": "",
-          "empty": ""
-        },
-        {
-          "name": "import",
-          "aliases": [],
-          "description": "Import tool output (nuclei / nmap / ZAP)",
           "takes_argument": false,
           "ask": false,
           "question": "",

@@ -412,8 +412,8 @@ export const assessmentGuide: GroupContent = {
           <p>
             A finding is revealed when the run reaches it: it shows up on the Findings screen at once, with its severity,
             title, path, validation, CVSS and the tool that found it. The counters in the top bar follow. Findings from
-            imported tool output (<Mono>/import</Mono>) and from the AI agent are added the same way, with their own id
-            prefixes (<Mono>IMP-001</Mono>, <Mono>AI-001</Mono>); duplicates (same severity, title and path) are not added
+            the AI agent are added the same way, with their own id
+            prefix (<Mono>AI-001</Mono>); duplicates (same severity, title and path) are not added
             twice.
           </p>
         </DocSection>

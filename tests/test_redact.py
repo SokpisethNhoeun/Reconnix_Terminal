@@ -1,6 +1,5 @@
-"""Secrets in free text are masked before anything is saved or imported."""
+"""Secrets in free text are masked before anything is saved."""
 
-import json
 
 import pytest
 
@@ -9,7 +8,7 @@ from reconix.store import persist
 from reconix.store.parser import parse_request
 from reconix.store.redact import clean, redact
 
-from .support import play_until_gate, run_to
+from .support import add_finding, play_until_gate, run_to
 
 
 @pytest.mark.parametrize("text, secret", [
@@ -64,14 +63,9 @@ def test_the_prompt_refuses_text_while_a_login_is_asked_for():
     assert all("abc123def456" not in c.text for c in store.list_chat())
 
 
-def test_a_crafted_import_cannot_crash_saving(tmp_path):
+def test_a_crafted_finding_cannot_crash_saving():
     run_to("scope")
-    row = {"template-id": "t", "matched-at": "https://staging.example.com/x",
-           "info": {"name": "bad \\udc80 name", "severity": "low"},
-           "extracted-results": ["token=\\udc80abcdef123456"]}
-    path = tmp_path / "n.jsonl"
-    path.write_text(json.dumps(row).replace("\\\\udc80", "\\udc80"))
-    store.import_findings(str(path))
+    add_finding("bad \udc80 name", "/x", evidence=["token=\udc80abcdef123456"])
     assert store.autosave() is True
     saved = next(persist.DATA_DIR.glob("*.json")).read_text()
     assert "abcdef123456" not in saved

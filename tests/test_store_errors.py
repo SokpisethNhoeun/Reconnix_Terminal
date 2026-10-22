@@ -5,7 +5,7 @@ import json
 import pytest
 
 from reconix import store
-from reconix.store import importers, lists
+from reconix.store import lists
 from reconix.store.snapshot import snapshot
 
 from .support import auth_values, play_until_gate, run_to
@@ -15,46 +15,6 @@ def refused(call, *args, **kwargs) -> str:
     with pytest.raises(store.StoreValidationError) as error:
         call(*args, **kwargs)
     return str(error.value)
-
-
-# --- importing tool output -------------------------------------------------------------------
-NMAP_NO_PORTS = ('<?xml version="1.0"?><nmaprun><host><address addr="192.0.2.10"/>'
-                 '<ports></ports></host></nmaprun>')
-
-
-@pytest.mark.parametrize("name, content", [
-    ("unknown.txt", "just some notes, not tool output"),
-    ("bad.jsonl", '{"template-id": "x", "matched-at": '),           # nuclei, broken JSON
-    ("bad.xml", '<?xml version="1.0"?><nmaprun><host>'),            # nmap, broken XML
-    ("no-ports.xml", NMAP_NO_PORTS),                                 # nmap, nothing open
-    ("bad-zap.json", '{"alerts": ['),                                # ZAP, broken JSON
-    ("no-alerts.json", '{"@programName": "ZAP", "site": []}'),       # ZAP, no alerts
-])
-def test_a_bad_import_is_refused_and_adds_nothing(tmp_path, name, content):
-    path = tmp_path / name
-    path.write_text(content)
-    before = list(lists.current().findings)
-    assert refused(store.import_findings, str(path))
-    assert lists.current().findings == before
-
-
-@pytest.mark.parametrize("path_text", ["", "   ", None])
-def test_an_import_needs_a_path(path_text):
-    assert "path" in refused(store.import_findings, path_text)
-
-
-def test_an_import_needs_a_file(tmp_path):
-    assert "No file" in refused(store.import_findings, str(tmp_path / "missing.jsonl"))
-    assert "No file" in refused(store.import_findings, str(tmp_path))     # a folder
-
-
-def test_an_unknown_parser_is_refused():
-    assert "Unknown tool" in refused(importers.parse, "{}", "burp")
-
-
-def test_nuclei_output_with_no_rows_is_refused():
-    # A file detected as nuclei always holds a row, so only the parser can see none.
-    assert "No nuclei results" in refused(importers.parse, "\n\n", "nuclei")
 
 
 # --- scope edits -----------------------------------------------------------------------------

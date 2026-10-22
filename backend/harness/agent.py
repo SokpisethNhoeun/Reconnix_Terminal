@@ -289,7 +289,7 @@ TOOLS: list[dict[str, Any]] = [
                     "headers": {"type": "object", "description": "request headers (e.g. Authorization, Cookie)"},
                     "body": {"type": "string", "description": "request body, if any"},
                     "title": {"type": "string", "description": "short finding title, e.g. 'IDOR: read another user's order'"},
-                    "severity": {"type": "string", "enum": ["critical", "high", "medium", "low", "info"]},
+                    "severity": {"type": "string", "enum": ["critical", "high", "medium", "low"]},
                     "description": {"type": "string", "description": "what this proves and why it matters"},
                 },
                 "required": ["method", "url", "title", "severity"],
@@ -351,7 +351,7 @@ TOOLS: list[dict[str, Any]] = [
                 "type": "object",
                 "properties": {
                     "target": {"type": "string"},
-                    "min_severity": {"type": "string", "enum": ["info", "low", "medium", "high", "critical"]},
+                    "min_severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
                 },
                 "required": ["target"],
             },
@@ -605,6 +605,9 @@ class Agent:
 
         from .models import Finding, Severity
 
+        sev = Severity.coerce(str(args.get("severity", "medium")))
+        if sev is None:
+            return {"error": "severity must be one of critical, high, medium, low"}
         url = str(args.get("url", "")).strip()
         method = str(args.get("method", "GET")).upper()
         target = self._poc_in_scope(url)
@@ -622,7 +625,6 @@ class Agent:
         except Exception as exc:  # noqa: BLE001
             return {"error": f"request failed: {exc!r}"[:300]}
 
-        sev = Severity.coerce(str(args.get("severity", "medium")))
         title = str(args.get("title") or f"PoC: {method} {url}")[:200]
         evidence = _poc_evidence(method, url, headers, body, resp.status_code,
                                  dict(resp.headers), text)
@@ -783,7 +785,8 @@ class Agent:
         floor = args.get("min_severity")
         from .models import Severity
 
-        floor_rank = Severity.coerce(floor).rank if floor else -1
+        floor_sev = Severity.coerce(floor) if floor else None
+        floor_rank = floor_sev.rank if floor_sev else -1
         rows = [f for f in self.db.findings_for_target(t.id) if f.severity.rank >= floor_rank]
         return {
             "count": len(rows),

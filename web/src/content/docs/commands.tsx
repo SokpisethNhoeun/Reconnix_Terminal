@@ -155,13 +155,13 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
   },
   findings: {
     purpose: "Opens the Findings list.",
-    when: "As soon as the run reveals findings, and afterwards to filter, sort, triage or import.",
+    when: "As soon as the run reveals findings, and afterwards to filter, sort or triage.",
     syntax: "/findings",
     example: "/findings",
     behaviour: (
       <>
         The list of revealed findings under the current filter and sort: <Kbd>Enter</Kbd> opens one, <Kbd>f</Kbd> filter,{" "}
-        <Kbd>s</Kbd> sort, <Kbd>t</Kbd> triage, <Kbd>i</Kbd> import. The filter and sort are kept while you move around.
+        <Kbd>s</Kbd> sort, <Kbd>t</Kbd> triage, <Kbd>c</Kbd> chat. The filter and sort are kept while you move around.
         See <DocLink href="/docs/reports/understanding-findings">Understanding findings</DocLink>.
       </>
     ),
@@ -193,7 +193,7 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
     behaviour: (
       <>
         Same as <Kbd>8</Kbd>. The buttons <Kbd>p</Kbd> PDF, <Kbd>j</Kbd> JSON and <Kbd>w</Kbd> DOCX are enabled once
-        the run completed; <Kbd>b</Kbd> opens the web dashboard. See{" "}
+        the run completed; <Mono>/web</Mono> opens the web dashboard. See{" "}
         <DocLink href="/docs/reports/reviewing">Reviewing results</DocLink>.
       </>
     ),
@@ -249,29 +249,6 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
       </>
     ),
     errors: [{ message: "No such assessment.", meaning: "The index is out of range (cannot happen from the menu)." }],
-  },
-  import: {
-    purpose: "Adds findings from a tool output file: nuclei (JSONL), nmap (XML) or OWASP ZAP (JSON).",
-    when: "To bring real scanner results into the current assessment, so they show in the list, the report and the dashboard.",
-    syntax: "/import",
-    example: "/import",
-    behaviour: (
-      <>
-        A form asks for the file path (<Mono>~</Mono> is expanded). The tool is recognized from the content, the file is
-        only read (never run), and each result becomes an <Mono>IMP-NNN</Mono> finding; duplicates are skipped. A
-        notification says &quot;Imported N finding(s) from &lt;tool&gt; output.&quot; Same as <Kbd>i</Kbd> on the
-        Findings screen. See <DocLink href="/docs/reports/understanding-findings">Understanding findings</DocLink>.
-      </>
-    ),
-    errors: [
-      { message: "Enter the path to a tool output file.", meaning: "The field is empty." },
-      { message: "No file at that path. / Couldn't read that file.", meaning: "The path does not exist or is not readable." },
-      { message: "That file is too large to import (over 5 MB).", meaning: "Split the output." },
-      { message: "Unrecognized file — expected nuclei (JSONL), nmap (XML) or ZAP (JSON) output.", meaning: "The content matched none of the three tools." },
-      { message: "No nuclei results found in the file. / No open ports found in the nmap output. / No ZAP alerts found in the file.", meaning: "The file was recognized but holds nothing to import." },
-      { message: "The XML declares a DTD or entities, which aren't allowed.", meaning: "nmap XML with a DTD or entity declarations is refused." },
-      { message: "Could not read the nuclei output (invalid JSON line). / Could not read the ZAP report (invalid JSON). / Could not read the nmap XML output.", meaning: "The file is not well-formed." },
-    ],
   },
   audit: {
     purpose: "Shows the activity log, the audit trail and any feedback you typed.",
@@ -367,8 +344,8 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
       <>
         If a dashboard is listening at the saved sign-in link, the browser opens it. Otherwise the first call installs
         the dashboard&apos;s packages if needed, starts <Mono>npm run dev</Mono> in <Mono>web/</Mono> quietly (log:{" "}
-        <Mono>~/.reconix/web.log</Mono>) and the dashboard opens the browser when ready; it stops when you quit. Same as{" "}
-        <Kbd>b</Kbd> on the Report screen. See <DocLink href="/docs/reports/dashboard">The web dashboard</DocLink>.
+        <Mono>~/.reconix/web.log</Mono>) and the dashboard opens the browser when ready; it stops when you quit. The
+        Report screen has no button for it: type <Mono>/web</Mono> there too. See <DocLink href="/docs/reports/dashboard">The web dashboard</DocLink>.
       </>
     ),
     errors: [

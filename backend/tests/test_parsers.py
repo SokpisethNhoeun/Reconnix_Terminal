@@ -25,14 +25,9 @@ PORT      STATE    SERVICE VERSION
 """
 
 
-def test_parse_nmap_only_open_ports():
-    findings = parse_nmap(NMAP_OUTPUT, scan_id=1)
-    titles = [f.title for f in findings]
-    assert len(findings) == 2  # 22 and 80 open; 443 closed, 9929 filtered excluded
-    assert any("22/tcp" in t and "ssh" in t for t in titles)
-    assert any("80/tcp" in t and "http" in t for t in titles)
-    assert all(f.severity is Severity.INFO for f in findings)
-    assert all(f.scan_id == 1 for f in findings)
+def test_parse_nmap_open_ports_are_not_findings():
+    # There is no Info severity: open ports are observations, so nothing is stored.
+    assert parse_nmap(NMAP_OUTPUT, scan_id=1) == []
 
 
 def test_parse_nuclei_jsonl():
@@ -59,7 +54,7 @@ def test_parse_nuclei_jsonl():
         ),
     ]
     findings = parse_nuclei("\n".join(lines), scan_id=7)
-    assert len(findings) == 2
+    assert len(findings) == 1          # the info-level template is not a finding
     crit = next(f for f in findings if f.severity is Severity.CRITICAL)
     assert crit.cve_id == "CVE-2021-44228"
     assert crit.cvss_score == 10.0
@@ -90,10 +85,7 @@ def test_parse_sqlmap_not_vulnerable():
 
 def test_parse_whatweb():
     out = "http://t:8081 [200 OK] HTTPServer[Express], JQuery, Title[OWASP Juice Shop], IP[192.168.210.1]"
-    f = parse_whatweb(out, scan_id=1)
-    assert len(f) == 1
-    assert f[0].severity is Severity.INFO
-    assert "Express" in f[0].evidence
+    assert parse_whatweb(out, scan_id=1) == []     # a fingerprint is not a finding
 
 
 def test_parse_nikto_filters_metadata_and_rates_headers():
@@ -110,6 +102,7 @@ def test_parse_nikto_filters_metadata_and_rates_headers():
     assert not any("Start Time" in t for t in titles)
     header = next(x for x in f if "content-security-policy" in x.title)
     assert header.severity is Severity.LOW             # missing header -> low
+    assert not any("interesting" in t for t in titles)  # informational line: no finding
 
 
 def test_parse_commix_detects_and_clean():
@@ -119,9 +112,21 @@ def test_parse_commix_detects_and_clean():
 
 def test_parse_gobuster():
     out = "/admin (Status: 200)\n/secret (Status: 301)\nnoise line"
-    f = parse_gobuster(out, scan_id=4)
-    assert len(f) == 2
-    assert f[0].location == "/admin"
+    assert parse_gobuster(out, scan_id=4) == []     # discovered paths are not findings
+
+
+def test_severity_has_no_info():
+    assert [s.value for s in Severity] == ["critical", "high", "medium", "low"]
+    assert Severity.coerce("info") is None
+    assert Severity.coerce("") is None
+    assert Severity.coerce("bogus") is None
+    assert Severity.coerce(" High ") is Severity.HIGH
+
+
+def test_parse_zap_skips_informational():
+    from harness.utils.parsers import parse_zap
+    out = "[Informational] Modern Web Application (Medium) — http://t:8081/\n    CWE-1\n"
+    assert parse_zap(out, scan_id=9) == []
 
 
 def test_parse_zap():

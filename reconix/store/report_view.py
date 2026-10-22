@@ -9,7 +9,7 @@ looks (HTML escapes it, python-docx writes it), so the two documents never disag
 from typing import Any, Dict, List, Tuple
 
 # Severity ranked high-to-low; used for ordering and the counts.
-SEV_ORDER = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")
+SEV_ORDER = ("CRITICAL", "HIGH", "MEDIUM", "LOW")
 STATUS_LABEL = {"open": "Open", "fixed": "Fixed", "accepted": "Accepted",
                 "false-positive": "False+"}
 
@@ -91,9 +91,9 @@ def counts(findings: List[Dict[str, Any]]) -> Dict[str, int]:
 
 
 def count_columns(findings: List[Dict[str, Any]]) -> List[Tuple[str, int]]:
-    """The severity tiles: every severity but Info (shown when there is one), then the total."""
+    """The severity tiles (the four severities), then the total."""
     tally = counts(findings)
-    cols = [(sev.title(), tally[sev]) for sev in SEV_ORDER if sev != "INFO" or tally["INFO"]]
+    cols = [(sev.title(), tally[sev]) for sev in SEV_ORDER]
     return cols + [("Total", len(findings))]
 
 
@@ -129,7 +129,7 @@ def summary(data: Dict[str, Any]) -> List[Segment]:
     """The executive summary's sentence, in pieces (the bold ones are stressed)."""
     findings = ordered(data.get("findings", []))
     tally = counts(findings)
-    high_sev = next((sev for sev in SEV_ORDER if tally[sev]), "INFO")
+    high_sev = next((sev for sev in SEV_ORDER if tally[sev]), "NONE")
     parts = [f"{tally[sev]} {sev.title()}" for sev in SEV_ORDER if tally[sev]]
     breakdown = ", ".join(parts) if parts else "no findings"
     out: List[Segment] = [
