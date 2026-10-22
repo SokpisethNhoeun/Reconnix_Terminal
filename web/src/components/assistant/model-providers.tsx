@@ -2,8 +2,10 @@
 
 /* The model picker's step 1, "Add or change a provider": the presets in their order (OpenAI,
    Anthropic, DeepSeek, OpenRouter, Groq, Ollama, LM Studio, Custom), each the saved provider
-   made from it or the preset itself, with its state ("key saved", "local", "saved", "cloud").
-   Choosing a row goes to its credentials (step 2). A cloud row is disabled while the server
+   made from it or the preset itself, with its state ("key saved", "local" or "remote" for a saved
+   one, by its address; "cloud" or "local" for a preset). A provider saved under a cloud preset
+   at another address is listed under Custom, with its host. Choosing a row goes to its
+   credentials (step 2). A cloud row is disabled while the server
    keeps data on this machine, and says why (the note under the heading). A saved provider has
    Remove beside its row: an inline confirm, focused on No; Escape there keeps it. One tab stop
    for the rows and their Remove buttons (use-roving.ts). */

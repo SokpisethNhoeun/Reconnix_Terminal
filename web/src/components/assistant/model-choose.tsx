@@ -22,7 +22,8 @@ interface Props {
   preset: Preset;
   provider: ProviderView | null;
   view: ModelsView;
-  credentials: Credentials;
+  /** Step 2's values with the key it read (never rendered: read when the model is used). */
+  credentials: () => Credentials;
   list: ChooseList;
   models: Models;
   onBack: () => void;
@@ -59,12 +60,13 @@ export function ModelChoose({ preset, provider, view, credentials, list, models,
     const problem = typing ? nameProblem(typed) : null;
     if (problem) return setError(problem);
     const model = typing ? typed.trim() : choice;
-    const built = requestsForUse(preset, provider, view, credentials, model);
+    const c = credentials();
+    const built = requestsForUse(preset, provider, view, c, model);
     if (!built.ok) return setError(built.problem);
     setBusy(true);
     setError(null);
     if (typing || list.verify) {
-      const tested = await api.testModel(probeOf(preset, provider, credentials, model));
+      const tested = await api.testModel(probeOf(preset, provider, c, model));
       const failed = !tested.ok ? tested.detail : tested.result.ok ? null : tested.result.detail;
       if (failed) {
         if (alive.current) {

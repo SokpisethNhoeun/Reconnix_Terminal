@@ -1,10 +1,11 @@
 /* The Model menu's routes called directly (e2e/access.spec.ts and e2e/assistant.spec.ts go
    through the proxy too): the operator role and the page's Origin on every change, strict
-   bodies within a byte cap, remote addresses only when the server allows them, an API key that
-   never comes back in any answer, "Test connection" and "Fetch models" against a stand-in model
-   server (and a redirect, which is refused), and a switch that the next question uses. The
-   saved models go to a temporary folder. */
-import { chmodSync, mkdtempSync, rmSync, statSync } from "node:fs";
+   bodies within a byte cap, remote addresses only when the server allows them, a cloud preset
+   only at its own address, an API key that never comes back in any answer, "Test connection"
+   and "Fetch models" against a stand-in model server (a server that answers without a list said
+   apart from one that can't be asked, and a redirect, which is refused), and a switch that the
+   next question uses. The saved models go to a temporary folder. */
+import { chmodSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -12,6 +13,7 @@ import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MODELS_FAIL } from "@/lib/assistant/models/errors";
+import { CLOUD_FIXED } from "@/lib/assistant/models/presets";
 import { COOKIE, sessionValue } from "@/lib/auth/session";
 
 const TOKEN = "models-route-test-token-0123456789";
@@ -43,6 +45,18 @@ beforeAll(async () => {
       seen.push({ method: req.method ?? "", url, auth: String(req.headers.authorization ?? ""), model });
       if (url.startsWith("/moved/")) return res.writeHead(302, { Location: `${base}/models` }).end();
       if (url.startsWith("/locked/") && req.headers.authorization !== `Bearer ${SECRET}`) return res.writeHead(401).end("{}");
+      // a GET {base}/models that is no list: none at all, an error, not JSON, another shape
+      if (url === "/nolist/v1/models") return res.writeHead(404).end();
+      if (url === "/broken/v1/models") return res.writeHead(500).end("{}");
+      if (url === "/garbled/v1/models") return res.writeHead(200, { "Content-Type": "text/html" }).end("<html>models</html>");
+      if (url === "/shape/v1/models") return res.writeHead(200, { "Content-Type": "application/json" }).end('{"models":["a"]}');
+      // …and one that may not be had: a refused key, the limit, a list past 1 MB
+      if (url === "/forbidden/v1/models") return res.writeHead(403).end("{}");
+      if (url === "/busy/v1/models") return res.writeHead(429).end("{}");
+      if (url === "/huge/v1/models") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ data: [{ id: "x".repeat(1_100_000) }] }));
+      }
       if (url.endsWith("/models") && req.method === "GET") {
         res.writeHead(200, { "Content-Type": "application/json" });
         return res.end(JSON.stringify({ object: "list", data: [{ id: "stub-b" }, { id: "stub-a" }, { id: "bad name" }, { id: 7 }, { id: "stub-a" }] }));
@@ -231,6 +245,41 @@ describe("the providers", () => {
     expect((await add(provider({ baseUrl: "https://api.openai.com/v1", preset: "openai" }))).status).toBe(201);
     expect(seen).toHaveLength(0); // nothing was sent anywhere
   });
+  it("tie a cloud preset to its own address: another one is refused, Custom takes it", async () => {
+    process.env.LLM_ALLOW_REMOTE = "1";
+    const crafted = { name: "OpenAI", preset: "openai", baseUrl: "https://other.example/v1", models: ["gpt-4o-mini"], apiKey: SECRET };
+    for (const baseUrl of ["https://other.example/v1", "https://api.openai.com.other.example/v1", "https://api.openai.com:8443/v1"]) {
+      const refused = await add({ ...crafted, baseUrl });
+      expect(refused).toEqual({ status: 400, body: { detail: CLOUD_FIXED } });
+    }
+    expect(CLOUD_FIXED).toBe("A cloud provider's address is fixed; use Custom for another address.");
+    expect((await list()).body.providers).toEqual([]); // nothing saved
+    const real = await add({ ...crafted, baseUrl: "https://api.openai.com/v1" });
+    expect(real.status).toBe(201);
+    const id = (real.body.provider as { id: string }).id;
+    expect((await add({ ...crafted, name: "Elsewhere", preset: "custom" })).status).toBe(201); // Custom: any address
+
+    // a change of the address or the preset is checked the same way
+    expect((await patch(id, { baseUrl: "https://other.example/v1", apiKey: "new-key" })).body.detail).toBe(CLOUD_FIXED);
+    const local = (await add(provider({ name: "Local" }))).body.provider as { id: string };
+    expect((await patch(local.id, { preset: "anthropic" })).body.detail).toBe(CLOUD_FIXED);
+    const moved = await patch(id, { preset: "custom", baseUrl: "https://other.example/v1", apiKey: "new-key" });
+    expect(moved.status).toBe(200);
+    expect(moved.body.provider).toMatchObject({ preset: "custom", baseUrl: "https://other.example/v1", keySaved: true });
+    expect((await patch(id, { preset: "openai" })).body.detail).toBe(CLOUD_FIXED);
+    expect((await patch(id, { preset: "openai", baseUrl: "https://api.openai.com/v1", apiKey: SECRET })).status).toBe(200);
+    expect(seen).toHaveLength(0);
+  });
+  it("leave a cloud preset saved at another address before that rule working until its preset or address changes", async () => {
+    process.env.LLM_ALLOW_REMOTE = "1";
+    const older = { id: ID, name: "OpenAI", preset: "openai", baseUrl: "https://llm.other.example/v1", models: ["gpt-4o-mini"] };
+    writeFileSync(path.join(dir, "models.json"), JSON.stringify({ format: "reconix.assistant.models/v1", providers: [older], active: null }), { mode: 0o600 });
+    expect((await list()).body.providers).toEqual([expect.objectContaining({ preset: "openai", baseUrl: older.baseUrl })]);
+    expect((await patch(ID, { models: ["gpt-4o-mini", "gpt-4o"] })).status).toBe(200);
+    expect((await choose({ providerId: ID, model: "gpt-4o" })).status).toBe(200);
+    expect((await patch(ID, { baseUrl: "https://llm.other.example/v2" })).body.detail).toBe(CLOUD_FIXED);
+    expect((await patch(ID, { preset: "custom" })).body.provider).toMatchObject({ preset: "custom", baseUrl: older.baseUrl }); // what the picker sends
+  });
   it("say clearly when an address grows too long, or models.key is open to other users", async () => {
     const long = await add(provider({ baseUrl: `${base}/${"é".repeat(400)}` })); // %-encoded: 6 times as long
     expect(long.status).toBe(400);
@@ -271,13 +320,34 @@ describe("test and fetch", () => {
     expect(seen.at(-1)).toMatchObject({ method: "GET", url: "/v1/models" });
     const p = (await add(provider({ baseUrl: `${base}/locked/v1` }))).body.provider as { id: string };
     expect((await fetchNames({ providerId: p.id })).body).toEqual({ models: ["stub-a", "stub-b"] });
-    expect((await fetchNames({ baseUrl: `${base}/locked/v1` })).status).toBe(502);
-    expect((await fetchNames({ baseUrl: "http://127.0.0.1:9/v1" })).status).toBe(502);
+  });
+  it("say when the model's server answered without a list (the picker may test or type a model then), and nothing else", async () => {
+    // answered, but no list: { listed: false, detail }
+    const NO_LIST = "The address did not answer with a model list ({ data: [{ id }] }).";
+    expect(await fetchNames({ baseUrl: `${base}/nolist/v1` })).toEqual({
+      status: 200,
+      body: { listed: false, detail: "The model's server answered HTTP 404: check the model name and the base URL." },
+    });
+    expect(await fetchNames({ baseUrl: `${base}/broken/v1` })).toEqual({ status: 200, body: { listed: false, detail: "The model's server answered HTTP 500." } });
+    expect(await fetchNames({ baseUrl: `${base}/garbled/v1` })).toEqual({ status: 200, body: { listed: false, detail: NO_LIST } });
+    expect(await fetchNames({ baseUrl: `${base}/shape/v1` })).toEqual({ status: 200, body: { listed: false, detail: NO_LIST } });
+    // never reached, refused or too much: a plain failure, never "not listed"
+    const plain = async (baseUrl: string, detail: string) => {
+      const r = await fetchNames({ baseUrl });
+      expect(r.status).toBe(502);
+      expect(r.body).toEqual({ detail });
+    };
+    await plain(`${base}/locked/v1`, "The model's server answered HTTP 401: check the API key.");
+    await plain(`${base}/forbidden/v1`, "The model's server answered HTTP 403: check the API key.");
+    await plain(`${base}/busy/v1`, "The model's server answered HTTP 429: too many requests, or no credit left.");
+    await plain(`${base}/huge/v1`, "The model list is too large.");
+    await plain("http://127.0.0.1:9/v1", "Could not reach the address. Is the model's server running?");
   });
   it("never follow a redirect", async () => {
     const moved = await fetchNames({ baseUrl: `${base}/moved/v1` });
     expect(moved.status).toBe(502);
     expect(moved.body.detail).toContain("redirect");
+    expect(moved.body.listed).toBeUndefined(); // a plain failure
     expect(seen.map((s) => s.url)).toEqual(["/moved/v1/models"]); // the target was never asked
     const test2 = await test({ baseUrl: `${base}/moved/v1`, model: "m" });
     expect(test2.body).toMatchObject({ ok: false });

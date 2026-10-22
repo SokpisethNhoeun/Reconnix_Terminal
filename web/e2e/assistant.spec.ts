@@ -7,8 +7,9 @@
    naming the Environment's model, no Model button in the header, Custom against the stand-in
    through credentials and the fetched list to asking with the new model, a one-click switch
    back, removing a provider, a cloud provider disabled with the reason, a refusal kept on its
-   step, Escape a step back and then closed, the arrow keys); what a viewer can't do; and the
-   routes' locks.
+   step, Escape a step back and then closed, the arrow keys, a typed API key never in the markup
+   and gone with the picker when the Assistant is left by keyboard or by Back); what a viewer
+   can't do; and the routes' locks.
    The chat panel holds still (text never moves), but the welcome's globe and the sidebar's icon
    breathe, so this project runs with reduced motion (playwright.config.ts; the motion itself is
    tested in motion.spec.ts) and clicks need no `force`. The
@@ -76,6 +77,8 @@ const markColours = (svg: SVGElement | HTMLElement) => {
 const chip = (page: Page) => page.locator(".ai-composer").getByRole("button", { name: /^(Model: |Choose a model$)/ });
 /** The model picker, named after its step ("Choose a model", "Custom · credentials"…). */
 const picker = (page: Page, step: string) => page.getByRole("dialog", { name: step, exact: true });
+/** An API key typed in the picker (the stand-in model takes none: it only has to be typed). */
+const KEY = "sk-e2e-picker-key-0123456789abcdef";
 
 test("the Ask bar and the sidebar open the same assistant in place, and Back returns", async ({ page }) => {
   await signIn(page);
@@ -541,6 +544,68 @@ test.describe("the composer and its model picker", () => {
     await expect(pick).toBeVisible();
     await log(page).click({ position: { x: 20, y: 20 } });
     await expect(pick).toBeHidden();
+  });
+
+  /** Opens step 2 for Custom and types KEY in its API key field: masked, never in the markup. */
+  const typeKey = async (page: Page) => {
+    await chip(page).click();
+    await picker(page, "Choose a model").getByRole("button", { name: /^Custom/ }).click();
+    const creds = picker(page, "Custom · credentials");
+    const key = creds.getByLabel("API key", { exact: true });
+    await key.pressSequentially(KEY);
+    await expect(key).toHaveValue(KEY);
+    await expect(key).toHaveAttribute("type", "password");
+    // nothing that looks like a sign-in for a password manager to offer to save
+    await expect(key).toHaveAttribute("autocomplete", "off");
+    for (const flag of ["data-1p-ignore", "data-lpignore", "data-bwignore"]) await expect(key).toHaveAttribute(flag, /.*/);
+    await expect(creds.locator("form")).toHaveCount(0);
+    expect(await page.evaluate(() => document.querySelector("input[type=password]")?.getAttribute("value") ?? null)).toBeNull();
+    expect(await page.evaluate((k) => document.documentElement.outerHTML.includes(k), KEY)).toBe(false);
+    return creds;
+  };
+  /** No field on the page holds KEY, as its value or in the markup, and the picker is closed. */
+  const keyGone = async (page: Page) => {
+    await expect(page.locator(".ai-picker")).toHaveCount(0);
+    expect(await page.evaluate((k) => [...document.querySelectorAll("input")].some((i) => i.value === k) || document.documentElement.outerHTML.includes(k), KEY)).toBe(false);
+  };
+
+  test("leaving the Assistant by keyboard closes the picker and forgets a key typed in it", async ({ page }) => {
+    await page.goto("/?view=assistant");
+    const creds = await typeKey(page);
+    // Shift+Tab out of the picker (focus leaving it closes it), on to Minimize, and Enter
+    const back = page.getByRole("button", { name: "Back to the dashboard" });
+    for (let i = 0; i < 80 && !(await back.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Shift+Tab");
+    await expect(back).toBeFocused();
+    await expect(creds).toHaveCount(0); // closed as focus left it and the chip, the Assistant still shown
+    await expect(chip(page)).toHaveAttribute("aria-expanded", "false");
+    await page.keyboard.press("Enter");
+    await expect(page).not.toHaveURL(/view=assistant/);
+    await expect(page.getByRole("heading", { name: "Assessment Operations Center" })).toBeVisible();
+    await keyGone(page);
+    await tab(page).click();
+    await assistantShown(page);
+    await expect(chip(page)).toHaveAttribute("aria-expanded", "false");
+    await keyGone(page);
+  });
+
+  test("Back out of the Assistant closes the picker with it and forgets a key typed in it", async ({ page }) => {
+    await page.goto("/");
+    await tab(page).click();
+    await assistantShown(page);
+    const creds = await typeKey(page);
+    await expect(creds.getByLabel("API key", { exact: true })).toBeFocused(); // still being typed in
+    await page.goBack();
+    await expect(page).not.toHaveURL(/view=assistant/);
+    await expect(page.getByRole("heading", { name: "Assessment Operations Center" })).toBeVisible();
+    await keyGone(page); // closed as the Assistant went, not left behind its inert stage
+    await page.goForward();
+    await assistantShown(page);
+    await expect(chip(page)).toHaveAttribute("aria-expanded", "false");
+    await keyGone(page);
+    // opened again: step 2 starts empty
+    await chip(page).click();
+    await picker(page, "Choose a model").getByRole("button", { name: /^Custom/ }).click();
+    await expect(picker(page, "Custom · credentials").getByLabel("API key", { exact: true })).toHaveValue("");
   });
 });
 

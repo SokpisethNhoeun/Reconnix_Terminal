@@ -3,7 +3,8 @@
 /* Focus around the assistant (plan §6, point 5):
    - the opener: the element that had focus, or, for a click on something that can't take it
      (the Ask bar's background), the field it belongs to;
-   - on open: the composer, unless the user moved focus elsewhere meanwhile or it is disabled;
+   - on open: the composer, unless the user moved focus elsewhere meanwhile (a dialog or a popup
+     opened in the assistant before it landed, say) or it is disabled;
    - on close: back to the opener when focus was in the assistant (or lost), else left alone. */
 import { type RefObject, useCallback, useEffect, useRef } from "react";
 
@@ -53,13 +54,16 @@ export function useReturnFocus(stage: RefObject<HTMLElement | null>) {
     opener.current = recent && (!active || active.contains(recent)) ? recent : active;
   }, [stage]);
 
-  /** As the open lands: the composer, if focus is still where the open found it (or in the stage). */
+  /** As the open lands: the composer, if focus is still where the open found it (or in the stage,
+      unless something opened there meanwhile holds it: a dialog, or the control whose popup is
+      open, such as the model chip with its picker, which focus leaving would close). */
   const focusComposer = useCallback(
     (composer: HTMLTextAreaElement | null) => {
       const s = stage.current;
       const active = document.activeElement;
       const stayed = active === opener.current || active === focusedAtOpen.current;
-      const free = !active || active === document.body || stayed || !!s?.contains(active);
+      const held = !!active?.closest('[role="dialog"], [aria-expanded="true"]');
+      const free = !active || active === document.body || stayed || (!!s?.contains(active) && !held);
       if (free && composer && !composer.disabled) composer.focus({ preventScroll: true });
     },
     [stage],

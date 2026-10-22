@@ -56,5 +56,12 @@ export type ModelsView = z.infer<typeof ModelsViewSchema>;
 export const ProbeResultSchema = z.object({ ok: z.boolean(), detail: z.string().max(400) }).strict();
 export type ProbeResult = z.infer<typeof ProbeResultSchema>;
 
-/** The answer of "Fetch models" (the server keeps at most 200 names). */
-export const FetchResultSchema = z.object({ models: z.array(ModelNameSchema).max(200) }).strict();
+/** The answer of "Fetch models": the names the model's server lists (the server keeps at most
+    200), or `listed: false` with why when it answered without a list that could be read (the
+    picker may then test a model it knows of, or have one typed). Any other failure is an error
+    status. */
+export const FetchResultSchema = z.union([
+  z.object({ models: z.array(ModelNameSchema).max(200) }).strict(),
+  z.object({ listed: z.literal(false), detail: z.string().max(400) }).strict(),
+]);
+export type FetchResult = z.infer<typeof FetchResultSchema>;
