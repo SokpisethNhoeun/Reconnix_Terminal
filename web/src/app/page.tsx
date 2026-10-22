@@ -3,7 +3,8 @@
    (derive-overall.ts), Findings lists them all, and Reports sums them up (derive-report.ts);
    `?uid=` opens one run (derive.ts). `?view=` is
    the open view, read by the client Viewer. The terminal is rendered only when the server says
-   this browser may use it (lib/auth/guard.ts); the AI Assistant learns what it is about, whether
+   this browser may use it (lib/auth/guard.ts), and Security knowledge only for operators; the AI
+   Assistant learns what it is about, whether
    this browser may ask (operator role), which model answers (lib/assistant/models/resolve.ts) and what
    to suggest, from the data in scope (lib/assistant/prompts.ts). */
 import type { AssistantInfo } from "@/components/assistant/types";
@@ -17,6 +18,7 @@ import { OverviewView } from "@/components/dashboard/overview-view";
 import { ReportsView } from "@/components/dashboard/reports-view";
 import { TopBar } from "@/components/dashboard/top-bar";
 import { Viewer } from "@/components/dashboard/viewer";
+import { KnowledgeView } from "@/components/knowledge/knowledge-view";
 import { TerminalView } from "@/components/terminal/terminal-view";
 import { retentionDays } from "@/lib/assistant/history-store";
 import { activeModelSummary } from "@/lib/assistant/models/resolve";
@@ -89,6 +91,7 @@ export default async function Home({ searchParams }: Props) {
       reports={report ? <ReportsView key={chosen?.uid ?? "all"} data={report} /> : empty}
       terminal={<TerminalView access={access} />}
       terminalState={access}
+      knowledge={assistant.operator ? <KnowledgeView /> : null}
       assistant={assistant}
     />
   );

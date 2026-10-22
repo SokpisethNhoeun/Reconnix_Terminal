@@ -9,14 +9,15 @@ import { CardCursorLight } from "@/components/dashboard/card-cursor-light";
 import { HydratedMark } from "@/components/dashboard/hydrated-mark";
 import { Intro } from "@/components/dashboard/intro";
 import { Sidebar } from "@/components/dashboard/sidebar";
-import { leaveAssistant, openAssistant, parseView, showView, watchHistory, type View } from "@/components/dashboard/view-url";
+import { allowedView, leaveAssistant, openAssistant, parseView, showView, watchHistory, type View } from "@/components/dashboard/view-url";
 
 export type { View };
 
 /**
  * Local Assessment Viewer shell: sidebar + top bar around a content area that switches between
- * the Overview dashboard, Assessments, Findings (list + evidence), Reports and Terminal, plus
- * the AI Assistant, which opens over the top bar and content (AssistantStage). The views are
+ * the Overview dashboard, Assessments, Findings (list + evidence), Reports, Terminal and, for
+ * operators, Security knowledge (opened from the assistant's header), plus the AI Assistant,
+ * which opens over the top bar and content (AssistantStage). The views are
  * server-rendered and passed in as props; all stay mounted and are toggled with `hidden` so the
  * globe keeps its WebGL context (it pauses itself when it can't be seen) and the intro's
  * one-shot reveal never leaves a remounted view's cards stuck hidden. The open view lives in the
@@ -25,8 +26,8 @@ export type { View };
  * out underneath as its backdrop (unseen and inert, data-assistant-backdrop in motion.css): its
  * globe is carried into the assistant, and closing grows straight back into it with its scroll
  * position kept. The Terminal view is mounted on its first visit (that starts the session) and
- * then only hidden, so the TUI keeps running. The assistant's conversation lives in
- * AssistantProvider, above every view.
+ * then only hidden, so the TUI keeps running; Security knowledge too (its first visit reads the
+ * list). The assistant's conversation lives in AssistantProvider, above every view.
  */
 export function Viewer({
   topBar,
@@ -36,6 +37,7 @@ export function Viewer({
   reports,
   terminal,
   terminalState,
+  knowledge,
   assistant,
 }: {
   topBar: React.ReactNode;
@@ -45,12 +47,17 @@ export function Viewer({
   reports: React.ReactNode;
   terminal: React.ReactNode;
   terminalState: "operator" | "viewer" | "off";
+  /** The Security knowledge page: given to operators only (null for anyone else, whose
+      ?view=knowledge opens the Overview). */
+  knowledge: React.ReactNode | null;
   assistant: AssistantInfo;
 }) {
-  const view = parseView(useSearchParams().get("view"));
+  const view = allowedView(parseView(useSearchParams().get("view")), knowledge !== null);
   const [shown, setShown] = useState<View>(view);
   const [terminalOpened, setTerminalOpened] = useState(view === "terminal");
   if (view === "terminal" && !terminalOpened) setTerminalOpened(true); // first visit: start the session
+  const [knowledgeOpened, setKnowledgeOpened] = useState(view === "knowledge");
+  if (view === "knowledge" && !knowledgeOpened) setKnowledgeOpened(true); // first visit: read the list
   const backdrop = shown === "assistant"; // the Overview under the open assistant
 
   useEffect(() => watchHistory(), []);
@@ -88,6 +95,9 @@ export function Viewer({
             <div data-view-pane="findings" hidden={shown !== "findings"}>{findings}</div>
             <div data-view-pane="reports" hidden={shown !== "reports"}>{reports}</div>
             <div data-view-pane="terminal" hidden={shown !== "terminal"}>{terminalOpened && terminal}</div>
+            {knowledge !== null && (
+              <div data-view-pane="knowledge" hidden={shown !== "knowledge"}>{knowledgeOpened && knowledge}</div>
+            )}
           </main>
           <AssistantStage view={view} shown={shown} setShown={setShown} />
         </div>

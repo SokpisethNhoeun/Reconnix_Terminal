@@ -6,8 +6,10 @@ import { useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 
 // (no "audit" or "scope": the Audit log and Scope views were removed; old ?view=audit and
-// ?view=scope links open the Overview)
-export const VIEWS = ["overview", "assessments", "findings", "reports", "terminal", "assistant"] as const;
+// ?view=scope links open the Overview). "knowledge" is the Security knowledge page, opened from
+// the AI Assistant's header (no sidebar item), for operators only: anyone else lands on the
+// Overview (allowedView).
+export const VIEWS = ["overview", "assessments", "findings", "reports", "terminal", "assistant", "knowledge"] as const;
 export type View = (typeof VIEWS)[number];
 
 /** The Assessments view's own address parameters (its filters, its page). */
@@ -30,6 +32,12 @@ export type ViewParams = Record<string, string | undefined>;
 
 export const parseView = (value: string | null | undefined): View =>
   (VIEWS as readonly string[]).includes(value ?? "") ? (value as View) : "overview";
+
+/** The views only an operator may open (the page never renders them for anyone else). */
+export const OPERATOR_VIEWS: readonly View[] = ["knowledge"];
+
+/** `view`, or the Overview when it is an operator's view and this browser isn't one. */
+export const allowedView = (view: View, operator: boolean): View => (OPERATOR_VIEWS.includes(view) && !operator ? "overview" : view);
 
 /** Whether the page is interactive: viewer.tsx marks `html[data-hydrated]` once React has taken
     over. A click React replays from before that would change the address before the router
