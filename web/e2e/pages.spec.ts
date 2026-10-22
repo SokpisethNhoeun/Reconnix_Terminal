@@ -56,16 +56,14 @@ test("the overview totals every saved file by default", async ({ page }) => {
 
 test("Findings by Severity lists Critical, High, Medium and Low, even at 0, and never Info", async ({ page }) => {
   await signIn(page);
-  const all = sample();
+  const all = sample(); // an older file's informational findings already left out, as the page does
   const found = all.flatMap(counted);
-  const info = found.filter((f) => f.severity === "INFO").length;
-  expect(info, "the sample data has informational findings").toBeGreaterThan(0);
-  // every run: the four rows; the card's total leaves Info out, the summary strip counts it
+  // every run: the four rows; the card and the summary strip count the same findings
   await expect(severityRows(page)).toHaveText(FOUR_LEVELS);
-  await expect(page.getByRole("region", { name: "Findings by Severity" })).toContainText(`${found.length - info} findings`);
+  await expect(page.getByRole("region", { name: "Findings by Severity" })).toContainText(`${found.length} findings`);
   await expect(stat(page, "Findings")).toHaveText(String(found.length));
-  // one run with no critical finding (and no info) still lists Critical first, at 0
-  const a = all.find((x) => counted(x).length > 0 && !counted(x).some((f) => f.severity === "CRITICAL" || f.severity === "INFO"))!;
+  // one run with no critical finding still lists Critical first, at 0
+  const a = all.find((x) => counted(x).length > 0 && !counted(x).some((f) => f.severity === "CRITICAL"))!;
   await page.goto(`/?uid=${a.uid}`);
   await expect(severityRows(page)).toHaveText(FOUR_LEVELS);
   await expect(severityRows(page).first().locator("[data-countup]")).toHaveText("0");

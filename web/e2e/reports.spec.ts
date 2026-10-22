@@ -231,7 +231,7 @@ test("with evidence and LOW off the preview drops the evidence blocks and the LO
   await openReports(page);
   for (const uid of SHARED) await tickRun(page, uid);
   await turnOff(page, "Include masked evidence");
-  await turnOff(page, "Include LOW and INFO findings");
+  await turnOff(page, "Include LOW findings");
   await preview(page).click();
   const doc = frame(page);
   await expect(doc.getByRole("heading", { name: "Combined security assessment report" })).toBeVisible({ timeout: 20_000 });

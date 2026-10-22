@@ -21,7 +21,7 @@ test.beforeAll(() => expect(sample().length, "the every-run mode needs at least 
 const MODES = [
   { name: "every run", view: "overview" },
   { name: "one run", view: `overview&uid=${newest().uid}` },
-  { name: "the run with every severity", view: "overview&uid=20260929-112000-8c51_RCX-DEMO-001" }, // critical to info, one a false positive
+  { name: "the run with every severity", view: "overview&uid=20260929-112000-8c51_RCX-DEMO-001" }, // critical to low, one a false positive
   { name: "the heaviest run", view: "overview&uid=20261005-140300-9f76_RCX-DEMO-001" },
   { name: "the run with twelve findings", view: "overview&uid=20260929-112000-8c51_RCX-DEMO-002" },
   { name: "a run with nothing found", view: "overview&uid=20261001-083000-2265_RCX-DEMO-001" },
