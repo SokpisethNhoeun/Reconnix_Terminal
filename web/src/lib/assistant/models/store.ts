@@ -16,7 +16,7 @@ import path from "node:path";
 import { checkAddress, isLocal, remoteAllowed } from "../config";
 import { cleanTitle } from "../history-schema";
 import { assistantDir, code, type Folder, inFolder, openFolder, readText, serial, tempSuffix, writeAtomic } from "../secure-fs";
-import { ensureKey, open, readKey, seal } from "./crypto";
+import { ensureKey, hasKey, open, readKey, seal } from "./crypto";
 import { folderFault, MODELS_FAIL, ModelsError } from "./errors";
 import type { AddProvider, UpdateProvider } from "./requests";
 import { type Active, EMPTY_MODELS, ENVIRONMENT_NAME, MAX_FILE_BYTES, MAX_NAME, MAX_PROVIDERS, type ModelsFile, ModelsFileSchema, type SavedProvider } from "./schema";
@@ -61,16 +61,25 @@ export interface Saved {
   apiKeyOf: (p: SavedProvider) => string | null;
 }
 
-/** What is saved, without making the folder when there is none. */
-export async function readSaved(): Promise<Saved> {
+/** `read` on the open folder, or `none` when there is no folder (it is never made here). */
+async function fromFolder<T>(none: T, read: (f: Folder) => Promise<T>): Promise<T> {
   const dir = assistantDir();
   const exists = await lstat(/*turbopackIgnore: true*/ dir).then(
     () => true,
     (error) => (code(error) === "ENOENT" ? false : Promise.reject(new ModelsError(MODELS_FAIL.folder))),
   );
-  if (!exists) return { file: EMPTY_MODELS, apiKeyOf: () => null };
+  if (!exists) return none;
   const f = await openFolder(dir, folderFault);
   try {
+    return await read(f);
+  } finally {
+    await f.handle?.close().catch(() => {});
+  }
+}
+
+/** What is saved, without making the folder when there is none. */
+export function readSaved(): Promise<Saved> {
+  return fromFolder<Saved>({ file: EMPTY_MODELS, apiKeyOf: () => null }, async (f) => {
     const file = await readFile(f);
     const key = file.providers.some((p) => p.key) ? await readKey(f) : null;
     return {
@@ -81,9 +90,17 @@ export async function readSaved(): Promise<Saved> {
         return open(p.key, key, p.id);
       },
     };
-  } finally {
-    await f.handle?.close().catch(() => {});
-  }
+  });
+}
+
+/** What is saved, for saying which model answers: the file, and whether there is a models.key
+    for its sealed keys (checked as readSaved checks it, throwing the same errors), but no key is
+    read or opened. */
+export function readChoice(): Promise<{ file: ModelsFile; keyFile: boolean }> {
+  return fromFolder({ file: EMPTY_MODELS, keyFile: false }, async (f) => {
+    const file = await readFile(f);
+    return { file, keyFile: file.providers.some((p) => p.key) ? await hasKey(f) : false };
+  });
 }
 
 /** A saved provider as the browser may see it: never the key, only whether one is saved. */

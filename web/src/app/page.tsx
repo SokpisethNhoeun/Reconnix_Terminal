@@ -19,7 +19,7 @@ import { TopBar } from "@/components/dashboard/top-bar";
 import { Viewer } from "@/components/dashboard/viewer";
 import { TerminalView } from "@/components/terminal/terminal-view";
 import { retentionDays } from "@/lib/assistant/history-store";
-import { activeModel } from "@/lib/assistant/models/resolve";
+import { activeModelSummary } from "@/lib/assistant/models/resolve";
 import { runRef, scopedViews, scopeOf } from "@/lib/assistant/insights";
 import { welcomePrompts } from "@/lib/assistant/prompts";
 import { currentRole, terminalAccess } from "@/lib/auth/guard";
@@ -40,7 +40,7 @@ export default async function Home({ searchParams }: Props) {
   const items = library.assessments.map(libraryItem);
   const dir = shownDir(library.dir);
   const terminal = access === "operator";
-  const { summary: model } = await activeModel();
+  const model = await activeModelSummary(); // its summary only: no API key is read for a page
   const assistant: AssistantInfo = {
     scope: scopeOf(chosen),
     runs: scopedViews(views, null).map((v) => ({ ...runRef(v), status: v.status })),

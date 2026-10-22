@@ -2,16 +2,17 @@
    provider and model) wins, checked again on every use by config.ts's rules with this server's
    LLM_ALLOW_REMOTE: if it can't be used any more, the reason is reported and nothing else
    answers in its place. With nothing chosen, the Environment's model (LLM_BASE_URL / LLM_MODEL
-   in web/.env.local) answers, as before the menu existed. Also what the Model menu's routes
-   answer (`modelsView`) and the model a test or a fetch talks to (`probeTarget`): a saved key
-   only ever goes to its provider's saved address. */
+   in web/.env.local) answers, as before the menu existed. The page needs only the summary
+   (`activeModelSummary`, which reads no API key); asking needs the whole model (`activeModel`).
+   Also what the Model menu's routes answer (`modelsView`) and the model a test or a fetch talks
+   to (`probeTarget`): a saved key only ever goes to its provider's saved address. */
 import "server-only";
 
 import { checkAddress, checkModel, isLocal, type ModelConfig, modelSetup, remoteAllowed } from "../config";
 import { MODELS_FAIL, ModelsError } from "./errors";
 import type { Probe } from "./requests";
-import { readSaved, type Saved, viewOf } from "./store";
-import { ENVIRONMENT, ENVIRONMENT_NAME } from "./schema";
+import { readChoice, readSaved, type Saved, viewOf } from "./store";
+import { ENVIRONMENT, ENVIRONMENT_NAME, type ModelsFile, type SavedProvider } from "./schema";
 import type { ActiveView, EnvironmentView, ModelsView, ModelSummary } from "./view";
 
 type Env = Record<string, string | undefined>;
@@ -36,13 +37,14 @@ const refused = (reason: string, name = "", provider = "", local = false): Activ
   summary: { configured: false, name: cut(name, 128), provider: cut(provider, 60), local, reason: cut(reason, 600) },
 });
 
-function resolveFrom(saved: Saved, env: Env): ActiveModel {
-  const active = saved.file.active;
+/** `keyOf`: the provider's API key (null: none), or throws why it can't be had. */
+function resolveFrom(file: ModelsFile, keyOf: Saved["apiKeyOf"], env: Env): ActiveModel {
+  const active = file.active;
   if (active) {
-    const p = saved.file.providers.find((x) => x.id === active.providerId)!; // store.ts checked it is there
+    const p = file.providers.find((x) => x.id === active.providerId)!; // store.ts checked it is there
     let apiKey: string | null;
     try {
-      apiKey = saved.apiKeyOf(p);
+      apiKey = keyOf(p);
     } catch (error) {
       return refused(`${p.name}: ${error instanceof ModelsError ? error.message : MODELS_FAIL.sealed}`, active.model, p.name, isLocal(p.baseUrl));
     }
@@ -64,7 +66,30 @@ export async function activeModel(env: Env = process.env): Promise<ActiveModel> 
   } catch (error) {
     return refused(error instanceof ModelsError ? error.message : MODELS_FAIL.read);
   }
-  return resolveFrom(saved, env);
+  return resolveFrom(saved.file, saved.apiKeyOf, env);
+}
+
+/** Stands in for a saved key that is there but not opened: the rules only ask whether there is
+    one (a key goes only over https to a remote model), and this summary never calls the model. */
+const UNOPENED = "unopened";
+
+/** Only the summary of activeModel, for the page (every render, and the live refresh): the same
+    rules and reasons, but no API key is read or opened (models.key is checked without reading
+    it). A sealed key that no longer opens with an intact models.key shows up when a question is
+    asked, and in the Model menu. Never throws. */
+export async function activeModelSummary(env: Env = process.env): Promise<ModelSummary> {
+  let choice: { file: ModelsFile; keyFile: boolean };
+  try {
+    choice = await readChoice();
+  } catch (error) {
+    return refused(error instanceof ModelsError ? error.message : MODELS_FAIL.read).summary;
+  }
+  const keyOf = (p: SavedProvider) => {
+    if (!p.key) return null;
+    if (!choice.keyFile) throw new ModelsError(MODELS_FAIL.sealed); // as readSaved().apiKeyOf
+    return UNOPENED;
+  };
+  return resolveFrom(choice.file, keyOf, env).summary;
 }
 
 /** What the Model menu shows: the saved providers (no keys), the Environment, the choice and the
@@ -81,7 +106,7 @@ export async function modelsView(env: Env = process.env): Promise<ModelsView> {
     providers: saved.file.providers.map(viewOf),
     environment,
     active,
-    summary: resolveFrom(saved, env).summary,
+    summary: resolveFrom(saved.file, saved.apiKeyOf, env).summary,
     allowRemote: remoteAllowed(env),
   };
 }

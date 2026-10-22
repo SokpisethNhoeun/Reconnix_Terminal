@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { checkModel, ENV_WORDING, FORM_WORDING, modelSetup } from "@/lib/assistant/config";
 import { open, seal } from "@/lib/assistant/models/crypto";
 import { MODELS_FAIL, ModelsError } from "@/lib/assistant/models/errors";
-import { activeModel, modelsView, NO_MODEL, probeTarget } from "@/lib/assistant/models/resolve";
+import { activeModel, activeModelSummary, modelsView, NO_MODEL, probeTarget } from "@/lib/assistant/models/resolve";
 import { MAX_FILE_BYTES, MAX_MODELS, MAX_NAME, MAX_PROVIDERS, MAX_URL, MODELS_FORMAT } from "@/lib/assistant/models/schema";
 import { addProvider, listProviders, MODELS_TEMP, modelsTempName, readSaved, removeProvider, setActive, updateProvider } from "@/lib/assistant/models/store";
 import { addQuestion, deleteAllConversations, listConversations } from "@/lib/assistant/history-store";
@@ -187,6 +187,7 @@ describe("the saved models", () => {
       await expect(modelsView()).rejects.toThrow(MODELS_FAIL.keyShared); // GET models says so
       const r = await activeModel();
       expect(!r.ok && r.reason).toBe(MODELS_FAIL.keyShared); // so does asking
+      expect((await activeModelSummary()).reason).toBe(MODELS_FAIL.keyShared); // and the page
       expect(modeOf(keyFile)).toBe(mode); // left as it was found, never chmodded
     }
     expect(MODELS_FAIL.keyShared).toContain("enter the API keys again");
@@ -312,6 +313,29 @@ describe("which model answers", () => {
     rmSync(path.join(dir, "models.key")); // the key can't be opened any more
     const lost = await activeModel({ ...ENV, LLM_ALLOW_REMOTE: "1" });
     expect(!lost.ok && lost.reason).toBe(`OpenRouter: ${MODELS_FAIL.sealed}`);
+  });
+  it("is summed up for the page by the same rules, without reading or opening any key", async () => {
+    const same = async (env: Record<string, string>) => expect(await activeModelSummary(env)).toEqual((await activeModel(env)).summary);
+    await same(ENV);
+    await same({});
+    await same({ ...ENV, LLM_BASE_URL: "nope" });
+    expect(existsSync(dir)).toBe(false); // reading made no folder
+    await addProvider({ ...remote, apiKey: SECRET, activate: true }, { LLM_ALLOW_REMOTE: "1" });
+    await same({ ...ENV, LLM_ALLOW_REMOTE: "1" });
+    await same(ENV); // remote no longer allowed: the same reason
+    await addProvider({ ...local, apiKey: SECRET, activate: true });
+    await same(ENV);
+    // another key of the same shape: asking finds it can't open the sealed key, but the summary
+    // never read it, so it can't tell (the reason shows when a question is asked)
+    writeFileSync(path.join(dir, "models.key"), randomBytes(32), { mode: 0o600 });
+    const asked = await activeModel(ENV);
+    expect(!asked.ok && asked.reason).toBe(`Local Ollama: ${MODELS_FAIL.sealed}`);
+    expect(await activeModelSummary(ENV)).toMatchObject({ configured: true, name: "llama3.2", provider: "Local Ollama" });
+    rmSync(path.join(dir, "models.key")); // no key file at all: both say so
+    await same(ENV);
+    expect((await activeModelSummary(ENV)).reason).toBe(`Local Ollama: ${MODELS_FAIL.sealed}`);
+    writeFileSync(path.join(dir, "models.json"), "{ not json");
+    await same(ENV);
   });
   it("sends a saved key only to its saved address when testing", async () => {
     const p = await addProvider({ ...local, apiKey: SECRET });

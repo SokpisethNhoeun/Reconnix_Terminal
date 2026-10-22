@@ -91,6 +91,14 @@ export async function readKey(f: Folder): Promise<Buffer | null> {
   }
 }
 
+/** Whether there is a models.key that readKey would accept, checked the same way but without
+    reading the key (refused as above). For what only says which model answers. */
+export async function hasKey(f: Folder): Promise<boolean> {
+  const handle = await openKeyFile(f);
+  await handle?.close().catch(() => {});
+  return handle !== null;
+}
+
 /** The key, made first when there is none (32 random bytes, O_EXCL, 0600). */
 export async function ensureKey(f: Folder, fail: Faults): Promise<Buffer> {
   const existing = await readKey(f);
