@@ -254,7 +254,7 @@ describe("pickCards", () => {
     const cards = pickCards(samples, null, "Plan a security assessment");
     expect(cards).toEqual([NOTICES.plan]);
     expect(NOTICES.plan.body).toContain("no plan has been made");
-    expect(NOTICES.plan.action).toBe("terminal");
+    expect(NOTICES.plan.action).toBeNull(); // no button: planning is done in the TUI
     expect(kinds(pickCards(samples, null, "Run nmap against 192.0.2.10"))).toEqual(["notice"]);
   });
   it("narrows every run to the runs a question names", () => {

@@ -399,7 +399,6 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
       { message: "Another web dashboard already uses its port on 127.0.0.1 (an older one left running?). Stop it, then run /web again.", meaning: "The launcher exited with code 2: its port is taken." },
       { message: "Couldn't install the web dashboard's packages. / The web dashboard stopped while starting. / The web dashboard is taking a while to start.", meaning: <>Read the log; see <DocRef>Troubleshooting</DocRef>.</> },
       { message: "Open it in your browser: <link>", meaning: "The dashboard runs but no browser could be launched here." },
-      { message: "You're already in the web dashboard: this is its Terminal page.", meaning: "Not an error." },
     ],
   },
   quit: {

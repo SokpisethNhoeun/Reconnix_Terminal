@@ -11,10 +11,10 @@
    ({"ok":false,"error"} on stdout, or on stderr for `original`), anything else an internal error.
 
    The Python is the dashboard's own (RECONIX_PYTHON, else the repo's .venv, else python3/python),
-   as scripts/serve.mjs finds it for the terminal helper. It runs from the repo root with fixed
+   as the TUI's /web passes it (web_server.py). It runs from the repo root with fixed
    arguments and no shell, with a minimal environment (never an LLM_* key or the launch token),
    and is killed after CLI_TIMEOUT_MS or once its output passes its cap. Its output is never
-   logged. Tests only: with RECONIX_TERM_TEST=1, RECONIX_KNOWLEDGE_CLI names a stand-in script
+   logged. Tests only: with RECONIX_KNOWLEDGE_CLI_TEST=1, RECONIX_KNOWLEDGE_CLI names a stand-in script
    (.mjs/.js run with this Node, anything else with the Python) that keeps the same contract
    (e2e/knowledge-cli-stub.mjs); without the flag it is ignored. */
 import "server-only";
@@ -49,7 +49,7 @@ export function pythonCommand(env: Env = process.env): string {
 
 /** The program and the arguments before the command: the real CLI, or (tests only) a stand-in. */
 export function cliCommand(env: Env = process.env): { program: string; prefix: string[] } {
-  const stub = env.RECONIX_TERM_TEST === "1" ? env.RECONIX_KNOWLEDGE_CLI?.trim() : "";
+  const stub = env.RECONIX_KNOWLEDGE_CLI_TEST === "1" ? env.RECONIX_KNOWLEDGE_CLI?.trim() : "";
   if (stub) {
     const script = path.resolve(/*turbopackIgnore: true*/ process.cwd(), stub); // the CLI runs from the repo root
     return { program: /\.[cm]?js$/.test(stub) ? process.execPath : pythonCommand(env), prefix: [script] };

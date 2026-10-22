@@ -1,15 +1,13 @@
 /* End-to-end tests: start the built dashboard on the sample data and drive it in Chromium.
    Run `npm run build` first. Uses Playwright's Chromium (`npx playwright install chromium`)
-   or the browser at CHROMIUM_PATH. The terminal helper runs a stand-in instead of the TUI:
-   it prints READY and echoes what is typed (needs the repo's Python with websockets). */
+   or the browser at CHROMIUM_PATH. */
 import { defineConfig, devices } from "@playwright/test";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-// E2E_PORT moves the three test ports together, so several checkouts can test at once.
+// E2E_PORT moves the test ports together, so several checkouts can test at once.
 export const PORT = Number(process.env.E2E_PORT || 3199);
 export const TOKEN = "e2e-token-0123456789abcdef";
-export const TERM_PORT = PORT - 1;
 export const LLM_PORT = PORT - 4; // e2e/llm-stub.mjs, the AI Assistant's stand-in model
 export const LIVE_PORT = PORT - 2; // a second dashboard with live refresh on (e2e/live-refresh.spec.ts)
 /** The signed-in state every spec starts from (e2e/global-setup.ts writes it once per run). */
@@ -39,9 +37,8 @@ export default defineConfig({
   /* `parallel`: the specs that share nothing, three at a time, with motion reduced (they test
      content, not the transition). Then, after it, the specs that write to the assistant's
      conversation folder or the knowledge folder on one worker (`serial-assistant`: no two of
-     them at once) and the one
-     that opens a terminal (`serial-terminal`: the helper allows two sessions); last, alone, the
-     one that needs the whole CPU for frame timing (`serial-motion`). */
+     them at once); last, alone, the one that needs the whole CPU for frame timing
+     (`serial-motion`). */
   projects: [
     {
       name: "parallel",
@@ -56,13 +53,12 @@ export default defineConfig({
       dependencies: ["parallel"],
       use: { ...DESKTOP, reducedMotion: "reduce" },
     },
-    { name: "serial-terminal", testMatch: /\/terminal\.spec\.ts$/, workers: 1, dependencies: ["parallel"], use: { ...DESKTOP, reducedMotion: "reduce" } },
-    { name: "serial-motion", testMatch: /\/motion\.spec\.ts$/, dependencies: ["serial-assistant", "serial-terminal"], use: DESKTOP },
+    { name: "serial-motion", testMatch: /\/motion\.spec\.ts$/, dependencies: ["serial-assistant"], use: DESKTOP },
   ],
   webServer: [
     {
       // the same built dashboard with live refresh on every second: only the live-refresh spec uses it
-      command: "node scripts/serve.mjs start --no-open --no-terminal",
+      command: "node scripts/serve.mjs start --no-open",
       url: `http://127.0.0.1:${LIVE_PORT}/login`,
       env: {
         RECONIX_WEB_PORT: String(LIVE_PORT),
@@ -92,9 +88,8 @@ export default defineConfig({
         RECONIX_STALE_AFTER_HOURS: "0",
         // no 10 s self-refresh under a test (a spec that wants it sets its own server)
         RECONIX_LIVE_REFRESH_MS: "0",
-        RECONIX_TERM_PORT: String(TERM_PORT),
-        RECONIX_TERM_TEST: "1",
-        RECONIX_TERM_COMMAND: "sh -c 'echo READY; exec cat'",
+        // honour RECONIX_KNOWLEDGE_CLI below (the knowledge CLI's stand-in)
+        RECONIX_KNOWLEDGE_CLI_TEST: "1",
         // keep the test server's sign-in link out of ~/.reconix/web.url (a running dashboard's)
         RECONIX_WEB_URL_FILE: path.join(tmpdir(), `reconix-e2e-${PORT}.url`),
         // the AI Assistant's saved conversations go to a test folder, never ~/.reconix/assistant
@@ -104,7 +99,7 @@ export default defineConfig({
         RECONIX_KNOWLEDGE_DIR: KNOWLEDGE_DIR,
         RECONIX_KNOWLEDGE_KEY_FILE: KNOWLEDGE_KEY_FILE,
         // the page's uploads, opens and removals run the CLI's stand-in (honoured only with
-        // RECONIX_TERM_TEST=1, above); remove this line to run them against python -m reconix.knowledge
+        // RECONIX_KNOWLEDGE_CLI_TEST=1, above); remove this line to run them against python -m reconix.knowledge
         RECONIX_KNOWLEDGE_CLI: path.join(__dirname, "e2e", "knowledge-cli-stub.mjs"),
         // the specs ask more than the default 12 questions a minute
         RECONIX_ASSISTANT_RATE_PER_MINUTE: "120",

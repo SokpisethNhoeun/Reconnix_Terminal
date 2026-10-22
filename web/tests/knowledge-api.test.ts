@@ -5,7 +5,7 @@
    Origin on every change, the 10 MB cap counted while the body is read (413), the extension
    allow-list and the .doc message, the CLI's exit codes (0 → 201, 2 → 400 with its message,
    1 → 500 with a fixed one), the temp copy removed every time, the original's headers, the id
-   checks, and the stand-in honoured only with RECONIX_TERM_TEST=1. */
+   checks, and the stand-in honoured only with RECONIX_KNOWLEDGE_CLI_TEST=1. */
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -34,7 +34,7 @@ const ORIGIN = "http://127.0.0.1:3100";
 // the keys set here, restored one by one: os.tmpdir() reads the real environment, so process.env
 // must stay the real object (never replaced by a copy)
 const KEYS = [
-  "RECONIX_WEB_TOKEN", "RECONIX_WEB_TERMINAL", "RECONIX_KNOWLEDGE_DIR", "RECONIX_KNOWLEDGE_KEY_FILE", "RECONIX_TERM_TEST",
+  "RECONIX_WEB_TOKEN", "RECONIX_KNOWLEDGE_DIR", "RECONIX_KNOWLEDGE_KEY_FILE", "RECONIX_KNOWLEDGE_CLI_TEST",
   "RECONIX_KNOWLEDGE_CLI", "RECONIX_PYTHON", "TMPDIR", "LLM_API_KEY", "LLM_BASE_URL",
 ];
 const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
@@ -51,10 +51,9 @@ beforeEach(() => {
   knowledge = path.join(root, "knowledge");
   uploads = path.join(root, "tmp");
   process.env.RECONIX_WEB_TOKEN = TOKEN;
-  process.env.RECONIX_WEB_TERMINAL = "1";
   process.env.RECONIX_KNOWLEDGE_DIR = knowledge;
   process.env.RECONIX_KNOWLEDGE_KEY_FILE = path.join(root, "knowledge.key");
-  process.env.RECONIX_TERM_TEST = "1";
+  process.env.RECONIX_KNOWLEDGE_CLI_TEST = "1";
   process.env.RECONIX_KNOWLEDGE_CLI = STUB;
   process.env.TMPDIR = uploads; // the upload copies go here (os.tmpdir() reads it on every call)
   process.env.LLM_API_KEY = "sk-never-to-the-cli"; // the stand-in refuses any key it wasn't promised
@@ -131,10 +130,10 @@ describe("the upload rules", () => {
 // --- the CLI's process -----------------------------------------------------------------------
 
 describe("the CLI's process", () => {
-  it("is the stand-in only with RECONIX_TERM_TEST=1, else python -m reconix.knowledge", () => {
-    expect(cliCommand({ RECONIX_TERM_TEST: "1", RECONIX_KNOWLEDGE_CLI: STUB, RECONIX_PYTHON: "/py" })).toEqual({ program: process.execPath, prefix: [STUB] });
+  it("is the stand-in only with RECONIX_KNOWLEDGE_CLI_TEST=1, else python -m reconix.knowledge", () => {
+    expect(cliCommand({ RECONIX_KNOWLEDGE_CLI_TEST: "1", RECONIX_KNOWLEDGE_CLI: STUB, RECONIX_PYTHON: "/py" })).toEqual({ program: process.execPath, prefix: [STUB] });
     expect(cliCommand({ RECONIX_KNOWLEDGE_CLI: STUB, RECONIX_PYTHON: "/py" })).toEqual({ program: "/py", prefix: ["-m", "reconix.knowledge"] });
-    expect(cliCommand({ RECONIX_TERM_TEST: "0", RECONIX_KNOWLEDGE_CLI: STUB, RECONIX_PYTHON: "/py" }).prefix).toEqual(["-m", "reconix.knowledge"]);
+    expect(cliCommand({ RECONIX_KNOWLEDGE_CLI_TEST: "0", RECONIX_KNOWLEDGE_CLI: STUB, RECONIX_PYTHON: "/py" }).prefix).toEqual(["-m", "reconix.knowledge"]);
   });
 
   it("gets a minimal environment: never an LLM_* key or the launch token", () => {

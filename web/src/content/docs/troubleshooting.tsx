@@ -251,13 +251,12 @@ export const troubleshooting: GroupContent = {
             rows={[
               { key: "The web dashboard folder (web/) isn't next to this install.", value: <>Run Reconix from the cloned repository, where <Mono>web/package.json</Mono> exists.</> },
               { key: "The web dashboard needs Node.js (node and npm).", value: <>Install Node.js 20 or later so <Mono>node</Mono> and <Mono>npm</Mono> are on the PATH, or start it yourself: <Mono>cd web &amp;&amp; npm run dev</Mono>.</> },
-              { key: "Another web dashboard already uses its port on 127.0.0.1 (an older one left running?). Stop it, then run /web again.", value: <>The launcher exited with code 2: its ports are taken, usually by a dashboard from an earlier session. Find it with <Mono>ss -ltnp</Mono> (or your OS&apos;s equivalent) and stop that process, then <Mono>/web</Mono> again.</> },
+              { key: "Another web dashboard already uses its port on 127.0.0.1 (an older one left running?). Stop it, then run /web again.", value: <>The launcher exited with code 2: its port is taken, usually by a dashboard from an earlier session. Find it with <Mono>ss -ltnp</Mono> (or your OS&apos;s equivalent) and stop that process, then <Mono>/web</Mono> again.</> },
               { key: "Couldn't install the web dashboard's packages.", value: <><Mono>npm install</Mono> failed; the log has the reason (network, Node version).</> },
               { key: "The web dashboard stopped while starting.", value: "It exited for another reason; read the log." },
               { key: "The web dashboard is taking a while to start.", value: "Three minutes passed without an answer; a first compile can be slow. Wait, then /web again, or read the log." },
               { key: "The web dashboard is still starting. It opens in your browser when it's ready.", value: "Not an error: a start is in progress." },
               { key: "Open it in your browser: http://127.0.0.1:…", value: "The dashboard runs but no browser could be launched here (for example over SSH): open the link yourself." },
-              { key: "You're already in the web dashboard: this is its Terminal page.", value: "Not an error: use the dashboard's sidebar." },
             ]}
           />
         </DocSection>
@@ -271,7 +270,7 @@ export const troubleshooting: GroupContent = {
         <DocSection title="Running it yourself">
           <Code>{`cd web && npm install && npm run dev       # prints a sign-in link; /web opens the same one
 RECONIX_DATA_DIR=sample-data npm run dev    # browse the bundled sample assessments
-npm run dev -- --no-terminal                # without the Terminal page (read-only)`}</Code>
+npm run dev -- --no-open                    # print the link without opening a browser`}</Code>
           <Callout>
             The dashboard binds to 127.0.0.1 only and refuses other Host headers. A dashboard the terminal started stops
             when the terminal quits; one you started yourself keeps running.

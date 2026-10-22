@@ -8,7 +8,6 @@ import {
   Layers,
   LayoutGrid,
   Sparkles,
-  TerminalSquare,
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
@@ -24,27 +23,10 @@ const VIEWS: NavItem[] = [
   { icon: Layers, label: "Assessments", view: "assessments" },
   { icon: TriangleAlert, label: "Findings", view: "findings" },
   { icon: FileText, label: "Reports", view: "reports" },
-  { icon: TerminalSquare, label: "Terminal", view: "terminal" },
 ];
-// The Terminal item always opens its view; when the terminal is off, the view says why (no dead
-// ends), and the tooltip says so up front.
-const TERMINAL_HINT = { on: "Terminal", off: "Terminal · off" } as const;
 const DOC_ITEMS: DocItem[] = [
   { icon: BookOpen, label: "Documentation", href: DOCS.home },
 ];
-
-// Logo: a 3×3 grid of rounded teal squares, 4 of the 9 dimmed (like the reference mark).
-const DIM = new Set([1, 3, 5, 7]);
-
-function Logo() {
-  return (
-    <span aria-hidden className="grid size-7 grid-cols-3 gap-[2px]">
-      {Array.from({ length: 9 }, (_, i) => (
-        <span key={i} className="rounded-[2px] bg-primary" style={{ opacity: DIM.has(i) ? 0.35 : 1 }} />
-      ))}
-    </span>
-  );
-}
 
 /** A view's own address, for the sidebar outside the viewer (the docs): a plain link to `/`. */
 const viewHref = (view: View): string => (view === "overview" ? "/" : `/?view=${view}`);
@@ -52,31 +34,20 @@ const viewHref = (view: View): string => (view === "overview" ? "/" : `/?view=${
 const NAV_CLASS = "dash-navbtn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 /**
- * The rail: the views, then the docs. Inside the viewer (`onSelect` given) a view is a button that
- * switches in place; on the docs pages (`active` null) it is a link back to that view at `/`, and
+ * The rail (no logo at its top): the views, then the docs. Inside the viewer (`onSelect` given) a
+ * view is a button that switches in place; on the docs pages (`active` null) it is a link back to that view at `/`, and
  * the Documentation item is the one marked (the docs have no other item: no Settings).
  */
-export function Sidebar({
-  active,
-  onSelect,
-  terminalState,
-}: {
-  active: View | null;
-  onSelect?: (v: View) => void;
-  terminalState: keyof typeof TERMINAL_HINT;
-}) {
+export function Sidebar({ active, onSelect }: { active: View | null; onSelect?: (v: View) => void }) {
   const pathname = usePathname();
   // every docs page marks Documentation
   const docActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   return (
     <aside className="dash-sidebar flex items-center border-border">
-      <Link href="/" aria-label="Reconix local assessment viewer" className="grid h-16 w-full place-items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <Logo />
-      </Link>
       <nav aria-label="Views" className="flex flex-1 flex-col items-center gap-2 py-3">
         {VIEWS.map((item) => {
           const Icon = item.icon;
-          const label = item.view === "terminal" ? TERMINAL_HINT[terminalState] : item.label;
+          const label = item.label;
           const content = (
             <>
               {item.view === "assistant" ? (

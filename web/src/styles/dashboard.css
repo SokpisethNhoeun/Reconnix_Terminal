@@ -409,11 +409,6 @@
   70%, 100% { box-shadow: 0 0 0 6px transparent; }
 }
 .dash-livedot { animation: dash-ping 1.6s ease-out infinite; }
-.dash-bell-dot { animation: dash-ping-amber 1.6s ease-out 0.7s infinite; box-shadow: 0 0 0 0 color-mix(in oklab, var(--warning) 55%, transparent); }
-@keyframes dash-ping-amber {
-  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--warning) 55%, transparent); }
-  70%, 100% { box-shadow: 0 0 0 6px transparent; }
-}
 @keyframes dash-gate { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
 @keyframes dash-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
@@ -518,7 +513,7 @@
 
 /* ---- Reduced motion: the dashboard's loops and enter animations off, nothing hidden ---- */
 @media (prefers-reduced-motion: reduce) {
-  .dash-livedot, .dash-bell-dot, .dash-mark[data-pending], .dash-seg[data-live], .dash-gate-mark,
+  .dash-livedot, .dash-mark[data-pending], .dash-seg[data-live], .dash-gate-mark,
   .dash-pop, .dash-details { animation: none; }
   /* inherit, not visible: under a hidden parent (the top bar beneath the open assistant) the
      controls must stay hidden and out of the tab order */

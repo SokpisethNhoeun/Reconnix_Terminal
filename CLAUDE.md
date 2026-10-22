@@ -8,8 +8,8 @@ Keyboard-first terminal UI for **Reconix**, an AI-powered security-testing
 assistant. Built with **Textual 8.x + Rich**, Python ≥ 3.9. The app runs on an
 **in-memory store** (`reconix/store/`) that plays a realistic, simulated assessment
 and is the seam for the Reconix backend. A Next.js dashboard lives in `web/` (opened with
-`/web`): the globe "Assessment Operations Center" with read-only views of the saved runs, plus
-a **Terminal** view that runs this TUI in the browser (`reconix/webterm/`).
+`/web`): the globe "Assessment Operations Center" with read-only views of the saved runs and
+the AI Assistant. Assessments run and are decided in this TUI only (the web has no terminal).
 
 Flow: **Start → Template → Plan → Approval → Execution → Findings → Finding Detail → Report**.
 Branch `classic-ui`: the original full-screen UI (53ac746) running version 1's process —
@@ -33,8 +33,8 @@ python scripts/export_tokens.py       # theme.WEB_TOKENS → web/src/styles/toke
 python scripts/export_commands.py     # COMMANDS → web/src/content/docs/commands.json (the docs'
                                       #   command reference); `--check` exits 1 when it is stale
 
-cd web && npm run dev             # web dashboard + terminal helper; RECONIX_DATA_DIR=sample-data
-                                  #   for demo data, `-- --no-terminal` for read-only
+cd web && npm run dev             # web dashboard; RECONIX_DATA_DIR=sample-data for demo data,
+                                  #   `-- --no-open` to not open a browser
 npm test                          # vitest
 npm run lint && npm run typecheck # typecheck needs `npx next typegen` (or a build) first
 npm run build && npm run e2e      # Playwright on sample-data (needs a Chromium)
@@ -50,8 +50,6 @@ drive the store; `run_ui_to(app, pilot, gate)` / `pass_gate()` drive the screens
 `store.DEMO_REQUEST` (a URL) skips the template gate; pass `ASK_REQUEST` to stop at it.
 `TEST_PASSWORD` must never show up in output, logs, reports or saved copies. The
 `web_launches` fixture stubs `web_server` (start/install/stop): no test starts a real dashboard.
-`tests/test_webterm_server.py` runs the terminal server on a free port with a stand-in
-program instead of the TUI.
 
 ## Architecture
 
@@ -86,10 +84,6 @@ reconix/
 ├── reconix.tcss      # Textual stylesheet (no hex values: $variables only)
 ├── browser.py        # open_url / open_path, detached and silent
 ├── web_server.py     # start / stop `npm run dev` in web/ quietly (log: ~/.reconix/web.log)
-├── webterm/          # the web Terminal page's server (python -m reconix.webterm):
-│                     #   settings, ticket (single use), guard (Host/Origin/ticket),
-│                     #   protocol (frames, close codes), session (+ pty_posix: pty,
-│                     #   pty_windows: ConPTY via pywinpty), server (websockets)
 ├── widgets/          # SessionBar/FlowProgress, ChoiceMenu, PromptBox, Question, RunLog,
 │                     #   ScopeManifestView, Spinner/ActivityStatus,
 │                     #   finding cells (widgets/findings.py)
@@ -190,8 +184,12 @@ Next.js 16 / React 19 with GSAP and a three.js globe (the UI came from
 the reconix-web-ui site, see `docs/WEB_GLOBE_UI_PLAN.md`; the v2 redesign in
 `docs/WEB_REDESIGN_V2_PLAN.md`; v3 — Assessments, paging, the combined report, the docs — in
 `docs/WEB_REDESIGN_V3_PLAN.md`, §5 its status). `/` is one viewer page whose views (Overview,
-Assessments, Findings, Reports, Terminal, AI Assistant) switch in-page via `?view=` (no
-Audit log view: the audit data stays in the saved files and the TUI); each view's own address
+Assessments, Findings, Reports, AI Assistant; Security knowledge from the assistant's header)
+switch in-page via `?view=` (no Audit log view: the audit data stays in the saved files and the
+TUI; no Terminal view, `/terminal` or `/api/terminal/*`: removed with `reconix/webterm`, see
+`docs/WEB_NO_TERMINAL_BELL_LOGO_PLAN.md`). The sidebar has no logo (the views, Documentation at
+the bottom) and the top bar no bell (live-refresh pill, assessment switcher, chips, docs
+search); each view's own address
 keys and every run link live in `components/dashboard/view-url.ts` (`VIEW_FILTERS`, `runHref`),
 and `viewer.tsx` marks each pane `data-view-pane` and sets `html[data-hydrated]` once interactive
 (the e2e hook). With no `?uid=` the Overview totals every saved run
@@ -250,7 +248,7 @@ model, Add model); the header has no model control; `/api/assistant/models…`,
 the active choice live in `models.json` beside the conversations, API keys AES-256-GCM-sealed
 with `models.key` (0600) and never sent to the browser; every model passes `config.ts`'s
 `checkModel`, and while nothing is chosen no model answers (there is no Environment model).
-`webterm` drops `LLM_*` from the TUI's env. Exports: a report is saved as PDF, JSON or DOCX,
+Exports: a report is saved as PDF, JSON or DOCX,
 in the TUI and the web alike (the report HTML is only the PDF's source and the combined preview,
 never a download): `GET /api/assessments/<uid>/export?format=pdf|json|docx`
 (`lib/report/formats.ts`) and `GET /api/reports/combined?uids=a,b&format=preview|pdf|docx` (signed in;
@@ -271,30 +269,19 @@ always deleted, one upload at a time and ten a minute (`docs/WEB_KNOWLEDGE_PAGE_
 **Read-only for assessments**: no route writes or deletes anything the TUI reads; the only
 writes are the assistant's own conversation and model files and the knowledge files the Security
 knowledge page adds or removes (through that CLI only; the knowledge folder is not assessment
-data), and the only things started are the Terminal
-page's TUI (the ticket route hands out a ticket; `reconix/webterm`, started by
-`web/scripts/serve.mjs`, runs the TUI, so its gates are the store's gates), the knowledge CLI and,
-for both PDF routes, a headless Chrome that prints a temp file the server wrote
-(`lib/report/pdf.ts`, `RECONIX_CHROME`; never anything the request said). Minting a ticket needs the session
-cookie, the terminal on **and** the terminal key cookie (`Path=/api/terminal`, signed differently,
-set at sign-in only while the terminal is on); a ticket is single use; the helper
-proves itself with a hello before the page sends anything; the TUI's pty is its controlling
-terminal, so
-it dies with the helper (on Windows the TUI runs in a ConPTY console the helper owns, see
-`docs/WEB_WINDOWS_PLAN.md`; keep both backends behind `webterm/session.py`'s `spawn()`). A stand-in command needs `RECONIX_TERM_TEST=1` (tests only),
-and so does the knowledge CLI's stand-in (`RECONIX_KNOWLEDGE_CLI`, `web/e2e/knowledge-cli-stub.mjs`:
-the same contract over a temp folder).
+data), and the only things started are the knowledge CLI and, for both PDF routes, a headless
+Chrome that prints a temp file the server wrote (`lib/report/pdf.ts`, `RECONIX_CHROME`; never
+anything the request said). The knowledge CLI's stand-in (`RECONIX_KNOWLEDGE_CLI`,
+`web/e2e/knowledge-cli-stub.mjs`: the same contract over a temp folder) is honoured only with
+`RECONIX_KNOWLEDGE_CLI_TEST=1` (tests only).
 Read `web/CLAUDE.md` and `web/README.md` (Rules) before changing it. This Next.js version
 differs from older ones, so check `web/node_modules/next/dist/docs/` before writing code.
 There are no roles (one local user, `docs/WEB_NO_ROLES_AND_WORKFLOW_PARITY_PLAN.md` §1): every
 page and route but the sign-in page and route needs a session (`<issued>.<signature>`; an old
-role-prefixed cookie no longer reads), and signed in everything is open; `/terminal` and
-`/api/terminal/*` also need the dashboard to host the terminal (`proxy.ts`, and the pages /
-handlers check again; guarded pages read the cookies first so none is prerendered). The ticket format lives in
-both `web/src/lib/auth/ticket.ts` and `reconix/webterm/ticket.py` (shared test vector), and
-the frame protocol in `web/src/lib/terminal/protocol.ts` and `reconix/webterm/protocol.py`:
-change each pair together. The helper never logs terminal data (`TEST_PASSWORD` test), and
-the sign-in link (full control) is printed only to a TTY, never to `~/.reconix/web.log`.
+role-prefixed cookie no longer reads), and signed in everything is open (`proxy.ts`, and the
+pages / handlers check again; guarded pages read the cookies first so none is prerendered). The
+dashboard binds to 127.0.0.1, refuses other Host headers and checks every change's Origin; the
+sign-in link is printed only to a TTY, never to `~/.reconix/web.log`.
 
 ## Project rules (applied to this TUI)
 

@@ -85,25 +85,14 @@ async def test_a_dashboard_it_started_stops_when_the_tui_quits(app, web_launches
     assert dashboard.stopped
 
 
-async def test_on_the_terminal_page_it_says_you_are_already_there(app, opened, web_launches,
-                                                                  monkeypatch):
-    monkeypatch.setenv("RECONIX_IN_WEB", "1")              # set by reconix/webterm
-    persist.WEB_URL_FILE.write_text(LINK)
-    async with app.run_test(size=SIZE) as pilot:
-        app.run_command_line("/web")
-        await settle(pilot)
-        assert opened == [] and web_launches == []
-        assert "already in the web dashboard" in _notes(app)
-
-
 def test_a_newly_added_package_triggers_an_install(monkeypatch, tmp_path):
-    (tmp_path / "package.json").write_text('{"dependencies": {"next": "1", "@xterm/xterm": "6"}}')
+    (tmp_path / "package.json").write_text('{"dependencies": {"next": "1", "gsap": "3"}}')
     (tmp_path / "node_modules" / "next").mkdir(parents=True)
     (tmp_path / "node_modules" / "next" / "package.json").write_text("{}")
     monkeypatch.setattr(web_server, "WEB_DIR", tmp_path)
-    assert real_needs_install()                         # @xterm/xterm is missing
-    (tmp_path / "node_modules" / "@xterm" / "xterm").mkdir(parents=True)
-    (tmp_path / "node_modules" / "@xterm" / "xterm" / "package.json").write_text("{}")
+    assert real_needs_install()                         # gsap is missing
+    (tmp_path / "node_modules" / "gsap").mkdir(parents=True)
+    (tmp_path / "node_modules" / "gsap" / "package.json").write_text("{}")
     assert not real_needs_install()
 
 
@@ -117,7 +106,7 @@ def test_its_log_is_private(monkeypatch, tmp_path):
     assert (log.stat().st_mode & 0o777) == 0o600 and log.read_text() == "old\nnew\n"
 
 
-def test_the_dashboard_runs_its_terminal_with_this_python(monkeypatch, tmp_path):
+def test_the_dashboard_runs_its_knowledge_cli_with_this_python(monkeypatch, tmp_path):
     seen = {}
 
     class Popen:

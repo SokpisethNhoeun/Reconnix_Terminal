@@ -335,8 +335,8 @@ export const assessmentGuide: GroupContent = {
           <p>
             Each decision (approved or rejected, the operator, the request hash, the time) goes into the assessment, the
             activity log, the audit trail, the report&apos;s approvals list and the saved copy. The dashboard shows a
-            request that waits on you in its bell and on the Overview&apos;s Execution Timeline; decisions are only
-            ever made in the terminal.
+            request that waits on you on the Overview&apos;s Execution Timeline; decisions are only ever made in the
+            terminal.
           </p>
         </DocSection>
       </>

@@ -157,7 +157,9 @@ const NoticeCardSchema = z
     title: short,
     body: line,
     steps: z.array(line).max(6),
-    action: z.enum(["terminal"]).nullable(), // the button shows while the terminal is on; nothing acts from the chat
+    // always null now; an older saved card's "terminal" (the removed Terminal view's button)
+    // still reads, and shows nothing. Nothing acts from the chat.
+    action: z.enum(["terminal"]).nullable(),
   })
   .strict();
 

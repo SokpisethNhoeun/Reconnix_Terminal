@@ -32,11 +32,6 @@ def problem() -> str:
     return ""
 
 
-def in_browser_terminal() -> bool:
-    """This TUI runs on the dashboard's Terminal page (reconix/webterm sets RECONIX_IN_WEB)."""
-    return os.environ.get("RECONIX_IN_WEB") == "1"
-
-
 def needs_install() -> bool:
     """Some of its packages aren't installed yet (the first start, or new ones were added)."""
     try:
@@ -69,7 +64,8 @@ def install() -> bool:
 def start(data_dir: Path, url_file: Path) -> subprocess.Popen:
     """`npm run dev` in the background, reading `data_dir` and writing its link to `url_file`
     (the places the TUI saves to and reads from). It opens the browser when it's ready.
-    Its Terminal page runs this same Python (RECONIX_PYTHON)."""
+    Its Security knowledge page runs the knowledge CLI with this same Python
+    (RECONIX_PYTHON)."""
     env = {**os.environ, "RECONIX_DATA_DIR": str(data_dir),
            "RECONIX_WEB_URL_FILE": str(url_file), "RECONIX_PYTHON": sys.executable}
     url_file.unlink(missing_ok=True)      # a link left by a dashboard that died is stale
@@ -106,7 +102,7 @@ def _signal(process: subprocess.Popen, sig: int) -> None:
 
 def _kill_tree(process: subprocess.Popen) -> None:
     """Windows: end npm and everything it started (terminating npm.cmd alone would leave
-    Node, Next.js and the terminal helper running)."""
+    Node and Next.js running)."""
     subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                    stderr=subprocess.DEVNULL, check=False)

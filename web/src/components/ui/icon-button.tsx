@@ -1,5 +1,5 @@
 /* A small square icon button with a tooltip and an accessible name (the label is both): the
-   terminal's toolbar, the finding detail's Previous / Next. Children are one lucide icon. */
+   finding detail's Previous / Next. Children are one lucide icon. */
 import * as React from "react";
 import { cn } from "@/lib/utils";
 

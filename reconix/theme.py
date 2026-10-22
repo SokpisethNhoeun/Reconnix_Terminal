@@ -60,9 +60,6 @@ CSS_TOKENS: Dict[str, str] = {
     "violet-bg": VIOLET_BG,
 }
 
-# The web Terminal page shows the TUI itself, which is dark in both web themes.
-TERMINAL_WEB_TOKENS: Dict[str, str] = {"term-bg": BG, "term-text": TEXT, "term-cursor": CYAN}
-
 # Web dashboard (web/) — the dark Security-Operations-Center console from the reconix-web-ui
 # site (globe dashboard). Teal `primary` for active states, chart fills and rings; amber
 # `accent` for approval gates / MEDIUM; green `success` for pass / LOW; red `danger` for
@@ -82,7 +79,6 @@ WEB_TOKENS: Dict[str, Dict[str, str]] = {
         # `info` = informational; the severity scale is the TUI's own (SEVERITY below)
         "warning": "#E7C183", "info": INFO,
         "sev-critical": CRITICAL_WEB, "sev-high": HIGH, "sev-medium": MEDIUM, "sev-low": LOW,
-        **TERMINAL_WEB_TOKENS,
     },
 }
 
