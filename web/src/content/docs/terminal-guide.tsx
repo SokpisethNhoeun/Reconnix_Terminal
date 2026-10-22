@@ -64,9 +64,10 @@ export const terminalGuide: GroupContent = {
         <DocSection title="6 · Findings and 7 · Finding Detail">
           <p>
             The list: filter (<Kbd>f</Kbd>), sort (<Kbd>s</Kbd>), triage (<Kbd>t</Kbd>), import tool output (<Kbd>i</Kbd>),
-            open one (<Kbd>Enter</Kbd>). The detail: description, affected URL, evidence (masked), impact, remediation,
+            open one (<Kbd>Enter</Kbd>), chat about the assessment (<Kbd>c</Kbd>). The detail: description, affected URL, evidence (masked), impact, remediation,
             references and CVSS; <Kbd>[</Kbd>/<Kbd>]</Kbd> step to the previous or next finding in the same filter and
-            sort, <Kbd>r</Kbd> jumps to the report, <Kbd>←</Kbd> goes back to the list. See{" "}
+            sort, <Kbd>r</Kbd> jumps to the report, <Kbd>c</Kbd> chats about the finding, <Kbd>←</Kbd> goes back to
+            the list. See{" "}
             <DocLink href="/docs/reports/understanding-findings">Understanding findings</DocLink>.
           </p>
         </DocSection>
@@ -74,8 +75,8 @@ export const terminalGuide: GroupContent = {
           <p>
             The executive summary, findings by severity, the key findings and the changes since the last assessment of
             the same target, with the export buttons (<Kbd>p</Kbd> PDF, <Kbd>j</Kbd> JSON, <Kbd>w</Kbd> DOCX) and{" "}
-            <Kbd>b</Kbd> for the web dashboard. Exports are available once the
-            assessment completes. See <DocLink href="/docs/reports/reviewing">Reviewing results</DocLink>.
+            <Kbd>b</Kbd> for the web dashboard, and <Kbd>c</Kbd> to chat about the assessment. Exports are
+            available once the assessment completes. See <DocLink href="/docs/reports/reviewing">Reviewing results</DocLink>.
           </p>
         </DocSection>
         <DocSection title="Dialogs and forms">
@@ -144,9 +145,9 @@ export const terminalGuide: GroupContent = {
               { key: "Plan", value: <><Kbd>Enter</Kbd> select; <Kbd>Tab</Kbd> switch between the menu and the steps; <Kbd>Esc</Kbd> back.</> },
               { key: "Approval", value: <><Kbd>Enter</Kbd> select; <Kbd>d</Kbd> details (scope limits, exact request, audit trail); <Kbd>Esc</Kbd> decide later.</> },
               { key: "Execution", value: <><Kbd>Enter</Kbd> continue (open what the run waits for); <Kbd>Ctrl+C</Kbd> stop the run, after a confirmation; <Kbd>End</Kbd> jump to the newest output line and follow it again; <Kbd>Esc</Kbd> back to the plan.</> },
-              { key: "Findings", value: <><Kbd>Enter</Kbd> open the finding; <Kbd>f</Kbd> filter; <Kbd>s</Kbd> cycle the sort; <Kbd>t</Kbd> triage; <Kbd>i</Kbd> import tool output; <Kbd>Esc</Kbd> back.</> },
-              { key: "Finding Detail", value: <><Kbd>t</Kbd> triage; <Kbd>r</Kbd> report; <Kbd>[</Kbd> / <Kbd>]</Kbd> previous / next finding (same filter and sort); <Kbd>←</Kbd> or <Kbd>Esc</Kbd> back to the list.</> },
-              { key: "Report", value: <><Kbd>p</Kbd> PDF, <Kbd>j</Kbd> JSON, <Kbd>w</Kbd> DOCX, <Kbd>b</Kbd> web dashboard; <Kbd>Esc</Kbd> back.</> },
+              { key: "Findings", value: <><Kbd>Enter</Kbd> open the finding; <Kbd>f</Kbd> filter; <Kbd>s</Kbd> cycle the sort; <Kbd>t</Kbd> triage; <Kbd>i</Kbd> import tool output; <Kbd>c</Kbd> chat; <Kbd>Esc</Kbd> back.</> },
+              { key: "Finding Detail", value: <><Kbd>t</Kbd> triage; <Kbd>r</Kbd> report; <Kbd>c</Kbd> chat about this finding; <Kbd>[</Kbd> / <Kbd>]</Kbd> previous / next finding (same filter and sort); <Kbd>←</Kbd> or <Kbd>Esc</Kbd> back to the list.</> },
+              { key: "Report", value: <><Kbd>p</Kbd> PDF, <Kbd>j</Kbd> JSON, <Kbd>w</Kbd> DOCX, <Kbd>b</Kbd> web dashboard; <Kbd>c</Kbd> chat; <Kbd>Esc</Kbd> back.</> },
             ]}
           />
           <Callout>
@@ -258,14 +259,18 @@ export const terminalGuide: GroupContent = {
             <li>
               While the run waits for the target login, the chat is closed: &quot;Reconix is waiting for the target login.
               Press Enter on the Execution screen to open the secure input; never paste credentials into the chat.&quot;
-              The line is not recorded.
+              The line is not recorded. A run stopped at the login refuses it too, so a pasted password never
+              reaches the chat or a model.
             </li>
           </ul>
         </DocSection>
         <DocSection title="After a run">
           <p>
-            Once the run has completed or stopped, a new target starts a fresh assessment; the finished one stays
-            listed under <Mono>/assessments</Mono>.
+            Once the run has completed or stopped, every line you type is chat about the same assessment, with its
+            history and findings. An empty line opens Findings (or the Report when there are none). <Mono>/new</Mono>,{" "}
+            <Mono>/assess &lt;target&gt;</Mono> or <Mono>/template</Mono> start another assessment; the finished one
+            stays listed under <Mono>/assessments</Mono>. On Findings, Finding Detail and the Report, <Kbd>c</Kbd>{" "}
+            opens the chat.
           </p>
         </DocSection>
         <DocSection title="With a model and the harness">
