@@ -1,11 +1,12 @@
 "use client";
 
-/* The assistant's header: its name, what the open conversation is about (a run, or every run)
-   with that scope's status, the Model menu (the model that answers, local or remote; switch or
-   add one), History, New chat and minimize (back to the dashboard). */
+/* The assistant's header: the Reconix mark (the terminal's ◆) and its name, what the open
+   conversation is about (a run, or every run) with that scope's status, the Model menu (the
+   model that answers, local or remote; switch or add one), History, New chat and minimize (back
+   to the dashboard). */
 import { Crosshair, Minimize2, SquarePen } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
-import { AssistantOrb } from "./assistant-orb";
+import { ReconixMark } from "@/components/ui/reconix-mark";
 import { useAssistant } from "./assistant-provider";
 import { ConversationMenu } from "./conversation-menu";
 import { ModelMenu } from "./model-menu";
@@ -18,7 +19,7 @@ export function AssistantHeader({ onMinimize }: { onMinimize: () => void }) {
   return (
     <header data-assistant-piece className="ai-header">
       <div className="ai-brand">
-        <AssistantOrb size={26} className="shrink-0" />
+        <ReconixMark size={26} className="shrink-0" />
         <h1 className="ai-title">Reconix AI Assistant</h1>
       </div>
       <span className="ai-divider" aria-hidden />

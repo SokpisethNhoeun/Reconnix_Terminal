@@ -1,8 +1,9 @@
 "use client";
 
 /* One 6-second breathing cycle shared by everything that breathes: the sidebar's AI icon, the
-   globe behind the assistant (motion.css) and the small orbs. Nothing that holds text breathes:
-   the chat panel and its card stay still (the owner's rule: scaled text vibrates while reading).
+   globe behind the assistant (motion.css) and the glow of a reply's mark while it is written
+   (message.tsx). Nothing that holds text breathes: the chat panel and its card stay still (the
+   owner's rule: scaled text vibrates while reading).
    Every loop is aligned to the page clock (performance.now() and the document timeline share an
    origin): rest at each multiple of BREATH_MS, the peak half-way, so they swell and settle
    together.
@@ -17,11 +18,11 @@ import { gsap } from "gsap";
 
 export const BREATH_MS = 6_000;
 
-/** A negative delay that puts a loop started now in phase with the page clock (the orbs). */
+/** A negative delay that puts a loop started now in phase with the page clock (a live mark). */
 export const breathDelay = () => `-${Math.round(performance.now() % BREATH_MS)}ms`;
 
 /** `{ animationDelay }` for a breathing element, set after mount (the server has no clock), and
-    only while it is `active` (a still orb needs no phase; it gets one as it starts). */
+    only while it is `active` (a still mark needs no phase; it gets one as it starts). */
 export function useBreathPhase(active = true): React.CSSProperties | undefined {
   const [delay, setDelay] = useState<string>();
   useEffect(() => {

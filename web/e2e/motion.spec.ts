@@ -1,6 +1,7 @@
 /* The dashboard ↔ AI Assistant transition (components/assistant/motion.ts, assistant-stage.tsx):
    its directions and timing sampled frame by frame, the one globe carried behind the welcome and
-   faded out once the conversation starts, the history entry and rapid clicks, the direct address,
+   faded out once the conversation starts, a reply's mark glowing while it is written (the header's
+   still), the history entry and rapid clicks, the direct address,
    phones and reduced motion. The globe runs on SwiftShader here, so the timing tests hide its
    canvas (the carrier still travels) to keep the frames coming. Times are measured from the first
    frame that moves, with room for a slow (2–4 core) machine. */
@@ -305,6 +306,27 @@ test("text never moves: once a conversation shows, the panel, the card and every
     await expect(page.locator(still)).toHaveCSS("animation-name", "none");
     await expect(page.locator(still)).toHaveCSS("transform", "none");
   }
+});
+
+test("a reply's mark glows on the breathing cycle while it is written; the marks never scale", async ({ page }) => {
+  await ready(page);
+  await tab(page).click();
+  await settled(page);
+  const logo = page.locator(".ai-header [data-reconix-mark]");
+  await expect(logo).toHaveCSS("animation-name", "none"); // the header's logo holds still
+  await expect(logo).toHaveCSS("transform", "none");
+  await composer(page).fill("Tell me the whole story [stub:long]"); // stays open until Stop
+  await composer(page).press("Enter");
+  const live = log(page).locator(".ai-row-assistant > [data-reconix-mark][data-live]");
+  await expect(live).toHaveCount(1);
+  await expect(live).toHaveCSS("animation-name", "dash-mark-live");
+  await expect(live).toHaveCSS("animation-duration", "6s");
+  await expect(live).toHaveAttribute("style", /animation-delay: ?-\d+ms/); // in phase with the page clock
+  await expect(live).toHaveCSS("transform", "none"); // a glow only
+  await clickMoving(page, page.getByRole("button", { name: "Stop the answer" }));
+  await expect(log(page).getByText("Stopped")).toBeVisible();
+  await expect(live).toHaveCount(0);
+  await expect(log(page).locator(".ai-row-assistant > [data-reconix-mark]")).toHaveCSS("animation-name", "none");
 });
 
 test("open and close keep the address (run and filters), the scroll position and the page", async ({ page }) => {

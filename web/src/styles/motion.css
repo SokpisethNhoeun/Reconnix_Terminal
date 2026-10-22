@@ -1,5 +1,5 @@
 /* Motion: the sidebar and its AI item, the AI Assistant's stage (its layers, the open and close
-   animation's resting states, the carried globe), the breathing loops and the AI orb.
+   animation's resting states, the carried globe), the breathing loops and a live mark's glow.
    Owner: animation and navigation. */
 
 /* ---- Sidebar ---- */
@@ -223,40 +223,21 @@
 @keyframes dash-breath-globe-glow-in { from { opacity: 0.7; } to { opacity: 1; } }
 @keyframes dash-breath-globe-glow { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
 
-/* The AI orb: the globe's colours as a small sphere with a dot texture and a halo, breathing on
-   the same cycle (useBreathPhase puts it in phase with the page clock). */
-.dash-orb {
-  position: relative;
-  display: inline-block;
-  border-radius: 50%;
-  background: radial-gradient(circle at 34% 30%,
-    color-mix(in oklab, var(--primary-strong) 85%, var(--foreground)) 0%,
-    var(--primary) 24%,
-    color-mix(in oklab, var(--globe-glow) 70%, transparent) 50%,
-    color-mix(in oklab, var(--primary-dim) 55%, transparent) 69%,
-    transparent 71%);
-  animation: dash-orb-breathe var(--breath-period, 6s) ease-in-out infinite;
-}
-.dash-orb-dots {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background-image: radial-gradient(circle, color-mix(in oklab, var(--globe-dot) 80%, transparent) 0.6px, transparent 1.1px);
-  background-size: 4px 4px;
-  -webkit-mask-image: radial-gradient(circle at 50% 50%, var(--foreground) 58%, transparent 70%);
-  mask-image: radial-gradient(circle at 50% 50%, var(--foreground) 58%, transparent 70%);
-  opacity: 0.6;
-}
-@keyframes dash-orb-breathe {
-  0%, 100% { transform: scale(0.98); filter: drop-shadow(0 0 3px color-mix(in oklab, var(--globe-glow) 45%, transparent)); }
-  50% { transform: scale(1.02); filter: drop-shadow(0 0 12px color-mix(in oklab, var(--globe-glow) 70%, transparent)); }
+/* A live Reconix mark (ui/reconix-mark.tsx with data-live: the avatar of a reply being written,
+   message.tsx) glows on the same cycle (useBreathPhase puts it in phase with the page clock). A
+   glow only: the mark never scales, and a written reply's mark and the header's hold still. */
+[data-reconix-mark][data-live] { animation: dash-mark-live var(--breath-period, 6s) ease-in-out infinite; }
+@keyframes dash-mark-live {
+  0%, 100% { filter: drop-shadow(0 0 2px color-mix(in oklab, var(--globe-glow) 30%, transparent)); }
+  50% { filter: drop-shadow(0 0 10px color-mix(in oklab, var(--globe-glow) 70%, transparent)); }
 }
 
-/* Reduced motion: no breathing scale and no loops; a still halo marks the open assistant. */
+/* Reduced motion: no breathing scale and no loops; a still halo marks the open assistant (and a
+   still glow the reply being written). */
 @media (prefers-reduced-motion: reduce) {
-  .dash-frame[data-breathing] [data-breath], .dash-orb { animation: none; }
+  .dash-frame[data-breathing] [data-breath], [data-reconix-mark][data-live] { animation: none; }
   .dash-frame[data-breathing] .dash-ai-halo { opacity: 0.6; }
   .dash-frame[data-breathing] .dash-assistant-halo-glow { opacity: 0.85; }
-  .dash-orb { filter: drop-shadow(0 0 8px color-mix(in oklab, var(--globe-glow) 55%, transparent)); }
+  [data-reconix-mark][data-live] { filter: drop-shadow(0 0 6px color-mix(in oklab, var(--globe-glow) 55%, transparent)); }
   .dash-navbtn, .dash-navbtn::after { transition: none; }
 }

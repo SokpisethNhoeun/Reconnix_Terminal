@@ -117,10 +117,15 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   context; `use-globe.ts`) and sits behind the welcome at about 18 % opacity; once a
   conversation has messages it fades out and stops drawing (also when hidden, or on low-power
   devices, where it holds a still frame).
+- **The mark:** the header and each reply show the terminal's logo, the cyan ◆ on its dark tile
+  (`components/ui/reconix-mark.tsx`, drawn as the favicon `app/icon.svg`; tokens `--surface`
+  and `--globe-glow`, the TUI's cyan). It holds still, except that a reply's mark glows while
+  the reply is being written.
 - **Breathing** (`breath.ts`, `styles/motion.css`): one 6 s cycle shared by the sidebar's AI
-  icon and the globe/orb, started once the open has settled, on its own layer. Nothing that
-  holds text breathes: the chat panel and its card are static once messages exist (scaled text
-  vibrates while reading); reduced motion shows a still halo instead.
+  icon, the globe and a live reply's mark (a glow, never a scale), started once the open has
+  settled, on its own layer. Nothing that holds text breathes: the chat panel and its card are
+  static once messages exist (scaled text vibrates while reading); reduced motion shows a still
+  halo (and a still glow) instead.
 
 - **Model:** any OpenAI-compatible endpoint, as the product docs' "Model switching": set
   `LLM_BASE_URL` and `LLM_MODEL` in the environment `/web` starts from or in `web/.env.local`
