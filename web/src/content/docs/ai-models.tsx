@@ -285,11 +285,41 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
         </DocSection>
         <DocSection title="Knowledge in the web assistant">
           <p>
-            The web assistant also uses the files you added with <Mono>/add-on</Mono> in the terminal. It reads{" "}
-            <Mono>~/.reconix/knowledge</Mono> and never changes it; with each question it sends only the passages that
-            match it (at most four, 4,000 characters, secrets masked) as reference material the model must not take orders
-            from, and the answer ends with a muted <strong>Knowledge used: a.md, b.pdf</strong> line. A file removed with{" "}
-            <Mono>/add-on</Mono> is no longer used from the next question on.
+            The web assistant also uses the files you added with <Mono>/add-on</Mono> in the terminal, and the ones
+            uploaded on its <DocRef>Security knowledge page</DocRef>. With each question it reads{" "}
+            <Mono>~/.reconix/knowledge</Mono> and sends only the passages that match it (at most four, 4,000 characters,
+            secrets masked) as reference material the model must not take orders from, and the answer ends with a muted{" "}
+            <strong>Knowledge used: a.md, b.pdf</strong> line. A file removed with <Mono>/add-on</Mono> or on the page is
+            no longer used from the next question on.
+          </p>
+        </DocSection>
+        <DocSection title="Security knowledge page">
+          <p>
+            The <strong>Security knowledge</strong> button in the AI Assistant&apos;s header (a book with a lock; just the
+            icon on a phone) opens the page of knowledge files; <strong>← AI Assistant</strong> goes back. It is for
+            operators only: a viewer sees neither the button nor the page.
+          </p>
+          <DocTable
+            caption="The Security knowledge page"
+            head={["Part", "What it does"]}
+            rows={[
+              { key: "Table / Grid", value: "Each file's Name (with its type's icon), Source (Web upload or Terminal (/add-on), with the type and size, for example Web upload · PDF · 1.2 MB) and Uploaded (your local date and time), as rows or as cards, ten a page. Your choice is remembered in this browser; a phone starts on the grid." },
+              { key: "Search", value: "Narrows the list to the files whose name holds what you type." },
+              { key: "Upload", value: "One .docx, .pdf, .txt, .md, .json, .yaml or .yml file of up to 10 MB. A .doc is refused with “Save it as .docx first”. The dialog shows the upload's progress, then the server's answer: a refusal keeps the dialog open with the reason." },
+              { key: "Open", value: "The file as it was added: PDF, text, Markdown, JSON and YAML open in a new tab (shown as text, nothing in them can run), a Word file is downloaded. A file added before originals were kept can't be opened: add it again." },
+              { key: "Remove", value: "Asks first (No is the default), then removes the file, its passages and its original." },
+            ]}
+          />
+          <p>
+            An upload is handled by the same code as <Mono>/add-on</Mono>: the dashboard copies the file to a private temporary
+            file (0600 in a 0700 folder) and runs <Mono>python -m reconix.knowledge add</Mono> on it, then deletes the copy.
+            The text is checked, masked and split into passages exactly as in the terminal, and the original is kept
+            encrypted on this computer (<Mono>&lt;id&gt;.orig</Mono> in the knowledge folder, with the key in{" "}
+            <Mono>~/.reconix/knowledge.key</Mono>, 0600). The model still only ever sees the masked passages. Opening and
+            removing go through the same command (<Mono>original</Mono>, <Mono>remove</Mono>). The command runs with the
+            dashboard&apos;s Python (<Mono>RECONIX_PYTHON</Mono>, else the repository&apos;s <Mono>.venv</Mono>), fixed
+            arguments, a minimal environment that never holds a model key, and a 60-second limit. One upload runs at a time,
+            ten a minute; the folder holds at most 50 files.
           </p>
         </DocSection>
       </>
