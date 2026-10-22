@@ -12,9 +12,9 @@ from .base import ReconixScreen
 from .. import store, theme
 from ..widgets.findings import cvss_text, severity_bars, severity_text, triage_text
 
-# (button id, key, label) for the quick export buttons; "more" opens every format.
-QUICK_EXPORTS = (("html", "h", "HTML"), ("pdf", "p", "PDF"), ("docx", "w", "DOCX"),
-                 ("json", "j", "JSON"))
+# (format id, key, label): a button and a key per report format (PDF, JSON, DOCX), the same
+# three that /export offers. The bindings and the buttons are both built from this.
+EXPORTS = (("pdf", "p", "PDF"), ("json", "j", "JSON"), ("docx", "w", "DOCX"))
 
 
 def executive_summary() -> str:
@@ -44,11 +44,7 @@ class ReportScreen(ReconixScreen):
     mode_name = "REPORT"
 
     BINDINGS = [
-        Binding("h", "export('html')", "export HTML"),
-        Binding("p", "export('pdf')", "export PDF"),
-        Binding("w", "export('docx')", "export DOCX"),
-        Binding("j", "export('json')", "export JSON"),
-        Binding("e", "more_formats", "more formats"),
+        *(Binding(key, f"export('{fid}')", f"export {label}") for fid, key, label in EXPORTS),
         Binding("b", "web", "web dashboard"),
         Binding("escape", "back", "back", show=False),
     ]
@@ -112,20 +108,16 @@ class ReportScreen(ReconixScreen):
     @staticmethod
     def _buttons(ready: bool) -> Iterable[Button]:
         formats = {f.id: f for f in store.list_report_formats()}
-        for i, (fid, key, label) in enumerate(QUICK_EXPORTS):
+        for i, (fid, key, label) in enumerate(EXPORTS):
             available = formats[fid].available
             text = f"{key}  {label}" if available else f"{label} (not installed)"
             yield Button(text, id=fid, classes="primary" if i == 0 else "ghost-cyan",
                          disabled=not (ready and available))
-        yield Button("e  More…", id="more", classes="ghost-cyan", disabled=not ready)
         yield Button("b  Web dashboard", id="web", classes="ghost-cyan")
 
     # --- actions ----------------------------------------------------------------------------
     def action_export(self, fmt: str) -> None:
         self.app.export_report(fmt)
-
-    def action_more_formats(self) -> None:
-        self.app.run_command_line("/export")
 
     def action_web(self) -> None:
         self.app.open_web_dashboard()
@@ -138,7 +130,5 @@ class ReportScreen(ReconixScreen):
         button = event.button.id
         if button == "web":
             self.action_web()
-        elif button == "more":
-            self.action_more_formats()
         else:
             self.action_export(button)

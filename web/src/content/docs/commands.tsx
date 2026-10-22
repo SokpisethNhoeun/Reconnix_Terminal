@@ -192,8 +192,8 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
     example: "/report",
     behaviour: (
       <>
-        Same as <Kbd>8</Kbd>. The buttons <Kbd>h</Kbd> HTML, <Kbd>p</Kbd> PDF, <Kbd>w</Kbd> DOCX, <Kbd>j</Kbd> JSON and{" "}
-        <Kbd>e</Kbd> more formats are enabled once the run completed; <Kbd>b</Kbd> opens the web dashboard. See{" "}
+        Same as <Kbd>8</Kbd>. The buttons <Kbd>p</Kbd> PDF, <Kbd>j</Kbd> JSON and <Kbd>w</Kbd> DOCX are enabled once
+        the run completed; <Kbd>b</Kbd> opens the web dashboard. See{" "}
         <DocLink href="/docs/reports/reviewing">Reviewing results</DocLink>.
       </>
     ),
@@ -202,22 +202,22 @@ export const COMMAND_DOCS: Record<string, CommandDoc> = {
   export: {
     purpose: "Writes the report in a format to ./reports/ and offers to open it.",
     when: "After the assessment completed. From any screen; the Report screen's keys do the same.",
-    syntax: "/export [html | pdf | docx | sarif | csv | json | markdown]",
+    syntax: "/export [pdf | json | docx]",
     example: "/export pdf",
     behaviour: (
       <>
         With a format, the file <Mono>./reports/&lt;assessment id&gt;.&lt;ext&gt;</Mono> is written (relative to where
         Reconix was launched) and a dialog &quot;Saved … Open it now?&quot; offers to open it in the browser or the
-        default app. Without a format, a menu &quot;Export the report as…&quot; lists the seven formats; PDF and DOCX are
-        dimmed when their engine is missing. The path is kept on the Report screen and in <Mono>/summary</Mono>. See{" "}
+        default app. Without a format, a menu &quot;Export the report as…&quot; lists the three formats; PDF is dimmed
+        without a PDF engine, DOCX without python-docx. The path is kept on the Report screen and in <Mono>/summary</Mono>. See{" "}
         <DocLink href="/docs/reports/exporting">Exporting</DocLink>.
       </>
     ),
     errors: [
       { message: "The report is available once the assessment is complete.", meaning: "The run is still going or was stopped." },
-      { message: "(the \u201cExport the report as…\u201d menu opens)", meaning: "An argument that is not one of the seven format ids is not an error: the menu opens instead." },
+      { message: "(the \u201cExport the report as…\u201d menu opens)", meaning: "An argument that is not one of the three format ids is not an error: the menu opens instead." },
       { message: "<Format> reports aren't in this demo.", meaning: "PDF without WeasyPrint or Chrome, or DOCX without python-docx." },
-      { message: "PDF export needs WeasyPrint or a Chrome/Chromium browser. / Couldn't render the PDF with the browser. / The browser did not produce a PDF.", meaning: "The PDF engine is missing or failed; export HTML and print it." },
+      { message: "PDF export needs WeasyPrint or a Chrome/Chromium browser. / Couldn't render the PDF with the browser. / The browser did not produce a PDF.", meaning: "The PDF engine is missing or failed; export DOCX or JSON instead." },
       { message: "Couldn't open it. The report is saved at <path>.", meaning: "The file is written but no browser or app could be launched here." },
     ],
   },

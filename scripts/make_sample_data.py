@@ -199,11 +199,11 @@ def main() -> None:
     snapshots = []
     snapshots += session(datetime(2026, 9, 28, 9, 12, tzinfo=utc), [
         dict(text="Review the source repository git@git.example.com:shop/storefront.git "
-                  "for security issues.", fmt="markdown"),
+                  "for security issues.", fmt="docx"),
     ])
     snapshots += session(datetime(2026, 9, 30, 16, 5, tzinfo=utc), [
         dict(text="Test the REST API at https://api.example.com/v1 for security issues.",
-             fmt="markdown"),
+             fmt="docx"),
     ])
     snapshots += session(datetime(2026, 10, 3, 10, 15, tzinfo=utc), [
         dict(text="Scan the network host 192.0.2.10 for exposed services.", fmt="json"),
@@ -211,7 +211,7 @@ def main() -> None:
              high="reject", imports=NUCLEI, gap=12),
     ])
     snapshots += session(datetime(2026, 10, 5, 14, 3, tzinfo=utc), [
-        dict(text="Assess https://staging.example.com for web security issues.", fmt="markdown",
+        dict(text="Assess https://staging.example.com for web security issues.", fmt="docx",
              imports=NUCLEI.split("\n")[0]),
         dict(text="Review the source repository git@git.example.com:shop/storefront.git "
                   "for security issues.", high="wait", gap=6),

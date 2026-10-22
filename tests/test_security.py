@@ -2,15 +2,17 @@
 
 import dataclasses
 import json
+import zipfile
 
 import pytest
 
 from reconix import store
 from reconix.models import Secret
-from reconix.store import lists
-from reconix.store.report_markdown import md
+from reconix.models.scope import PolicyVerdict
+from reconix.store import lists, report
+from reconix.store.report_html import render_html
 
-from .support import ASK_REQUEST, TEST_PASSWORD, play_until_gate, run_to
+from .support import ASK_REQUEST, TEST_PASSWORD, play_until_gate, run_to, run_to_end
 
 HIGH = "approval-002"
 
@@ -81,23 +83,71 @@ def test_reports_never_leave_the_reports_folder(reports_dir, bad_id):
     assert not any(reports_dir.parent.parent.glob("escape*"))
 
 
-def test_markdown_escapes_run_text(reports_dir):
-    run_to(None)
-    lists.current().findings[0].title = "x | ![img](http://evil.example/p.png) [link](http://e.example)"
-    lists.current().findings[0].evidence.append("``` break out")
-    store.generate_report("markdown")
-    text = (reports_dir / "RCX-DEMO-001.md").read_text()
-    assert "![img](" not in text and "[link](" not in text
-    assert "\\|" in text
-    assert "````" in text                     # the fence is longer than the evidence's run
-    assert md("a|b") == "a\\|b"
-
-
 def test_json_report_is_valid_and_has_no_secret(reports_dir):
     run_to(None)
     store.generate_report("json")
     data = json.loads((reports_dir / "RCX-DEMO-001.json").read_text())
     assert TEST_PASSWORD not in json.dumps(data)
+
+
+KEY_BODY = "MIIBOgIBAAJBAKs3cr3tKeyB0dyL1ne"
+
+
+def _secrets_everywhere_a_report_prints() -> None:
+    """The test password in a blocked request, an approval's reason and operator and the scope's
+    tools and excluded paths, and a private key stored one evidence entry per line."""
+    store.start_run(store.DEMO_REQUEST)
+    assert play_until_gate() == "scope"
+    store.edit_scope(tools=["Nuclei", f"api_key={TEST_PASSWORD}"],
+                     excluded_paths=["/admin", f"/backup?token={TEST_PASSWORD}"])
+    store.approve_scope()
+    run_to_end()
+    current = lists.current()
+    current.verdicts += [
+        PolicyVerdict("GET", f"https://admin:{TEST_PASSWORD}@staging.example.com/x", False,
+                      "Host outside approved scope"),
+        PolicyVerdict("GET", f"/export?token={TEST_PASSWORD}", False,
+                      f"Path outside approved scope (password={TEST_PASSWORD})"),
+    ]
+    current.decisions[0] = dataclasses.replace(
+        current.decisions[0], reason=f"ok, Authorization: Bearer {TEST_PASSWORD}",
+        operator=f"https://analyst:{TEST_PASSWORD}@sso.example.com")
+    current.findings[0].evidence[:] = ["GET /backup/key.pem → 200",
+                                       "-----BEGIN RSA PRIVATE KEY-----", KEY_BODY,
+                                       "-----END RSA PRIVATE KEY-----"]
+
+
+def test_no_report_shows_a_secret_from_the_scope_the_policy_or_the_approvals(reports_dir):
+    _secrets_everywhere_a_report_prints()
+    texts = {"html (the PDF)": render_html(store.report_data())}
+    store.generate_report("json")
+    texts["json"] = (reports_dir / "RCX-DEMO-001.json").read_text("utf-8")
+    if report.HAS_DOCX:
+        store.generate_report("docx")
+        with zipfile.ZipFile(reports_dir / "RCX-DEMO-001.docx") as docx:
+            texts["docx"] = "".join(docx.read(n).decode("utf-8") for n in docx.namelist()
+                                    if n.endswith((".xml", ".rels")))
+    for name, text in texts.items():
+        assert TEST_PASSWORD not in text, name
+        assert KEY_BODY not in text, name
+        assert "staging.example.com/x" in text, name           # the blocked row is there
+        assert "(private key)" in text, name
+    data = json.loads(texts["json"])
+    assert data["scope"]["tools"] == ["Nuclei", "api_key=••••"]
+    assert data["approvals"][0]["operator"] == "https://••••@sso.example.com"
+    assert data["findings"][0]["evidence"] == ["GET /backup/key.pem → 200",
+                                               "•••• (private key)"]
+    if report.HAS_DOCX:
+        assert "/backup?token=••••" in texts["docx"]
+        assert "https://••••@sso.example.com" in texts["docx"]
+
+
+def test_the_saved_copy_masks_a_private_key_split_over_evidence_entries():
+    from reconix.store import snapshot
+
+    _secrets_everywhere_a_report_prints()
+    saved = json.dumps(snapshot.snapshot(lists.current()), ensure_ascii=False)
+    assert KEY_BODY not in saved and TEST_PASSWORD not in saved
 
 
 # --- review round 2 ---------------------------------------------------------------------------

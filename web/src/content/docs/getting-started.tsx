@@ -12,7 +12,7 @@ export const gettingStarted: GroupContent = {
             repository or a local path); Reconix picks a template, drafts a <strong>scope manifest</strong> and shows it in
             plain words. Nothing is tested until you approve it. You then review the <strong>test plan</strong>, run it,
             and the run pauses at every risky step for your decision. Findings appear as testing finds them, and the{" "}
-            <strong>report</strong> can be exported in seven formats.
+            <strong>report</strong> can be saved as PDF, JSON or DOCX.
           </p>
           <p>
             The flow is eight screens: Start → Template → Plan → Approval → Execution → Findings → Finding Detail → Report.
@@ -51,7 +51,7 @@ export const gettingStarted: GroupContent = {
               { key: "Store", value: "The authority: every decision goes through a store function that validates it. Holds the run, the scope, the policy engine, the approvals and the findings." },
               { key: "LLM layer", value: "Providers and the active model (/provider, /model). Keys are encrypted in ~/.reconix/llm.db; the model is called through LiteLLM and can only propose text." },
               { key: "Backend harness", value: "Optional (backend/). The AI agent behind /assess: plans, runs tools through a Kali MCP server, reports findings into the store." },
-              { key: "Reports", value: "HTML, PDF, DOCX, SARIF, CSV, JSON and Markdown written to ./reports/." },
+              { key: "Reports", value: "PDF, JSON and DOCX written to ./reports/." },
               { key: "Web dashboard", value: "Optional (web/, started by /web). Read-only views of the saved runs, a Terminal page that runs this TUI in the browser, and an AI Assistant." },
             ]}
           />
@@ -102,7 +102,6 @@ export const gettingStarted: GroupContent = {
             head={["Feature", "Needs"]}
             rows={[
               { key: "PDF export", value: <>WeasyPrint (a Python package with system libraries), or a Chrome/Chromium browser on the machine: Reconix looks for google-chrome, google-chrome-stable, chromium, chromium-browser and chrome on the PATH, the usual Linux and macOS install paths, and Chrome or Edge on Windows. <Mono>RECONIX_CHROME</Mono> points at another binary. Without either, the PDF button reads &quot;not installed&quot;.</> },
-              { key: "DOCX export", value: <>The <Mono>python-docx</Mono> package (<Mono>pip install python-docx</Mono>; it is in <Mono>requirements-dev.txt</Mono>).</> },
               { key: "/web dashboard", value: <>Node.js 20 or later with npm. The first <Mono>/web</Mono> runs <Mono>npm install</Mono> in <Mono>web/</Mono>, which takes a few minutes.</> },
               { key: "A model", value: <>An API key for OpenAI, Anthropic or DeepSeek, a local Ollama, or any OpenAI-compatible endpoint. See <DocLink href="/docs/ai-models">AI models</DocLink>.</> },
               { key: "/assess (the AI agent)", value: <>A model, the backend harness (<Mono>pip install -e backend</Mono>, which needs <strong>Python 3.10 or later</strong>) and a reachable Kali MCP server configured in <Mono>.env</Mono>. See <DocLink href="/docs/assessment-guide/ai-agent">The AI agent</DocLink>.</> },
@@ -144,8 +143,7 @@ python -m pip install -e .`}</Code>
           </p>
         </DocSection>
         <DocSection title="Optional extras">
-          <Code>{`pip install python-docx            # the DOCX export
-pip install -r requirements-dev.txt  # pytest, pytest-asyncio and python-docx (to run the tests)
+          <Code>{`pip install -r requirements-dev.txt  # pytest and pytest-asyncio (to run the tests)
 pip install -e backend               # the AI agent's harness, for /assess
 cp .env.example .env                 # the model and Kali MCP settings (edit it)`}</Code>
           <p>
@@ -257,9 +255,9 @@ python run.py         # the launcher in the repository root`}</Code>
               detail screen.
             </li>
             <li>
-              <strong>Report.</strong> When the run completes, press <Kbd>h</Kbd> to export the HTML report (or{" "}
-              <Kbd>p</Kbd> PDF, <Kbd>w</Kbd> DOCX, <Kbd>j</Kbd> JSON, <Kbd>e</Kbd> for every format). The file lands in{" "}
-              <Mono>./reports/</Mono> and a dialog offers to open it.
+              <strong>Report.</strong> When the run completes, press <Kbd>p</Kbd> to export the PDF report (or{" "}
+              <Kbd>j</Kbd> JSON, <Kbd>w</Kbd> DOCX). The file lands in <Mono>./reports/</Mono> and a dialog offers to
+              open it.
             </li>
           </Steps>
         </DocSection>

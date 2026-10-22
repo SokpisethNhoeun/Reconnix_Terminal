@@ -315,7 +315,7 @@ export function renderCombinedHtml(r: CombinedReport, now: Date = new Date()): s
     sheet("limitations", `<section class="block">${limitations(r.limitations)}</section>${foot("Reconix — Confidential", tag)}`),
     sheet("appendix", `<section class="block">${appendix(r)}</section>${foot("Reconix — Confidential", `${tag} · End of report`)}`),
   ].join("");
-  const body = `<div class="toolbar"><span class="hint">&#8681; Press Ctrl+P / &#8984;P to save as PDF</span></div><main class="doc">${sheets}</main>`;
+  const body = `<main class="doc">${sheets}</main>`;
   return (
     `<!doctype html>\n<html lang="en"><head><meta charset="utf-8">${META_CSP}<meta name="viewport" content="width=device-width, initial-scale=1">` +
     `<title>Reconix Combined Report — ${plural(r.summary.runs, "run")}</title><style>${CSS}${EXTRA_CSS}</style></head><body>${body}</body></html>\n`

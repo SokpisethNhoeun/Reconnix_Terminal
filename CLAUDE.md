@@ -21,7 +21,7 @@ see `docs/CLASSIC_UI_PLAN.md`.
 source .venv/bin/activate
 pip install -r requirements.txt
 python -m reconix                 # run the app (or: python run.py / reconix)
-pip install -r requirements-dev.txt   # pytest + pytest-asyncio + python-docx
+pip install -r requirements-dev.txt   # pytest + pytest-asyncio (python-docx is a runtime dep)
 pytest -q                         # store tests + Textual Pilot tests (~70 s)
 pytest -q tests/test_store_run.py             # one file
 pytest -q tests/test_gates_ui.py::test_name   # one test   (or: pytest -q -k approval)
@@ -224,11 +224,13 @@ vectors in `web/tests/redact-vectors.json` check both), streams NDJSON frames wi
 server builds from the saved data (`lib/assistant/cards.ts`; the model never supplies numbers,
 and nothing is run or approved from the chat), and keeps conversations on disk
 (`lib/assistant/history-store.ts`, `~/.reconix/assistant`, 0700/0600, 30-day retention).
-`webterm` drops `LLM_*` from the TUI's env. Exports: `GET /api/assessments/<uid>/export?format=`
-(`lib/report/formats.ts`) and `GET /api/reports/combined?uids=a,b&format=html|pdf` (viewer; 1–5
-saved runs combined in memory from the saved, already-redacted files, `lib/report/combined/`,
-the query validated first; the HTML inline, the PDF printed by the same headless Chrome as the
-single export, 501 with the HTML link without one).
+`webterm` drops `LLM_*` from the TUI's env. Exports: a report is saved as PDF, JSON or DOCX,
+in the TUI and the web alike (the report HTML is only the PDF's source and the combined preview,
+never a download): `GET /api/assessments/<uid>/export?format=pdf|json|docx`
+(`lib/report/formats.ts`) and `GET /api/reports/combined?uids=a,b&format=preview|pdf|docx` (viewer;
+1–5 saved runs combined in memory from the saved, already-redacted files, `lib/report/combined/`,
+the query validated first; the preview inline, the PDF printed by the same headless Chrome as the
+single export, 501 with the DOCX link without one; the Word files come from `lib/report/docx/`).
 **Read-only for assessments**: no route writes or deletes anything the TUI reads; the only
 writes are the assistant's own conversation files, and the only things started are the Terminal
 page's TUI (the ticket route hands out a ticket; `reconix/webterm`, started by

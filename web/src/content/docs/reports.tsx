@@ -1,5 +1,6 @@
 import { Callout, Code, DocLink, DocSection, DocTable, Kbd, Mono, Steps } from "@/components/docs-primitives";
 import type { GroupContent } from "@/content/docs/types";
+import { DOCX_MAX_MIB } from "@/lib/report/formats";
 
 export const reports: GroupContent = {
   reviewing: {
@@ -118,7 +119,7 @@ export const reports: GroupContent = {
     ),
   },
   exporting: {
-    lede: "Seven formats, written to ./reports/ once the assessment is complete.",
+    lede: "Three formats (PDF, JSON and DOCX), written to ./reports/ once the assessment is complete.",
     body: (
       <>
         <DocSection title="The formats">
@@ -126,22 +127,18 @@ export const reports: GroupContent = {
             caption="The report formats the terminal exports"
             head={["Format (file)", "What it is and what it needs"]}
             rows={[
-              { key: "HTML (.html)", value: "The styled report, page 1 the executive summary: open it in a browser, print it to PDF yourself. Always available." },
-              { key: "PDF (.pdf)", value: <>The same report printed to PDF by WeasyPrint when installed, otherwise by a headless Chrome/Chromium on the machine. Shown as &quot;not installed&quot; without either. See <DocLink href="/docs/getting-started/requirements">Requirements</DocLink>.</> },
-              { key: "DOCX (.docx)", value: <>An editable Word document. Needs the <Mono>python-docx</Mono> package.</> },
-              { key: "SARIF (.sarif)", value: "Findings for CI and code scanning (SARIF 2.1): one rule per weakness, one result per finding." },
-              { key: "CSV (.csv)", value: "Findings as a spreadsheet, one row per finding." },
+              { key: "PDF (.pdf)", value: <>The styled report, page 1 the executive summary, printed to PDF by WeasyPrint when installed, otherwise by a headless Chrome/Chromium on the machine. Shown as &quot;not installed&quot; without either. See <DocLink href="/docs/getting-started/requirements">Requirements</DocLink>.</> },
               { key: "JSON (.json)", value: "The complete report data, machine-readable." },
-              { key: "Markdown (.md)", value: "A readable text document." },
+              { key: "DOCX (.docx)", value: <>The same report as an editable Word document, every section included. Uses the <Mono>python-docx</Mono> package (installed with Reconix).</> },
             ]}
           />
         </DocSection>
         <DocSection title="How to export">
           <Steps>
             <li>
-              On the Report screen: <Kbd>h</Kbd> HTML, <Kbd>p</Kbd> PDF, <Kbd>w</Kbd> DOCX, <Kbd>j</Kbd> JSON, or{" "}
-              <Kbd>e</Kbd> for the full list. Or <Mono>/export</Mono> from anywhere, with the format or without (a menu
-              asks); <Kbd>r</Kbd> on a finding jumps to the Report screen.
+              On the Report screen: <Kbd>p</Kbd> PDF, <Kbd>j</Kbd> JSON, <Kbd>w</Kbd> DOCX. Or <Mono>/export</Mono>{" "}
+              from anywhere, with the format or without (a menu asks); <Kbd>r</Kbd> on a finding jumps to the Report
+              screen.
             </li>
             <li>
               The file is written to <Mono>./reports/&lt;assessment id&gt;.&lt;ext&gt;</Mono>, relative to the folder you
@@ -153,9 +150,9 @@ export const reports: GroupContent = {
               <Mono>/summary</Mono> can open it again.
             </li>
           </Steps>
-          <Code>{`/export html     # ./reports/<id>.html
-/export pdf
-/export sarif`}</Code>
+          <Code>{`/export pdf      # ./reports/<id>.pdf
+/export json
+/export docx`}</Code>
         </DocSection>
         <DocSection title="What a report contains">
           <p>
@@ -175,7 +172,7 @@ export const reports: GroupContent = {
               { key: "(the \u201cExport the report as…\u201d menu opens)", value: "An argument that is not a format id is not refused: /export opens its menu instead." },
               { key: "<Format> reports aren't in this demo.", value: "PDF without WeasyPrint or Chrome, or DOCX without python-docx." },
               { key: "PDF export needs WeasyPrint or a Chrome/Chromium browser.", value: "Neither PDF engine was found at export time." },
-              { key: "Couldn't render the PDF with the browser. / The browser did not produce a PDF.", value: "Chrome was found but printing failed; the HTML export still works." },
+              { key: "Couldn't render the PDF with the browser. / The browser did not produce a PDF.", value: "Chrome was found but printing failed; the DOCX and JSON exports still work." },
               { key: "The assessment id can't be used as a file name. / Reports can only be saved in the reports folder.", value: "The id contains characters that could leave ./reports/." },
             ]}
           />
@@ -187,7 +184,7 @@ export const reports: GroupContent = {
     ),
   },
   dashboard: {
-    lede: "The web dashboard reads the saved runs: download one run's report in five formats, and combine up to five runs into one report.",
+    lede: "The web dashboard reads the saved runs: download one run's report as PDF, JSON or DOCX, and combine up to five runs into one report.",
     body: (
       <>
         <DocSection title="Opening it">
@@ -208,16 +205,14 @@ export const reports: GroupContent = {
             caption="The dashboard's export formats for one run"
             head={["Format", "What it is"]}
             rows={[
-              { key: "PDF", value: "The styled report printed to PDF on this computer by a headless Chrome; page 1 is the one-page executive summary. Without one the route answers 501 with a link to the HTML export and the hint \"PDF export needs a Chrome/Chromium browser on the dashboard machine (set RECONIX_CHROME). Download the HTML report instead and print it to PDF.\"" },
-              { key: "HTML", value: "The same report as one self-contained page." },
+              { key: "PDF", value: "The styled report printed to PDF on this computer by a headless Chrome; page 1 is the one-page executive summary. Without one the route answers 501 with a link to the Word export and the hint \"PDF export needs a Chrome/Chromium browser on the dashboard machine (set RECONIX_CHROME). Download the Word (DOCX) report instead.\"" },
               { key: "JSON", value: "The complete saved assessment, exactly as the terminal wrote it (evidence already masked)." },
-              { key: "CSV", value: "One row per finding: id, severity, CVSS, status, category, location, CWE/OWASP, remediation." },
-              { key: "SARIF", value: "SARIF 2.1, one result per finding, for CI and code-scanning dashboards." },
+              { key: "DOCX", value: "The same report as an editable Word document, with every section of the PDF." },
             ]}
           />
           <p>
-            PDF and HTML can be previewed in the browser before downloading. With no run chosen, the Reports view sums up
-            every saved run and lists them in a table; each row opens that run&apos;s report.
+            Every format is a download. With no run chosen, the Reports view sums up every saved run and lists them in a
+            table; each row opens that run&apos;s report and offers the same three downloads.
           </p>
         </DocSection>
         <DocSection title="The combined report">
@@ -232,17 +227,19 @@ export const reports: GroupContent = {
               appendix.
             </li>
             <li>
-              <strong>Preview:</strong> the very HTML the PDF prints, shown in a sandboxed frame.
+              <strong>Preview:</strong> exactly what the PDF prints, shown in a sandboxed frame.
             </li>
             <li>
-              <strong>Generate:</strong> the dashboard fetches the finished file and downloads it, as one PDF (or HTML,
-              from the same renderer).
+              <strong>Generate PDF or Generate DOCX</strong> (once the preview is shown): the dashboard fetches the
+              finished file and downloads it as one PDF or one Word document. Without a browser to print with, the PDF
+              offers the Word document instead; a Word document over {DOCX_MAX_MIB} MB of text is refused with the reason (leave the
+              evidence out, or save the PDF).
             </li>
           </Steps>
           <p>
             The combined report has ten sections and counts <strong>unique findings</strong> (same title, weakness and
             target) separately from their <strong>occurrences</strong> across runs. It is built on request from the saved
-            files by <Mono>GET /api/reports/combined?uids=…&amp;format=pdf|html</Mono>, which needs the viewer role,
+            files by <Mono>GET /api/reports/combined?uids=…&amp;format=preview|pdf|docx</Mono>, which needs the viewer role,
             accepts one to five valid run ids (otherwise 400), only reads, and writes nothing. Missing data, a failed
             preview and a failed export each show their own state. The terminal keeps its own per-run export; combining
             runs is web-only.

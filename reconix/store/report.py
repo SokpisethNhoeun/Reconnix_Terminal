@@ -1,6 +1,8 @@
 """The assessment report: its contents, the formats, and writing it to ./reports/.
 
-Reports never contain the test account. Evidence is already masked in the findings.
+Three formats: PDF (printed from the styled HTML report, report_html.py), JSON (exactly
+`report_data()`) and DOCX (the editable Word document). Reports never contain the test account.
+Evidence is already masked in the findings.
 """
 
 import json
@@ -17,12 +19,8 @@ from .assessment import get_assessment
 from .errors import StoreValidationError
 from .findings import confirmed_count, findings_line, list_findings, review_count
 from .redact import redact_all
-from .report_csv import render_csv
 from .report_docx import HAS_DOCX, write_docx
-from .report_html import render_html
-from .report_markdown import render_markdown
 from .report_pdf import HAS_PDF, write_pdf
-from .report_sarif import render_sarif
 from .retest import retest
 from .scope import blocked_count, get_scope, is_scope_approved, list_verdicts
 from .templates import selected_template
@@ -34,13 +32,9 @@ SAFE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
 BINARY_FORMATS = {"docx", "pdf"}
 
 REPORT_FORMATS = (
-    ReportFormat("html", "HTML", "Styled report — open in a browser, print to PDF", "html"),
     ReportFormat("pdf", "PDF", "The styled report as a PDF", "pdf", available=HAS_PDF),
-    ReportFormat("docx", "DOCX", "Editable Word document", "docx", available=HAS_DOCX),
-    ReportFormat("sarif", "SARIF", "Findings for CI / code scanning (SARIF 2.1)", "sarif"),
-    ReportFormat("csv", "CSV", "Findings as a spreadsheet", "csv"),
     ReportFormat("json", "JSON", "Machine-readable export", "json"),
-    ReportFormat("markdown", "Markdown", "Readable text document", "md"),
+    ReportFormat("docx", "DOCX", "Editable Word document", "docx", available=HAS_DOCX),
 )
 
 REPORT_SECTIONS = (
@@ -149,17 +143,9 @@ def _report_path(assessment_id: str, extension: str) -> Path:
     return REPORTS_DIR / path.name
 
 
-def _render_text(format_id: str, data: Dict[str, Any]) -> str:
-    """The text body for a text report format."""
-    if format_id == "json":
-        return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
-    if format_id == "html":
-        return render_html(data)
-    if format_id == "sarif":
-        return render_sarif(data)
-    if format_id == "csv":
-        return render_csv(data)
-    return render_markdown(data)
+def _render_json(data: Dict[str, Any]) -> str:
+    """The JSON report: exactly `report_data()`."""
+    return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
 
 
 def generate_report(format_id: str) -> str:
@@ -174,15 +160,13 @@ def generate_report(format_id: str) -> str:
     if fmt.id in BINARY_FORMATS:
         (write_pdf if fmt.id == "pdf" else write_docx)(data, path)
     else:
-        path.write_text(_render_text(fmt.id, data), encoding="utf-8")
+        path.write_text(_render_json(data), encoding="utf-8")
     shown = _display_path(path)
     run.report_path = shown
     run.progress["report"] = 100
     add_activity("USER", f"Report format: {fmt.name}")
     add_activity("SYS", f"Report saved · {shown}", tone="ok")
-    hint = (" Open it in a browser, then use Print / Save as PDF to export a PDF."
-            if fmt.id == "html" else "")
-    add_chat("text", "reconix", f"Report saved: {shown}.{hint}", tone="ok")
+    add_chat("text", "reconix", f"Report saved: {shown}.", tone="ok")
     log_event("report.generated", shown)
     return shown
 

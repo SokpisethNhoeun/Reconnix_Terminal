@@ -188,7 +188,7 @@ stays still.
 | Assessment planning | A progress card for the run's plan phases. For "Plan a new assessment": guidance only, plus **Open Terminal** (planning happens in the TUI) | Saved plan / Terminal |
 | Tool execution | Tools used: steps and times (from the log; nothing runs) | Saved timeline |
 | Approval requests | Pending and decided approvals, with "Decide in the TUI" and **Open Terminal** (operators). **Nothing can be approved from the chat.** | Saved approvals |
-| Report generation | Download links: PDF, HTML, JSON, CSV, SARIF (with all runs shown, it asks for a run first) | Existing export route |
+| Report generation | Download links: PDF, JSON, DOCX (2026-10-21; it was PDF, HTML, JSON, CSV, SARIF) (with all runs shown, it asks for a run first) | Existing export route |
 | Errors / restrictions | An error card with the reason and what to do (model not set up, viewer role, too many questions, can't act) | Route |
 
 - **Composer:**

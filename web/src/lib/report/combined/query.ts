@@ -24,7 +24,7 @@ export const CombinedQuerySchema = z.object({
         .max(COMBINE_MAX, `at most ${COMBINE_MAX} runs can be combined`)
         .refine((list) => new Set(list).size === list.length, "a run is listed twice"),
     ),
-  format: z.enum(["html", "pdf"]).default("html"),
+  format: z.enum(["preview", "pdf", "docx"]).default("preview"),
   evidence: flag,
   low: flag,
   appendix: flag,

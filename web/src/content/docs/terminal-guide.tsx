@@ -73,8 +73,8 @@ export const terminalGuide: GroupContent = {
         <DocSection title="8 · Report">
           <p>
             The executive summary, findings by severity, the key findings and the changes since the last assessment of
-            the same target, with the export buttons (<Kbd>h</Kbd> HTML, <Kbd>p</Kbd> PDF, <Kbd>w</Kbd> DOCX, <Kbd>j</Kbd>{" "}
-            JSON, <Kbd>e</Kbd> more formats) and <Kbd>b</Kbd> for the web dashboard. Exports are available once the
+            the same target, with the export buttons (<Kbd>p</Kbd> PDF, <Kbd>j</Kbd> JSON, <Kbd>w</Kbd> DOCX) and{" "}
+            <Kbd>b</Kbd> for the web dashboard. Exports are available once the
             assessment completes. See <DocLink href="/docs/reports/reviewing">Reviewing results</DocLink>.
           </p>
         </DocSection>
@@ -146,7 +146,7 @@ export const terminalGuide: GroupContent = {
               { key: "Execution", value: <><Kbd>Enter</Kbd> continue (open what the run waits for); <Kbd>Ctrl+C</Kbd> stop the run, after a confirmation; <Kbd>End</Kbd> jump to the newest output line and follow it again; <Kbd>Esc</Kbd> back to the plan.</> },
               { key: "Findings", value: <><Kbd>Enter</Kbd> open the finding; <Kbd>f</Kbd> filter; <Kbd>s</Kbd> cycle the sort; <Kbd>t</Kbd> triage; <Kbd>i</Kbd> import tool output; <Kbd>Esc</Kbd> back.</> },
               { key: "Finding Detail", value: <><Kbd>t</Kbd> triage; <Kbd>r</Kbd> report; <Kbd>[</Kbd> / <Kbd>]</Kbd> previous / next finding (same filter and sort); <Kbd>←</Kbd> or <Kbd>Esc</Kbd> back to the list.</> },
-              { key: "Report", value: <><Kbd>h</Kbd> HTML, <Kbd>p</Kbd> PDF, <Kbd>w</Kbd> DOCX, <Kbd>j</Kbd> JSON, <Kbd>e</Kbd> more formats, <Kbd>b</Kbd> web dashboard; <Kbd>Esc</Kbd> back.</> },
+              { key: "Report", value: <><Kbd>p</Kbd> PDF, <Kbd>j</Kbd> JSON, <Kbd>w</Kbd> DOCX, <Kbd>b</Kbd> web dashboard; <Kbd>Esc</Kbd> back.</> },
             ]}
           />
           <Callout>

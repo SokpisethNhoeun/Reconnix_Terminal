@@ -78,7 +78,7 @@ Public surface is `reconix/store/__init__.py`.
 | Findings | `list_findings`, `get_finding`, `import_findings`, `import_findings_content` | `GET /runs/{id}/findings`, `POST …/import` | yes (analyse) |
 | Triage | `triage_finding` (status / severity override) | `POST …/findings/{fid}/triage` | no (analyst) |
 | Retest & trend | `retest`, `severity_trend`, `compare_findings` | `GET …/retest`, `GET …/trend` | yes (narrate) |
-| Reports | `generate_report` (html, pdf, docx, sarif, csv, json, markdown) | `POST …/report?format=` | draft only |
+| Reports | `generate_report` (pdf, json, docx) | `POST …/report?format=` | draft only |
 | Report | `generate_report`, `report_data`, `report_file`, `assessment_summary` | `POST /runs/{id}/report` | narrative only; data authoritative |
 | Chat | `say_to_assistant(text)`, `list_chat`, `list_activity` | `POST /runs/{id}/messages` | yes (answer) |
 

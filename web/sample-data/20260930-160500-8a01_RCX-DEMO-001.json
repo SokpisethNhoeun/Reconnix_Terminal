@@ -40,7 +40,7 @@
       "analysis": 100,
       "report": 100
     },
-    "report_path": "./reports/RCX-DEMO-001.md"
+    "report_path": "./reports/RCX-DEMO-001.docx"
   },
   "login": {
     "kind": "cookie",
@@ -811,7 +811,7 @@
       "type": "activity",
       "who": "USER",
       "kind": "line",
-      "text": "Report format: Markdown",
+      "text": "Report format: DOCX",
       "tone": "default",
       "rows": []
     },
@@ -821,7 +821,7 @@
       "type": "activity",
       "who": "SYS",
       "kind": "line",
-      "text": "Report saved · ./reports/RCX-DEMO-001.md",
+      "text": "Report saved · ./reports/RCX-DEMO-001.docx",
       "tone": "ok",
       "rows": []
     },
@@ -831,7 +831,7 @@
       "type": "chat",
       "who": "reconix",
       "kind": "text",
-      "text": "Report saved: ./reports/RCX-DEMO-001.md.",
+      "text": "Report saved: ./reports/RCX-DEMO-001.docx.",
       "tone": "ok",
       "rows": []
     }

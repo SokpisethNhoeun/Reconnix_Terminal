@@ -71,13 +71,14 @@ export const troubleshooting: GroupContent = {
             </li>
           </ul>
           <p>
-            Meanwhile, export HTML (<Kbd>h</Kbd>) and print it to PDF from your browser.
+            Meanwhile, export the Word document (<Kbd>w</Kbd>) or the JSON (<Kbd>j</Kbd>): neither needs a PDF engine.
           </p>
         </DocSection>
         <DocSection title="No DOCX">
           <p>
-            &quot;DOCX (not installed)&quot;: <Mono>pip install python-docx</Mono> in the same virtual environment, then
-            restart.
+            &quot;DOCX (not installed)&quot;: <Mono>python-docx</Mono> is installed with Reconix, so the install skipped its
+            dependencies. Run <Mono>pip install -r requirements.txt</Mono> (or <Mono>pip install python-docx</Mono>) in the
+            same virtual environment, then restart.
           </p>
         </DocSection>
         <DocSection title="No AI agent">
@@ -208,7 +209,7 @@ export const troubleshooting: GroupContent = {
             <li>
               <strong>&quot;Couldn&apos;t render the PDF with the browser.&quot; / &quot;The browser did not produce a
               PDF.&quot;</strong> Chrome was found but printing failed (a broken install, no write access to a temp
-              folder). Export HTML and print it, or set <Mono>RECONIX_CHROME</Mono> to another browser.
+              folder). Export DOCX instead, or set <Mono>RECONIX_CHROME</Mono> to another browser.
             </li>
             <li>
               <strong>An operating-system error</strong> (permission denied, disk full) is shown as it is: the file goes to{" "}

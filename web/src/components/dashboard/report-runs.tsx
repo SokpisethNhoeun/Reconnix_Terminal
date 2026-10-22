@@ -1,7 +1,8 @@
 "use client";
 
 /* Every saved run as a row of the Report view (newest first): the shared cells (run-cells.tsx;
-   the run's name opens that run's report) and its PDF and HTML reports to download. A search
+   the run's name opens that run's report) and its report to download in every export format
+   (PDF, JSON and DOCX: EXPORT_FORMATS, the same three the TUI saves). A search
    narrows the rows by ID, template, target or status; ten rows show at a time. With a
    `selection`, each row gets a checkbox to put the run in the combined report
    (report-selection.tsx owns which are chosen); once the most are chosen, the others are
@@ -19,10 +20,9 @@ import { EmptyNote } from "@/components/ui/empty-note";
 import { Pagination } from "@/components/ui/pagination";
 import { DOCS } from "@/lib/docs-nav";
 import { paginate, slicePage } from "@/lib/paging";
-import { downloadHref, exportSpec } from "@/lib/report/formats";
+import { downloadHref, EXPORT_FORMATS } from "@/lib/report/formats";
 
 const SEARCH_FROM = 7; // runs before a search field is worth it
-const QUICK = ["pdf", "html"] as const; // the other formats are on the run's own report
 // status is positioned: its sr-only "waiting on" text then overflows the table's scroller, not the page
 const CELL_CLASS: Partial<Record<RunCellProps["column"], string>> = { target: "max-w-[220px]", status: "relative", plan: "text-right" };
 
@@ -119,16 +119,16 @@ export function ReportRuns({ runs, selection }: { runs: ReportRunRow[]; selectio
                     after={
                       <td>
                         <span className="flex gap-1.5">
-                          {QUICK.map((id) => (
+                          {EXPORT_FORMATS.map((f) => (
                             <a
-                              key={id}
-                              href={downloadHref(r.uid, id)}
+                              key={f.id}
+                              href={downloadHref(r.uid, f.id)}
                               download
-                              aria-label={`Download the ${exportSpec(id).title} of ${r.id} (${r.when})`}
-                              title={exportSpec(id).blurb}
+                              aria-label={`Download the ${f.title} of ${r.id} (${r.when})`}
+                              title={f.blurb}
                               className="dash-chip h-[24px] border border-border px-2 text-[11px] text-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
-                              {exportSpec(id).label}
+                              {f.label}
                             </a>
                           ))}
                         </span>

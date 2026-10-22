@@ -62,7 +62,7 @@ export function welcomePrompts(views: AssessmentView[]): WelcomePrompt[] {
     out.push({
       kind: "report",
       title: "Generate a report",
-      detail: one ? "PDF, HTML, JSON, CSV or SARIF" : "Pick a run, then download",
+      detail: one ? "PDF, JSON or DOCX" : "Pick a run, then download",
       question: "Generate a report",
     });
   }

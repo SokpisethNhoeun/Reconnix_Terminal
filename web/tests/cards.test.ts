@@ -42,6 +42,13 @@ describe("readIntent", () => {
     ["How do I see which tools were used?", ["tools"]],
     ["What tools do you have?", ["tools"]],
     ["Create a report for the latest assessment", ["report"]],
+    // the three formats by name, a Word file without the word "report", and the gone ones still ask
+    ["Can I get it as a docx?", ["report"]],
+    ["Send me the Word document", ["report"]],
+    ["Is there a word file of this?", ["report"]],
+    ["Give me the JSON", ["report"]],
+    ["Where is the SARIF?", ["report"]],
+    ["The word count is high", []],
     ["What is the status of the scan?", ["progress"]],
     ["Did the run finish?", ["progress"]],
     ["Was anything blocked by the policy?", ["policy"]],

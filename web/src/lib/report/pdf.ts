@@ -1,7 +1,7 @@
 /* Print the HTML report to PDF with a headless Chrome/Chromium on the dashboard machine
    (no extra Node dependencies). `RECONIX_CHROME` names the browser; otherwise the usual
    names on PATH and the common install locations are tried. Returns null when none exists;
-   the export route then answers 501 with a hint and a link to the HTML export. The paths it
+   the export route then answers 501 with a hint and a link to the Word (DOCX) export. The paths it
    probes are outside the project on purpose (turbopackIgnore, as lib/data/store.ts). */
 import "server-only";
 

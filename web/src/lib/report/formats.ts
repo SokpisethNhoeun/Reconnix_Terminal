@@ -2,7 +2,10 @@
    downloads and the API route both read, so they can never disagree. Pure metadata and URL
    helpers; safe to import from client components. */
 
-export type ExportFormat = "pdf" | "html" | "json" | "csv" | "sarif";
+/** The Word document's media type (a plain constant: client code imports this file). */
+export const DOCX_MEDIA = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+export type ExportFormat = "pdf" | "json" | "docx";
 
 export interface ExportSpec {
   id: ExportFormat;
@@ -16,6 +19,8 @@ export interface ExportSpec {
   blurb: string;
 }
 
+/** The three formats a report is saved in, everywhere (the TUI's /export offers the same). The
+    report HTML is only the PDF's source and the combined report's preview: never a download. */
 export const EXPORT_FORMATS: readonly ExportSpec[] = [
   {
     id: "pdf",
@@ -26,14 +31,6 @@ export const EXPORT_FORMATS: readonly ExportSpec[] = [
     blurb: "The styled security report, printed to PDF on this computer. Page 1 is the one-page executive summary.",
   },
   {
-    id: "html",
-    label: "HTML",
-    title: "HTML report",
-    ext: "html",
-    media: "text/html; charset=utf-8",
-    blurb: "The same report as one self-contained web page: open it anywhere, or print it yourself.",
-  },
-  {
     id: "json",
     label: "JSON",
     title: "JSON snapshot",
@@ -42,26 +39,25 @@ export const EXPORT_FORMATS: readonly ExportSpec[] = [
     blurb: "The complete saved assessment, exactly as the terminal app wrote it (evidence already masked).",
   },
   {
-    id: "csv",
-    label: "CSV",
-    title: "CSV spreadsheet",
-    ext: "csv",
-    media: "text/csv; charset=utf-8",
-    blurb: "Findings as a spreadsheet: one row per finding, for tracking and triage outside Reconix.",
-  },
-  {
-    id: "sarif",
-    label: "SARIF",
-    title: "SARIF 2.1",
-    ext: "sarif",
-    media: "application/sarif+json; charset=utf-8",
-    blurb: "Findings for CI and code-scanning dashboards (SARIF 2.1, one result per finding).",
+    id: "docx",
+    label: "DOCX",
+    title: "Word document",
+    ext: "docx",
+    media: DOCX_MEDIA,
+    blurb: "The same report as an editable Word document, to annotate or hand over (evidence already masked).",
   },
 ];
 
 /** The 501 the PDF routes answer, and the Report view repeats, when no browser can print. */
 export const NO_PRINTER =
-  "PDF export needs a Chrome/Chromium browser on the dashboard machine (set RECONIX_CHROME). Download the HTML report instead and print it to PDF.";
+  "PDF export needs a Chrome/Chromium browser on the dashboard machine (set RECONIX_CHROME). Download the Word (DOCX) report instead.";
+
+/** The most text a Word report holds (its document.xml, in MB): past it both DOCX routes answer
+    413 with DOCX_TOO_LARGE (lib/report/docx/ooxml.ts enforces it). */
+export const DOCX_MAX_MIB = 16;
+
+/** The 413 the DOCX routes answer, and the Report view repeats, when a report is too large. */
+export const DOCX_TOO_LARGE = `This report is too large for a Word document (over ${DOCX_MAX_MIB} MB of text). Download the PDF or the JSON instead, or leave the evidence out of a combined report.`;
 
 export const isExportFormat = (value: string): value is ExportFormat =>
   EXPORT_FORMATS.some((f) => f.id === value);
@@ -72,6 +68,6 @@ export function exportSpec(id: ExportFormat): ExportSpec {
 
 export const exportFileName = (uid: string, id: ExportFormat) => `${uid}.${exportSpec(id).ext}`;
 
-/** The API route that serves the file as a download (the HTML inline; the PDF too with `&inline=1`). */
+/** The API route that serves the file as a download. */
 export const downloadHref = (uid: string, id: ExportFormat) =>
   `/api/assessments/${encodeURIComponent(uid)}/export?format=${id}`;

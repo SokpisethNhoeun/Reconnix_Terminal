@@ -1,7 +1,7 @@
 "use client";
 
 /* Report downloads for the run in scope, straight from the export route (lib/report/formats.ts):
-   PDF, HTML, JSON, CSV and SARIF. About every run, it first asks which run. */
+   PDF, JSON and DOCX. About every run, it first asks which run. */
 import { useState } from "react";
 import { ChevronDown, Download, FileText } from "lucide-react";
 import { RUN_STATUS } from "@/lib/status";

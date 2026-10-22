@@ -184,9 +184,9 @@ test("the report links every export format and each one downloads the newest run
   await page.goto(`/?uid=${run.uid}`);
   await page.click(view("Reports"));
   const links = page.getByRole("navigation", { name: "Download the report" }).getByRole("link");
-  await expect(links).toHaveText(["PDF", "HTML", "JSON", "CSV", "SARIF"]);
-  const media = { pdf: "application/pdf", html: "text/html", json: "application/json", csv: "text/csv", sarif: "application/sarif+json" };
-  for (const [i, format] of (["pdf", "html", "json", "csv", "sarif"] as const).entries()) {
+  await expect(links).toHaveText(["PDF", "JSON", "DOCX"]);
+  const media = { pdf: "application/pdf", json: "application/json", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
+  for (const [i, format] of (["pdf", "json", "docx"] as const).entries()) {
     const href = (await links.nth(i).getAttribute("href"))!;
     const url = new URL(href, page.url());
     expect(url.pathname, format).toBe(`/api/assessments/${run.uid}/export`);
@@ -194,6 +194,9 @@ test("the report links every export format and each one downloads the newest run
     const res = await page.request.get(href);
     expect(res.status(), format).toBe(200);
     expect(res.headers()["content-type"], format).toContain(media[format]);
+    // every format is a download, and no export may be framed
+    expect(res.headers()["content-disposition"], format).toMatch(/^attachment; /);
+    expect(res.headers()["content-security-policy"], format).toContain("frame-ancestors 'none'");
     const body = await res.body();
     expect(body.length, `${format} is not empty`).toBeGreaterThan(100);
     if (format === "json") expect((JSON.parse(body.toString()) as { uid: string }).uid).toBe(run.uid);

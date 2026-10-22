@@ -1,15 +1,19 @@
 /* Combining saved runs into one report, in the Report view's all-runs mode: pick runs (the
    sixth is disabled with a reason, Clear empties the selection, the selection survives a
    search), Preview report frames the combined HTML with every chosen run in it, Generate PDF
-   downloads one real PDF, the failure paths (a 500 on the preview offers Retry, a 501 on the PDF
-   offers the HTML), and the panel works at phone size. */
+   downloads one real PDF and Generate DOCX one Word document (both only after the preview), the
+   failure paths (a 500 on the preview offers Retry, a 501 on the PDF offers the Word document, a
+   413 on the DOCX says why), every run's row offers PDF, JSON and DOCX, and the panel works at
+   phone size. */
 import { readFileSync } from "node:fs";
 
 import { type Page } from "@playwright/test";
 
+import { unzip } from "../tests/unzip";
 import { expect, test } from "./fixtures";
 
 import { combinedHref } from "../src/lib/report/combined/options";
+import { DOCX_TOO_LARGE } from "../src/lib/report/formats";
 import { hydrated, sample } from "./support";
 
 const COMBINE_MAX = 5;
@@ -21,7 +25,9 @@ const boxLabel = (page: Page) => page.locator("label").filter({ has: page.getByR
 const tickRun = (page: Page, uid: string) =>
   page.locator("tr").filter({ has: page.locator(`a[href*="uid=${uid}"]`) }).locator("label").filter({ has: page.getByRole("checkbox", { name: /^Combine / }) }).click();
 const preview = (page: Page) => page.getByRole("button", { name: /^(Preview report|Loading preview…)$/ });
-const generate = (page: Page) => page.getByRole("button", { name: /^(Generate PDF|Generating…)$/ });
+const generate = (page: Page) => page.getByRole("button", { name: /^(Generate PDF|Generating PDF…)$/ });
+const generateDocx = (page: Page) => page.getByRole("button", { name: /^(Generate DOCX|Generating DOCX…)$/ });
+const fileStatus = (page: Page) => page.locator("[data-file]");
 const frame = (page: Page) => page.frameLocator('iframe[title="Combined report preview"]');
 
 async function openReports(page: Page) {
@@ -39,6 +45,7 @@ test("two runs preview as one combined report and generate one PDF", async ({ pa
   await expect(count).toHaveText(`0 of ${COMBINE_MAX} selected`);
   await expect(preview(page)).toBeDisabled();
   await expect(generate(page)).toBeDisabled();
+  await expect(generateDocx(page)).toBeDisabled();
   await expect(page.getByText("Pick at least one run.")).toBeVisible();
 
   // the two newest runs (the table is newest first)
@@ -48,7 +55,9 @@ test("two runs preview as one combined report and generate one PDF", async ({ pa
   await expect(pick(page).nth(1)).toBeChecked();
   await expect(count).toHaveText(`2 of ${COMBINE_MAX} selected`);
   await expect(generate(page)).toBeDisabled();
+  await expect(generateDocx(page)).toBeDisabled();
   await expect(page.getByText("Preview the report first.")).toBeVisible();
+  await expect(generateDocx(page)).toHaveAccessibleDescription("Preview the report first.");
   const chosen = [...all].sort((a, b) => b.created_at.localeCompare(a.created_at) || b.uid.localeCompare(a.uid)).slice(0, 2);
 
   await preview(page).click();
@@ -65,7 +74,7 @@ test("two runs preview as one combined report and generate one PDF", async ({ pa
   const iframe = page.locator('iframe[title="Combined report preview"]');
   await expect(iframe).toHaveAttribute("sandbox", "");
   expect(await iframe.getAttribute("src")).toBeNull();
-  const res = await page.request.get(combinedHref(chosen.map((a) => a.uid).sort(), "html", { evidence: true, low: true, appendix: true }));
+  const res = await page.request.get(combinedHref(chosen.map((a) => a.uid).sort(), "preview", { evidence: true, low: true, appendix: true }));
   expect(res.status()).toBe(200);
   expect(res.headers()["cache-control"]).toBe("no-store");
   const served = await res.text();
@@ -80,20 +89,31 @@ test("two runs preview as one combined report and generate one PDF", async ({ pa
   await expect(page.getByRole("status").filter({ hasText: /^Downloaded combined-2-runs-/ })).toBeVisible();
   await expect(generate(page)).toHaveText("Generate PDF");
 
+  // the same selection as a Word document: one .docx with both runs in it
+  await expect(generateDocx(page)).toBeEnabled();
+  const [word] = await Promise.all([page.waitForEvent("download", { timeout: 30_000 }), generateDocx(page).click()]);
+  expect(word.suggestedFilename()).toMatch(/^combined-2-runs-\d{4}-\d{2}-\d{2}\.docx$/);
+  const xml = unzip(readFileSync((await word.path())!)).get("word/document.xml") ?? "";
+  for (const a of chosen) expect(xml).toContain(a.uid);
+  await expect(fileStatus(page)).toHaveAttribute("data-format", "docx");
+  await expect(fileStatus(page)).toHaveText(/^Downloaded combined-2-runs-\d{4}-\d{2}-\d{2}\.docx\.$/);
+  await expect(generateDocx(page)).toHaveText("Generate DOCX");
+
   // a changed option makes the preview stale: the PDF waits for a new preview
   await page.locator("label").filter({ has: page.getByRole("checkbox", { name: "Include the appendix" }) }).click();
   await expect(page.getByRole("checkbox", { name: "Include the appendix" })).not.toBeChecked();
   await expect(generate(page)).toBeDisabled();
+  await expect(generateDocx(page)).toBeDisabled();
   await expect(page.getByText(/changed since this preview/)).toBeVisible();
 });
 
-test("a failed preview offers Retry, and a PDF without a printer offers the HTML", async ({ page }) => {
+test("a failed preview offers Retry, and a PDF without a printer offers the Word document", async ({ page }) => {
   await openReports(page);
   let previews = 0;
   await page.route("**/api/reports/combined?*", async (route) => {
     const url = new URL(route.request().url());
     if (url.searchParams.get("format") === "pdf") {
-      await route.fulfill({ status: 501, contentType: "application/json", body: JSON.stringify({ detail: "No browser to print with (stub).", html: `/api/reports/combined?${url.searchParams}`.replace("format=pdf", "format=html") }) });
+      await route.fulfill({ status: 501, contentType: "application/json", body: JSON.stringify({ detail: "No browser to print with (stub).", docx: `/api/reports/combined?${url.searchParams}`.replace("format=pdf", "format=docx") }) });
       return;
     }
     previews += 1;
@@ -111,10 +131,37 @@ test("a failed preview offers Retry, and a PDF without a printer offers the HTML
   await generate(page).click();
   const status = page.locator(".rep-status");
   await expect(status).toContainText("No browser to print with (stub).");
-  const html = status.getByRole("link", { name: "Download HTML" });
-  await expect(html).toBeVisible();
-  expect(await html.getAttribute("href")).toContain("format=html");
-  await expect(generate(page)).toBeEnabled(); // not stuck on "Generating…"
+  const docx = status.getByRole("link", { name: "Download DOCX" });
+  await expect(docx).toBeVisible();
+  expect(await docx.getAttribute("href")).toContain("format=docx");
+  await expect(generate(page)).toBeEnabled(); // not stuck on "Generating PDF…"
+});
+
+test("a Word document too large to build (413) says why, with no Retry", async ({ page }) => {
+  await openReports(page);
+  await page.route("**/api/reports/combined?*format=docx*", (route) =>
+    route.fulfill({ status: 413, contentType: "application/json", body: JSON.stringify({ detail: DOCX_TOO_LARGE }) }),
+  );
+  await tickRun(page, SHARED[0]);
+  await preview(page).click();
+  await expect(frame(page).getByRole("heading", { name: "Combined security assessment report" })).toBeVisible({ timeout: 20_000 });
+  await generateDocx(page).click();
+  await expect(fileStatus(page)).toHaveAttribute("data-file", "refused");
+  await expect(fileStatus(page)).toHaveText(DOCX_TOO_LARGE);
+  await expect(fileStatus(page).getByRole("button", { name: "Retry" })).toHaveCount(0);
+  await expect(generateDocx(page)).toHaveText("Generate DOCX");
+  await expect(generateDocx(page)).toBeEnabled();
+});
+
+test("every run's row downloads its report as PDF, JSON and DOCX", async ({ page }) => {
+  await openReports(page);
+  const run = sample().find((a) => a.uid === SHARED[0])!;
+  const row = page.locator("tr").filter({ has: page.locator(`a[href*="uid=${run.uid}"]`) });
+  const links = row.getByRole("link", { name: /^Download the / });
+  await expect(links).toHaveText(["PDF", "JSON", "DOCX"]);
+  for (const [i, format] of (["pdf", "json", "docx"] as const).entries()) {
+    expect(await links.nth(i).getAttribute("href")).toBe(`/api/assessments/${run.uid}/export?format=${format}`);
+  }
 });
 
 test("the sixth run is disabled with a reason, and Clear empties the selection", async ({ page }) => {
@@ -215,11 +262,12 @@ test("a PDF the server fails on (500) shows why, offers Retry, and the button le
   await preview(page).click();
   await expect(frame(page).getByRole("heading", { name: "Combined security assessment report" })).toBeVisible({ timeout: 20_000 });
   await generate(page).click();
-  const status = page.locator("[data-pdf]");
-  await expect(status).toHaveAttribute("data-pdf", "failed");
+  const status = fileStatus(page);
+  await expect(status).toHaveAttribute("data-file", "failed");
+  await expect(status).toHaveAttribute("data-format", "pdf");
   await expect(status).toContainText("The PDF could not be generated");
   await expect(status.getByRole("button", { name: "Retry" })).toBeVisible();
-  await expect(generate(page)).toHaveText("Generate PDF"); // not stuck on "Generating…"
+  await expect(generate(page)).toHaveText("Generate PDF"); // not stuck on "Generating PDF…"
   await expect(generate(page)).toBeEnabled();
 });
 
@@ -230,8 +278,8 @@ test("a PDF request that is cut off shows the dashboard could not be reached", a
   await preview(page).click();
   await expect(frame(page).getByRole("heading", { name: "Combined security assessment report" })).toBeVisible({ timeout: 20_000 });
   await generate(page).click();
-  await expect(page.locator("[data-pdf]")).toHaveAttribute("data-pdf", "failed");
-  await expect(page.locator("[data-pdf]")).toContainText("the dashboard could not be reached");
+  await expect(fileStatus(page)).toHaveAttribute("data-file", "failed");
+  await expect(fileStatus(page)).toContainText("the dashboard could not be reached");
   await expect(generate(page)).toHaveText("Generate PDF");
 });
 

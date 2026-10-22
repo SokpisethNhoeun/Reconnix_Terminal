@@ -25,6 +25,8 @@ describe("HTML report", () => {
 
   it("carries no scripts and escapes markup in saved text", () => {
     expect(html).not.toContain("<script");
+    // the HTML is only the PDF's source and the preview: no print toolbar or "save as PDF" hint
+    expect(html).not.toMatch(/toolbar|Ctrl\+P|save as PDF/i);
     const hostile = { ...assessment, findings: [{ ...assessment.findings[0], title: '<img src=x onerror="alert(1)">' }] };
     const out = renderReportHtml(hostile as typeof assessment);
     expect(out).not.toContain("<img");

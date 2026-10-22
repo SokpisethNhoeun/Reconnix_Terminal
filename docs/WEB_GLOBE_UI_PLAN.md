@@ -31,7 +31,8 @@ New, from reconix-web-ui (the version already adapted to live data on 2026-10-20
   confidence).
 - `/docs/**`: the site's documentation (the cards' ↗ links point there). Pages render per
   request behind the viewer check, so they get the nonce CSP like every other page.
-- Reports view links the existing export route (PDF, HTML, JSON, CSV, SARIF).
+- Reports view links the existing export route (PDF, HTML, JSON, CSV, SARIF; since
+  2026-10-21 PDF, JSON and DOCX only, see `WEB_REDESIGN_V3_PLAN.md` §5.2).
 - Colours: the globe palette goes into `theme.WEB_TOKENS` (dark only) and
   `scripts/export_tokens.py` writes `tokens.css`; `globals.css` has no colour literals.
 - After `/web` signs in, the browser lands on the Overview.

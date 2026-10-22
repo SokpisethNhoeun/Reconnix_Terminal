@@ -1,7 +1,9 @@
 /* One report that combines 1–5 saved runs (viewer role), built in memory from the saved,
-   already-redacted files, masked once more at this boundary (lib/report/mask.ts), and streamed back: `?uids=a,b&format=html|pdf&evidence=1&low=1&appendix=1`.
-   The HTML is served inline (the Report view's preview fetches it), the PDF as a download printed
-   by the same headless Chrome the single export uses (501 with the HTML link without one).
+   already-redacted files, masked once more at this boundary (lib/report/mask.ts), and streamed back: `?uids=a,b&format=preview|pdf|docx&evidence=1&low=1&appendix=1`.
+   `preview` is the report's HTML, served inline for the Report view's sandboxed frame (it is never
+   offered as a download); the PDF is a download printed by the same headless Chrome the single
+   export uses (501 with the Word document's link without one); `docx` is the Word document (413,
+   DOCX_TOO_LARGE, past DOCX_MAX_MIB of text).
    Nothing is written, started or shelled out with anything the request said: the query is
    validated first (lib/report/combined/query.ts), and the printer only ever gets a temp file. */
 import { cookies } from "next/headers";
@@ -9,10 +11,12 @@ import { NextResponse } from "next/server";
 
 import { COOKIE, hasRole, launchToken, readRole } from "@/lib/auth/session";
 import { loadLibrary } from "@/lib/data/store";
+import { renderCombinedDocx } from "@/lib/report/docx/combined";
+import { DocxTooLarge } from "@/lib/report/docx/ooxml";
 import { renderCombinedHtml } from "@/lib/report/combined/html";
 import { maskAssessment } from "@/lib/report/mask";
 import { combinedFileName, combinedHref } from "@/lib/report/combined/options";
-import { NO_PRINTER } from "@/lib/report/formats";
+import { DOCX_MEDIA, DOCX_TOO_LARGE, NO_PRINTER } from "@/lib/report/formats";
 import { parseCombinedQuery } from "@/lib/report/combined/query";
 import { combineAssessments } from "@/lib/report/combined/select";
 import { renderPdf } from "@/lib/report/pdf";
@@ -37,25 +41,35 @@ export async function GET(request: Request) {
 
   const now = new Date();
   const picked = assessments.filter((a) => typeof a !== "string").map(maskAssessment);
-  const html = renderCombinedHtml(combineAssessments(picked, options), now);
-  const name = combinedFileName(uids.length, format, now);
+  const report = combineAssessments(picked, options);
 
+  if (format === "docx") {
+    let docx: Uint8Array<ArrayBuffer>;
+    try {
+      docx = renderCombinedDocx(report, now);
+    } catch (error) {
+      if (error instanceof DocxTooLarge) return refuse(DOCX_TOO_LARGE, 413);
+      throw error;
+    }
+    return new NextResponse(docx, {
+      headers: { "Content-Type": DOCX_MEDIA, "Content-Disposition": `attachment; filename="${combinedFileName(uids.length, "docx", now)}"`, ...NO_STORE },
+    });
+  }
+  const html = renderCombinedHtml(report, now);
   if (format === "pdf") {
     const pdf = await renderPdf(html).catch(() => null);
     if (!pdf) {
       return NextResponse.json(
         {
           detail: NO_PRINTER,
-          html: combinedHref(uids, "html", options),
+          docx: combinedHref(uids, "docx", options),
         },
         { status: 501, headers: NO_STORE },
       );
     }
     return new NextResponse(pdf, {
-      headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${name}"`, ...NO_STORE },
+      headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${combinedFileName(uids.length, "pdf", now)}"`, ...NO_STORE },
     });
   }
-  return new NextResponse(html, {
-    headers: { "Content-Type": "text/html; charset=utf-8", "Content-Disposition": `inline; filename="${name}"`, ...NO_STORE },
-  });
+  return new NextResponse(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Content-Disposition": "inline", ...NO_STORE } });
 }

@@ -1,5 +1,10 @@
 # Web: export menu + preview before download
 
+> **Superseded (2026-10-21).** Reports are now saved as PDF, JSON and DOCX only, in the TUI
+> and the web alike; the HTML report is the PDF's source and the combined preview, never a
+> download, and the CSV, SARIF and Markdown writers are gone. See
+> `WEB_REDESIGN_V3_PLAN.md` §5.2. The plan below is kept as the record of that round.
+
 **Ask (2026-10-06):** on the assessment page the five export buttons (PDF, Report, JSON,
 CSV, SARIF) should be one dropdown, and every format should show a preview before it is
 downloaded.

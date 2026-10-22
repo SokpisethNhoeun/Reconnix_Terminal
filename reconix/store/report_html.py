@@ -1,23 +1,25 @@
-"""Render `report.report_data()` as a standalone, print-ready HTML document.
+"""Render `report.report_data()` as a standalone, print-ready HTML document: the source the PDF
+report is printed from (report_pdf.py). It is not a report format of its own (the formats are
+PDF, JSON and DOCX), so it has no toolbar or print button.
 
+The headings, rows and sentences come from report_view.py, which the Word report reads too.
 Every dynamic value is HTML-escaped, so tool output, AI text or an operator's reason reads as
-text and can never inject markup. The file is self-contained (inline CSS, no network needed) and
-opens in any browser; the "Print / Save as PDF" button — or the browser's own print — exports it
-as a one-page-first PDF. Evidence arrives already masked and stays masked.
+text and can never inject markup. The document is self-contained (inline CSS, no network needed)
+and prints as a one-page-first PDF. Evidence arrives already masked and stays masked.
 """
 
 import html
+import re
 from typing import Any, Dict, List
 
-# Severity ranked high-to-low; used for ordering and for the colored pill class.
-SEV_ORDER = ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO")
+from . import report_view as view
+
+# The colored pill class of each severity, validation state and triage status.
 SEV_CLASS = {"CRITICAL": "crit", "HIGH": "high", "MEDIUM": "med", "LOW": "low", "INFO": "info"}
 VALIDATION_CLASS = {"CONFIRMED": "confirmed", "UNCONFIRMED": "unconfirmed",
                     "INCONCLUSIVE": "inconclusive"}
 STATUS_CLASS = {"open": "open", "fixed": "fixed", "accepted": "accepted",
                 "false-positive": "falsepos"}
-STATUS_LABEL = {"open": "Open", "fixed": "Fixed", "accepted": "Accepted",
-                "false-positive": "False+"}
 
 
 def esc(value: Any) -> str:
@@ -30,40 +32,16 @@ def esc_pre(value: Any) -> str:
     return html.escape(str(value), quote=True)
 
 
-def short_date(value: Any) -> str:
-    """The date part of an ISO timestamp (2026-10-05T05:24:33+00:00 -> 2026-10-05)."""
-    return str(value).split("T", 1)[0] if value else "—"
+def esc_run(value: Any) -> str:
+    """Escape a piece of a sentence: runs of whitespace become one space, the edges kept."""
+    return html.escape(re.sub(r"\s+", " ", str(value)), quote=True)
 
 
-def _window(data: Dict[str, Any]) -> str:
-    """The engagement window as a date or date range, from the run's timestamps."""
-    window = data.get("window") or {}
-    start, end = short_date(window.get("started")), short_date(window.get("finished"))
-    if start == "—" and end == "—":
-        return "Time-boxed"
-    return start if start == end else f"{start} → {end}"
-
-
-def _cvss(finding: Dict[str, Any]) -> str:
-    """The CVSS base score as text, or an em dash when the finding is not scored."""
-    score = finding.get("cvss_score") or 0
-    return f"{score:.1f}" if score else "—"
-
-
-def _sev_rank(severity: str) -> int:
-    try:
-        return SEV_ORDER.index(severity.upper())
-    except ValueError:
-        return len(SEV_ORDER)
-
-
-def _counts(findings: List[Dict[str, Any]]) -> Dict[str, int]:
-    counts = {sev: 0 for sev in SEV_ORDER}
-    for finding in findings:
-        sev = finding["severity"].upper()
-        if sev in counts:
-            counts[sev] += 1
-    return counts
+def _heading(number: str, tag: str = "") -> str:
+    """A numbered section's heading bar (report_view.SECTIONS)."""
+    extra = f'<span class="tag">{esc(tag)}</span>' if tag else ""
+    return (f'<div class="sh"><span class="no">{number}</span>'
+            f'<h2>{esc(view.section(number))}</h2>{extra}</div>')
 
 
 def _pill(severity: str) -> str:
@@ -79,7 +57,7 @@ def _validation(state: str) -> str:
 def _status(finding: Dict[str, Any]) -> str:
     state = finding.get("status") or "open"
     return (f'<span class="st {STATUS_CLASS.get(state, "open")}">'
-            f'{esc(STATUS_LABEL.get(state, state))}</span>')
+            f'{esc(view.status_label(finding))}</span>')
 
 
 # --- the fixed stylesheet (no f-string: it is full of braces) --------------------------------
@@ -102,13 +80,6 @@ h1,h2,h3{margin:0; line-height:1.15}
 p{margin:0}
 .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
 a{color:var(--accent); text-decoration:none}
-
-.toolbar{position:fixed; top:14px; right:16px; z-index:10}
-.print-btn{display:inline-flex; align-items:center; gap:7px; cursor:pointer;
-  background:var(--accent); color:#fff; border:none; border-radius:9px;
-  padding:9px 15px; font:inherit; font-weight:600; font-size:12.5px;
-  box-shadow:0 4px 14px rgba(31,95,192,.35)}
-.print-btn:hover{background:#1850a8}
 
 .doc{max-width:860px; margin:0 auto; padding:26px 18px 70px;
   display:flex; flex-direction:column; gap:18px}
@@ -233,7 +204,6 @@ td.id{font-family:"IBM Plex Mono"; font-weight:600; color:var(--accent); white-s
 @media print{
   @page{size:A4; margin:8mm}
   body{background:#fff; font-size:8.7pt; line-height:1.42}
-  .toolbar{display:none}
   .doc{max-width:none; margin:0; padding:0; gap:0}
   .sheet{border:none; border-radius:0; box-shadow:none; padding:0; gap:9px}
   .sheet+.sheet{margin-top:0; break-before:page}
@@ -252,51 +222,33 @@ td.id{font-family:"IBM Plex Mono"; font-weight:600; color:var(--accent); white-s
 }
 """
 
-PRINT_SCRIPT = ("<script>function rcxPrint(){window.print();}</script>")
-
-
 def _masthead(data: Dict[str, Any]) -> str:
-    template = data.get("template") or "Security assessment"
-    rows = [
-        ("Client", data.get("client") or "—"),
-        ("Engagement ID", data.get("assessment_id") or "—"),
-        ("Assessment window", _window(data)),
-        ("Report date", short_date(data.get("generated_at"))),
-        ("Assessment type", data.get("mode") or "—"),
-        ("Report version", f"{data.get('report_version') or '1.0'} — Final"),
-    ]
     items = "".join(f"<div><dt>{esc(label)}</dt><dd>{esc(value)}</dd></div>"
-                    for label, value in rows)
+                    for label, value in view.cover_rows(data))
     return (
         '<header class="mast">'
         '<div class="eye">RECONIX</div>'
-        '<h1>Security Assessment Report</h1>'
-        f'<div class="sub">AI-Assisted Authorized Penetration Test — {esc(template)}</div>'
+        f'<h1>{esc(view.TITLE)}</h1>'
+        f'<div class="sub">{esc(view.subtitle(data))}</div>'
         f'<div class="tgt mono">{esc(data.get("target") or "—")}</div>'
         f'<dl>{items}</dl>'
-        '<div class="conf">&#128274; CONFIDENTIAL — AUTHORIZED RECIPIENTS ONLY</div>'
+        f'<div class="conf">&#128274; {esc(view.CONFIDENTIAL)}</div>'
         '</header>'
     )
 
 
 def _severity_block(findings: List[Dict[str, Any]]) -> str:
-    counts = _counts(findings)
-    total = len(findings) or 1
-    present = [sev for sev in SEV_ORDER if counts[sev]]
     tiles = "".join(
-        f'<div class="tile {SEV_CLASS[sev]}"><div class="n">{counts[sev]}</div>'
-        f'<div class="k">{esc(sev.title())}</div></div>'
-        for sev in SEV_ORDER if sev != "INFO" or counts["INFO"]
+        f'<div class="tile {SEV_CLASS.get(label.upper(), "tot")}"><div class="n">{n}</div>'
+        f'<div class="k">{esc(label)}</div></div>'
+        for label, n in view.count_columns(findings)
     )
-    tiles += (f'<div class="tile tot"><div class="n">{len(findings)}</div>'
-              '<div class="k">Total</div></div>')
+    present = view.distribution(findings)
     segs = "".join(
-        f'<i class="{SEV_CLASS[sev]}" style="width:{round(100 * counts[sev] / total)}%">'
-        f'{round(100 * counts[sev] / total)}%</i>'
-        for sev in present
+        f'<i class="{SEV_CLASS[sev]}" style="width:{pct}%">{pct}%</i>' for sev, _n, pct in present
     )
-    legend = "".join(f'<span class="sev {SEV_CLASS[sev]}">{counts[sev]} {esc(sev.title())}</span>'
-                     for sev in present)
+    legend = "".join(f'<span class="sev {SEV_CLASS[sev]}">{n} {esc(sev.title())}</span>'
+                     for sev, n, _pct in present)
     return (
         '<div class="grid2">'
         f'<div class="tiles">{tiles}</div>'
@@ -307,40 +259,26 @@ def _severity_block(findings: List[Dict[str, Any]]) -> str:
     )
 
 
-def _summary_narrative(data: Dict[str, Any], findings: List[Dict[str, Any]]) -> str:
-    counts = _counts(findings)
-    high_sev = next((sev for sev in SEV_ORDER if counts[sev]), "INFO")
-    lead = findings[0]["title"] if findings else "no issues"
-    parts = [f"{counts[sev]} {sev.title()}" for sev in SEV_ORDER if counts[sev]]
-    breakdown = ", ".join(parts) if parts else "no findings"
-    return (
-        '<p class="summary">Reconix performed an authorized assessment of '
-        f'<b>{esc(data.get("target") or "the target")}</b>'
-        f' ({esc(data.get("template") or "assessment")}). It recorded <b>{len(findings)} '
-        f'finding(s)</b> — {esc(breakdown)}. The highest severity is '
-        f'<b>{esc(high_sev.title())}</b>'
-        + (f', led by <b>{esc(lead)}</b>' if findings else "")
-        + f'. {len(data.get("blocked_requests", []))} out-of-scope request(s) were blocked by '
-        f'policy and {len(data.get("approvals", []))} gated action(s) were approved by a human. '
-        'Intrusive actions ran only after explicit, single-use approval.</p>'
-    )
+def _summary_narrative(data: Dict[str, Any]) -> str:
+    sentence = "".join(f"<b>{esc_run(text)}</b>" if bold else esc_run(text)
+                       for text, bold in view.summary(data))
+    return f'<p class="summary">{sentence}</p>'
 
 
 def _findings_table(findings: List[Dict[str, Any]]) -> str:
-    ordered = sorted(findings, key=lambda f: (_sev_rank(f["severity"]), f["id"]))
     rows = "".join(
         f'<tr><td class="id">{esc(f["id"])}</td><td>{esc(f["title"])}</td>'
-        f'<td>{_pill(f["severity"])}</td><td class="mono">{_cvss(f)}</td>'
+        f'<td>{_pill(f["severity"])}</td><td class="mono">{view.cvss(f)}</td>'
         f'<td>{_status(f)}</td>'
         f'<td>{esc(f.get("category") or "—")}</td></tr>'
-        for f in ordered
+        for f in view.ordered(findings)
     )
     if not rows:
-        rows = '<tr><td colspan="6">No findings were recorded.</td></tr>'
+        rows = f'<tr><td colspan="6">{esc(view.NO_FINDINGS_ROW)}</td></tr>'
+    head = "".join(f"<th>{esc(h)}</th>" for h in view.FINDINGS_HEAD)
     return (
         '<div class="tw"><table>'
-        '<thead><tr><th>ID</th><th>Finding</th><th>Severity</th><th>CVSS</th>'
-        '<th>Status</th><th>Category</th></tr></thead>'
+        f'<thead><tr>{head}</tr></thead>'
         f'<tbody>{rows}</tbody></table></div>'
     )
 
@@ -363,7 +301,7 @@ def _retest_block(data: Dict[str, Any]) -> str:
     caption = (f'<p class="note">New this run: {new_list}.</p>' if new_list else "")
     return (
         '<section class="block"><div class="sh"><span class="no">+</span>'
-        '<h2>Changes since last assessment</h2>'
+        f'<h2>{esc(view.RETEST_HEADING)}</h2>'
         f'<span class="tag">vs {esc(rt["previous_label"])}</span></div>'
         f'<div class="tiles" style="grid-template-columns:repeat(3,1fr)">{tiles}</div>'
         f'{caption}</section>'
@@ -403,13 +341,10 @@ def _scope_block(data: Dict[str, Any]) -> str:
 def _finding_card(finding: Dict[str, Any]) -> str:
     sev = finding["severity"].upper()
     cls = SEV_CLASS.get(sev, "info")
-    maps = (list(finding.get("owasp", [])) + list(finding.get("cwe", []))
-            + list(finding.get("cve", [])))
-    mapping = esc(", ".join(maps) or "—")
-    cvss = finding.get("cvss_score") or 0
-    cvss_badge = f'<span class="find-cvss">CVSS {cvss:.1f}</span>' if cvss else ""
-    vector = (f'<div><dt>CVSS vector</dt><dd>{esc(finding.get("cvss_vector"))}</dd></div>'
-              if finding.get("cvss_vector") else "")
+    score = view.cvss(finding)
+    cvss_badge = f'<span class="find-cvss">CVSS {score}</span>' if score != "—" else ""
+    meta = "".join(f"<div><dt>{esc(label)}</dt><dd>{esc(value)}</dd></div>"
+                   for label, value in view.finding_meta(finding))
     evidence = "\n".join(esc_pre(line) for line in finding.get("evidence", [])) or "—"
     return (
         f'<div class="find s-{cls}">'
@@ -418,14 +353,7 @@ def _finding_card(finding: Dict[str, Any]) -> str:
         f'<h3>{esc(finding["title"])}</h3>{_pill(sev)}'
         f'{_validation(finding["validation"])}{_status(finding)}{cvss_badge}</div>'
         '<div class="find-body">'
-        '<dl class="find-meta">'
-        f'<div><dt>Affected asset</dt><dd>{esc(finding.get("affected_url") or "—")}</dd></div>'
-        f'<div><dt>Location</dt><dd>{esc(finding.get("path") or "—")}</dd></div>'
-        f'<div><dt>Category</dt><dd>{esc(finding.get("category") or "—")}</dd></div>'
-        f'<div><dt>Detected by</dt><dd>{esc(finding.get("tool") or "—")}</dd></div>'
-        f'<div><dt>Mapping</dt><dd>{mapping}</dd></div>'
-        f'{vector}'
-        '</dl>'
+        f'<dl class="find-meta">{meta}</dl>'
         f'<div class="fb"><span class="eyebrow">Description</span>'
         f'<p>{esc(finding.get("description"))}</p></div>'
         f'<div class="fb"><span class="eyebrow">Evidence &amp; validation (masked)</span>'
@@ -447,13 +375,13 @@ def _governance_block(data: Dict[str, Any]) -> str:
     blocked_rows = "".join(
         f'<tr><td class="mono">{esc(b["request"])}</td><td>{esc(b["reason"])}</td></tr>'
         for b in blocked
-    ) or '<tr><td colspan="2">No requests were blocked.</td></tr>'
+    ) or f'<tr><td colspan="2">{esc(view.NO_BLOCKED)}</td></tr>'
     approval_rows = "".join(
         f'<tr><td>{_pill(a["risk"])}</td><td>{esc(a["action"])}</td>'
         f'<td class="mono">{esc(a["target"])}</td><td>{_validation(a["decision"])}</td>'
         f'<td>{esc(a.get("operator") or "—")}</td></tr>'
         for a in approvals
-    ) or '<tr><td colspan="5">No gated actions were required.</td></tr>'
+    ) or f'<tr><td colspan="5">{esc(view.NO_APPROVALS)}</td></tr>'
     return (
         f'<div class="eyebrow" style="margin-bottom:8px">Blocked by policy · {len(blocked)}</div>'
         '<div class="tw"><table><thead><tr><th>Request</th><th>Reason</th></tr></thead>'
@@ -469,55 +397,42 @@ def _governance_block(data: Dict[str, Any]) -> str:
 def render_html(data: Dict[str, Any]) -> str:
     """Return a complete, self-contained HTML report document for `data`."""
     findings = data.get("findings", [])
-    ordered = sorted(findings, key=lambda f: (_sev_rank(f["severity"]), f["id"]))
-    cards = "".join(_finding_card(f) for f in ordered) or '<p class="note">No findings.</p>'
+    cards = ("".join(_finding_card(f) for f in view.ordered(findings))
+             or '<p class="note">No findings.</p>')
     engagement = esc(data.get("assessment_id") or "—")
-    generated = esc(short_date(data.get("generated_at")))
+    first_foot, last_foot = view.footers(data)
     body = (
-        '<div class="toolbar">'
-        '<button class="print-btn" type="button" onclick="rcxPrint()">'
-        '&#8681; Print / Save as PDF</button></div>'
         '<main class="doc">'
 
         # --- page 1: executive one-pager ---
         '<section class="sheet">'
         + _masthead(data) +
-        '<p class="note"><b>Generated by Reconix.</b> AI-guided assessment; the policy engine, '
-        'approvals and vault are deterministic. Credentials and one-time codes are never stored '
-        'or shown, and evidence is masked at the source.</p>'
-        '<section class="block"><div class="sh"><span class="no">1</span>'
-        '<h2>Executive summary</h2></div>'
-        + _summary_narrative(data, findings)
+        f'<p class="note"><b>Generated by Reconix.</b> {esc(view.GENERATED_NOTE)}</p>'
+        '<section class="block">' + _heading("1")
+        + _summary_narrative(data)
         + _severity_block(findings) +
         '</section>'
-        '<section class="block"><div class="sh"><span class="no">2</span>'
-        f'<h2>Findings summary</h2><span class="tag">{len(findings)} findings</span></div>'
+        '<section class="block">' + _heading("2", f"{len(findings)} findings")
         + _findings_table(findings) +
         '</section>'
         + _retest_block(data) +
-        '<section class="block"><div class="sh"><span class="no">3</span>'
-        '<h2>Approved scope &amp; limitations</h2></div>'
+        '<section class="block">' + _heading("3")
         + _scope_block(data) +
-        '<div class="disclaimer">Testing was limited to the approved actions, methods and time '
-        'window. Requests to an excluded path or outside the allowed methods were refused by the '
-        'policy engine rather than sent. Findings reflect only what was observed under these '
-        'constraints.</div>'
+        f'<div class="disclaimer">{esc(view.DISCLAIMER)}</div>'
         '</section>'
-        f'<div class="pfoot"><span>Reconix — AI-Powered Security Testing Assistant</span>'
-        f'<span>Confidential · {engagement} · Generated {generated}</span></div>'
+        f'<div class="pfoot"><span>{esc(view.FOOTER_TOOL)}</span>'
+        f'<span>{esc(first_foot)}</span></div>'
         '</section>'
 
         # --- page 2+: detailed findings ---
         '<section class="sheet">'
-        '<section class="block"><div class="sh"><span class="no">4</span>'
-        '<h2>Detailed findings</h2></div>'
+        '<section class="block">' + _heading("4") +
         f'{cards}</section>'
-        '<section class="block"><div class="sh"><span class="no">5</span>'
-        '<h2>Policy &amp; governance</h2><span class="tag">Audit trail</span></div>'
+        '<section class="block">' + _heading("5", "Audit trail")
         + _governance_block(data) +
         '</section>'
         f'<div class="pfoot"><span>Reconix — Confidential</span>'
-        f'<span>{engagement} · End of report</span></div>'
+        f'<span>{esc(last_foot)}</span></div>'
         '</section>'
 
         '</main>'
@@ -530,5 +445,5 @@ def render_html(data: Dict[str, Any]) -> str:
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?'
         'family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">'
-        f"<style>{CSS}</style></head><body>{body}{PRINT_SCRIPT}</body></html>\n"
+        f"<style>{CSS}</style></head><body>{body}</body></html>\n"
     )

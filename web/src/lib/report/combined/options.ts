@@ -2,7 +2,12 @@
    preview frame and the API route share, so they can never disagree. Pure metadata and URL
    helpers; safe to import from client components. */
 
-export type CombinedFormat = "html" | "pdf";
+/** `preview`: the report's HTML, served inline for the Report view's sandboxed frame (never a
+    download); `pdf` and `docx`: the files it saves. */
+export type CombinedFormat = "preview" | "pdf" | "docx";
+
+/** The formats a combined report is saved in. */
+export type CombinedFile = Exclude<CombinedFormat, "preview">;
 
 export interface CombineOptions {
   /** Include each occurrence's masked evidence lines. */
@@ -29,7 +34,7 @@ export const COMBINED_ROUTE = "/api/reports/combined";
 
 const OPTION_KEYS: (keyof CombineOptions)[] = ["evidence", "low", "appendix"];
 
-/** The route that builds the report: `?uids=a,b&format=html&evidence=1&low=1&appendix=1`
+/** The route that builds the report: `?uids=a,b&format=preview&evidence=1&low=1&appendix=1`
     (an option is sent only when it is on). */
 export function combinedHref(uids: readonly string[], format: CombinedFormat, opts: CombineOptions): string {
   const search = new URLSearchParams({ uids: uids.join(","), format });
@@ -38,5 +43,5 @@ export function combinedHref(uids: readonly string[], format: CombinedFormat, op
 }
 
 /** The download's name: ASCII only, so the Content-Disposition header never needs encoding. */
-export const combinedFileName = (runs: number, format: CombinedFormat, now: Date) =>
+export const combinedFileName = (runs: number, format: CombinedFile, now: Date) =>
   `combined-${runs}-runs-${now.toISOString().slice(0, 10)}.${format}`;

@@ -1,7 +1,7 @@
 /* GET /api/reports/combined called directly (the e2e tests go through the proxy too): the
    viewer role, the query checked before anything is read (1–5 distinct uids, the format, the
-   flags), 404 for a run that is not saved, the HTML inline, the PDF as a download, 501 with the
-   HTML link when no browser can print. Every answer is no-store. */
+   flags), 404 for a run that is not saved, the preview HTML inline, the PDF and the DOCX as
+   downloads, 501 with the DOCX link when no browser can print. Every answer is no-store. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { COOKIE, sessionValue } from "@/lib/auth/session";
@@ -10,6 +10,7 @@ import { parseCombinedQuery } from "@/lib/report/combined/query";
 import { chromeBinary } from "@/lib/report/pdf";
 
 import { sampleNames } from "./fixtures";
+import { unzip } from "./unzip";
 
 const TOKEN = "route-test-token-0123456789";
 let cookie = "";
@@ -38,7 +39,8 @@ describe("the query", () => {
   it("accepts 1 to 5 distinct uids, a format and flags", () => {
     const ok = parseCombinedQuery(new URLSearchParams({ uids: uids.slice(0, 2).join(","), format: "pdf", evidence: "1", low: "true" }));
     expect(ok).toEqual({ ok: true, query: { uids: uids.slice(0, 2), format: "pdf", options: { evidence: true, low: true, appendix: false } } });
-    expect(parseCombinedQuery(new URLSearchParams({ uids: uids[0] }))).toMatchObject({ ok: true, query: { format: "html" } });
+    expect(parseCombinedQuery(new URLSearchParams({ uids: uids[0] }))).toMatchObject({ ok: true, query: { format: "preview" } });
+    expect(parseCombinedQuery(new URLSearchParams({ uids: uids[0], format: "docx" }))).toMatchObject({ ok: true, query: { format: "docx" } });
     expect(parseCombinedQuery(new URLSearchParams({ uids: uids.slice(0, 5).join(",") }))).toMatchObject({ ok: true });
   });
 
@@ -55,13 +57,14 @@ describe("the query", () => {
   });
 
   it("refuses an unknown format or flag value", () => {
-    expect(parseCombinedQuery(new URLSearchParams({ uids: uids[0], format: "docx" })).ok).toBe(false);
+    for (const gone of ["html", "csv", "sarif", "json"]) expect(parseCombinedQuery(new URLSearchParams({ uids: uids[0], format: gone })).ok).toBe(false);
     expect(parseCombinedQuery(new URLSearchParams({ uids: uids[0], evidence: "yes" })).ok).toBe(false);
   });
 
   it("builds the route's link and an ASCII file name", () => {
-    expect(combinedHref(["u1", "u2"], "html", { evidence: true, low: false, appendix: true })).toBe("/api/reports/combined?uids=u1%2Cu2&format=html&evidence=1&appendix=1");
+    expect(combinedHref(["u1", "u2"], "preview", { evidence: true, low: false, appendix: true })).toBe("/api/reports/combined?uids=u1%2Cu2&format=preview&evidence=1&appendix=1");
     expect(combinedFileName(3, "pdf", new Date("2026-10-20T23:59:00Z"))).toBe("combined-3-runs-2026-10-20.pdf");
+    expect(combinedFileName(3, "docx", new Date("2026-10-20T23:59:00Z"))).toBe("combined-3-runs-2026-10-20.docx");
   });
 });
 
@@ -92,12 +95,12 @@ describe("GET /api/reports/combined", () => {
     expect(await detail(res)).toContain("20200101-000000-dead_RCX-NOPE-1");
   });
 
-  it("serves the HTML inline, never cached, with every run in it", async () => {
-    const res = await get(`uids=${uids[0]},${uids[1]}&format=html&evidence=1&low=1&appendix=1`);
+  it("serves the preview's HTML inline (never as a file), never cached, with every run in it", async () => {
+    const res = await get(`uids=${uids[0]},${uids[1]}&format=preview&evidence=1&low=1&appendix=1`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
     expect(res.headers.get("cache-control")).toBe("no-store");
-    expect(res.headers.get("content-disposition")).toMatch(/^inline; filename="combined-2-runs-\d{4}-\d{2}-\d{2}\.html"$/);
+    expect(res.headers.get("content-disposition")).toBe("inline");
     const html = await res.text();
     expect(html).toContain(uids[0]);
     expect(html).toContain(uids[1]);
@@ -106,14 +109,29 @@ describe("GET /api/reports/combined", () => {
     expect(html).not.toContain("<script");
   });
 
-  it("answers 501 with the HTML link when no browser can print the PDF", async () => {
+  it("serves the Word document as a download, with every run in it", async () => {
+    const res = await get(`uids=${uids[0]},${uids[1]}&format=docx&evidence=1&low=1&appendix=1`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("content-disposition")).toMatch(/^attachment; filename="combined-2-runs-\d{4}-\d{2}-\d{2}\.docx"$/);
+    const doc = unzip(new Uint8Array(await res.arrayBuffer())).get("word/document.xml") ?? "";
+    expect(doc).toContain(uids[0]);
+    expect(doc).toContain(uids[1]);
+    expect(doc).toContain("Combined findings summary");
+    expect(doc).toContain("Appendix &amp; references");
+  });
+
+  it("answers 501 with the DOCX link when no browser can print the PDF", async () => {
     process.env.RECONIX_CHROME = "/nonexistent/chrome";
     const res = await get(`uids=${uids[0]},${uids[1]}&format=pdf&low=1`);
     expect(res.status).toBe(501);
     expect(res.headers.get("cache-control")).toBe("no-store");
-    const body = (await res.json()) as { detail: string; html: string };
+    const body = (await res.json()) as { detail: string; docx: string; html?: string };
     expect(body.detail).toContain("RECONIX_CHROME");
-    expect(body.html).toBe(combinedHref([uids[0], uids[1]], "html", { evidence: false, low: true, appendix: false }));
+    expect(body.detail).not.toContain("HTML");
+    expect(body.docx).toBe(combinedHref([uids[0], uids[1]], "docx", { evidence: false, low: true, appendix: false }));
+    expect(body.html).toBeUndefined();
   });
 
   // a printer is not part of every machine's contract; the e2e spec downloads a real one too

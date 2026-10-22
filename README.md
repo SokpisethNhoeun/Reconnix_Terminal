@@ -41,7 +41,7 @@ python -m reconix
 Tests (Textual Pilot, no terminal needed):
 
 ```bash
-pip install -r requirements-dev.txt     # + python-docx for the DOCX export
+pip install -r requirements-dev.txt     # pytest + pytest-asyncio
 pytest -q
 ```
 
@@ -145,7 +145,7 @@ Windows 10+ (there in a ConPTY pseudo console, through `pywinpty`, which
    rebuilt, and the risk stays the same.
 6. **Findings / Detail** — filter, sort, triage (open, fixed, accepted risk, false
    positive) and import nuclei / nmap / ZAP output.
-7. **Report** — export HTML, PDF, DOCX, JSON, SARIF, CSV or Markdown to `./reports/`,
+7. **Report** — export PDF, JSON or DOCX to `./reports/`,
    or open the web dashboard.
 
 The run keeps playing while you move between screens; when it reaches a gate the app
@@ -175,7 +175,7 @@ command suggestions, and `?` shows the keys for the screen you are on.
 | `Ctrl+C` | stop the run (on Execution, after a confirmation) |
 | `f` / `s` / `t` / `i` | Findings: filter / cycle the sort / triage / import tool output |
 | `[` / `]` | previous / next finding on Finding Detail (same filter and sort) |
-| `h` `p` `w` `j` `e` | Report: export HTML / PDF / DOCX / JSON / more formats |
+| `p` `j` `w` | Report: export PDF / JSON / DOCX |
 | `b` | Report: open the web dashboard |
 | `?` | shortcuts for the current screen (on Start: when the prompt is empty) |
 | `Ctrl+Q` | quit |

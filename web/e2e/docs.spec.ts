@@ -219,7 +219,8 @@ test.describe("on a phone", () => {
   });
 
   test("a code block that scrolls sideways is a tab stop named Code, and one that fits is not", async ({ page }) => {
-    await page.goto("/docs/commands/export");
+    // /provider's syntax line is the longest of the commands: wider than a phone
+    await page.goto("/docs/commands/provider");
     await expect(page.locator('.docs-code pre[tabindex="0"]').first()).toBeVisible(); // hydrated and measured
     const blocks = await page.locator(".docs-code pre").evaluateAll((els) =>
       els.map((el) => ({

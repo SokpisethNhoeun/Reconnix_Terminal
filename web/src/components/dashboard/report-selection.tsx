@@ -1,49 +1,69 @@
 "use client";
 
 /* Combining saved runs into one report, in the Report view's all-runs mode: the Selection
-   panel (the count, the options, Preview report, Generate PDF, Clear selection), the runs table
-   with a checkbox per run (ReportRuns), and the preview frame (ReportPreview). The selection
-   lives here, in state — never in the address — so it survives paging and searching the table.
+   panel (the count, the options, Preview report, Generate PDF, Generate DOCX, Clear selection),
+   the runs table with a checkbox per run (ReportRuns), and the preview frame (ReportPreview). The
+   selection lives here, in state — never in the address — so it survives paging and searching
+   the table.
 
    Preview fetches the HTML once and hands it to a fully sandboxed frame as `srcDoc` (so a
    refused or failed request shows as an error with Retry, and the report is built once).
-   Generate PDF is enabled once the preview of this exact selection and options was shown; it
-   fetches the PDF, waits for the whole file, then downloads that one blob. A 501 (no browser to
-   print with) offers the HTML instead. One request at a time: a change to the selection or the
+   Generate PDF and Generate DOCX (report-file.tsx) are enabled once the preview of this exact
+   selection and options was shown — both files hold what the preview shows, so it is seen before
+   either is saved; each fetches its file, waits for the whole of it, then downloads that one
+   blob. A 501 on the PDF (no browser to print with) offers the Word document instead; a 413 on
+   the DOCX (DOCX_TOO_LARGE) says why. One request at a time: a change to the selection or the
    options aborts whatever is in flight, and answers to an older request are dropped. */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Download, Eye, FileText, X } from "lucide-react";
+import { Eye, X } from "lucide-react";
 
 import { DashCard } from "@/components/dashboard/dash-card";
+import { COMBINED_FILES, FileStatus, type FileState, GenerateButton } from "@/components/dashboard/report-file";
 import { ReportPreview, type PreviewState } from "@/components/dashboard/report-preview";
 import { ReportRuns } from "@/components/dashboard/report-runs";
 import type { ReportRunRow } from "@/components/dashboard/report-types";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DOCS } from "@/lib/docs-nav";
-import { COMBINE_MAX, COMBINE_OPTION_META, type CombineOptions, combinedFileName, combinedHref, DEFAULT_COMBINE_OPTIONS } from "@/lib/report/combined/options";
-import { NO_PRINTER } from "@/lib/report/formats";
-import { cn } from "@/lib/utils";
+import {
+  COMBINE_MAX,
+  COMBINE_OPTION_META,
+  type CombinedFile,
+  type CombineOptions,
+  combinedFileName,
+  combinedHref,
+  DEFAULT_COMBINE_OPTIONS,
+} from "@/lib/report/combined/options";
+import { DOCX_TOO_LARGE, NO_PRINTER } from "@/lib/report/formats";
 
-type PdfState =
-  | { kind: "idle" }
-  | { kind: "generating" }
-  | { kind: "done"; name: string }
-  | { kind: "unsupported"; message: string; html: string }
-  | { kind: "failed"; message: string };
+const FETCH_TIMEOUT_MS = 15_000; // the HTML is built in milliseconds
 
-const FETCH_TIMEOUT_MS = 15_000; // the HTML is built in milliseconds; the PDF gets the printer's own 90 s
-const PDF_TIMEOUT_MS = 120_000;
-
-/** Why a response was refused, from its JSON `detail` when it has one. */
-async function describe(res: Response): Promise<string> {
+/** A refused response's JSON `detail`, when it has one. */
+async function detailOf(res: Response): Promise<string | null> {
   try {
-    const body = (await res.json()) as { detail?: string };
+    const body = (await res.json()) as { detail?: unknown };
     if (typeof body.detail === "string" && body.detail) return body.detail;
   } catch {
     /* not JSON */
   }
-  return `The dashboard answered ${res.status}.`;
+  return null;
+}
+
+/** Why a response was refused, from its JSON `detail` when it has one. */
+async function describe(res: Response): Promise<string> {
+  return (await detailOf(res)) ?? `The dashboard answered ${res.status}.`;
+}
+
+/** Save a fetched file under `name` (one click on a temporary link to the blob). */
+function saveBlob(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 const fileNameOf = (disposition: string | null) => disposition?.match(/filename="([A-Za-z0-9._-]+)"/)?.[1] ?? null;
@@ -58,7 +78,7 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [options, setOptions] = useState<CombineOptions>(DEFAULT_COMBINE_OPTIONS);
   const [preview, setPreview] = useState<PreviewState>({ kind: "idle" });
-  const [pdf, setPdf] = useState<PdfState>({ kind: "idle" });
+  const [file, setFile] = useState<FileState>({ kind: "idle" });
   const inflight = useRef<AbortController | null>(null); // the one request allowed at a time
   const serial = useRef(0); // its number: answers to an older one are dropped
   const hintId = useId();
@@ -82,16 +102,16 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
 
   const chosen = useMemo(() => new Set(selected), [selected]);
   const uids = useMemo(() => [...selected].sort(), [selected]); // a,b and b,a are the same report
-  const href = combinedHref(uids, "html", options);
+  const href = combinedHref(uids, "preview", options);
   const previewed = preview.kind === "shown" && preview.href === href;
   const stale = preview.kind !== "idle" && preview.href !== href;
-  const busy = preview.kind === "loading" || pdf.kind === "generating";
+  const busy = preview.kind === "loading" || file.kind === "generating";
 
   /** The selection or the options changed: nothing in flight is wanted any more. */
   const changed = () => {
     abortInflight();
     setPreview((p) => (p.kind === "loading" ? { kind: "idle" } : p));
-    setPdf({ kind: "idle" });
+    setFile({ kind: "idle" });
   };
   const toggle = (uid: string) => {
     setSelected((list) => (list.includes(uid) ? list.filter((u) => u !== uid) : list.length < COMBINE_MAX ? [...list, uid] : list));
@@ -128,56 +148,46 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
     }
   };
 
-  const generatePdf = async () => {
+  const generate = async (format: CombinedFile) => {
     const { signal, mine } = begin();
-    const pdfHref = combinedHref(uids, "pdf", options);
-    setPdf({ kind: "generating" });
+    const spec = COMBINED_FILES[format];
+    setFile({ kind: "generating", format });
     try {
-      const res = await fetchWithin(pdfHref, PDF_TIMEOUT_MS, signal, "application/pdf");
+      const res = await fetchWithin(combinedHref(uids, format, options), spec.timeoutMs, signal, spec.accept);
       if (!mine()) return;
-      if (res.status === 501) {
-        let body: { detail?: string; html?: string } = {};
-        try {
-          body = (await res.json()) as typeof body;
-        } catch {
-          /* not JSON: the fixed message and the HTML link still apply */
-        }
+      if (res.status === 501 || res.status === 413) {
+        // the message comes from the route (the fixed one when it has none); the DOCX link is ours
+        const detail = await detailOf(res);
         if (!mine()) return;
-        setPdf({ kind: "unsupported", message: typeof body.detail === "string" && body.detail ? body.detail : NO_PRINTER, html: typeof body.html === "string" ? body.html : href });
+        if (res.status === 501) setFile({ kind: "unsupported", format, message: detail ?? NO_PRINTER, docx: combinedHref(uids, "docx", options) });
+        else setFile({ kind: "refused", format, message: detail ?? DOCX_TOO_LARGE });
         return;
       }
       if (!res.ok) {
         const message = await describe(res);
-        if (mine()) setPdf({ kind: "failed", message });
+        if (mine()) setFile({ kind: "failed", format, message });
         return;
       }
       const blob = await res.blob();
       if (!mine()) return;
-      const name = fileNameOf(res.headers.get("content-disposition")) ?? combinedFileName(uids.length, "pdf", new Date());
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name;
-      document.body.append(a);
-      a.click();
-      a.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-      setPdf({ kind: "done", name });
+      const name = fileNameOf(res.headers.get("content-disposition")) ?? combinedFileName(uids.length, format, new Date());
+      saveBlob(blob, name);
+      setFile({ kind: "done", format, name });
     } catch (error) {
       if (!mine()) return;
       const timedOut = error instanceof DOMException && error.name === "TimeoutError";
-      setPdf({ kind: "failed", message: timedOut ? "the printer took too long" : "the dashboard could not be reached" });
+      setFile({ kind: "failed", format, message: timedOut ? (format === "pdf" ? "the printer took too long" : "the dashboard took too long") : "the dashboard could not be reached" });
     } finally {
       if (mine()) inflight.current = null;
     }
   };
 
   const none = selected.length === 0;
-  const pdfReason = none ? "Pick at least one run" : !previewed ? "Preview the report first" : null;
+  const fileReason = none ? "Pick at least one run" : !previewed ? "Preview the report first" : null;
   // The buttons stay focusable while they can't act (aria-disabled), so focus is never dropped
   // when a click empties the selection or starts a request; the handlers check themselves.
   const previewBlocked = none || busy;
-  const pdfBlocked = Boolean(pdfReason) || busy;
+  const fileBlocked = Boolean(fileReason) || busy;
 
   return (
     <>
@@ -194,8 +204,8 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
         bodyClassName="rep-select"
       >
         <p className="rep-help">
-          Tick up to {COMBINE_MAX} runs in the table below, choose what to include, preview the report, then generate one PDF with every run in it. A finding
-          seen in several runs is counted once, with each run as an occurrence.
+          Tick up to {COMBINE_MAX} runs in the table below, choose what to include, preview the report, then generate one PDF or one Word document (DOCX)
+          with every run in it. A finding seen in several runs is counted once, with each run as an occurrence.
         </p>
         <fieldset className="rep-options">
           <legend className="rep-legend">Options</legend>
@@ -212,51 +222,23 @@ export function ReportCombine({ runs }: { runs: ReportRunRow[] }) {
           <Button onClick={() => !previewBlocked && showPreview()} aria-disabled={previewBlocked || undefined} aria-describedby={`${whyId}-preview`}>
             <Eye className="size-3.5" aria-hidden /> {preview.kind === "loading" ? "Loading preview…" : "Preview report"}
           </Button>
-          <Button variant="outline" onClick={() => !pdfBlocked && generatePdf()} aria-disabled={pdfBlocked || undefined} aria-describedby={`${whyId}-pdf`}>
-            <FileText className="size-3.5" aria-hidden /> {pdf.kind === "generating" ? "Generating…" : "Generate PDF"}
-          </Button>
+          {(Object.keys(COMBINED_FILES) as CombinedFile[]).map((format) => (
+            <GenerateButton key={format} format={format} state={file} blocked={fileBlocked} describedBy={`${whyId}-file`} onGenerate={generate} />
+          ))}
           <Button variant="quiet" onClick={() => !none && clear()} aria-disabled={none || undefined}>
             <X className="size-3.5" aria-hidden /> Clear selection
           </Button>
           <span id={`${whyId}-preview`} className="rep-reason">
             {none ? "Pick at least one run." : ""}
           </span>
-          <span id={`${whyId}-pdf`} className="rep-reason">
-            {pdfReason && !none ? `${pdfReason}.` : ""}
+          <span id={`${whyId}-file`} className="rep-reason">
+            {fileReason && !none ? `${fileReason}.` : ""}
           </span>
         </div>
-        <PdfStatus state={pdf} onRetry={generatePdf} />
+        <FileStatus state={file} onRetry={generate} />
       </DashCard>
       <ReportRuns runs={runs} selection={{ chosen, max: COMBINE_MAX, onToggle: toggle }} />
       {preview.kind !== "idle" && <ReportPreview state={preview} runs={selected.length} stale={stale} onRetry={showPreview} />}
     </>
-  );
-}
-
-/** What the PDF is doing, with what to do next: a Retry on failure, the HTML on a 501. The
-    region is always there (empty when idle), so a screen reader hears every change. */
-function PdfStatus({ state, onRetry }: { state: PdfState; onRetry: () => void }) {
-  const failed = state.kind === "failed" || state.kind === "unsupported";
-  return (
-    <p role="status" className={cn("rep-status", state.kind === "idle" && "sr-only", failed && "is-error")} data-pdf={state.kind}>
-      {state.kind === "generating" && "Generating the PDF on this computer — the download starts when the file is complete."}
-      {state.kind === "done" && `Downloaded ${state.name}.`}
-      {state.kind === "unsupported" && (
-        <>
-          {state.message}{" "}
-          <a href={state.html} download className="ui-link inline-flex items-center gap-1">
-            <Download className="size-3.5" aria-hidden /> Download HTML
-          </a>
-        </>
-      )}
-      {state.kind === "failed" && (
-        <>
-          The PDF could not be generated: {state.message}.{" "}
-          <button type="button" onClick={onRetry} className="ui-link">
-            Retry
-          </button>
-        </>
-      )}
-    </p>
   );
 }

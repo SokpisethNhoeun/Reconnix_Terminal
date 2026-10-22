@@ -38,7 +38,7 @@ export function ReportPreview({ state, runs, stale, onRetry }: { state: Exclude<
       id="report-preview"
       title="Preview"
       docsHref={DOCS.exporting}
-      meta={`${plural(runs, "run")} · the same HTML the PDF prints`}
+      meta={`${plural(runs, "run")} · exactly what the PDF prints`}
       className="is-wide rep-preview-card"
     >
         {state.kind === "failed" ? (

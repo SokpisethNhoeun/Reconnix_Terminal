@@ -1,4 +1,6 @@
-/* maskDeep / maskAssessment (lib/report/mask.ts): strings are masked, shapes are kept. */
+/* maskDeep / maskAssessment (lib/report/mask.ts): strings are masked, shapes are kept. Lists of
+   strings are masked as one text: redact-list-vectors.json holds cases the TUI's redact_all
+   (reconix/store/redact.py) checks too, so the two stay in step. */
 import { describe, expect, it } from "vitest";
 
 import { AssessmentSchema } from "@/lib/data/schema";
@@ -7,8 +9,13 @@ import { combineAssessments } from "@/lib/report/combined/select";
 import { maskAssessment, maskDeep } from "@/lib/report/mask";
 
 import { sampleAssessments } from "./fixtures";
+import listVectors from "./redact-list-vectors.json";
 
 describe("maskDeep", () => {
+  it.each(listVectors as [string[], string[]][])("masks the list %j as the TUI does", (list, masked) => {
+    expect(maskDeep(list)).toEqual(masked);
+  });
+
   it("keeps an empty list empty (it is no list holding one empty string)", () => {
     expect(maskDeep({ plan: [], cwe: [], nested: { rows: [] } })).toEqual({ plan: [], cwe: [], nested: { rows: [] } });
   });

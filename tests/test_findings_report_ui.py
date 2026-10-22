@@ -3,9 +3,12 @@ web dashboard button."""
 
 import json
 
+import pytest
 from textual.widgets import Button, DataTable, Input, Static
 
 from reconix import store
+from reconix.models.scope import PolicyVerdict
+from reconix.store import lists, report, report_docx
 from reconix.screens import (
     ChoiceScreen, FindingDetailScreen, FindingsListScreen, ReportScreen,
 )
@@ -116,22 +119,31 @@ async def test_exports_wait_for_a_completed_assessment(app):
     run_to("approval:approval-001")
     async with app.run_test(size=SIZE) as pilot:
         await show(app, pilot, "report")
-        assert app.screen.query_one("#html", Button).disabled
+        assert all(app.screen.query_one(f"#{fid}", Button).disabled
+                   for fid in ("pdf", "json", "docx"))
         assert not app.screen.query_one("#web", Button).disabled
-        await pilot.press("h")
+        await pilot.press("j")
         await settle(pilot)
         assert store.get_run().report_path == ""
 
 
-async def test_export_html_then_open_it(app, opened):
+async def test_the_report_offers_pdf_json_and_docx_only(app):
+    run_to(None)
+    async with app.run_test(size=SIZE) as pilot:
+        await show(app, pilot, "report")
+        ids = [b.id for b in app.screen.query(".actions Button")]
+        assert ids == ["pdf", "json", "docx", "web"]
+
+
+async def test_export_json_then_open_it(app, opened):
     async with app.run_test(size=SIZE) as pilot:
         await run_ui_to(app, pilot, None)
         await show(app, pilot, "report")
-        await pilot.press("h")
+        await pilot.press("j")
         await settle(pilot)
         assert isinstance(app.screen, ChoiceScreen)
         path = store.get_run().report_path
-        assert path.endswith("RCX-DEMO-001.html")
+        assert path.endswith("RCX-DEMO-001.json")
         await pilot.press("enter")                                     # Open it
         await settle(pilot)
         assert opened == [path]
@@ -139,18 +151,60 @@ async def test_export_html_then_open_it(app, opened):
         assert "report saved" in " ".join(str(w.render()) for w in app.screen.query(Static))
 
 
-async def test_export_command_offers_every_format(app):
+async def test_export_command_offers_pdf_json_and_docx(app):
     run_to(None)
     async with app.run_test(size=SIZE) as pilot:
         await show(app, pilot, "report")
-        await pilot.press("e")                                         # More… = /export
+        app.run_command_line("/export")
         await settle(pilot)
         assert isinstance(app.screen, ChoiceScreen)
         ids = [o.id for o in app.screen.query_one("#dialog-menu").options]
-        assert ids == ["html", "pdf", "docx", "sarif", "csv", "json", "markdown"]
-        app.run_command_line("/export sarif")
+        assert ids == ["pdf", "json", "docx"]
+        await pilot.press("escape")
         await settle(pilot)
-        assert store.get_run().report_path.endswith(".sarif")
+        app.run_command_line("/export json")
+        await settle(pilot)
+        assert store.get_run().report_path.endswith(".json")
+
+
+def _control_characters_in_the_run(tmp_path) -> None:
+    """An imported nuclei finding and a blocked request holding ESC and NUL bytes."""
+    source = tmp_path / "nuclei.jsonl"
+    source.write_text(json.dumps({
+        "template-id": "banner", "matched-at": "https://staging.example.com/",
+        "info": {"name": "Banner \u001b[31mred\u0000", "severity": "low"},
+        "extracted-results": ["Server: \u001b[2Jnginx\u0000"]}) + "\n")
+    store.import_findings(str(source))
+    lists.current().verdicts.append(PolicyVerdict("GET", "/x\x00", False, "outside \x1b[1m"))
+
+
+@pytest.mark.skipif(not report.HAS_DOCX, reason="python-docx not installed")
+async def test_docx_export_with_control_characters_keeps_the_app_running(app, tmp_path):
+    run_to(None)
+    _control_characters_in_the_run(tmp_path)
+    async with app.run_test(size=SIZE) as pilot:
+        await show(app, pilot, "report")
+        await pilot.press("w")
+        await settle(pilot)
+        assert app.is_running
+        assert isinstance(app.screen, ChoiceScreen)                    # ✓ REPORT SAVED
+        assert store.get_run().report_path.endswith("RCX-DEMO-001.docx")
+
+
+@pytest.mark.skipif(not report.HAS_DOCX, reason="python-docx not installed")
+async def test_a_docx_the_writer_refuses_is_a_warning_not_a_crash(app, monkeypatch):
+    def refuse(_data, _path):
+        raise ValueError("All strings must be XML compatible")
+
+    run_to(None)
+    monkeypatch.setattr(report_docx, "_build", refuse)
+    async with app.run_test(size=SIZE) as pilot:
+        await show(app, pilot, "report")
+        await pilot.press("w")
+        await settle(pilot)
+        assert app.is_running and isinstance(app.screen, ReportScreen)
+        assert store.get_run().report_path == ""
+        assert any("couldn't be written" in str(n.message) for n in app._notifications)
 
 
 async def test_web_button_without_a_running_dashboard_starts_it(app, opened, web_launches):

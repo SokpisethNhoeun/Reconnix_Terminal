@@ -75,7 +75,7 @@ export const DOCS_NAV: DocGroup[] = [
     icon: Rocket,
     pages: [
       { title: "Introduction", href: "/docs/getting-started/introduction", description: "What Reconix does, what is simulated and what is real." },
-      { title: "Requirements", href: "/docs/getting-started/requirements", description: "Python, a terminal, and the optional pieces for PDF, DOCX, the dashboard and a model." },
+      { title: "Requirements", href: "/docs/getting-started/requirements", description: "Python, a terminal, and the optional pieces for PDF, the dashboard and a model." },
       { title: "Installation", href: "/docs/getting-started/installation", description: "Clone, create a virtual environment, install." },
       { title: "Launching", href: "/docs/getting-started/launching", description: "python -m reconix, the reconix command and run.py." },
       { title: "First steps", href: "/docs/getting-started/first-steps", description: "A first assessment on the demo target, gate by gate." },
@@ -141,7 +141,7 @@ export const DOCS_NAV: DocGroup[] = [
     pages: [
       { title: "Reviewing results", href: "/docs/reports/reviewing", description: "The Report screen, the summary and the audit trail." },
       { title: "Understanding findings", href: "/docs/reports/understanding-findings", description: "Severity, validation, CVSS, triage, filters and imports." },
-      { title: "Exporting", href: "/docs/reports/exporting", description: "Seven formats from the terminal, saved under ./reports/." },
+      { title: "Exporting", href: "/docs/reports/exporting", description: "PDF, JSON and DOCX from the terminal, saved under ./reports/." },
       { title: "The web dashboard", href: "/docs/reports/dashboard", description: "Single downloads, the preview, and the combined report of up to five runs." },
     ],
   },

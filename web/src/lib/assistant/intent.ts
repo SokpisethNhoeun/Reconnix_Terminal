@@ -42,7 +42,7 @@ const TOOLS =
   /\btools?\b|\bnmap\b|\bsqlmap\b|\bnikto\b|\bnuclei\b|\bffuf\b|\bsemgrep\b|\bgitleaks\b|\bzap\b|\btestssl\b|\bscanners?\b|\bwhat ran\b|\bexecuted\b|\bcommands?\b|\brequests? (sent|made)\b|\bhow many requests\b|\bactivity\b|\b(tool|scan|scanner) outputs?\b|\boutputs? of\b|\bresults? of\b|\bwhich (scans?|checks?) (ran|were run)\b/;
 const POLICY =
   /\bpolic|\bblock(ed|s)?\b(?! on)|\bout of scope\b|\boutside (the )?scope\b|\brefus|\bdenied\b|\bforbidden\b|\bguardrails?\b|\bscope (checks?|violations?|rules?)\b|\b(scope|policy) restrict|\brestrict\w* (did|does|on|of|by|from) (the )?(scope|policy|run)\b|\bdisallow|\bnot allowed\b|\bverdicts?\b|\bexcluded\b|\bprevented\b/;
-const REPORT = /\breports?\b|\bexport|\bdownload|\bpdf\b|\bsarif\b|\bcsv\b|\bhtml\b|\bjson\b|\bdeliverable/;
+const REPORT = /\breports?\b|\bexport|\bdownload|\bpdf\b|\bjson\b|\bdocx\b|\bword (?:file|document)\b|\bdeliverable|\bsarif\b|\bcsv\b|\bhtml\b/; // a format the dashboard no longer saves still asks about the report
 // errors and failures of the run itself: the saved data has no error log and no failed state, so
 // the reply says so (with the runs' real states). Only with the run in the sentence, and never
 // when the question is about findings ("error-based SQL injection", "broken access control",

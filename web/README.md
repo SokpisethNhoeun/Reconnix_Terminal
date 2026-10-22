@@ -168,10 +168,10 @@ The e2e specs: `access` (roles, origin, headers), `pages` (views, switcher, down
 the Terminal view with a stand-in program), `assessments` (ten a page, the pager, chips, search,
 the address), `findings` (paging, deep links, Previous / Next across a page end, the notice for
 a hidden finding, the list scroller, the phone's list → detail → Back), `reports` (combining
-runs: the selection, the preview frame, one real PDF, the 500 / 501 paths), `docs` (groups,
-command pages, Copy, search, redirects, the phone menu), `dashboard-fit` (the Overview fits the
-fixed frame with nothing to scroll), `assistant` (with the stand-in model `e2e/llm-stub.mjs`;
-`[stub:markdown]`, `[stub:long]` and `[stub:fail]` pick its answers), `motion` (directions,
+runs: the selection, the preview frame, one real PDF and DOCX, the 500 / 501 / 413 paths),
+`docs` (groups, command pages, Copy, search, redirects, the phone menu), `dashboard-fit` (the
+Overview fits the fixed frame with nothing to scroll), `assistant` (with the stand-in model
+`e2e/llm-stub.mjs`; `[stub:markdown]`, `[stub:long]` and `[stub:fail]` pick its answers), `motion` (directions,
 timing, the globe, history), `scroll` (the wheel and keys at six sizes, no sideways scroll) and
 `a11y` (axe via `@axe-core/playwright`, focus order). Known faults are listed in the specs as
 expected failures that fail with "remove this entry" once fixed. The specs wait for
@@ -196,14 +196,15 @@ src/
 │   ├── assistant/           # /assistant → /?view=assistant
 │   ├── login/               # sign-in (token from the link's #fragment) → the Overview
 │   └── api/                 # session (sign-in), assessments/[uid] (JSON), assessments/[uid]/export,
-│                            #   reports/combined (1–5 runs as one HTML / PDF; viewer), terminal/ticket,
+│                            #   reports/combined (1–5 runs as one PDF / DOCX; viewer), terminal/ticket,
 │                            #   assistant and assistant/conversations (operators)
 ├── lib/
-│   ├── data/                # schema.ts (zod), store.ts (server-only reader), stats.ts (pure), export.ts,
+│   ├── data/                # schema.ts (zod), store.ts (server-only reader), stats.ts (pure),
 │   │                        #   adapt.ts (a saved run → the viewer's terms), view-types.ts, format.ts
 │   ├── report/              # formats.ts (the export registry), html.ts (report), pdf.ts (Chrome), render.ts,
 │   │                        #   combined/ (query.ts validates ?uids=&format=&evidence=&low=&appendix=,
-│   │                        #   select.ts merges the runs, html.ts renders, options.ts names the file)
+│   │                        #   select.ts merges the runs, html.ts renders, options.ts names the file),
+│   │                        #   docx/ (zip.ts, ooxml.ts, report.ts and combined.ts: the Word documents)
 │   ├── auth/                # session.ts (launch token, signed cookie, roles, hosts), csp.ts, guard.ts
 │   │                        #   (+ terminalAccess), origin.ts (same-origin check), ticket.ts (terminal tickets)
 │   ├── terminal/            # config.ts (on/off, helper port), paths.ts, protocol.ts (frames, close codes),
@@ -252,15 +253,20 @@ public/globe/land.bin        # the globe's land dots (scripts/build-globe-points
 
 ## Exports
 
-The Reports view's **Download** row offers PDF, HTML, JSON, CSV and SARIF, straight from
-`/api/assessments/<uid>/export?format=…`. The PDF is printed by a Chrome/Chromium on the
-dashboard machine (`RECONIX_CHROME` names one); without a browser the route says so, and
-the HTML report can be printed to PDF from any browser. All formats come from the saved,
+The Reports view's **Download** row offers PDF, JSON and DOCX (the same three the TUI saves),
+straight from `/api/assessments/<uid>/export?format=…`. The PDF is printed by a Chrome/Chromium
+on the dashboard machine (`RECONIX_CHROME` names one); without a browser the route says so and
+links the Word document. Every format is a download, and no route may be framed. The DOCX is
+written by `lib/report/docx/` (no dependency: a stored ZIP of the document and its styles, every
+value XML-escaped, one run per value and a size cap). All formats come from the saved,
 already-masked data; `lib/report/formats.ts` is the single list of formats.
 
 With every run shown, the Reports view's **Combine runs** panel picks up to five saved runs,
-previews them as one report (the same HTML the PDF prints, in a sandboxed frame) and generates
-one PDF from `/api/reports/combined?uids=a,b&format=pdf|html&evidence=1&low=1&appendix=1`
+previews them as one report (the same HTML the PDF prints, in a sandboxed frame: a preview, never
+a download) and generates one PDF or one DOCX from
+`/api/reports/combined?uids=a,b&format=pdf|docx|preview&evidence=1&low=1&appendix=1` (without a
+printer the PDF answers 501 and the panel offers the DOCX; a Word document past `DOCX_MAX_MIB` of
+text answers 413, on the single export too)
 (`lib/report/combined/`). A finding with the same title, CWE and target in several runs counts
 once, with each run as an occurrence; what a run lacks is listed under Limitations.
 

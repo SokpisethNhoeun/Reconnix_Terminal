@@ -6,6 +6,7 @@
    is the one with more than one page. */
 import { type Page } from "@playwright/test";
 
+import { unzip } from "../tests/unzip";
 import { expect, test } from "./fixtures";
 
 import { PER_PAGE } from "../src/lib/paging";
@@ -186,26 +187,26 @@ test("a critical finding, an info finding and a false positive show their own ba
   await rows(page).filter({ hasText: "Technology detected: nginx" }).locator("button").click();
   await expect(detail(page)).toContainText("False positive");
   // the analyst's note is part of the report, and the markup in a title is escaped there too
-  const html = await (await page.request.get(`/api/assessments/${uid}/export?format=html`)).text();
-  expect(html).toContain("Analyst note");
-  expect(html).toContain("Banner is a test fixture; the scanner matched a stale cache.");
-  expect(html).toContain("&lt;b&gt;Status page&lt;/b&gt; leaks build details");
-  expect(html).not.toContain("<b>Status page</b>");
+  const doc = unzip(await (await page.request.get(`/api/assessments/${uid}/export?format=docx`)).body()).get("word/document.xml") ?? "";
+  expect(doc).toContain("Analyst note");
+  expect(doc).toContain("Banner is a test fixture; the scanner matched a stale cache.");
+  expect(doc).toContain("&lt;b&gt;Status page&lt;/b&gt; leaks build details");
+  expect(doc).not.toContain("<b>Status page</b>");
 });
 
 /* The sample run whose target held a login (scripts/make_sample_data.py): the store masked it
    when it saved the run, and the dashboard and its export mask the saved copy once more. */
 const MASKED_RUN = "20260929-112000-8c51_RCX-DEMO-001";
 
-test("a login in a target is masked in the finding's detail and in the HTML export", async ({ page }) => {
+test("a login in a target is masked in the finding's detail and in the Word export", async ({ page }) => {
   await go(page, `/?uid=${MASKED_RUN}&view=findings&finding=IMP-001`);
   await expect(detail(page)).toContainText("••••@portal.example.com");
   await expect(detail(page)).not.toContainText("hunter2");
-  const res = await page.request.get(`/api/assessments/${MASKED_RUN}/export?format=html`);
+  const res = await page.request.get(`/api/assessments/${MASKED_RUN}/export?format=docx`);
   expect(res.status()).toBe(200);
-  const html = await res.text();
-  expect(html).toContain("••••@portal.example.com");
-  expect(html).not.toContain("hunter2");
+  const doc = unzip(await res.body()).get("word/document.xml") ?? "";
+  expect(doc).toContain("••••@portal.example.com");
+  expect(doc).not.toContain("hunter2");
 });
 
 test.describe("on the fixed frame (1366×768)", () => {

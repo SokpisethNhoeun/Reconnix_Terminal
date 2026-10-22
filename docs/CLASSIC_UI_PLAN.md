@@ -53,7 +53,7 @@ Start ──► Template ──► Plan ──► Execution ⇄ Approval ──�
 | 5 | Execution | `account`, `code` (modals) | plan tasks with live status, a spinner (no %), live log (chat + activity merged; see `LIVE_OUTPUT_PLAN.md`), ^C stop |
 | 6 | Findings | — | severity strip, filter / sort, table; `t` triage, `i` import |
 | 7 | Detail | — | evidence + analysis panels (CVSS, CWE/OWASP, remediation); `t` triage, `[`/`]` prev/next |
-| 8 | Report | — | executive summary, severity bars, key findings, changes since last run; export HTML / PDF / DOCX / JSON / more…; **Web dashboard** button |
+| 8 | Report | — | executive summary, severity bars, key findings, changes since last run; export PDF / JSON / DOCX (`p` / `j` / `w`); **Web dashboard** button |
 
 Approvals happen while the run is executing (that is how the v1 process works), so the
 flow line shows Approval before Execution but you visit it from Execution when the run

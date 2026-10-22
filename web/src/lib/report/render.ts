@@ -1,25 +1,20 @@
-/* One place that turns a saved assessment into the text of an export (everything but the
-   PDF, which `pdf.ts` prints from the HTML). Server-only so the report renderer never ships
-   to the browser. */
+/* One place that turns a saved assessment into the bytes of an export: the JSON as text, the
+   Word document as a .docx (the PDF is printed by `pdf.ts` from the HTML). Server-only so the
+   report renderers never ship to the browser. */
 import "server-only";
 
-import { toCsv, toSarif } from "@/lib/data/export";
 import type { Assessment } from "@/lib/data/schema";
 
+import { renderReportDocx } from "./docx/report";
 import type { ExportFormat } from "./formats";
-import { renderReportHtml } from "./html";
 
-export type TextFormat = Exclude<ExportFormat, "pdf">;
+export type FileFormat = Exclude<ExportFormat, "pdf">;
 
-export function renderText(format: TextFormat, assessment: Assessment): string {
+export function renderFile(format: FileFormat, assessment: Assessment): string | Uint8Array<ArrayBuffer> {
   switch (format) {
-    case "html":
-      return renderReportHtml(assessment);
     case "json":
       return `${JSON.stringify(assessment, null, 2)}\n`;
-    case "csv":
-      return toCsv(assessment);
-    case "sarif":
-      return toSarif(assessment);
+    case "docx":
+      return renderReportDocx(assessment);
   }
 }

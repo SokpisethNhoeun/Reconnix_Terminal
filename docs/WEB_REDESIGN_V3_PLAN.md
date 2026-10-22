@@ -79,12 +79,14 @@ what is left. This plan answers the "Master implementation prompt" of 2026-10-20
      `docs.css`), so no two agents edit one stylesheet.
    - **Tokens:** only the main agent changes `theme.py` / `lib/status.ts`.
    - **Combined report API contract:**
-     `GET /api/reports/combined?uids=a,b&format=pdf|html&evidence=1&low=1&appendix=1`.
-     It needs `viewer`, accepts 1–5 distinct valid uids (else 400), `format` defaults to `html`,
+     `GET /api/reports/combined?uids=a,b&format=preview|pdf|docx&evidence=1&low=1&appendix=1`
+     (2026-10-21; it was `pdf|html`, see §5.2).
+     It needs `viewer`, accepts 1–5 distinct valid uids (else 400), `format` defaults to
+     `preview` (the HTML, shown only in the Report view's frame, never a download),
      and each option is a flag (`1`/`true` on; absent, `0` or `false` off) — so a bare `?uids=a`
      builds the report with every option off; the Report view's panel starts with all three on.
      It only reads (one read of the folder per request) and writes nothing; 404 names a missing
-     run, 501 (no browser to print the PDF) carries the HTML link.
+     run, 501 (no browser to print the PDF) carries the Word (DOCX) report's link.
 4. One worktree per workstream: `reconix-wt3/<area>` on `redesign/v3-<area>`.
 
 ### Phase 1 — parallel workstreams (code, each in its own worktree)
@@ -150,7 +152,8 @@ partial, blocked or unverified).
 5. **Assessments:** a new `?view=assessments` page. The alternative is mapping it onto the
    switcher and the Report table. *New page recommended.*
 6. **Combined report:**
-   - Formats: PDF and HTML, from one renderer. *Recommended.*
+   - Formats: PDF and HTML, from one renderer. *Recommended.* (2026-10-21: the downloads are
+     PDF and DOCX; the HTML is the preview and the PDF's source only, see §5.2.)
    - Options: include evidence (masked), include LOW and INFO, include the appendix.
    - Unique finding: same title, weakness (CWE) and target; each run it appears in is an
      occurrence.
@@ -251,3 +254,36 @@ every instance) is fixed in the builder (`rx.setTint`); every screen was rebuilt
 against the running dashboard; the FigJam board gained workflows 8–10 (Overview, Scope,
 Terminal). The prototype is being wired against a click map of the real dashboard
 (50 states, 2,541 interactive elements) with a parity table in the builder.
+
+### 5.2 Report formats: PDF, JSON and DOCX (2026-10-21)
+
+**Owner's decision:** a report is saved as **PDF, JSON or DOCX**, in the TUI and the web alike.
+The report HTML is internal: the PDF's source and the combined report's preview, never a
+download. The CSV, SARIF and Markdown writers are gone.
+
+- **TUI:** the Report screen's keys are `p` / `j` / `w` (bindings and buttons from one list),
+  `/export` offers the same three; python-docx is a runtime dependency (`requirements.txt`,
+  `pyproject.toml`). `reconix/store/report_view.py` is the one outline the PDF's HTML and the
+  Word report both read, so the DOCX has the PDF's sections, order and headings (severity
+  counts, approval status, the scope disclaimer, severity-then-id order, the analyst's note).
+  The print toolbar and script are gone from the HTML.
+- **Web:** `GET /api/assessments/<uid>/export?format=pdf|json|docx` (always an attachment; the
+  `inline=1` path and the CSP's framing exception are gone, every route is
+  `frame-ancestors 'none'`) and `GET /api/reports/combined?…&format=preview|pdf|docx`. A
+  dependency-free Word writer in `web/src/lib/report/docx/` (stored ZIP, OOXML from a small
+  block model, one run per value, a 16 MiB cap on `document.xml` answered with 413 by both
+  routes). The Report view's rows offer all three files, and the Selection panel has
+  **Generate PDF** and **Generate DOCX** (`components/dashboard/report-file.tsx`); a 501 (no
+  printer) links the DOCX.
+- **Review fixes:** `redact.clean()` drops the control characters XML can't hold (a crafted
+  import could crash the TUI's DOCX export; a refused value is now a `StoreValidationError`);
+  Python masks a list of strings as one text like the web's `maskStrings` (a private key stored
+  one line per evidence entry is masked whole; shared vectors in
+  `web/tests/redact-list-vectors.json`); the docs and plans say three formats; e2e checks the
+  sideways scroller on `/docs/commands/provider`; new tests for DOCX masking of every field,
+  well-formed XML in every part, the size cap and the export routes.
+
+**Checks:** `pytest` 811 passed, ruff 0, `export_commands.py --check` up to date, `compileall`
+clean; `typecheck` and `lint` clean, vitest 615 passed (36 files), `next build` ok, Playwright
+**198 passed** (0 skipped, 0 flaky). A single-run and a combined web DOCX and a TUI DOCX all
+open in python-docx, with the PDF's numbered sections.

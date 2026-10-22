@@ -143,7 +143,7 @@ test.describe("axe, more states", () => {
     });
 
     test("the docs menu, open, has no violations", async ({ page }) => {
-      await page.goto("/docs/commands/export");
+      await page.goto("/docs/commands/provider"); // a page with a code block that scrolls sideways
       await page.getByRole("button", { name: "Docs menu" }).click();
       await expect(page.getByRole("navigation", { name: "Documentation", exact: true })).toBeVisible();
       await axe(page, "phone docs menu");

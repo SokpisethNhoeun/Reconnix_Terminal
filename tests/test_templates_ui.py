@@ -54,11 +54,11 @@ async def test_template_runs_through_the_ui_to_an_exported_report(
         await pilot.press("8")
         await settle(pilot)
         assert isinstance(app.screen, ReportScreen)
-        await pilot.press("h")
+        await pilot.press("j")
         await settle(pilot)
         assert isinstance(app.screen, ChoiceScreen)
         path = Path(store.get_run().report_path)
-        assert path.suffix == ".html" and path.exists()
+        assert path.suffix == ".json" and path.exists()
         assert TEST_PASSWORD not in path.read_text(encoding="utf-8")
 
     assert store.get_finding("001").path == first_path
