@@ -9,6 +9,7 @@
  */
 import { redact } from "@/lib/assistant/redact";
 import { duration, hourMinute, minutesLimit, shortDay } from "@/lib/data/format";
+import { SEVERITIES } from "@/lib/data/schema";
 import type { AssessmentView, FindingView, LibraryItem, Severity } from "@/lib/data/view-types";
 import { FINDING_REVIEW, RUN_STATUS, scopeMeaning, SEVERITY_META, STEP_STATUS } from "@/lib/status";
 
@@ -26,12 +27,11 @@ const counted = (v: AssessmentView) => v.findings.filter((f) => !f.falsePositive
 
 /** The worst severity among findings (false positives left out), or null. */
 export function worstOf(levels: Severity[]): Severity | null {
-  const order = Object.keys(SEVERITY_META) as Severity[]; // CRITICAL first
-  return order.find((s) => levels.includes(s)) ?? null;
+  return SEVERITIES.find((s) => levels.includes(s)) ?? null; // CRITICAL first
 }
 
-/** The Findings card of the strip: the total (INFO too, like the Overview's strip), the worst
-    severity and what needs review. */
+/** The Findings card of the strip: the total (like the Overview's strip), the worst severity
+    and what needs review. */
 function findingsStat(rows: FindingView[]): Stat {
   const s = findingsSummary(rows);
   const badges: EventBadge[] = [];

@@ -49,7 +49,10 @@ describe("frames", () => {
     ["an extra field", JSON.stringify({ t: "done", run: "rm -rf" })],
     ["a bad conversation id", JSON.stringify({ t: "meta", conversationId: "../x", title: "x", scope: { uid: null, label: "x" } })],
     ["a card linking to a made-up run", JSON.stringify({ t: "card", card: { kind: "report", runs: [{ run: { uid: "javascript:alert(1)", label: "x", when: "y" }, status: "Completed" }], more: 0 } })],
-    ["a card with a made-up severity", JSON.stringify({ t: "card", card: { kind: "findings", total: 1, counts: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 }, items: [{ id: "F", title: "t", severity: "APOCALYPTIC", cvss: 1, target: "t", review: "review", run: { uid: samples[0].uid, label: "x", when: "y" } }], runs: 1 } })],
+    ["a card with a made-up severity", JSON.stringify({ t: "card", card: { kind: "findings", total: 1, counts: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }, items: [{ id: "F", title: "t", severity: "APOCALYPTIC", cvss: 1, target: "t", review: "review", run: { uid: samples[0].uid, label: "x", when: "y" } }], runs: 1 } })],
+    // Info is no severity any more: a live frame never carries it (only saved conversations do)
+    ["a card counting INFO", JSON.stringify({ t: "card", card: { kind: "findings", total: 0, counts: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 }, items: [], runs: 0 } })],
+    ["a card listing an INFO finding", JSON.stringify({ t: "card", card: { kind: "finding", item: { id: "F", title: "t", severity: "INFO", cvss: null, target: "t", review: "review", run: { uid: samples[0].uid, label: "x", when: "y" } }, cwe: "—", tool: "—", description: "", impact: "", remediation: [] } })],
     ["a notice with an action that does something", JSON.stringify({ t: "card", card: { ...NOTICES.act, action: "approve" } })],
   ])("skip %s", (_name, line) => {
     expect(parseFrame(line)).toBeNull();

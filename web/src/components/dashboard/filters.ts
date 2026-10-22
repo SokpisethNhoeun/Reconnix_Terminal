@@ -9,7 +9,7 @@ import { FINDING_REVIEW, RUN_STATUS, SEVERITY_META, toneColor } from "@/lib/stat
 
 import { plural } from "./derive-shared";
 
-/** Worst first: the schema's order (lib/data/schema.ts). */
+/** Worst first: the schema's four levels (lib/data/schema.ts); `?sev=INFO` is ignored. */
 export const SEVERITY_ORDER = SEVERITIES;
 
 /** Validation buckets: confirmed; open and not confirmed (to review); closed by triage. */
@@ -87,8 +87,9 @@ export interface ChipOption {
   hint?: string; // what it means (the tooltip)
 }
 
-/** One chip per severity (lib/status.ts SEVERITY_META), worst first; levels with no finding
-    are left out unless they are selected (so a selection can always be undone). */
+/** One chip per severity (lib/status.ts SEVERITY_META: Critical, High, Medium, Low), worst
+    first; levels with no finding are left out unless they are selected (so a selection can
+    always be undone). */
 export function severityChips(findings: FindingRow[], selected: readonly string[]): ChipOption[] {
   return countBy(findings, (f) => f.severity, SEVERITY_ORDER)
     .filter((c) => c.count > 0 || selected.includes(c.value))

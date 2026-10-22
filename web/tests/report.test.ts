@@ -1,7 +1,7 @@
 /* The Report view's data (derive-report.ts), for one run and for every saved run, checked
    against the sample files: every count agrees with what the files hold and the policy tiles are
-   gone. Its Findings tile counts every finding, INFO too, like the Overview's strip; its Findings
-   by Severity card counts the four levels it lists. */
+   gone. Its Findings tile counts every finding, like the Overview's strip, and its Findings by
+   Severity card counts the same findings on the four levels it lists. */
 import { describe, expect, it } from "vitest";
 
 import { deriveDashboard } from "@/components/dashboard/derive";
@@ -47,7 +47,7 @@ describe("one run's report", () => {
 
   it("lists the worst findings first, each with its review state", () => {
     const r = report(withFindings);
-    const order = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
+    const order = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
     for (let i = 1; i < r.rows.length; i++) expect(order.indexOf(r.rows[i - 1].severity)).toBeLessThanOrEqual(order.indexOf(r.rows[i].severity));
     expect(r.rows.every((f) => ["Confirmed", "Needs review", "Closed", "Fixed", "Accepted", "False positive"].includes(f.review.label))).toBe(true);
   });
@@ -75,11 +75,11 @@ describe("every run's report", () => {
     }
   });
 
-  it("counts INFO in the Findings tile but not on the Findings by Severity card", () => {
-    const info = views.flatMap((v) => v.findings).filter((f) => !f.falsePositive && f.severity === "INFO").length;
-    expect(info).toBeGreaterThan(0);
+  it("counts the same findings in the Findings tile and on the Findings by Severity card", () => {
+    const real = views.flatMap((v) => v.findings).filter((f) => !f.falsePositive).length;
     expect(r.findings.severity.map((s) => s.level)).toEqual(["CRITICAL", "HIGH", "MEDIUM", "LOW"]);
-    expect(Number(stat(r.stats, "Findings").value)).toBe(r.findings.total + info);
+    expect(Number(stat(r.stats, "Findings").value)).toBe(r.findings.total);
+    expect(r.findings.total).toBe(real);
   });
 
   it("sums the targets' findings to the total", () => {

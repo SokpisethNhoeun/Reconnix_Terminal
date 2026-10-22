@@ -61,7 +61,7 @@ function reportBlocks(a: Assessment, now: Date = new Date()): Block[] {
   const findings = [...a.findings].sort((x, y) => sevRank(x.severity) - sevRank(y.severity) || x.id.localeCompare(y.id));
   const blocked = a.verdicts.filter((v) => !v.allowed);
   const approved = a.decisions.filter((d) => d.decision === "APPROVED").length;
-  const highest = findings[0]?.severity ?? "INFO";
+  const highest = findings[0]?.severity ?? "NONE"; // no findings: "None"
   const s = a.scope;
   return [
     { kind: "title", text: "Security Assessment Report" },

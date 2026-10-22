@@ -104,7 +104,8 @@ describe("pickCards", () => {
     expect(kinds(cards)).toEqual(["findings"]);
     const card = of(cards, "findings");
     expect(card.total).toBe(samples.reduce((n, a) => n + real(a).length, 0));
-    for (const s of ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const) {
+    expect(Object.keys(card.counts)).toEqual(["CRITICAL", "HIGH", "MEDIUM", "LOW"]);
+    for (const s of ["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const) {
       expect(card.counts[s]).toBe(samples.reduce((n, a) => n + real(a).filter((f) => (f.effective_severity || f.severity) === s).length, 0));
     }
     const top = rankFindings(scopedViews(views, null))[0];

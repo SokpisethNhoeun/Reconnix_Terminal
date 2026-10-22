@@ -186,8 +186,8 @@ export type ExecutionCard =
 export type SeverityCount = { level: Severity; count: number; share: number; frac: number };
 export type TopFinding = { key: string; id: string; title: string; severity: Severity; score: number; run: string | null };
 
-/** Findings by Severity: CRITICAL, HIGH, MEDIUM and LOW only (derive.ts CARD_LEVELS); INFO is
-    never on the card, though the summary strip and the Findings view count it. */
+/** Findings by Severity: CRITICAL, HIGH, MEDIUM and LOW (the whole scale), so its total is the
+    summary strip's and the Findings view's. */
 export interface FindingsSlice {
   total: number; // findings at the four levels (the card's count, the bar's whole)
   severity: SeverityCount[]; // CRITICAL, HIGH, MEDIUM, LOW in that order, each even at 0

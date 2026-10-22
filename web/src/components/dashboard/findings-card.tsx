@@ -1,8 +1,8 @@
 /* Findings by Severity: a stacked bar of the severity mix, one row per severity (badge, count,
    share; a row with findings opens Findings filtered to it), the review state, and the top CVSS
-   findings (each opens itself in Findings). Always four rows, Critical, High, Medium, Low, each
-   even at 0; INFO is never on the card (derive.ts CARD_LEVELS), so the bar, its accessible name
-   and the total count those four. Severity uses the TUI's scale (lib/status.ts SEVERITY_META). */
+   findings (each opens itself in Findings). Always four rows, Critical, High, Medium, Low (the
+   whole scale), each even at 0; the bar, its accessible name and the total count those four.
+   Severity uses the TUI's scale (lib/status.ts SEVERITY_META). */
 import { DashCard } from "@/components/dashboard/dash-card";
 import { plural } from "@/components/dashboard/derive-shared";
 import type { FindingsSlice } from "@/components/dashboard/overview-types";

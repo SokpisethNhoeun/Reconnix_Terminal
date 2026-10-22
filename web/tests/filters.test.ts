@@ -59,7 +59,7 @@ describe("findingMatches", () => {
 
 describe("sortFindings", () => {
   it("puts the highest severity first, then the highest CVSS", () => {
-    const order = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
+    const order = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
     const sorted = sortFindings(findings);
     for (let i = 1; i < sorted.length; i++) {
       const [a, b] = [sorted[i - 1], sorted[i]];
