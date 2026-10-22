@@ -1,6 +1,6 @@
 {
   "source": "reconix/commands/builtin.py",
-  "count": 18,
+  "count": 19,
   "groups": [
     {
       "id": "start",
@@ -164,6 +164,17 @@
             "agent"
           ],
           "description": "Run a real assessment with the AI agent (needs a /model)",
+          "takes_argument": false,
+          "ask": false,
+          "question": "",
+          "empty": ""
+        },
+        {
+          "name": "add-on",
+          "aliases": [
+            "addon"
+          ],
+          "description": "Add reference files for the AI (knowledge add-ons)",
           "takes_argument": false,
           "ask": false,
           "question": "",

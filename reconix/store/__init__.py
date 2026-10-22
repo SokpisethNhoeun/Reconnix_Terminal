@@ -28,6 +28,10 @@ from .openapi import (
     api_spec_handoff, attach_api_spec, can_attach_api_spec, get_api_spec, remove_api_spec,
 )
 from .history import add_history, list_history
+from . import knowledge
+from .knowledge import add_source, list_sources, remove_source
+from .knowledge import clear as clear_knowledge
+from .knowledge import search as search_knowledge
 from .persist import autosave, close_session, web_dashboard_url
 from .plan import gated_count, plan_overview
 from .providers import (
@@ -108,4 +112,7 @@ __all__ = [
     "activate", "active_model", "active_llm_settings",
     # the saved copy the web dashboard reads
     "autosave", "close_session", "web_dashboard_url",
+    # knowledge add-ons (/add-on): reference files for the AI
+    "knowledge", "add_source", "list_sources", "remove_source",
+    "clear_knowledge", "search_knowledge",
 ]

@@ -69,11 +69,23 @@ def _agent(uid: Optional[str] = None):
     agent = _agents.get(uid)
     if agent is None:
         settings = load_settings()      # Kali MCP + DB from env; the LLM is set per turn
-        agent = Agent(settings)
+        # Give the agent the store's /add-on knowledge as a read-only reference tool.
+        agent = Agent(settings, knowledge=_knowledge_search)
         agent.guard = agent_guard.make_guard(
             uid, lambda ref: _lookup_target(agent, ref), lambda a, kind: _tools_for(agent, a, kind))
         _agents[uid] = agent
     return agent
+
+
+def _knowledge_search(query: str) -> list:
+    """The store's knowledge search, as the harness tool expects it: a list of plain dicts.
+
+    Passages are already cleaned and redacted at ingest; the score is dropped (the model only
+    needs the text). The harness never imports Reconix, so this mapping lives here.
+    """
+    from . import knowledge
+    return [{"source": p.source, "index": p.index, "text": p.text}
+            for p in knowledge.search(query)]
 
 
 def _lookup_target(agent, ref: str) -> Optional[tuple]:

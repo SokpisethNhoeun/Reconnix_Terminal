@@ -13,6 +13,7 @@ dependencies = [
     "python-dotenv>=1.0",     # flexible LLM: load .env
     "python-docx>=1.1",       # the DOCX report (PDF, JSON, DOCX)
     "PyYAML>=6.0",            # OpenAPI specs (safe loading only)
+    "pypdf>=4.0",             # /add-on knowledge files: PDF page text
 ]
 
 [project.scripts]
@@ -26,7 +27,7 @@ build-backend = "setuptools.build_meta"
 packages = [
     "reconix", "reconix.commands", "reconix.flow", "reconix.llm", "reconix.models",
     "reconix.screens", "reconix.screens.forms", "reconix.shell", "reconix.store",
-    "reconix.store.templates", "reconix.webterm", "reconix.widgets",
+    "reconix.store.knowledge", "reconix.store.templates", "reconix.webterm", "reconix.widgets",
 ]
 
 [tool.setuptools.package-data]

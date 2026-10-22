@@ -19,14 +19,14 @@ from . import store, theme
 from .commands import COMMANDS, Command, find, parse
 from .screens import ChoiceScreen, CommandBarScreen, HelpScreen, StartScreen
 from .shell import (
-    ActionsMixin, AgentMixin, DialogsMixin, LlmMixin, NavigationMixin, RunHostMixin,
-    WebDashboardMixin,
+    ActionsMixin, AgentMixin, DialogsMixin, KnowledgeMixin, LlmMixin, NavigationMixin,
+    RunHostMixin, WebDashboardMixin,
 )
 from .widgets import ActivityStatus
 
 
 class ReconixApp(NavigationMixin, RunHostMixin, ActionsMixin, AgentMixin, DialogsMixin,
-                 LlmMixin, WebDashboardMixin, App):
+                 KnowledgeMixin, LlmMixin, WebDashboardMixin, App):
     """Reconix — AI-Powered Security Testing Assistant (demo)."""
 
     CSS_PATH = "reconix.tcss"
