@@ -20,7 +20,7 @@
     "OWASP WSTG"
   ],
   "report_version": "1.0",
-  "created_at": "2026-09-29T11:43:13+00:00",
+  "created_at": "2026-09-29T11:43:02+00:00",
   "status": "Completed",
   "waiting_gate": "",
   "waiting_request_id": "",
@@ -29,8 +29,8 @@
   "session_closed": true,
   "run": {
     "phase": "completed",
-    "started_at": "2026-09-29T11:44:17+00:00",
-    "finished_at": "2026-09-29T11:55:36+00:00",
+    "started_at": "2026-09-29T11:44:10+00:00",
+    "finished_at": "2026-09-29T11:55:29+00:00",
     "completed": true,
     "requests": 541,
     "progress": {
@@ -105,35 +105,35 @@
       "path": "/internal/metrics",
       "allowed": false,
       "reason": "Path outside approved scope",
-      "at": "2026-09-29T11:47:24+00:00"
+      "at": "2026-09-29T11:47:08+00:00"
     },
     {
       "method": "GET",
       "path": "/v1/orders/8842",
       "allowed": true,
       "reason": "Within approved scope",
-      "at": "2026-09-29T11:50:37+00:00"
+      "at": "2026-09-29T11:50:20+00:00"
     },
     {
       "method": "GET",
       "path": "/v1/orders/8842",
       "allowed": true,
       "reason": "Within approved scope",
-      "at": "2026-09-29T11:50:47+00:00"
+      "at": "2026-09-29T11:50:33+00:00"
     },
     {
       "method": "GET",
       "path": "/v1/orders/8843",
       "allowed": true,
       "reason": "Within approved scope",
-      "at": "2026-09-29T11:52:01+00:00"
+      "at": "2026-09-29T11:51:55+00:00"
     },
     {
       "method": "GET",
       "path": "/v1/orders/8843",
       "allowed": true,
       "reason": "Within approved scope",
-      "at": "2026-09-29T11:52:25+00:00"
+      "at": "2026-09-29T11:52:19+00:00"
     }
   ],
   "approvals": [
@@ -169,7 +169,7 @@
       "operator": "analyst",
       "reason": "",
       "command_hash": "sha256:b221d4804e94f3beb6ae1799df73934d7d9a777df8d87460084bb615aeb44cd1",
-      "at": "2026-09-29T11:50:54+00:00"
+      "at": "2026-09-29T11:50:36+00:00"
     },
     {
       "request_id": "approval-002",
@@ -177,7 +177,7 @@
       "operator": "analyst",
       "reason": "",
       "command_hash": "sha256:f7786bf7b1088de02cdaa9ca33b16eadd89fa5ac7ea84626eb73eb990fa25fa2",
-      "at": "2026-09-29T11:52:28+00:00"
+      "at": "2026-09-29T11:52:25+00:00"
     }
   ],
   "findings": [
@@ -187,15 +187,13 @@
       "title": "Exposed backup endpoint",
       "path": "/backup",
       "validation": "UNCONFIRMED",
-      "description": "Imported from tool output.",
+      "description": "Reported by nuclei.",
       "affected_url": "https://api.example.org/backup",
       "impact": "Review the finding and confirm its impact.",
       "remediation": "See the tool's guidance for remediation.",
-      "tool": "nuclei (imported)",
+      "tool": "nuclei",
       "references": [],
-      "evidence": [
-        "template: exposed-backup"
-      ],
+      "evidence": [],
       "cvss_score": 0.0,
       "cvss_vector": "",
       "category": "",
@@ -280,15 +278,13 @@
       "title": "Exposed metrics endpoint",
       "path": "/metrics",
       "validation": "UNCONFIRMED",
-      "description": "Imported from tool output.",
+      "description": "Reported by nuclei.",
       "affected_url": "https://api.example.org/metrics",
       "impact": "Review the finding and confirm its impact.",
       "remediation": "See the tool's guidance for remediation.",
-      "tool": "nuclei (imported)",
+      "tool": "nuclei",
       "references": [],
-      "evidence": [
-        "template: exposed-metrics"
-      ],
+      "evidence": [],
       "cvss_score": 0.0,
       "cvss_vector": "",
       "category": "",
@@ -306,15 +302,13 @@
       "title": "Exposed debug endpoint",
       "path": "/debug",
       "validation": "UNCONFIRMED",
-      "description": "Imported from tool output.",
+      "description": "Reported by nuclei.",
       "affected_url": "https://api.example.org/debug",
       "impact": "Review the finding and confirm its impact.",
       "remediation": "See the tool's guidance for remediation.",
-      "tool": "nuclei (imported)",
+      "tool": "nuclei",
       "references": [],
-      "evidence": [
-        "template: exposed-debug"
-      ],
+      "evidence": [],
       "cvss_score": 0.0,
       "cvss_vector": "",
       "category": "",
@@ -332,15 +326,13 @@
       "title": "Exposed config endpoint",
       "path": "/config",
       "validation": "UNCONFIRMED",
-      "description": "Imported from tool output.",
+      "description": "Reported by nuclei.",
       "affected_url": "https://api.example.org/config",
       "impact": "Review the finding and confirm its impact.",
       "remediation": "See the tool's guidance for remediation.",
-      "tool": "nuclei (imported)",
+      "tool": "nuclei",
       "references": [],
-      "evidence": [
-        "template: exposed-config"
-      ],
+      "evidence": [],
       "cvss_score": 0.0,
       "cvss_vector": "",
       "category": "",
@@ -391,15 +383,61 @@
       "title": "Exposed swagger endpoint",
       "path": "/swagger",
       "validation": "UNCONFIRMED",
-      "description": "Imported from tool output.",
+      "description": "Reported by nuclei.",
       "affected_url": "https://api.example.org/swagger",
       "impact": "Review the finding and confirm its impact.",
       "remediation": "See the tool's guidance for remediation.",
-      "tool": "nuclei (imported)",
+      "tool": "nuclei",
       "references": [],
-      "evidence": [
-        "template: exposed-swagger"
-      ],
+      "evidence": [],
+      "cvss_score": 0.0,
+      "cvss_vector": "",
+      "category": "",
+      "cwe": [],
+      "owasp": [],
+      "cve": [],
+      "status": "open",
+      "severity_override": "",
+      "effective_severity": "LOW",
+      "triage_note": ""
+    },
+    {
+      "id": "IMP-005",
+      "severity": "LOW",
+      "title": "Exposed health endpoint",
+      "path": "/health",
+      "validation": "UNCONFIRMED",
+      "description": "Reported by nuclei.",
+      "affected_url": "https://api.example.org/health",
+      "impact": "Review the finding and confirm its impact.",
+      "remediation": "See the tool's guidance for remediation.",
+      "tool": "nuclei",
+      "references": [],
+      "evidence": [],
+      "cvss_score": 0.0,
+      "cvss_vector": "",
+      "category": "",
+      "cwe": [],
+      "owasp": [],
+      "cve": [],
+      "status": "open",
+      "severity_override": "",
+      "effective_severity": "LOW",
+      "triage_note": ""
+    },
+    {
+      "id": "IMP-006",
+      "severity": "LOW",
+      "title": "Exposed version endpoint",
+      "path": "/version",
+      "validation": "UNCONFIRMED",
+      "description": "Reported by nuclei.",
+      "affected_url": "https://api.example.org/version",
+      "impact": "Review the finding and confirm its impact.",
+      "remediation": "See the tool's guidance for remediation.",
+      "tool": "nuclei",
+      "references": [],
+      "evidence": [],
       "cvss_score": 0.0,
       "cvss_vector": "",
       "category": "",
@@ -417,15 +455,13 @@
       "title": "Exposed status endpoint",
       "path": "/status",
       "validation": "UNCONFIRMED",
-      "description": "Imported from tool output.",
+      "description": "Reported by nuclei.",
       "affected_url": "https://api.example.org/status",
       "impact": "Review the finding and confirm its impact.",
       "remediation": "See the tool's guidance for remediation.",
-      "tool": "nuclei (imported)",
+      "tool": "nuclei",
       "references": [],
-      "evidence": [
-        "template: exposed-status"
-      ],
+      "evidence": [],
       "cvss_score": 0.0,
       "cvss_vector": "",
       "category": "",
@@ -443,15 +479,13 @@
       "title": "Exposed trace endpoint",
       "path": "/trace",
       "validation": "UNCONFIRMED",
-      "description": "Imported from tool output.",
+      "description": "Reported by nuclei.",
       "affected_url": "https://api.example.org/trace",
       "impact": "Review the finding and confirm its impact.",
       "remediation": "See the tool's guidance for remediation.",
-      "tool": "nuclei (imported)",
+      "tool": "nuclei",
       "references": [],
-      "evidence": [
-        "template: exposed-trace"
-      ],
+      "evidence": [],
       "cvss_score": 0.0,
       "cvss_vector": "",
       "category": "",
@@ -462,64 +496,12 @@
       "severity_override": "",
       "effective_severity": "LOW",
       "triage_note": ""
-    },
-    {
-      "id": "IMP-005",
-      "severity": "INFO",
-      "title": "Exposed health endpoint",
-      "path": "/health",
-      "validation": "UNCONFIRMED",
-      "description": "Imported from tool output.",
-      "affected_url": "https://api.example.org/health",
-      "impact": "Review the finding and confirm its impact.",
-      "remediation": "See the tool's guidance for remediation.",
-      "tool": "nuclei (imported)",
-      "references": [],
-      "evidence": [
-        "template: exposed-health"
-      ],
-      "cvss_score": 0.0,
-      "cvss_vector": "",
-      "category": "",
-      "cwe": [],
-      "owasp": [],
-      "cve": [],
-      "status": "open",
-      "severity_override": "",
-      "effective_severity": "INFO",
-      "triage_note": ""
-    },
-    {
-      "id": "IMP-006",
-      "severity": "INFO",
-      "title": "Exposed version endpoint",
-      "path": "/version",
-      "validation": "UNCONFIRMED",
-      "description": "Imported from tool output.",
-      "affected_url": "https://api.example.org/version",
-      "impact": "Review the finding and confirm its impact.",
-      "remediation": "See the tool's guidance for remediation.",
-      "tool": "nuclei (imported)",
-      "references": [],
-      "evidence": [
-        "template: exposed-version"
-      ],
-      "cvss_score": 0.0,
-      "cvss_vector": "",
-      "category": "",
-      "cwe": [],
-      "owasp": [],
-      "cve": [],
-      "status": "open",
-      "severity_override": "",
-      "effective_severity": "INFO",
-      "triage_note": ""
     }
   ],
   "timeline": [
     {
-      "seq": 57,
-      "at": "2026-09-29T11:43:04+00:00",
+      "seq": 55,
+      "at": "2026-09-29T11:42:55+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -528,8 +510,8 @@
       "rows": []
     },
     {
-      "seq": 58,
-      "at": "2026-09-29T11:43:07+00:00",
+      "seq": 56,
+      "at": "2026-09-29T11:42:58+00:00",
       "type": "activity",
       "who": "SYS",
       "kind": "line",
@@ -538,12 +520,32 @@
       "rows": []
     },
     {
-      "seq": 59,
-      "at": "2026-09-29T11:43:33+00:00",
+      "seq": 57,
+      "at": "2026-09-29T11:43:24+00:00",
       "type": "chat",
       "who": "you",
       "kind": "text",
       "text": "Test the REST API at https://api.example.org/v2 for security issues.",
+      "tone": "default",
+      "rows": []
+    },
+    {
+      "seq": 58,
+      "at": "2026-09-29T11:43:41+00:00",
+      "type": "activity",
+      "who": "AI",
+      "kind": "line",
+      "text": "Target parsed: api.example.org",
+      "tone": "default",
+      "rows": []
+    },
+    {
+      "seq": 59,
+      "at": "2026-09-29T11:43:44+00:00",
+      "type": "chat",
+      "who": "reconix",
+      "kind": "text",
+      "text": "Target identified: api.example.org (API service).",
       "tone": "default",
       "rows": []
     },
@@ -553,7 +555,7 @@
       "type": "activity",
       "who": "AI",
       "kind": "line",
-      "text": "Target parsed: api.example.org",
+      "text": "Template auto-selected: API (matched to the target)",
       "tone": "default",
       "rows": []
     },
@@ -563,33 +565,13 @@
       "type": "chat",
       "who": "reconix",
       "kind": "text",
-      "text": "Target identified: api.example.org (API service).",
-      "tone": "default",
-      "rows": []
-    },
-    {
-      "seq": 62,
-      "at": "2026-09-29T11:44:00+00:00",
-      "type": "activity",
-      "who": "AI",
-      "kind": "line",
-      "text": "Template auto-selected: API (matched to the target)",
-      "tone": "default",
-      "rows": []
-    },
-    {
-      "seq": 63,
-      "at": "2026-09-29T11:44:03+00:00",
-      "type": "chat",
-      "who": "reconix",
-      "kind": "text",
       "text": "Template auto-selected: API. Drafting a Scope Manifest…",
       "tone": "ok",
       "rows": []
     },
     {
-      "seq": 64,
-      "at": "2026-09-29T11:44:08+00:00",
+      "seq": 62,
+      "at": "2026-09-29T11:44:01+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -598,8 +580,8 @@
       "rows": []
     },
     {
-      "seq": 65,
-      "at": "2026-09-29T11:44:14+00:00",
+      "seq": 63,
+      "at": "2026-09-29T11:44:05+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -608,8 +590,8 @@
       "rows": []
     },
     {
-      "seq": 66,
-      "at": "2026-09-29T11:44:24+00:00",
+      "seq": 64,
+      "at": "2026-09-29T11:44:16+00:00",
       "type": "activity",
       "who": "USER",
       "kind": "line",
@@ -618,8 +600,8 @@
       "rows": []
     },
     {
-      "seq": 67,
-      "at": "2026-09-29T11:44:31+00:00",
+      "seq": 65,
+      "at": "2026-09-29T11:44:21+00:00",
       "type": "activity",
       "who": "SYS",
       "kind": "line",
@@ -628,8 +610,8 @@
       "rows": []
     },
     {
-      "seq": 68,
-      "at": "2026-09-29T11:44:48+00:00",
+      "seq": 66,
+      "at": "2026-09-29T11:44:39+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -638,8 +620,8 @@
       "rows": []
     },
     {
-      "seq": 69,
-      "at": "2026-09-29T11:44:56+00:00",
+      "seq": 67,
+      "at": "2026-09-29T11:44:51+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -648,8 +630,8 @@
       "rows": []
     },
     {
-      "seq": 70,
-      "at": "2026-09-29T11:45:04+00:00",
+      "seq": 68,
+      "at": "2026-09-29T11:45:01+00:00",
       "type": "activity",
       "who": "USER",
       "kind": "line",
@@ -658,7 +640,7 @@
       "rows": []
     },
     {
-      "seq": 71,
+      "seq": 69,
       "at": "2026-09-29T11:45:21+00:00",
       "type": "chat",
       "who": "reconix",
@@ -668,8 +650,8 @@
       "rows": []
     },
     {
-      "seq": 72,
-      "at": "2026-09-29T11:45:39+00:00",
+      "seq": 70,
+      "at": "2026-09-29T11:45:33+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -678,8 +660,8 @@
       "rows": []
     },
     {
-      "seq": 73,
-      "at": "2026-09-29T11:45:47+00:00",
+      "seq": 71,
+      "at": "2026-09-29T11:45:40+00:00",
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
@@ -688,8 +670,8 @@
       "rows": []
     },
     {
-      "seq": 74,
-      "at": "2026-09-29T11:46:00+00:00",
+      "seq": 72,
+      "at": "2026-09-29T11:45:49+00:00",
       "type": "activity",
       "who": "TOOL",
       "kind": "line",
@@ -698,8 +680,8 @@
       "rows": []
     },
     {
-      "seq": 75,
-      "at": "2026-09-29T11:46:35+00:00",
+      "seq": 73,
+      "at": "2026-09-29T11:46:19+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "card",
@@ -721,8 +703,8 @@
       ]
     },
     {
-      "seq": 76,
-      "at": "2026-09-29T11:46:48+00:00",
+      "seq": 74,
+      "at": "2026-09-29T11:46:29+00:00",
       "type": "activity",
       "who": "TOOL",
       "kind": "line",
@@ -731,8 +713,8 @@
       "rows": []
     },
     {
-      "seq": 77,
-      "at": "2026-09-29T11:47:14+00:00",
+      "seq": 75,
+      "at": "2026-09-29T11:46:55+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -741,8 +723,8 @@
       "rows": []
     },
     {
-      "seq": 78,
-      "at": "2026-09-29T11:47:35+00:00",
+      "seq": 76,
+      "at": "2026-09-29T11:47:20+00:00",
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
@@ -751,8 +733,8 @@
       "rows": []
     },
     {
-      "seq": 79,
-      "at": "2026-09-29T11:47:39+00:00",
+      "seq": 77,
+      "at": "2026-09-29T11:47:25+00:00",
       "type": "chat",
       "who": "policy",
       "kind": "banner",
@@ -761,8 +743,8 @@
       "rows": []
     },
     {
-      "seq": 80,
-      "at": "2026-09-29T11:47:50+00:00",
+      "seq": 78,
+      "at": "2026-09-29T11:47:40+00:00",
       "type": "activity",
       "who": "TOOL",
       "kind": "line",
@@ -771,8 +753,8 @@
       "rows": []
     },
     {
-      "seq": 81,
-      "at": "2026-09-29T11:48:13+00:00",
+      "seq": 79,
+      "at": "2026-09-29T11:48:01+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "card",
@@ -790,8 +772,8 @@
       ]
     },
     {
-      "seq": 82,
-      "at": "2026-09-29T11:48:21+00:00",
+      "seq": 80,
+      "at": "2026-09-29T11:48:12+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -800,8 +782,8 @@
       "rows": []
     },
     {
-      "seq": 83,
-      "at": "2026-09-29T11:48:30+00:00",
+      "seq": 81,
+      "at": "2026-09-29T11:48:23+00:00",
       "type": "chat",
       "who": "policy",
       "kind": "banner",
@@ -810,8 +792,8 @@
       "rows": []
     },
     {
-      "seq": 84,
-      "at": "2026-09-29T11:48:40+00:00",
+      "seq": 82,
+      "at": "2026-09-29T11:48:37+00:00",
       "type": "activity",
       "who": "USER",
       "kind": "line",
@@ -820,8 +802,8 @@
       "rows": []
     },
     {
-      "seq": 85,
-      "at": "2026-09-29T11:49:05+00:00",
+      "seq": 83,
+      "at": "2026-09-29T11:48:58+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -830,8 +812,8 @@
       "rows": []
     },
     {
-      "seq": 86,
-      "at": "2026-09-29T11:49:15+00:00",
+      "seq": 84,
+      "at": "2026-09-29T11:49:07+00:00",
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
@@ -840,8 +822,8 @@
       "rows": []
     },
     {
-      "seq": 87,
-      "at": "2026-09-29T11:49:43+00:00",
+      "seq": 85,
+      "at": "2026-09-29T11:49:31+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -850,8 +832,8 @@
       "rows": []
     },
     {
-      "seq": 88,
-      "at": "2026-09-29T11:49:57+00:00",
+      "seq": 86,
+      "at": "2026-09-29T11:49:42+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -860,8 +842,8 @@
       "rows": []
     },
     {
-      "seq": 89,
-      "at": "2026-09-29T11:50:18+00:00",
+      "seq": 87,
+      "at": "2026-09-29T11:50:03+00:00",
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
@@ -870,8 +852,8 @@
       "rows": []
     },
     {
-      "seq": 90,
-      "at": "2026-09-29T11:50:59+00:00",
+      "seq": 88,
+      "at": "2026-09-29T11:50:44+00:00",
       "type": "activity",
       "who": "USER",
       "kind": "line",
@@ -880,8 +862,8 @@
       "rows": []
     },
     {
-      "seq": 91,
-      "at": "2026-09-29T11:51:19+00:00",
+      "seq": 89,
+      "at": "2026-09-29T11:51:06+00:00",
       "type": "chat",
       "who": "policy",
       "kind": "banner",
@@ -890,8 +872,8 @@
       "rows": []
     },
     {
-      "seq": 92,
-      "at": "2026-09-29T11:51:29+00:00",
+      "seq": 90,
+      "at": "2026-09-29T11:51:19+00:00",
       "type": "activity",
       "who": "TOOL",
       "kind": "line",
@@ -900,8 +882,8 @@
       "rows": []
     },
     {
-      "seq": 93,
-      "at": "2026-09-29T11:51:53+00:00",
+      "seq": 91,
+      "at": "2026-09-29T11:51:39+00:00",
       "type": "activity",
       "who": "POLICY",
       "kind": "line",
@@ -910,8 +892,8 @@
       "rows": []
     },
     {
-      "seq": 94,
-      "at": "2026-09-29T11:52:32+00:00",
+      "seq": 92,
+      "at": "2026-09-29T11:52:29+00:00",
       "type": "activity",
       "who": "USER",
       "kind": "line",
@@ -920,8 +902,8 @@
       "rows": []
     },
     {
-      "seq": 95,
-      "at": "2026-09-29T11:52:47+00:00",
+      "seq": 93,
+      "at": "2026-09-29T11:52:44+00:00",
       "type": "chat",
       "who": "policy",
       "kind": "banner",
@@ -930,8 +912,8 @@
       "rows": []
     },
     {
-      "seq": 96,
-      "at": "2026-09-29T11:52:55+00:00",
+      "seq": 94,
+      "at": "2026-09-29T11:52:54+00:00",
       "type": "activity",
       "who": "TOOL",
       "kind": "line",
@@ -940,7 +922,7 @@
       "rows": []
     },
     {
-      "seq": 97,
+      "seq": 95,
       "at": "2026-09-29T11:53:14+00:00",
       "type": "chat",
       "who": "reconix",
@@ -950,8 +932,8 @@
       "rows": []
     },
     {
-      "seq": 98,
-      "at": "2026-09-29T11:53:25+00:00",
+      "seq": 96,
+      "at": "2026-09-29T11:53:20+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -960,8 +942,8 @@
       "rows": []
     },
     {
-      "seq": 99,
-      "at": "2026-09-29T11:53:39+00:00",
+      "seq": 97,
+      "at": "2026-09-29T11:53:32+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "check",
@@ -970,8 +952,8 @@
       "rows": []
     },
     {
-      "seq": 100,
-      "at": "2026-09-29T11:53:52+00:00",
+      "seq": 98,
+      "at": "2026-09-29T11:53:47+00:00",
       "type": "chat",
       "who": "",
       "kind": "check",
@@ -980,8 +962,8 @@
       "rows": []
     },
     {
-      "seq": 101,
-      "at": "2026-09-29T11:54:10+00:00",
+      "seq": 99,
+      "at": "2026-09-29T11:54:01+00:00",
       "type": "chat",
       "who": "",
       "kind": "check",
@@ -990,8 +972,8 @@
       "rows": []
     },
     {
-      "seq": 102,
-      "at": "2026-09-29T11:54:23+00:00",
+      "seq": 100,
+      "at": "2026-09-29T11:54:16+00:00",
       "type": "chat",
       "who": "",
       "kind": "check",
@@ -1000,8 +982,8 @@
       "rows": []
     },
     {
-      "seq": 103,
-      "at": "2026-09-29T11:54:52+00:00",
+      "seq": 101,
+      "at": "2026-09-29T11:54:43+00:00",
       "type": "activity",
       "who": "AI",
       "kind": "line",
@@ -1010,8 +992,8 @@
       "rows": []
     },
     {
-      "seq": 104,
-      "at": "2026-09-29T11:55:10+00:00",
+      "seq": 102,
+      "at": "2026-09-29T11:54:54+00:00",
       "type": "activity",
       "who": "SYS",
       "kind": "line",
@@ -1020,8 +1002,8 @@
       "rows": []
     },
     {
-      "seq": 105,
-      "at": "2026-09-29T11:55:18+00:00",
+      "seq": 103,
+      "at": "2026-09-29T11:55:05+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
@@ -1030,41 +1012,21 @@
       "rows": []
     },
     {
-      "seq": 106,
-      "at": "2026-09-29T11:55:26+00:00",
+      "seq": 104,
+      "at": "2026-09-29T11:55:16+00:00",
       "type": "chat",
       "who": "reconix",
       "kind": "text",
       "text": "Open the report (8 or /report) to export it.",
       "tone": "muted",
       "rows": []
-    },
-    {
-      "seq": 107,
-      "at": "2026-09-29T11:55:44+00:00",
-      "type": "activity",
-      "who": "USER",
-      "kind": "line",
-      "text": "Imported 9 finding(s) from nuclei output",
-      "tone": "ok",
-      "rows": []
-    },
-    {
-      "seq": 108,
-      "at": "2026-09-29T11:55:52+00:00",
-      "type": "chat",
-      "who": "reconix",
-      "kind": "text",
-      "text": "Imported 9 finding(s) from nuclei output (reconix-sample-nuclei.jsonl).",
-      "tone": "ok",
-      "rows": []
     }
   ],
   "requests": [
     {
       "text": "Test the REST API at https://api.example.org/v2 for security issues.",
-      "at": "2026-09-29T11:43:24+00:00"
+      "at": "2026-09-29T11:43:16+00:00"
     }
   ],
-  "saved_at": "2026-09-29T11:56:04+00:00"
+  "saved_at": "2026-09-29T11:55:46+00:00"
 }

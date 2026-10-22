@@ -218,11 +218,9 @@
       "affected_url": "https://api.example.com/docs",
       "impact": "Review the finding and confirm its impact.",
       "remediation": "See the tool's guidance for remediation.",
-      "tool": "nuclei (imported)",
+      "tool": "nuclei",
       "references": [],
-      "evidence": [
-        "template: api-docs-exposed"
-      ],
+      "evidence": [],
       "cvss_score": 0.0,
       "cvss_vector": "",
       "category": "",
@@ -244,11 +242,10 @@
       "affected_url": "https://api.example.com/",
       "impact": "Review the finding and confirm its impact.",
       "remediation": "See the tool's guidance for remediation.",
-      "tool": "nuclei (imported)",
+      "tool": "nuclei",
       "references": [],
       "evidence": [
-        "Server: nginx/1.18.0",
-        "template: server-version"
+        "Server: nginx/1.18.0"
       ],
       "cvss_score": 0.0,
       "cvss_vector": "",
@@ -267,15 +264,13 @@
       "title": "HSTS header missing",
       "path": "/",
       "validation": "UNCONFIRMED",
-      "description": "Imported from tool output.",
+      "description": "Reported by nuclei.",
       "affected_url": "https://api.example.com/",
       "impact": "Review the finding and confirm its impact.",
       "remediation": "See the tool's guidance for remediation.",
-      "tool": "nuclei (imported)",
+      "tool": "nuclei",
       "references": [],
-      "evidence": [
-        "template: missing-hsts"
-      ],
+      "evidence": [],
       "cvss_score": 0.0,
       "cvss_vector": "",
       "category": "",
@@ -720,26 +715,6 @@
       "text": "Assessment stopped",
       "tone": "block",
       "rows": []
-    },
-    {
-      "seq": 90,
-      "at": "2026-10-03T10:48:17+00:00",
-      "type": "activity",
-      "who": "USER",
-      "kind": "line",
-      "text": "Imported 3 finding(s) from nuclei output",
-      "tone": "ok",
-      "rows": []
-    },
-    {
-      "seq": 91,
-      "at": "2026-10-03T10:48:21+00:00",
-      "type": "chat",
-      "who": "reconix",
-      "kind": "text",
-      "text": "Imported 3 finding(s) from nuclei output (reconix-sample-nuclei.jsonl).",
-      "tone": "ok",
-      "rows": []
     }
   ],
   "requests": [
@@ -748,5 +723,5 @@
       "at": "2026-10-03T10:38:37+00:00"
     }
   ],
-  "saved_at": "2026-10-03T10:48:33+00:00"
+  "saved_at": "2026-10-03T10:48:21+00:00"
 }

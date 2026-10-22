@@ -2,7 +2,7 @@
 
 Plays the four templates through the real store (every gate decided through the same
 store functions the TUI uses) with a fake clock, so the files look like a week of work:
-completed runs with reports, an imported tool file, a run stopped by a rejected HIGH
+completed runs with reports, extra scanner findings, a run stopped by a rejected HIGH
 approval, and one still waiting at a HIGH approval. Only example domains and fake,
 masked evidence are used. No secret is written (the store's snapshot leaves them out).
 
@@ -23,8 +23,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from reconix import store  # noqa: E402
-from reconix.models import base  # noqa: E402
+from reconix.models import Finding, base  # noqa: E402
 from reconix.store import lists, report, snapshot  # noqa: E402
+from reconix.store.findings import SEVERITY_ORDER, ingest_external  # noqa: E402
+from reconix.store.redact import clean, redact  # noqa: E402
 
 FILE_NAME = re.compile(r"^\d{8}-\d{6}-[0-9a-f]{4}_[A-Za-z0-9-]{1,64}\.json$")
 
@@ -40,6 +42,8 @@ NUCLEI = "\n".join(json.dumps(row) for row in [
      "info": {"name": "HSTS header missing", "severity": "low"}},
 ])
 
+# Scanner rows (nuclei's JSON lines) the script turns into findings itself; only the four
+# severities exist, so a row with another one is a mistake in this file (`add_scanner_rows`).
 # A run with every severity the scale has, a title that must stay text, and a login in a URL
 # (the store masks the login in what it keeps).
 NUCLEI_EDGE = "\n".join(json.dumps(row) for row in [
@@ -50,7 +54,7 @@ NUCLEI_EDGE = "\n".join(json.dumps(row) for row in [
      "info": {"name": "<b>Status page</b> leaks build details", "severity": "high",
               "description": "The page prints the <i>build number</i> and the host name."}},
     {"template-id": "tech-detect", "matched-at": "https://{host}/",
-     "info": {"name": "Technology detected: nginx", "severity": "info"}},
+     "info": {"name": "Web server banner names nginx", "severity": "low"}},
     {"template-id": "robots-txt", "matched-at": "https://{host}/robots.txt",
      "info": {"name": "robots.txt lists internal paths", "severity": "low"},
      "extracted-results": ["Disallow: /internal/"]},
@@ -63,9 +67,34 @@ NUCLEI_MANY = "\n".join(json.dumps(row) for row in [
     {"template-id": f"exposed-{name}", "matched-at": f"https://{{host}}/{name}",
      "info": {"name": f"Exposed {name} endpoint", "severity": severity}}
     for name, severity in [("backup", "high"), ("metrics", "medium"), ("debug", "medium"),
-                           ("swagger", "low"), ("health", "info"), ("version", "info"),
+                           ("swagger", "low"), ("health", "low"), ("version", "low"),
                            ("status", "low"), ("config", "medium"), ("trace", "low")]
 ])
+
+
+def add_scanner_rows(rows_text: str) -> None:
+    """Add the findings in `rows_text` (nuclei JSON lines) to the current assessment.
+
+    They get `IMP-NNN` ids, are unconfirmed and are masked like the store masks any text.
+    """
+    findings = []
+    for line in rows_text.splitlines():
+        row = json.loads(line)
+        info = row["info"]
+        severity = info["severity"].upper()
+        assert severity in SEVERITY_ORDER, f"not a severity: {severity}"
+        url = row["matched-at"]
+        path = "/" + url.split("://", 1)[1].split("/", 1)[1] if url.count("/") > 2 else "/"
+        findings.append(Finding(
+            fid="", severity=severity, title=redact(info["name"]), path=redact(path),
+            validation="UNCONFIRMED", description=redact(info.get("description") or
+                                                         "Reported by nuclei."),
+            affected_url=redact(url), impact="Review the finding and confirm its impact.",
+            remediation="See the tool's guidance for remediation.", tool="nuclei",
+            evidence=[redact(" ".join(str(e).split()))[:200]
+                      for e in row.get("extracted-results", [])],
+            references=[clean(str(r)) for r in info.get("reference", [])]))
+    ingest_external(findings, prefix="IMP")
 
 
 def triage_false_positive() -> None:
@@ -121,7 +150,7 @@ def decide(gate: str, *, high: str) -> bool:
     return True
 
 
-def play(text: str, *, high: str = "approve", fmt: str = "", imports: str = "",
+def play(text: str, *, high: str = "approve", fmt: str = "", rows: str = "",
          stop_at: str = "", running_steps: int = 0, no_findings: bool = False,
          after: Optional[Callable[[], None]] = None) -> None:
     """Play one run from `text`.
@@ -155,12 +184,8 @@ def play(text: str, *, high: str = "approve", fmt: str = "", imports: str = "",
         run.revealed.clear()
     if fmt and store.is_completed():
         store.generate_report(fmt)
-    if imports:
-        path = Path(tempfile.gettempdir()) / "reconix-sample-nuclei.jsonl"
-        host = store.get_assessment().target
-        path.write_text(imports.replace("{host}", host), encoding="utf-8")
-        store.import_findings(str(path))
-        path.unlink()
+    if rows:
+        add_scanner_rows(rows.replace("{host}", store.get_assessment().target))
     if after:
         after()
 
@@ -208,11 +233,11 @@ def main() -> None:
     snapshots += session(datetime(2026, 10, 3, 10, 15, tzinfo=utc), [
         dict(text="Scan the network host 192.0.2.10 for exposed services.", fmt="json"),
         dict(text="Test the REST API at https://api.example.com/v1 for security issues.",
-             high="reject", imports=NUCLEI, gap=12),
+             high="reject", rows=NUCLEI, gap=12),
     ])
     snapshots += session(datetime(2026, 10, 5, 14, 3, tzinfo=utc), [
         dict(text="Assess https://staging.example.com for web security issues.", fmt="docx",
-             imports=NUCLEI.split("\n")[0]),
+             rows=NUCLEI.split("\n")[0]),
         dict(text="Review the source repository git@git.example.com:shop/storefront.git "
                   "for security issues.", high="wait", gap=6),
     ], closed=False)
@@ -228,9 +253,9 @@ def main() -> None:
     #   2026-10-04  a run still Running in a session left open (the TUI is on it now)
     snapshots += session(datetime(2026, 9, 29, 11, 20, tzinfo=utc), [
         dict(text="Assess https://ops:hunter2@portal.example.com for web security issues.",
-             imports=NUCLEI_EDGE, after=triage_false_positive),
+             rows=NUCLEI_EDGE, after=triage_false_positive),
         dict(text="Test the REST API at https://api.example.org/v2 for security issues.",
-             imports=NUCLEI_MANY, gap=9),
+             rows=NUCLEI_MANY, gap=9),
     ])
     snapshots += session(datetime(2026, 10, 1, 8, 30, tzinfo=utc), [
         dict(text="Assess https://quiet.example.com for web security issues.", no_findings=True),
