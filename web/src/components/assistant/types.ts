@@ -24,6 +24,6 @@ export interface AssistantInfo {
   operator: boolean; // this browser may ask the model and read the saved conversations
   terminal: boolean; // this browser may open the Terminal view
   retentionDays: number; // how long a conversation is kept without use (0: until deleted)
-  /** The model that answers next (lib/assistant/models/resolve.ts); the Model menu updates it. */
+  /** The model that answers next (lib/assistant/models/resolve.ts); the model picker updates it. */
   model: ModelSummary;
 }

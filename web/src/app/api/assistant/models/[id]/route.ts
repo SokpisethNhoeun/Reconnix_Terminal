@@ -3,7 +3,7 @@
    keeps the saved key while the address stays on its host); DELETE removes it and its key (the
    active choice goes with it). Both need the page's own Origin; the id must be a provider id
    (a random UUID) before anything is read. The Environment model is read-only. Answers carry
-   the Model menu's whole view, never a key. */
+   the model picker's whole view, never a key. */
 import { NextResponse } from "next/server";
 
 import { fail, NO_STORE, refuse } from "@/lib/assistant/access";

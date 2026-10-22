@@ -8,7 +8,7 @@ export const isAssistantPath = (pathname: string) => pathname === ASSISTANT_ROUT
 export const CONVERSATIONS_ROUTE = `${ASSISTANT_ROUTE}/conversations`;
 /** One saved conversation (GET, PATCH to rename, DELETE). */
 export const conversationRoute = (id: string) => `${CONVERSATIONS_ROUTE}/${encodeURIComponent(id)}`;
-/** The saved models (GET the Model menu's view, POST adds a provider). */
+/** The saved models (GET the model picker's view, POST adds a provider). */
 export const MODELS_ROUTE = `${ASSISTANT_ROUTE}/models`;
 /** One saved provider (PATCH changes it, DELETE removes it). */
 export const modelRoute = (id: string) => `${MODELS_ROUTE}/${encodeURIComponent(id)}`;

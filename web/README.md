@@ -144,16 +144,33 @@ The Overview's Ask bar and the sidebar's **AI Assistant** tab open the same chat
   An endpoint off this machine also needs `LLM_ALLOW_REMOTE=1` (assessment data goes there; the
   screen says so) and takes `LLM_API_KEY` over https only. The key stays in the Next.js
   process: the terminal helper and the TUI it runs never get `LLM_*`. Unset, the screen says how.
-- **Model menu** (`components/assistant/model-menu.tsx`, `lib/assistant/models/`): the header's
-  Model button names the model that answers next; its panel lists the `LLM_*` model as the
-  read-only **Environment** (the default while nothing is chosen) and every saved provider with
-  its models, switched in one click. **+ Add model** takes a preset (Ollama, LM Studio, OpenAI,
-  OpenRouter, Groq, Anthropic, DeepSeek or Custom: it fills the base URL), a name, an optional
-  API key and the model names (typed, or picked after **Fetch models**, `GET {base}/models`), with
-  **Test connection** (one tiny completion). Saved providers can be edited (no key typed keeps
-  the saved one while the address stays on its host; "Remove the saved key") and removed. They
-  live in `models.json` in the assistant's folder (0600, atomic), the keys AES-256-GCM-sealed with
-  `models.key` (32 bytes, 0600, made once): never sent to the browser or logged. Every model
+- **The composer** (`composer.tsx`): a rounded box (radius 16) with the text area on top and a
+  row under it: the model chip on the left; on the right "Enter to send · Shift+Enter for new
+  line" (hidden on a phone) and the round 32 px send button (Stop while a reply is written).
+  Under the box: "Answers use your saved assessment data. Scans and approvals stay in the
+  terminal." The header has no model control.
+- **Choosing a model** (`model-chip.tsx`, `model-picker.tsx` and its steps, the rules in
+  `model-picker-rules.ts`, `lib/assistant/models/`): the chip says `● <model> ▾` (green) or
+  `● Choose a model ▾` (amber, the reason in its tooltip); a viewer sees it disabled ("Choosing a
+  model needs the operator role"). It opens a picker upward (a sheet over the composer on a
+  phone), a dialog named after its step; Escape goes back a step, then closes; focus goes to each
+  step's first control and back to the chip. 1 **Choose a model**: *Your models* (the `LLM_*`
+  model as the read-only **Environment**, the default while nothing is chosen, and every saved
+  model; one click switches) and *Add or change a provider* (OpenAI, Anthropic, DeepSeek,
+  OpenRouter, Groq, Ollama (local), LM Studio (local), Custom (OpenAI-compatible); the cloud ones
+  disabled with "Start the dashboard with LLM_ALLOW_REMOTE=1 to use cloud models" unless the
+  server allows it; a saved one has Remove, asked first). 2 **`<Provider>` · credentials**: the
+  API key (never filled in; "Key saved: leave empty to keep it", Remove key) and, for Custom and
+  the local ones only, the base URL; Continue asks `…/models/fetch` (`GET {base}/models`) and,
+  when the server lists none, `…/models/test` (one tiny completion) for a model the provider is
+  known to have; a refusal stays on the step. 3 **`<Provider>` · choose a model**: the listed
+  models or a typed name (tested first); **Use this model** POSTs a new provider (named after its
+  preset, `activate: true`) or PATCHes the saved one and PUTs it active, and the chip follows
+  without a reload. A saved key goes only to its saved address (an unchanged provider is asked by
+  its id). Providers live in `models.json` in the assistant's folder (0600, atomic), the keys
+  AES-256-GCM-sealed with `models.key` (32 bytes, 0600, made once): never sent to the browser or
+  logged. `GET /api/assistant/models` also says whether the server allows remote models
+  (`allowRemote`) and lists the presets in the picker's order with their kind. Every model
   passes the same rules as the environment's (`config.ts` `checkModel`: http(s), no credentials
   in the URL, the model name pattern, a key only over https to a remote host, remote only with
   `LLM_ALLOW_REMOTE=1`), again on every use: a chosen model that can't be used says why instead
@@ -217,7 +234,9 @@ combining runs: the selection, the preview frame, one real PDF and DOCX, the 500
 `docs` (group pages with their pages in place, no link off the page, the rail without
 Configuration, Copy, the in-page search, the old addresses on their anchors, the phone menu), `dashboard-fit` (the
 Overview fits the fixed frame with nothing to scroll), `assistant` (with the stand-in model
-`e2e/llm-stub.mjs`; `[stub:markdown]`, `[stub:long]` and `[stub:fail]` pick its answers),
+`e2e/llm-stub.mjs`; `[stub:markdown]`, `[stub:long]` and `[stub:fail]` pick its answers; the
+composer's model picker against its `GET /v1/models`), `a11y-assistant` (axe on each picker
+step, and the phone's sheet),
 `assistant-knowledge` (an `/add-on` folder written as the TUI does: "Knowledge used" under the
 answer, kept after a reload), `motion` (directions,
 timing, the globe, history), `scroll` (the wheel and keys at six sizes, no sideways scroll) and
@@ -247,7 +266,7 @@ src/
 │   └── api/                 # session (sign-in), assessments/[uid] (JSON), assessments/[uid]/export,
 │                            #   reports/combined (1–5 runs as one PDF / DOCX; viewer), terminal/ticket,
 │                            #   assistant, assistant/conversations and assistant/models (+ [id], active,
-│                            #   test, fetch: the Model menu) (operators)
+│                            #   test, fetch: the model picker) (operators)
 ├── lib/
 │   ├── data/                # schema.ts (zod), store.ts (server-only reader), stats.ts (pure),
 │   │                        #   adapt.ts (a saved run → the viewer's terms), view-types.ts, format.ts
@@ -266,7 +285,7 @@ src/
 │   │                        #   prompts from saved data), history-store.ts + history-schema.ts (saved
 │   │                        #   conversations), secure-fs.ts (the folder's safe file handling), redact.ts,
 │   │                        #   markdown.ts, rate.ts, access.ts, client.ts;
-│   │                        #   models/ (the Model menu: presets.ts, schema.ts, requests.ts, view.ts, crypto.ts
+│   │                        #   models/ (the model picker: presets.ts, schema.ts, requests.ts, view.ts, crypto.ts
 │   │                        #   (AES-256-GCM keys), store.ts (models.json), resolve.ts (which model answers),
 │   │                        #   remote.ts (test, fetch), respond.ts, errors.ts);
 │   │                        #   knowledge/ (the TUI's /add-on files, read-only: paths.ts, schema.ts,
@@ -295,7 +314,10 @@ src/
 │   │                        #   AssistantStage + motion*.ts + use-globe*.ts (the transition and the globe),
 │   │                        #   AssistantView, header, welcome, prompt cards, messages, cards/, composer,
 │   │                        #   conversation menu, breath.ts, use-stick-to-bottom.ts + scroll-to-bottom.tsx,
-│   │                        #   the Model menu (model-menu/-list/-form/-names.tsx, use-models.ts, use-fit-below.ts)
+│   │                        #   the composer's model chip and picker (model-chip.tsx, model-picker.tsx, the
+│   │                        #   steps model-pick/-your-models/-providers/-credentials/-choose.tsx, the rules
+│   │                        #   model-picker-rules.ts + model-name-rules.ts, use-models.ts, use-roving.ts,
+│   │                        #   use-fit-above.ts)
 │   ├── terminal/            # TerminalView, TerminalPanel, TerminalToolbar, RestartButton, TerminalNotice,
 │   │                        #   ScrollToLatest, useXterm, useTerminalSession, useTerminalView, useLeaveWarning
 │   ├── ui/                  # Button, Badge, StatusBadge / SeverityBadge, IconButton, Checkbox, CopyButton,
@@ -338,7 +360,7 @@ once, with each run as an occurrence; what a run lacks is listed under Limitatio
   ticket route only hands out a ticket; the helper starts the session), and the AI Assistant
   writes **its own conversation files** and its saved models (`models.json`, `models.key`) in
   `~/.reconix/assistant` (and nothing else). The assistant's route is also the one place saved
-  data leaves the machine, and only to the model the operator chose (the Model menu's test and
+  data leaves the machine, and only to the model the operator chose (the model picker's test and
   fetch send no assessment data). The PDF exports (single and combined) start a headless Chrome on a
   temp file the server wrote (`lib/report/pdf.ts`), never on anything the request said.
 - **One data source.** Pages read through `lib/data/store.ts` only; it accepts regular files

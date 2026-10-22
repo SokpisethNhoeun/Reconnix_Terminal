@@ -1,6 +1,6 @@
 /* The saved models (server only): models.json in the assistant's folder (secure-fs.ts: the folder
    0700, the file 0600, written atomically through the shared queue, read without following a
-   link). It holds the providers the Model menu added and the active choice; an API key is sealed
+   link). It holds the providers the model picker added and the active choice; an API key is sealed
    with models/crypto.ts before it is written and is opened only for the request it is used in.
    Nothing here returns a key to a route except `readSaved().apiKeyOf`, which the server uses to
    call the model. A file that doesn't parse, or whose active choice names no saved model, is

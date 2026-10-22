@@ -22,7 +22,7 @@ export const MODELS_FAIL = {
   full: "Too many saved models: remove one first.",
   key: "The key that protects the saved API keys could not be used.",
   keyShared: "models.key can be read or changed by other users. Remove it from the assistant's folder and enter the API keys again.",
-  sealed: "A saved API key could not be read. Enter it again in the Model menu.",
+  sealed: "A saved API key could not be read. Enter it again in the model picker.",
 } as const;
 
 /** The folder's faults (secure-fs.ts) as the models' errors. */

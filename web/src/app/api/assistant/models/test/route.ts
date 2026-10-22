@@ -1,7 +1,8 @@
-/* "Test connection" in the Model menu (operators only; src/proxy.ts checks the role too). POST
-   { providerId, model? } tests a saved provider as saved (the Environment too), POST { baseUrl,
-   model, apiKey? } tests the form's unsaved values; a saved key only ever goes to its saved
-   address. The address is checked by the same rules as any model before anything is sent, then
+/* The model picker's connection test (operators only; src/proxy.ts checks the role too): its
+   Continue, when the model's server lists no models, and a model name typed there before it is
+   saved. POST { providerId, model? } tests a saved provider as saved (the Environment too), POST
+   { baseUrl, model, apiKey? } tests the picker's unsaved values; a saved key only ever goes to
+   its saved address. The address is checked by the same rules as any model before anything is sent, then
    one tiny chat completion goes out (no redirects, ten seconds, no cache). Answers { ok, detail }
    in fixed words. Needs the page's own Origin; at most a few at a time. */
 import { NextResponse } from "next/server";

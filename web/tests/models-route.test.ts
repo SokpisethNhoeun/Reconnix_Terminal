@@ -167,7 +167,37 @@ describe("the providers", () => {
       allowRemote: false,
     });
     expect(JSON.stringify(body)).not.toContain(base); // the environment's address stays on the server
-    expect((body.presets as { id: string }[]).map((p) => p.id)).toEqual(["ollama", "lmstudio", "openai", "openrouter", "groq", "anthropic", "deepseek", "custom"]);
+    // the model picker's rows, in its order, each saying what it needs: a key, and whether its
+    // address is a fixed cloud one (usable only with LLM_ALLOW_REMOTE=1), local or any
+    const presets = body.presets as { id: string; key: string; kind: string; baseUrl: string }[];
+    expect(presets.map((p) => [p.id, p.key, p.kind])).toEqual([
+      ["openai", "required", "cloud"],
+      ["anthropic", "required", "cloud"],
+      ["deepseek", "required", "cloud"],
+      ["openrouter", "required", "cloud"],
+      ["groq", "required", "cloud"],
+      ["ollama", "none", "local"],
+      ["lmstudio", "none", "local"],
+      ["custom", "optional", "custom"],
+    ]);
+    for (const p of presets) {
+      if (p.kind === "cloud") expect(p.baseUrl).toMatch(/^https:\/\//);
+      if (p.kind === "local") expect(p.baseUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/v1$/);
+    }
+  });
+  it("keep the cloud presets off while the server keeps data on this machine, and allow them with LLM_ALLOW_REMOTE=1", async () => {
+    expect((await list()).body.allowRemote).toBe(false);
+    const cloud = { name: "OpenAI", preset: "openai", baseUrl: "https://api.openai.com/v1", models: ["gpt-4o-mini"], apiKey: SECRET };
+    const refused = await add(cloud);
+    expect(refused.status).toBe(400);
+    expect(refused.body.detail).toContain("LLM_ALLOW_REMOTE=1");
+    expect((await fetchNames({ baseUrl: cloud.baseUrl, apiKey: SECRET })).status).toBe(400); // nothing sent
+    expect(seen).toEqual([]);
+    process.env.LLM_ALLOW_REMOTE = "1";
+    expect((await list()).body.allowRemote).toBe(true);
+    const added = await add({ ...cloud, activate: true });
+    expect(added.status).toBe(201);
+    expect(added.body.summary).toMatchObject({ configured: true, name: "gpt-4o-mini", provider: "OpenAI", local: false });
   });
   it("add, change and remove one, the key never coming back", async () => {
     const added = await add(provider({ activate: true }));

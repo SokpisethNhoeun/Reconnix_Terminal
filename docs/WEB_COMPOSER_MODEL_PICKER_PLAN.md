@@ -1,8 +1,28 @@
 # AI Assistant: the model picker in the composer
 
-Status: in progress (2026-10-22). Branch `feature/next-update`. Follows
-`WEB_DOCS_AND_MODELS_PLAN.md` §2: the providers, the encrypted keys and the routes stay as they
-are; only the way you pick and set up a model changes.
+Status: built (2026-10-22, branch `r5/composer-picker` off `feature/next-update`); the Figma
+frames follow separately. Follows `WEB_DOCS_AND_MODELS_PLAN.md` §2: the providers, the encrypted
+keys and the routes stay as they are; only the way you pick and set up a model changes.
+
+Built as below, plus:
+
+- Code: `components/assistant/model-chip.tsx`, `model-picker.tsx` and its steps
+  (`model-pick.tsx` with `model-your-models.tsx` and `model-providers.tsx`,
+  `model-credentials.tsx`, `model-choose.tsx`), the pure rules in `model-picker-rules.ts` (and
+  `model-name-rules.ts` for a typed name), `use-roving.ts`, `use-fit-above.ts`. The header's Model
+  menu and its form are gone.
+- Server: the presets carry a `kind` (cloud, local, custom) and are listed in the picker's order;
+  `GET /api/assistant/models` already sent `allowRemote` and the presets. No new route, no rule
+  relaxed.
+- Each preset row is the saved provider made from it, or the preset; a provider saved under the
+  old form keeps its own row. A new provider is named after its preset ("OpenAI", or "OpenAI 2"
+  when the name is taken).
+- Continue: the fetch route; when the model's server answers without a list (502), the test route
+  with a model the provider is known to have, else "Type a model name instead". A typed name is
+  tested before it is saved.
+- Tests: `tests/model-picker.test.ts` (the rules), `tests/models-route.test.ts` (the presets and
+  the cloud rule), `e2e/assistant.spec.ts` and `e2e/a11y-assistant.spec.ts` (axe on every step
+  and on the phone's sheet).
 
 ## Owner's decisions
 

@@ -1,4 +1,4 @@
-/* Roving focus in a list of items with one tab stop (the Model menu's models): where Up/Down,
+/* Roving focus in a list of items with one tab stop (the model picker's lists): where Up/Down,
    Left/Right (wrapping), Home and End move from item `at` of `count`. They only move focus;
    choosing an item stays a deliberate Enter, Space or click. Pure: browser and tests. */
 

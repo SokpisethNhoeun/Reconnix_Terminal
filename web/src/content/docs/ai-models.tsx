@@ -220,44 +220,44 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
             <DocRef>The AI agent</DocRef>.
           </p>
           <Callout>
-            The web dashboard&apos;s AI Assistant has its own models, chosen in its <strong>Model</strong> menu (below). The
-            terminal&apos;s providers and <Mono>llm.db</Mono> are never shared with it, and it never reads them.
+            The web dashboard&apos;s AI Assistant has its own models, chosen with the model chip in its message box
+            (below). The terminal&apos;s providers and <Mono>llm.db</Mono> are never shared with it, and it never reads them.
           </Callout>
         </DocSection>
-        <DocSection title="The web assistant's Model menu">
+        <DocSection title="Choosing a model">
           <p>
-            In the dashboard&apos;s AI Assistant, the <strong>Model</strong> button in the header names the model that
-            answers your next question (<Mono>name · local</Mono> or <Mono>· remote</Mono>; an icon on a phone). Its menu
-            lists:
+            In the dashboard&apos;s AI Assistant, the <strong>model chip</strong> at the bottom left of the message box
+            names the model that answers your next question: <Mono>● llama3.2 ▾</Mono> with a green dot, or{" "}
+            <strong>Choose a model</strong> with an amber dot while none can answer (its tooltip says why). It opens the
+            model picker above the message box (a sheet over it on a phone), in three steps. Escape goes back a step, then
+            closes the picker. Choosing a model needs the operator role: a viewer sees the chip, disabled.
           </p>
-          <ul>
-            <li>
-              <strong>Environment</strong>, read-only: the model from <Mono>web/.env.local</Mono> (<Mono>LLM_BASE_URL</Mono>,{" "}
-              <Mono>LLM_MODEL</Mono>, optional <Mono>LLM_API_KEY</Mono>). It answers while nothing else is chosen, so a
-              setup made before the menu existed keeps working. Change it in that file and restart <Mono>/web</Mono>.
-            </li>
-            <li>
-              Every provider you added, with its models. One click (or Enter) on a model switches to it; the checked one
-              answers next. The pencil edits a provider, the bin removes it (asked first); removing the active one hands
-              the answers back to the Environment.
-            </li>
-          </ul>
           <Steps>
             <li>
-              <strong>+ Add model</strong>. Pick a preset (Ollama, LM Studio, OpenAI, OpenRouter, Groq, Anthropic,
-              DeepSeek or Custom): it fills in the OpenAI-compatible base URL, which you can change.
+              <strong>Choose a model.</strong> <em>Your models</em> lists the <strong>Environment</strong> model, read-only,
+              from <Mono>web/.env.local</Mono> (<Mono>LLM_BASE_URL</Mono>, <Mono>LLM_MODEL</Mono>, optional{" "}
+              <Mono>LLM_API_KEY</Mono>; it answers while nothing else is chosen: change it in that file and restart{" "}
+              <Mono>/web</Mono>), and every model you saved, the one that answers next checked. One click, Enter or Space
+              switches to a model and closes the picker. <em>Add or change a provider</em> lists OpenAI, Anthropic,
+              DeepSeek, OpenRouter, Groq, Ollama (local), LM Studio (local) and Custom (OpenAI-compatible), each with its
+              state (<Mono>key saved</Mono>, <Mono>local</Mono>). The cloud ones are disabled, with the reason, unless the
+              dashboard was started with <Mono>LLM_ALLOW_REMOTE=1</Mono>. A saved provider has a bin beside its row:
+              removing it asks first, with No as the default, and removing the active one hands the answers back to the
+              Environment.
             </li>
             <li>
-              Give it a name, and an API key if the provider needs one (a password field, never filled in again).
+              <strong>Credentials.</strong> The API key, in a password field that is never filled in (with a key saved,
+              leave it empty to keep it, or tick <strong>Remove key</strong>) and, for Custom, Ollama and LM Studio only, the
+              base URL, filled in from the preset. <strong>Continue</strong> asks the provider for its models (
+              <Mono>GET &lt;base URL&gt;/models</Mono>); when it lists none, a model it is known to have is tested with one
+              tiny chat completion, or you can type a model name instead. A refusal (an address off this machine, a bad
+              address, a key over http, a key the provider turns down) stays on this step, in red.
             </li>
             <li>
-              Add the model names: type one and press Enter, or <strong>Fetch models</strong> to ask the server
-              (<Mono>GET &lt;base URL&gt;/models</Mono>) and tick the ones you want.
-            </li>
-            <li>
-              <strong>Test connection</strong> sends one tiny chat completion and says &quot;Connected&quot; or why not
-              (the HTTP status only). <strong>Save</strong>; with &quot;Use it for the next question&quot; ticked it is
-              switched to at once. A refusal stays in the form, said under it.
+              <strong>Choose the provider&apos;s model.</strong> The models it listed, or <strong>Type a model name</strong>{" "}
+              (tested before it is saved). <strong>Use this model</strong> saves the provider the first time (named after
+              its preset) or adds the model to it, switches to it and closes the picker: the chip names the new model at
+              once.
             </li>
           </Steps>
           <DocTable
@@ -269,10 +269,10 @@ OLLAMA_BASE_URL=http://localhost:11434`}</Code>
             ]}
           />
           <p>
-            A key never goes back to the browser (the menu only says &quot;key saved&quot;) and is never logged. Editing a
-            provider without typing a key keeps the saved one, as long as the address stays on the same host; another host
-            needs the key again, or <strong>Remove the saved key</strong>. Test and Fetch send a saved key only to its
-            saved address.
+            A key never goes back to the browser (the picker only says &quot;key saved&quot;) and is never logged. Using a
+            saved provider again without typing a key keeps the saved one, as long as the address stays on the same host;
+            another host needs the key again, or <strong>Remove key</strong>. Continue sends a saved key only to its saved
+            address, and neither the model list nor the test sends any assessment data.
           </p>
           <Callout variant="warning" title="The same rules as the environment">
             Every model, saved or from the environment, must use http(s) with no user or password in the address and a
