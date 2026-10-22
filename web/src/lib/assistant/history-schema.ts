@@ -26,13 +26,38 @@ export const UserMessageSchema = z.object({ id: Id, role: z.literal("user"), con
 export const ReplyStateSchema = z.enum(["done", "stopped", "error"]);
 export type ReplyState = z.infer<typeof ReplyStateSchema>;
 
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+const isInfoItem = (item: unknown) => isRecord(item) && item.severity === "INFO";
+
+/** Saved cards as they read back today. Conversations saved while there was an Info level hold
+    a findings card that counted INFO (and could list an INFO finding) or a finding card about
+    one: those lose the INFO count (and their total with it), the INFO rows and the card, like
+    every other list and count, so the conversation still loads under the strict CardSchema and
+    never shows Info. Anything else passes through unchanged for CardSchema to check. */
+export function withoutInfoCards(cards: unknown): unknown {
+  if (!Array.isArray(cards)) return cards;
+  return cards.flatMap((card) => {
+    if (!isRecord(card)) return [card];
+    if (card.kind === "finding") return isInfoItem(card.item) ? [] : [card];
+    if (card.kind !== "findings") return [card];
+    const out = { ...card };
+    if (Array.isArray(card.items)) out.items = card.items.filter((item) => !isInfoItem(item));
+    if (isRecord(card.counts) && Object.hasOwn(card.counts, "INFO")) {
+      const { INFO: info, ...four } = card.counts;
+      out.counts = four;
+      if (typeof card.total === "number" && typeof info === "number") out.total = Math.max(0, card.total - info);
+    }
+    return [out];
+  });
+}
+
 export const ReplyMessageSchema = z
   .object({
     id: Id,
     role: z.literal("assistant"),
     replyTo: Id, // the question it answers
     content: z.string().max(MAX_SAVED_REPLY),
-    cards: z.array(CardSchema).max(MAX_CARDS),
+    cards: z.preprocess(withoutInfoCards, z.array(CardSchema).max(MAX_CARDS)),
     state: ReplyStateSchema,
     detail: z.string().max(400).optional(), // what went wrong (state "error")
     // the /add-on files whose passages went to the model (came later: older replies have none)
