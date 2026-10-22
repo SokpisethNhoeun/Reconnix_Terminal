@@ -5,7 +5,7 @@
    (use-asking), the saved conversations for History and changes to them (use-history-list,
    use-conversation-changes), what this tab remembers (use-tab-memory), and the model that
    answers next: the page says which (info.model), and the Model menu replaces it after a switch
-   without a reload (until the page renders again with the server's word for it). The Viewer
+   without a reload (until a render of the page brings the server's word for it). The Viewer
    mounts it once, so switching views, the live refresh and the open/close animation never touch
    it.
 
@@ -15,6 +15,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 import { MAX_QUESTION } from "@/lib/assistant/request";
+import { liveSwitch, type Switched, switchOver } from "./model-switch";
 import { createSlot } from "./slot";
 import type { AssistantInfo, ChatMessage, ModelSummary } from "./types";
 import { useAsking } from "./use-asking";
@@ -62,12 +63,16 @@ export function useAssistant(): Assistant {
 }
 
 export function AssistantProvider({ info: page, children }: { info: AssistantInfo; children: React.ReactNode }) {
-  // the Model menu's latest word on the model, kept while the page's own info is the one it
-  // replaced (a new render of the page brings the server's word, which already knows the switch)
-  const [switched, setSwitched] = useState<{ from: ModelSummary; model: ModelSummary } | null>(null);
+  // The Model menu's latest word on the model, kept while the page still names the model it
+  // replaced, compared by value (model-switch.ts): a live refresh the server rendered before
+  // the switch brings a new object with the old model in it, and mustn't win. Once the page
+  // has caught up its word wins, and the switch is dropped (so a later change back shows too).
+  const [switched, setSwitched] = useState<Switched | null>(null);
   const latestPage = useLatest(page);
-  const setModel = useCallback((model: ModelSummary) => setSwitched({ from: latestPage.current.model, model }), [latestPage]);
-  const model = switched && switched.from === page.model ? switched.model : page.model;
+  const setModel = useCallback((model: ModelSummary) => setSwitched(switchOver(latestPage.current.model, model)), [latestPage]);
+  const live = liveSwitch(page.model, switched);
+  if (switched && !live) setSwitched(null); // adjusting state to new props, during render
+  const model = live ? live.model : page.model;
   const info = useMemo(() => (model === page.model ? page : { ...page, model }), [page, model]);
 
   const [draft, setDraftState] = useState("");
