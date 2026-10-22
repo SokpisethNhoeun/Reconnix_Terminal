@@ -287,3 +287,269 @@ def test_search_returns_passage_objects(tmp_path):
     assert hits and hits[0].source == "runbook.md"
     assert isinstance(hits[0], knowledge.Passage)
     assert hits[0].score > 0
+
+
+# --- parser failures are refusals, never crashes -------------------------------------------
+def _extract_module():
+    """The extract submodule (the package re-exports its `extract` function by that name)."""
+    import sys
+
+    return sys.modules["reconix.store.knowledge.extract"]
+
+
+@pytest.mark.parametrize("error, words", [
+    (RecursionError, "nested too deeply"),
+    (MemoryError, "too large to read"),
+    (OSError, "Couldn't read that JSON file"),
+    (ValueError, "Couldn't read that JSON file"),
+])
+def test_a_parser_failure_becomes_a_clear_refusal(tmp_path, monkeypatch, error, words):
+    extract = _extract_module()
+
+    def boom(data):
+        raise error("parser blew up")
+
+    monkeypatch.setitem(extract._EXTRACTORS, "json", boom)
+    p = tmp_path / "data.json"
+    p.write_text("{}")
+    with pytest.raises(store.StoreValidationError, match=words):
+        store.add_source(str(p))
+
+
+def test_deeply_nested_json_is_refused(tmp_path):
+    p = tmp_path / "deep.json"
+    p.write_text("[" * 200_000 + "]" * 200_000)
+    with pytest.raises(store.StoreValidationError, match="nested too deeply"):
+        store.add_source(str(p))
+
+
+def test_a_huge_yaml_integer_is_refused(tmp_path):
+    p = tmp_path / "big.yaml"
+    p.write_text("n: " + "9" * 10_000 + "\n")        # int() refuses it with a ValueError
+    with pytest.raises(store.StoreValidationError, match="YAML"):
+        store.add_source(str(p))
+
+
+def test_a_path_with_a_nul_is_refused():
+    with pytest.raises(store.StoreValidationError, match="valid path"):
+        store.add_source("/tmp/a\x00b.txt")
+
+
+def test_a_fifo_is_refused_without_blocking(tmp_path):
+    fifo = tmp_path / "pipe.txt"
+    os.mkfifo(fifo)
+    with pytest.raises(store.StoreValidationError, match="regular file"):
+        store.add_source(str(fifo))
+
+
+# --- the extraction caps -------------------------------------------------------------------
+def _zip(path, members):
+    import zipfile
+
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, data in members:
+            archive.writestr(name, data)
+
+
+def test_a_docx_that_unzips_past_50_mb_is_refused(tmp_path):
+    p = tmp_path / "bomb.docx"
+    _zip(p, [("word/document.xml", b"\0" * (51 * 1024 * 1024))])
+    assert p.stat().st_size < 1024 * 1024                  # small on disk
+    with pytest.raises(store.StoreValidationError, match="over 50 MB"):
+        store.add_source(str(p))
+
+
+def test_a_docx_with_too_many_parts_is_refused(tmp_path):
+    p = tmp_path / "parts.docx"
+    _zip(p, [(f"part{i}.xml", b"x") for i in range(2001)])
+    with pytest.raises(store.StoreValidationError, match="too many parts"):
+        store.add_source(str(p))
+
+
+def test_a_docx_that_is_not_a_zip_is_refused(tmp_path):
+    p = tmp_path / "fake.docx"
+    p.write_bytes(b"not a zip at all")
+    with pytest.raises(store.StoreValidationError, match="Word file"):
+        store.add_source(str(p))
+
+
+def _two_page_pdf(tmp_path):
+    from pypdf import PdfReader, PdfWriter
+
+    writer = PdfWriter()
+    writer.append(PdfReader(io.BytesIO(_pdf_bytes("first page reference text"))))
+    writer.append(PdfReader(io.BytesIO(_pdf_bytes("second page appendix words"))))
+    p = tmp_path / "two.pdf"
+    with open(p, "wb") as handle:
+        writer.write(handle)
+    return p
+
+
+def test_pdf_pages_stop_at_the_page_cap(tmp_path, monkeypatch):
+    extract = _extract_module()
+
+    monkeypatch.setattr(extract, "MAX_PDF_PAGES", 1)
+    source = store.add_source(str(_two_page_pdf(tmp_path)))
+    text = " ".join(files.read_chunks(source.id))
+    assert "first page" in text and "second page" not in text
+    assert source.cut == extract.CUT_PAGES
+
+
+def test_pdf_pages_stop_once_the_text_cap_is_reached(tmp_path, monkeypatch):
+    from pypdf import PageObject
+
+    extract = _extract_module()
+
+    monkeypatch.setattr(extract, "MAX_TEXT_CHARS", 10)
+    extracted = []
+    real = PageObject.extract_text
+
+    def counting(page, *args, **kwargs):
+        extracted.append(page)
+        return real(page, *args, **kwargs)
+
+    monkeypatch.setattr(PageObject, "extract_text", counting)
+    source = store.add_source(str(_two_page_pdf(tmp_path)))
+    assert len(extracted) == 1                              # page 2 was never extracted
+    assert source.cut == extract.CUT_TEXT
+
+
+def test_the_text_cap_is_reported(tmp_path, monkeypatch):
+    extract = _extract_module()
+
+    monkeypatch.setattr(extract, "MAX_TEXT_CHARS", 50)
+    p = tmp_path / "long.txt"
+    p.write_text("reference words " * 20)
+    assert store.add_source(str(p)).cut == "cut to the first 2 MB of text"
+
+
+def test_the_passage_cap_is_reported(tmp_path, monkeypatch):
+    import sys
+
+    monkeypatch.setattr(sys.modules["reconix.store.knowledge.chunk"], "MAX_PASSAGES", 5)
+    p = tmp_path / "big.txt"
+    p.write_text("\n\n".join(f"paragraph {i} " + "word " * 300 for i in range(20)))
+    source = store.add_source(str(p))
+    assert source.chunks == 5 and source.cut == "cut to the first 5 passages"
+    small = tmp_path / "small.txt"
+    small.write_text("a short reference document")
+    assert store.add_source(str(small)).cut == ""
+
+
+# --- the name is cleaned and redacted at ingest --------------------------------------------
+def test_the_source_name_is_cleaned_redacted_and_capped(tmp_path):
+    p = tmp_path / f"password={TEST_PASSWORD} \x1b[31mred\nline.txt"
+    p.write_text("reference material for the assessment")
+    source = store.add_source(str(p))
+    assert TEST_PASSWORD not in source.name and "password=••••" in source.name
+    assert "\x1b" not in source.name and "\n" not in source.name
+    assert TEST_PASSWORD not in files.index_path().read_text(encoding="utf-8")
+    assert TEST_PASSWORD not in files.source_path(source.id).read_text(encoding="utf-8")
+
+    long = tmp_path / ("n" * 200 + ".md")
+    long.write_text("another reference document")
+    assert len(store.add_source(str(long)).name) == 120
+
+
+# --- nothing is left behind on a refusal ---------------------------------------------------
+def _json_files():
+    return sorted(f.name for f in paths.knowledge_dir().glob("*.json"))
+
+
+def test_the_50_source_limit_leaves_nothing_new_on_disk(tmp_path):
+    for i in range(files.MAX_SOURCES):
+        p = tmp_path / f"f{i}.txt"
+        p.write_text(f"reference document number {i}")
+        store.add_source(str(p))
+    before = _json_files()
+    assert len(before) == files.MAX_SOURCES + 1               # the sources and the index
+    over = tmp_path / "over.txt"
+    over.write_text("one more document")
+    with pytest.raises(store.StoreValidationError, match="limit is 50"):
+        store.add_source(str(over))
+    assert _json_files() == before
+
+
+def test_a_failed_index_write_removes_the_new_source_file(tmp_path, monkeypatch):
+    p = tmp_path / "a.txt"
+    p.write_text("reference document")
+    store.add_source(str(p))
+    before = _json_files()
+
+    def broken(sources):
+        raise PermissionError("read-only folder")
+
+    monkeypatch.setattr(files, "write_index", broken)
+    q = tmp_path / "b.txt"
+    q.write_text("another reference document")
+    with pytest.raises(store.StoreValidationError, match="Couldn't save"):
+        store.add_source(str(q))
+    assert _json_files() == before                         # no orphan <id>.json
+
+
+# --- careful reads -------------------------------------------------------------------------
+def _one_source(tmp_path, name="a.txt", text="SQL injection reference for the search page"):
+    p = tmp_path / name
+    p.write_text(text)
+    return store.add_source(str(p))
+
+
+def test_a_symlinked_index_is_not_read(tmp_path):
+    _one_source(tmp_path)
+    real = tmp_path / "elsewhere.json"
+    real.write_bytes(files.index_path().read_bytes())
+    files.index_path().unlink()
+    files.index_path().symlink_to(real)
+    with pytest.raises(store.StoreValidationError, match="corrupt"):
+        store.list_sources()
+
+
+def test_an_index_writable_by_others_is_not_read(tmp_path):
+    _one_source(tmp_path)
+    os.chmod(files.index_path(), 0o622)
+    with pytest.raises(store.StoreValidationError, match="corrupt"):
+        store.list_sources()
+
+
+def test_an_index_over_its_cap_is_not_read(tmp_path, monkeypatch):
+    _one_source(tmp_path)
+    monkeypatch.setattr(files, "MAX_INDEX_BYTES", 10)
+    with pytest.raises(store.StoreValidationError, match="corrupt"):
+        store.list_sources()
+
+
+def test_a_source_file_over_its_cap_is_refused(tmp_path, monkeypatch):
+    source = _one_source(tmp_path)
+    monkeypatch.setattr(files, "MAX_SOURCE_BYTES", 10)
+    with pytest.raises(store.StoreValidationError, match="corrupt"):
+        files.read_chunks(source.id)
+
+
+def test_search_skips_a_corrupt_source_and_ranks_over_the_rest(tmp_path):
+    from reconix.store.knowledge import rank
+
+    good = _one_source(tmp_path, "good.md", "SQL injection was found in the search endpoint.")
+    bad = _one_source(tmp_path, "bad.md", "SQL injection notes for the search endpoint too.")
+    other = _one_source(tmp_path, "other.md", "Scope approval needs the owner's signature.")
+    files.source_path(bad.id).write_text("{ not json", encoding="utf-8")
+
+    hits = store.search_knowledge("sql injection search endpoint")
+    assert [h.source for h in hits] == ["good.md"]
+    # N and avgdl count only the readable sources: the same as ranking those two alone.
+    alone = rank.rank([("good.md", 0, files.read_chunks(good.id)[0]),
+                       ("other.md", 0, files.read_chunks(other.id)[0])],
+                      "sql injection search endpoint")
+    assert [round(h.score, 6) for h in hits] == [round(h.score, 6) for h in alone]
+
+
+# --- remove all, even when the index is unreadable -----------------------------------------
+def test_clear_removes_every_source_file_even_with_a_corrupt_index(tmp_path):
+    for name in ("a.txt", "b.txt"):
+        _one_source(tmp_path, name, f"reference document {name}")
+    folder = paths.knowledge_dir()
+    (folder / "keep-me.txt").write_text("not ours")
+    files.index_path().write_text("garbage", encoding="utf-8")
+
+    assert store.clear_knowledge() == 2
+    assert _json_files() == []
+    assert (folder / "keep-me.txt").exists()                 # only <id>.json and the index

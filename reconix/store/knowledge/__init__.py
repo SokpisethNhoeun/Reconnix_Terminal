@@ -4,19 +4,21 @@
 extracted, **cleaned and redacted at ingest** (secrets never reach disk), split into passages
 and saved under `~/.reconix/knowledge`. The terminal chat, the `/assess` agent and the web AI
 Assistant then search those passages (BM25) and quote the relevant ones as untrusted reference
-material — nothing is ever run from a knowledge file.
+material — nothing is ever run from a knowledge file. The relevant passages go to the active
+model with the question, so a remote model receives them too.
 
 This package is the only place that reads or writes the folder. The on-disk format and the
 ranker are the contract the web is built to (`rank.py`, `files.py`).
 """
 
-from typing import List
+import dataclasses
+from typing import List, Tuple
 
 from ..activity import log_event
 from ..errors import StoreValidationError
 from ..redact import redact
-from . import files
-from .chunk import chunk
+from . import files, paths
+from .chunk import split
 from .extract import extract
 from .files import MAX_SOURCES, Source
 # Importing from .rank registers the submodule, so `knowledge.rank` stays the module (the web
@@ -31,28 +33,40 @@ __all__ = [
 
 
 def add_source(path_text: str) -> Source:
-    """Read a file, redact it, chunk it and save it as a new source. Returns the `Source`.
+    """Read a file, redact it, chunk it and save it as a new source. Returns the `Source`,
+    whose `cut` says when a cap cut the file short ("" when it was read whole).
 
     Raises `StoreValidationError` on any refusal (bad path, unsupported type, too large, a
-    corrupt index, the 50-source limit) and changes nothing on disk in that case.
+    corrupt index, the 50-source limit, a folder that can't be written) and leaves nothing new
+    on disk in that case.
     """
     existing = files.read_index()               # also validates the index before we add
     if len(existing) >= MAX_SOURCES:
         raise StoreValidationError(f"The knowledge limit is {MAX_SOURCES} files. Remove one first.")
 
     extracted = extract(path_text)
-    passages = chunk(redact(extracted.text))    # redact the whole text BEFORE chunking/storing
+    # Redact the whole text BEFORE chunking/storing, so no secret reaches disk.
+    passages, passages_cut = split(redact(extracted.text))
     if not passages:
         raise StoreValidationError("That file has no readable text to add.")
 
-    source_id = _new_id(existing)
-    source = Source(id=source_id, name=extracted.name, kind=extracted.kind,
-                    bytes=extracted.bytes, chunks=len(passages),
-                    added_at=_now())
-    files.write_source(source_id, source.name, passages)
-    files.write_index(existing + [source])
+    source = Source(id=_new_id(existing), name=extracted.name, kind=extracted.kind,
+                    bytes=extracted.bytes, chunks=len(passages), added_at=_now())
+    _save(source, passages, existing)
     log_event("knowledge.added", f"{source.name} ({source.kind}, {source.chunks} passages)")
-    return source
+    cut = f"cut to the first {len(passages):,} passages" if passages_cut else extracted.cut
+    return dataclasses.replace(source, cut=cut)
+
+
+def _save(source: Source, passages: List[str], existing: List[Source]) -> None:
+    """Write the source's file, then the index; on a failure remove the new file again."""
+    try:
+        files.write_source(source.id, source.name, passages)
+        files.write_index(existing + [source])
+    except OSError:
+        files.delete_source_file(source.id)     # never leave a file the index doesn't list
+        raise StoreValidationError(f"Couldn't save the knowledge file; check that "
+                                   f"{paths.knowledge_dir()} is yours and writable.") from None
 
 
 def list_sources() -> List[Source]:
@@ -71,24 +85,37 @@ def remove_source(source_id: str) -> Source:
             remaining.append(source)
     if removed is None:
         raise StoreValidationError("Unknown add-on.")
-    files.write_index(remaining)
+    try:
+        files.write_index(remaining)
+    except OSError:
+        raise StoreValidationError("Couldn't update the knowledge index.") from None
     files.delete_source_file(source_id)
     log_event("knowledge.removed", removed.name)
     return removed
 
 
-def clear() -> None:
-    """Remove every source and the index."""
-    count = len(files._safe_index())
-    files.delete_all()
+def clear() -> int:
+    """Remove every source file and the index, even when the index is unreadable. Returns how
+    many source files were removed."""
+    count = files.delete_all()
     log_event("knowledge.cleared", f"{count} file(s)")
+    return count
 
 
 def search(query: str, k: int = 4) -> List[Passage]:
-    """The relevant passages for `query` across every source (BM25, top `k`, score >= 1.5)."""
-    corpus: List[tuple] = []
-    for source in files._safe_index():
-        for index, text in enumerate(files.read_chunks(source.id)):
+    """The relevant passages for `query` across every readable source: BM25, the top `k` that
+    hold at least min(2, query tokens) distinct query tokens and score above 0 (`rank.rank`).
+
+    An unreadable index searches nothing, and a source whose file is unreadable is skipped (as
+    the web does), so `N` and `avgdl` count only the passages actually searched.
+    """
+    corpus: List[Tuple[str, int, str]] = []
+    for source in files.safe_index():
+        try:
+            chunks = files.read_chunks(source.id)
+        except StoreValidationError:
+            continue
+        for index, text in enumerate(chunks):
             corpus.append((source.name, index, text))
     return _bm25(corpus, query, top=k)
 

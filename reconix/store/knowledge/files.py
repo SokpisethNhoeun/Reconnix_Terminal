@@ -6,13 +6,20 @@ The format is the contract the web reads (see the plan, §4):
     <id>.json    {"format":"reconix.knowledge.source/v1","id":…,"name":…,"chunks":[passage, …]}
 
 Writes are atomic and 0600 (a temp file opened `O_EXCL`, never following a symlink, then
-`os.replace`), reusing `persist`'s helpers so the private-write rules live in one place. A file
-that is missing is "no sources yet"; one that is present but malformed raises a clear error.
+`os.replace`), reusing `persist`'s helpers so the private-write rules live in one place.
+
+Reads are as careful as the web reader's: a file is opened without following a link or
+blocking and checked through its handle — a regular file, this user's, writable by no one
+else, under its size cap (the index 256 KiB, a source 16 MiB). A file that is missing is "no
+sources yet"; one that is present but fails a check or is malformed raises a clear error.
+`delete_all` needs no readable index: it removes every `<id>.json` in the folder by its name.
 """
 
 import json
+import os
 import re
-from dataclasses import dataclass
+import stat
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
@@ -25,19 +32,28 @@ SOURCE_FORMAT = "reconix.knowledge.source/v1"
 INDEX_NAME = "index.json"
 
 MAX_SOURCES = 50
+MAX_INDEX_BYTES = 256 * 1024
+MAX_SOURCE_BYTES = 16 * 1024 * 1024
 _ID = re.compile(r"^[0-9a-f]{32}$")
+_SOURCE_FILE = re.compile(r"^[0-9a-f]{32}\.json$")
 _CORRUPT_INDEX = "The knowledge index is corrupt. Remove it with /add-on, then add files again."
+_WRITABLE_BY_OTHERS = 0o022
 
 
 @dataclass(frozen=True)
 class Source:
-    """One add-on source as the index records it."""
+    """One add-on source as the index records it.
+
+    `cut` is not saved: `add_source` sets it when a cap cut the file short ("" otherwise), so
+    the notice can say so.
+    """
     id: str
     name: str
     kind: str
     bytes: int
     chunks: int
     added_at: str
+    cut: str = field(default="", compare=False)
 
 
 def index_path() -> Path:
@@ -56,19 +72,53 @@ def valid_id(source_id: str) -> bool:
 
 # --- reading -------------------------------------------------------------------------------
 
+def _read_private(path: Path, limit: int, problem: str) -> Optional[bytes]:
+    """The bytes of `path`, or None when it doesn't exist. Opened with no-follow and
+    non-blocking flags and checked through the handle; any failed check raises `problem`."""
+    flags = (os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+             | getattr(os, "O_BINARY", 0))
+    try:
+        fd = os.open(path, flags)
+    except FileNotFoundError:
+        return None
+    except OSError:                              # ELOOP (a link), EACCES…: never read through
+        raise StoreValidationError(problem) from None
+    try:
+        with os.fdopen(fd, "rb") as handle:
+            info = os.fstat(handle.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size > limit or not _owned(info):
+                raise StoreValidationError(problem)
+            data = handle.read(limit + 1)
+    except OSError:
+        raise StoreValidationError(problem) from None
+    if len(data) > limit:
+        raise StoreValidationError(problem)
+    return data
+
+
+def _owned(info: os.stat_result) -> bool:
+    """This user's file, writable by no one else (always true where there are no uids)."""
+    if not hasattr(os, "getuid"):
+        return True
+    return info.st_uid == os.getuid() and not info.st_mode & _WRITABLE_BY_OTHERS
+
+
+def _load_json(data: bytes, problem: str):
+    try:
+        return json.loads(data.decode("utf-8"))
+    except (ValueError, RecursionError):         # UnicodeDecodeError is a ValueError
+        raise StoreValidationError(problem) from None
+
+
 def read_index() -> List[Source]:
     """Every source in `index.json`, in order; `[]` when the file does not exist yet."""
-    path = index_path()
-    if not path.exists():
+    data = _read_private(index_path(), MAX_INDEX_BYTES, _CORRUPT_INDEX)
+    if data is None:
         return []
-    try:
-        raw = path.read_text(encoding="utf-8")
-        data = json.loads(raw)
-    except (OSError, ValueError):
-        raise StoreValidationError(_CORRUPT_INDEX) from None
-    if not isinstance(data, dict) or data.get("format") != INDEX_FORMAT:
+    body = _load_json(data, _CORRUPT_INDEX)
+    if not isinstance(body, dict) or body.get("format") != INDEX_FORMAT:
         raise StoreValidationError(_CORRUPT_INDEX)
-    rows = data.get("sources")
+    rows = body.get("sources")
     if not isinstance(rows, list):
         raise StoreValidationError(_CORRUPT_INDEX)
     sources: List[Source] = []
@@ -83,20 +133,27 @@ def read_index() -> List[Source]:
     return sources
 
 
+def safe_index() -> List[Source]:
+    """`read_index()`, or `[]` when the index is unreadable (for search and clear-up)."""
+    try:
+        return read_index()
+    except StoreValidationError:
+        return []
+
+
 def read_chunks(source_id: str) -> List[str]:
     """The passages of one source; `[]` if its file is missing (the index is the record)."""
     path = source_path(source_id)
-    if not path.exists():
+    problem = f"The add-on file {path.name} is corrupt."
+    data = _read_private(path, MAX_SOURCE_BYTES, problem)
+    if data is None:
         return []
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        raise StoreValidationError(f"The add-on file {path.name} is corrupt.") from None
-    if not isinstance(data, dict) or data.get("format") != SOURCE_FORMAT:
-        raise StoreValidationError(f"The add-on file {path.name} is corrupt.")
-    chunks = data.get("chunks")
+    body = _load_json(data, problem)
+    if not isinstance(body, dict) or body.get("format") != SOURCE_FORMAT:
+        raise StoreValidationError(problem)
+    chunks = body.get("chunks")
     if not isinstance(chunks, list) or not all(isinstance(c, str) for c in chunks):
-        raise StoreValidationError(f"The add-on file {path.name} is corrupt.")
+        raise StoreValidationError(problem)
     return chunks
 
 
@@ -135,21 +192,25 @@ def delete_source_file(source_id: str) -> None:
         pass
 
 
-def delete_all() -> None:
-    """Remove every source file and the index."""
+def delete_all() -> int:
+    """Remove every source file (`<32 hex>.json`) in the folder and the index, whether or not
+    the index can be read. Returns how many source files were removed."""
     folder = paths.knowledge_dir()
-    if not folder.exists():
-        return
-    for source in _safe_index():
-        delete_source_file(source.id)
+    try:
+        names = [entry.name for entry in os.scandir(folder)]
+    except OSError:                              # no folder (or not one): nothing to remove
+        return 0
+    removed = 0
+    for name in names:
+        if not _SOURCE_FILE.match(name):
+            continue
+        try:
+            (folder / name).unlink()            # a link is removed, never followed
+            removed += 1
+        except OSError:
+            pass
     try:
         index_path().unlink()
     except OSError:
         pass
-
-
-def _safe_index() -> List[Source]:
-    try:
-        return read_index()
-    except StoreValidationError:
-        return []
+    return removed
