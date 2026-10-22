@@ -62,7 +62,7 @@ reconix/
 │   ├── navigation.py # FLOW, goto / go_next / go_prev, reload_screen, open_dialog
 │   ├── run_host.py   # hosts RunController; refresh_view, open_gate (deferral), resume_run
 │   ├── actions.py    # submit_request, template/scope/plan decisions, new / switch assessment
-│   ├── dialogs.py    # assessments, triage, import, export, audit, summary
+│   ├── dialogs.py    # assessments, triage, export, audit, summary
 │   ├── llm.py        # /provider and /model: menus, ProviderForm, tests in a worker
 │   ├── agent.py      # agent mode: /assess drives the backend harness, streams events
 │   └── web.py        # /web: open the dashboard, starting it in the background if needed
@@ -94,7 +94,7 @@ reconix/
 └── screens/
     ├── base.py       # ReconixScreen: chrome + body + footer; view_state / refresh_live
     ├── <frame>.py    # one file per flow frame (template.py replaced scope.py)
-    ├── forms/        # FormScreen (+ LoginForm, ScopeEditForm, ApprovalEditForm, ImportForm)
+    ├── forms/        # FormScreen (+ LoginForm, ScopeEditForm, ApprovalEditForm, OpenApiForm)
     ├── choice.py     # ChoiceScreen dialog (+ details_body())
     ├── command_bar.py, help.py
 ```
