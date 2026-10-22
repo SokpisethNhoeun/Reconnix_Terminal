@@ -4,7 +4,7 @@
    file refused with a fixed message, never a key in what the routes get), the rules every saved
    model passes (config.ts) and which model answers (resolve.ts). Never touches ~/.reconix. */
 import { randomBytes } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -13,8 +13,8 @@ import { checkModel, ENV_WORDING, FORM_WORDING, modelSetup } from "@/lib/assista
 import { open, seal } from "@/lib/assistant/models/crypto";
 import { MODELS_FAIL, ModelsError } from "@/lib/assistant/models/errors";
 import { activeModel, modelsView, NO_MODEL, probeTarget } from "@/lib/assistant/models/resolve";
-import { MODELS_FORMAT } from "@/lib/assistant/models/schema";
-import { addProvider, listProviders, readSaved, removeProvider, setActive, updateProvider } from "@/lib/assistant/models/store";
+import { MAX_FILE_BYTES, MAX_MODELS, MAX_NAME, MAX_PROVIDERS, MAX_URL, MODELS_FORMAT } from "@/lib/assistant/models/schema";
+import { addProvider, listProviders, MODELS_TEMP, modelsTempName, readSaved, removeProvider, setActive, updateProvider } from "@/lib/assistant/models/store";
 import { addQuestion, deleteAllConversations, listConversations } from "@/lib/assistant/history-store";
 
 const SECRET = "sk-test-0123456789abcdefSECRET";
@@ -82,6 +82,18 @@ describe("the rules every model passes", () => {
     expect(form("http://llm.example.com/v1", "m", "k", true)).toBe("An API key is only sent over https to a remote model.");
     expect(form("http://127.0.0.1:1/v1", "a b")).toBe("The model name holds characters a model name doesn't use.");
     expect(form("http://127.0.0.1:1/v1", "m", "k")).toBe("ok"); // a key to this machine over http is fine
+  });
+  it("measure the address as it is kept: one that %-encoding makes too long is refused", async () => {
+    const grows = `http://127.0.0.1:1/${"é".repeat(400)}`; // 419 characters typed, 2 419 written out
+    expect(grows.length).toBeLessThan(MAX_URL);
+    const r = checkModel({ baseUrl: grows, model: "m", apiKey: null }, { allowRemote: false });
+    expect(r.ok ? "ok" : r.reason).toBe(`The base URL is too long once its special characters are encoded: at most ${MAX_URL} characters.`);
+    const fits = `http://127.0.0.1:1/${"a".repeat(MAX_URL - 19)}`;
+    expect(checkModel({ baseUrl: fits, model: "m", apiKey: null }, { allowRemote: false }).ok).toBe(true);
+    const saving = addProvider({ ...local, baseUrl: grows });
+    await expect(saving).rejects.toThrow("too long");
+    await expect(saving).rejects.toMatchObject({ status: 400 }); // said as such, never a 500
+    expect(existsSync(path.join(dir, "models.json"))).toBe(false);
   });
   it("are the environment's rules too, with the same results and messages", () => {
     const env = (e: Record<string, string>) => {
@@ -164,6 +176,61 @@ describe("the saved models", () => {
     symlinkSync(path.join(root, "real"), dir);
     await expect(addProvider(local)).rejects.toThrow(MODELS_FAIL.plain);
     expect(readdirSync(path.join(root, "real"))).toEqual([]);
+  });
+  it.runIf(posix)("refuse a models.key other users may read, without tightening it", async () => {
+    const p = await addProvider({ ...local, apiKey: SECRET, activate: true });
+    const keyFile = path.join(dir, "models.key");
+    for (const mode of [0o640, 0o604, 0o620]) {
+      chmodSync(keyFile, mode);
+      await expect(readSaved()).rejects.toThrow(MODELS_FAIL.keyShared);
+      await expect(updateProvider(p.id, { apiKey: "another-key" })).rejects.toThrow(MODELS_FAIL.keyShared);
+      await expect(modelsView()).rejects.toThrow(MODELS_FAIL.keyShared); // GET models says so
+      const r = await activeModel();
+      expect(!r.ok && r.reason).toBe(MODELS_FAIL.keyShared); // so does asking
+      expect(modeOf(keyFile)).toBe(mode); // left as it was found, never chmodded
+    }
+    expect(MODELS_FAIL.keyShared).toContain("enter the API keys again");
+    rmSync(keyFile); // what the message says to do: the key is entered again
+    expect(await updateProvider(p.id, { apiKey: "another-key" })).toMatchObject({ keySaved: true });
+    expect(modeOf(keyFile)).toBe(0o600);
+    const { file, apiKeyOf } = await readSaved();
+    expect(apiKeyOf(file.providers[0])).toBe("another-key");
+  });
+  it("clear a models.json write that never finished, once it is stale", async () => {
+    await addProvider(local);
+    expect(MODELS_TEMP.test(modelsTempName())).toBe(true); // the names the store writes
+    const stale = path.join(dir, ".models.0123456789ab.tmp");
+    const fresh = path.join(dir, ".models.ba9876543210.tmp");
+    const other = path.join(dir, ".models.json.tmp"); // not a name of ours: left alone
+    for (const name of [stale, fresh, other]) writeFileSync(name, "{", { mode: 0o600 });
+    const old = new Date(Date.now() - 11 * 60_000);
+    utimesSync(stale, old, old);
+    utimesSync(other, old, old);
+    await listConversations(); // the conversations' housekeeping clears both stores' leftovers
+    expect(existsSync(stale)).toBe(false);
+    expect(existsSync(fresh)).toBe(true); // a write may still be going on
+    expect(existsSync(other)).toBe(true);
+    expect((await listProviders()).providers).toHaveLength(1);
+    expect(await deleteAllConversations()).toBe(0);
+    expect(existsSync(fresh)).toBe(true); // "Delete all" is about the conversations only
+  });
+  it("keep every provider the schema allows, each at its largest, and stay readable", async () => {
+    const big = (i: number) => ({
+      name: `Provider ${String(i).padStart(2, "0")} `.padEnd(MAX_NAME, "x"),
+      preset: "custom" as const,
+      baseUrl: `http://127.0.0.1:11434/${"p".repeat(MAX_URL - 23)}`,
+      models: Array.from({ length: MAX_MODELS }, (_, m) => `m${i}-${m}-`.padEnd(128, "x")),
+      apiKey: "k".repeat(4_096),
+    });
+    for (let i = 0; i < MAX_PROVIDERS; i += 1) await addProvider(big(i));
+    const size = statSync(path.join(dir, "models.json")).size;
+    expect(size).toBeGreaterThan(200_000); // the old limit would have locked this file
+    expect(size).toBeLessThanOrEqual(MAX_FILE_BYTES);
+    await expect(addProvider(big(MAX_PROVIDERS))).rejects.toMatchObject({ status: 400 }); // the count first
+    const { file, apiKeyOf } = await readSaved();
+    expect(file.providers).toHaveLength(MAX_PROVIDERS);
+    expect(apiKeyOf(file.providers[MAX_PROVIDERS - 1])).toBe("k".repeat(4_096));
+    expect((await activeModel({ LLM_BASE_URL: "http://127.0.0.1:1/v1", LLM_MODEL: "env" })).ok).toBe(true);
   });
   it("leave the conversations alone, and the conversations leave them alone", async () => {
     await addProvider({ ...local, apiKey: SECRET });

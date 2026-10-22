@@ -11,7 +11,7 @@
    is an optional bearer key that never leaves the server. */
 import "server-only";
 
-import { MODEL_NAME } from "./models/schema";
+import { MAX_URL, MODEL_NAME } from "./models/schema";
 
 export interface ModelConfig {
   baseUrl: string; // ends without a slash, e.g. http://127.0.0.1:11434/v1
@@ -62,7 +62,7 @@ export interface ModelInput {
 }
 
 /** The address alone (no model name yet): the rules, then the address without its query, hash
-    and trailing slashes. */
+    and trailing slashes, at most MAX_URL characters as written out. */
 export function checkAddress(
   input: Omit<ModelInput, "model">,
   { allowRemote, words = FORM_WORDING }: { allowRemote: boolean; words?: Wording },
@@ -82,7 +82,10 @@ export function checkAddress(
   if (input.apiKey && !local && url.protocol !== "https:") return { ok: false, reason: `${words.keyStart} is only sent over https to a remote model.` };
   url.search = "";
   url.hash = "";
-  return { ok: true, baseUrl: url.toString().replace(/\/+$/, ""), local };
+  const baseUrl = url.toString().replace(/\/+$/, "");
+  // written out in full (%-encoded), an address can outgrow what was typed: checked as it is kept
+  if (baseUrl.length > MAX_URL) return { ok: false, reason: `${words.url} is too long once its special characters are encoded: at most ${MAX_URL} characters.` };
+  return { ok: true, baseUrl, local };
 }
 
 /** A model, wherever it comes from, against the rules above. */

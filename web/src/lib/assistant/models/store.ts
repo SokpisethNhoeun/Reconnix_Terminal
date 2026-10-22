@@ -23,6 +23,9 @@ import { type Active, EMPTY_MODELS, ENVIRONMENT_NAME, MAX_FILE_BYTES, MAX_NAME, 
 import type { ProviderView } from "./view";
 
 export const MODELS_FILE = "models.json";
+/** A write of models.json that never finished (history-store.ts prunes them once stale). */
+export const MODELS_TEMP = /^\.models\.[0-9a-f]{12}\.tmp$/;
+export const modelsTempName = () => `.models.${tempSuffix()}.tmp`;
 
 type Env = Record<string, string | undefined>;
 
@@ -102,7 +105,8 @@ export async function listProviders(): Promise<{ providers: ProviderView[]; acti
 
 // --- changing ------------------------------------------------------------------------------------
 
-/** One change: read, change, check, write, all in the shared queue. */
+/** One change: read, change, check, write, all in the shared queue. A change that would make
+    the file bigger than it may be read back is refused (400), so it is never written. */
 function change<T>(task: (file: ModelsFile, f: Folder) => Promise<{ file: ModelsFile; result: T }>): Promise<T> {
   return serial(() =>
     inFolder(assistantDir(), folderFault, async (f) => {
@@ -113,7 +117,8 @@ function change<T>(task: (file: ModelsFile, f: Folder) => Promise<{ file: Models
       } catch {
         throw new ModelsError(MODELS_FAIL.save);
       }
-      await writeAtomic(f, MODELS_FILE, `.models.${tempSuffix()}.tmp`, data, folderFault, () => new ModelsError(MODELS_FAIL.save));
+      if (Buffer.byteLength(data, "utf8") > MAX_FILE_BYTES) throw new ModelsError(MODELS_FAIL.full, 400);
+      await writeAtomic(f, MODELS_FILE, modelsTempName(), data, folderFault, () => new ModelsError(MODELS_FAIL.save));
       return result;
     }),
   );

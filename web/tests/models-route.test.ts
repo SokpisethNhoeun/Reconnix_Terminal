@@ -4,13 +4,14 @@
    never comes back in any answer, "Test connection" and "Fetch models" against a stand-in model
    server (and a redirect, which is refused), and a switch that the next question uses. The
    saved models go to a temporary folder. */
-import { mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MODELS_FAIL } from "@/lib/assistant/models/errors";
 import { COOKIE, sessionValue } from "@/lib/auth/session";
 
 const TOKEN = "models-route-test-token-0123456789";
@@ -199,6 +200,23 @@ describe("the providers", () => {
     expect((await add(provider({ baseUrl: "http://api.openai.com/v1", preset: "openai" }))).body.detail).toContain("only sent over https");
     expect((await add(provider({ baseUrl: "https://api.openai.com/v1", preset: "openai" }))).status).toBe(201);
     expect(seen).toHaveLength(0); // nothing was sent anywhere
+  });
+  it("say clearly when an address grows too long, or models.key is open to other users", async () => {
+    const long = await add(provider({ baseUrl: `${base}/${"é".repeat(400)}` })); // %-encoded: 6 times as long
+    expect(long.status).toBe(400);
+    expect(long.body.detail).toMatch(/^The base URL is too long/);
+    expect((await test({ baseUrl: `${base}/${"é".repeat(400)}`, model: "m" })).status).toBe(400);
+    if (process.platform === "win32") return;
+    expect((await add(provider({ activate: true }))).status).toBe(201);
+    chmodSync(path.join(dir, "models.key"), 0o644);
+    const listed = await list();
+    expect(listed.status).toBe(500);
+    expect(listed.body.detail).toBe(MODELS_FAIL.keyShared);
+    const asked = await question.POST(json("POST", "/api/assistant", { uid: null, question: "hi" }));
+    expect(asked.status).toBe(503);
+    expect(((await asked.json()) as { detail: string }).detail).toBe(MODELS_FAIL.keyShared);
+    expect(statSync(path.join(dir, "models.key")).mode & 0o777).toBe(0o644); // never quietly fixed
+    expect(seen).toHaveLength(0);
   });
 });
 
