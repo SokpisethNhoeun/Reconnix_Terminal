@@ -1,27 +1,23 @@
 /* The AI Assistant's saved conversations (server only): plain files the dashboard's own server
    writes, in ~/.reconix/assistant/ (RECONIX_ASSISTANT_DIR moves it, e.g. for tests). The folder
-   is the owner's only (0700), with one <id>.json per conversation (0600). It is the only thing
+   is the owner's only (0700), with one <id>.json per conversation (0600). Besides the saved
+   models (models/store.ts, models.json and models.key in the same folder) it is the only thing
    the dashboard writes: never an assessment or anything the TUI reads.
 
-   The folder: its parent must belong to this user (or root) and not be writable by others
-   unless sticky (like /tmp); the folder itself is opened without following a link, checked
-   through that handle (a directory, this user's) and tightened through it (fchmod). Before each
-   write and rename it must still be the same folder (device and inode).
-
-   Writing is atomic: a new temporary file (O_EXCL, never following a link), then a rename over
-   the old one. Reading opens without following links and checks through the handle: a regular
-   file, at most 1 MB, then the zod schema and that the id matches the file name. Questions are
-   masked, then cut, before they are saved (redact.ts). Old conversations are pruned on every
-   list and every write: after RECONIX_ASSISTANT_RETENTION_DAYS without use (default 30; 0
-   keeps them; an unreadable file of ours by its last change), beyond the newest
-   MAX_CONVERSATIONS, and messages beyond the newest MAX_CONVERSATION_MESSAGES. One queue (kept
-   on globalThis, so every route shares it) serializes this process's changes. Errors carry
-   fixed messages, never a path. */
+   The folder and the files are handled by secure-fs.ts: the parent checked, the folder opened
+   without following a link and checked through that handle, still the same folder before each
+   write and rename; atomic writes; reads that never follow a link (a regular file, at most
+   1 MB), then the zod schema and that the id matches the file name. Questions are masked, then
+   cut, before they are saved (redact.ts). Old conversations are pruned on every list and every
+   write: after RECONIX_ASSISTANT_RETENTION_DAYS without use (default 30; 0 keeps them; an
+   unreadable file of ours by its last change), beyond the newest MAX_CONVERSATIONS, and
+   messages beyond the newest MAX_CONVERSATION_MESSAGES. Pruning and "Delete all" only touch
+   <uuid>.json and this store's temporary files. One queue (secure-fs.ts `serial`, shared by
+   every route) serializes this process's changes. Errors carry fixed messages, never a path. */
 import "server-only";
 
-import { randomBytes, randomUUID } from "node:crypto";
-import { constants, type FileHandle, lstat, mkdir, open, readdir, rename, stat, unlink } from "node:fs/promises";
-import { homedir } from "node:os";
+import { randomUUID } from "node:crypto";
+import { lstat, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
 
 import {
@@ -45,6 +41,7 @@ import {
 import { isConversationId, type ScopeRef } from "./protocol";
 import { redact } from "./redact";
 import { MAX_QUESTION } from "./request";
+import { assistantDir, code, type Folder, inFolder as inSecureFolder, myUid, readText, serial, stillSame as stillSecure, tempSuffix, writeAtomic } from "./secure-fs";
 
 /** Something about the folder or a file the store refuses (the route says so). */
 export class HistoryError extends Error {}
@@ -66,20 +63,9 @@ const TEMP = /^\.[0-9a-f-]{36}\.[0-9a-f]{12}\.tmp$/;
 const TEMP_STALE_MS = 10 * 60_000;
 const DAY_MS = 86_400_000;
 const MAX_NAMES = 2_000; // a folder stuffed with other files is not read further
-const POSIX = process.platform !== "win32";
-const READ_FLAGS = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0);
-const WRITE_FLAGS = constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0);
-const DIR_FLAGS = constants.O_RDONLY | (constants.O_DIRECTORY ?? 0) | (constants.O_NOFOLLOW ?? 0);
 
-const code = (error: unknown) => (error as NodeJS.ErrnoException | null)?.code;
-const myUid = () => (POSIX && typeof process.getuid === "function" ? process.getuid() : null);
-
-export function historyDir(env: Record<string, string | undefined> = process.env): string {
-  const configured = env.RECONIX_ASSISTANT_DIR?.trim();
-  if (!configured) return path.join(homedir(), ".reconix", "assistant");
-  const expanded = configured.startsWith("~/") ? path.join(homedir(), configured.slice(2)) : configured;
-  return path.resolve(expanded);
-}
+/** The folder that holds the conversations (and the saved models). */
+export const historyDir = assistantDir;
 
 /** Days a conversation is kept without use (0: kept until deleted). */
 export function retentionDays(env: Record<string, string | undefined> = process.env): number {
@@ -90,16 +76,9 @@ export function retentionDays(env: Record<string, string | undefined> = process.
 
 // --- shared by every route of this process -------------------------------------------------------
 
-const QUEUE = Symbol.for("reconix.assistant.history.queue");
 const STREAMING = Symbol.for("reconix.assistant.history.streaming");
-type Shared = { [QUEUE]?: Promise<unknown>; [STREAMING]?: Set<string> };
+type Shared = { [STREAMING]?: Set<string> };
 const shared = globalThis as Shared;
-
-function serial<T>(task: () => Promise<T>): Promise<T> {
-  const run = (shared[QUEUE] ?? Promise.resolve()).then(task, task);
-  shared[QUEUE] = run.catch(() => undefined);
-  return run;
-}
 
 const streaming = () => (shared[STREAMING] ??= new Set<string>());
 
@@ -111,110 +90,16 @@ export function markStreaming(id: string): () => void {
 
 // --- the folder ------------------------------------------------------------------------------
 
-interface Folder {
-  dir: string;
-  handle: FileHandle | null; // null on Windows
-  dev: number;
-  ino: number;
-}
-
-/** The parent of the folder: this user's (or root's), not writable by others unless sticky. */
-async function checkParent(dir: string): Promise<void> {
-  const parent = path.dirname(dir);
-  try {
-    await mkdir(/*turbopackIgnore: true*/ parent, { recursive: true, mode: 0o700 });
-  } catch {
-    throw new HistoryError(FAIL.folder);
-  }
-  if (!POSIX) return;
-  const info = await stat(/*turbopackIgnore: true*/ parent).catch(() => null);
-  if (!info || !info.isDirectory()) throw new HistoryError(FAIL.folder);
-  const uid = myUid();
-  if (uid !== null && info.uid !== uid && info.uid !== 0) throw new HistoryError(FAIL.parent);
-  if ((info.mode & 0o022) !== 0 && (info.mode & 0o1000) === 0) throw new HistoryError(FAIL.parent);
-}
-
-/** The folder, made if missing (0700) and opened without following a link. */
-async function openFolder(): Promise<Folder> {
-  const dir = historyDir();
-  await checkParent(dir);
-  try {
-    await mkdir(/*turbopackIgnore: true*/ dir, { mode: 0o700 });
-  } catch (error) {
-    if (code(error) !== "EEXIST") throw new HistoryError(FAIL.folder);
-  }
-  if (!POSIX) {
-    const info = await lstat(/*turbopackIgnore: true*/ dir).catch(() => null);
-    if (!info || info.isSymbolicLink() || !info.isDirectory()) throw new HistoryError(FAIL.plain);
-    return { dir, handle: null, dev: info.dev, ino: info.ino };
-  }
-  let handle: FileHandle;
-  try {
-    handle = await open(/*turbopackIgnore: true*/ dir, DIR_FLAGS);
-  } catch (error) {
-    throw new HistoryError(code(error) === "ELOOP" || code(error) === "ENOTDIR" ? FAIL.plain : FAIL.folder);
-  }
-  try {
-    const info = await handle.stat();
-    if (!info.isDirectory()) throw new HistoryError(FAIL.plain);
-    const uid = myUid();
-    if (uid !== null && info.uid !== uid) throw new HistoryError(FAIL.owner);
-    if ((info.mode & 0o077) !== 0) await handle.chmod(0o700);
-    return { dir, handle, dev: info.dev, ino: info.ino };
-  } catch (error) {
-    await handle.close().catch(() => {});
-    throw error instanceof HistoryError ? error : new HistoryError(FAIL.folder);
-  }
-}
-
-/** Throws unless the folder is still the one that was opened (not swapped, not a link). */
-async function stillSame(f: Folder): Promise<void> {
-  const now = await lstat(/*turbopackIgnore: true*/ f.dir).catch(() => null);
-  if (!now || now.isSymbolicLink() || !now.isDirectory() || now.dev !== f.dev || now.ino !== f.ino) throw new HistoryError(FAIL.moved);
-}
-
-async function inFolder<T>(task: (f: Folder) => Promise<T>): Promise<T> {
-  const f = await openFolder();
-  try {
-    return await task(f);
-  } finally {
-    await f.handle?.close().catch(() => {});
-  }
-}
+const faults = (fault: keyof typeof FAIL) => new HistoryError(FAIL[fault]);
+const stillSame = (f: Folder) => stillSecure(f, faults);
+const inFolder = <T,>(task: (f: Folder) => Promise<T>): Promise<T> => inSecureFolder(historyDir(), faults, task);
 
 // --- the files ---------------------------------------------------------------------------------
 
 const fileOf = (dir: string, id: string) => path.join(dir, `${id}.json`);
 
-/** A file's text through one handle that never follows a link, or null (missing, a link, not a
-    regular file, over 1 MB, changing, unreadable). */
-async function readText(full: string): Promise<string | null> {
-  let handle: FileHandle;
-  try {
-    handle = await open(/*turbopackIgnore: true*/ full, READ_FLAGS);
-  } catch {
-    return null;
-  }
-  try {
-    const info = await handle.stat();
-    if (!info.isFile() || info.size > MAX_FILE_BYTES) return null;
-    const buffer = Buffer.alloc(info.size + 1);
-    let filled = 0;
-    while (filled < buffer.length) {
-      const { bytesRead } = await handle.read(buffer, filled, buffer.length - filled, filled);
-      if (!bytesRead) break;
-      filled += bytesRead;
-    }
-    return filled > info.size ? null : buffer.subarray(0, filled).toString("utf8");
-  } catch {
-    return null;
-  } finally {
-    await handle.close().catch(() => {});
-  }
-}
-
 async function readFrom(dir: string, id: string): Promise<Conversation | null> {
-  const text = await readText(fileOf(dir, id));
+  const text = await readText(fileOf(dir, id), MAX_FILE_BYTES);
   if (text === null) return null;
   try {
     const parsed = ConversationSchema.safeParse(JSON.parse(text));
@@ -242,30 +127,7 @@ export function fit(c: Conversation): Conversation {
 
 async function writeTo(f: Folder, c: Conversation): Promise<void> {
   const data = JSON.stringify(ConversationSchema.parse(fit(c)));
-  await stillSame(f);
-  const tmp = path.join(f.dir, `.${c.id}.${randomBytes(6).toString("hex")}.tmp`);
-  let handle: FileHandle;
-  try {
-    handle = await open(/*turbopackIgnore: true*/ tmp, WRITE_FLAGS, 0o600);
-  } catch {
-    throw new HistoryError(FAIL.save);
-  }
-  try {
-    await handle.writeFile(data, "utf8");
-    await handle.sync();
-    await handle.close();
-  } catch {
-    await handle.close().catch(() => {});
-    await unlink(tmp).catch(() => {});
-    throw new HistoryError(FAIL.save);
-  }
-  try {
-    await stillSame(f);
-    await rename(tmp, fileOf(f.dir, c.id)); // replaces a link at that name, never writes through it
-  } catch (error) {
-    await unlink(tmp).catch(() => {});
-    throw error instanceof HistoryError ? error : new HistoryError(FAIL.save);
-  }
+  await writeAtomic(f, `${c.id}.json`, `.${c.id}.${tempSuffix()}.tmp`, data, faults, () => new HistoryError(FAIL.save));
 }
 
 const expired = (updatedAt: number, now: number, days: number) => days > 0 && now - updatedAt > days * DAY_MS;
