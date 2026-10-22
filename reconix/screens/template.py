@@ -80,7 +80,8 @@ class TemplateScreen(ReconixScreen):
         return "busy"
 
     def view_state(self) -> object:
-        return self.state()
+        # the review menu offers "Replace" once a spec is attached
+        return (self.state(), store.get_api_spec() is not None)
 
     # --- layout ------------------------------------------------------------------------------
     def compose_body(self) -> ComposeResult:
@@ -137,6 +138,7 @@ class TemplateScreen(ReconixScreen):
             [
                 Choice("approve", "Approve scope",
                        "Lock the manifest; next you review the test plan.", recommended=True),
+                *self._spec_choices(),
                 Choice("edit", "Edit manifest",
                        "Change methods, excluded paths, ports, tools or the time limit."),
                 Choice("reject", "Reject",
@@ -145,6 +147,15 @@ class TemplateScreen(ReconixScreen):
             ],
             hint=menu_hint("go back"), menu_id="scope-menu",
         )
+
+    @staticmethod
+    def _spec_choices() -> List[Choice]:
+        """The API template can take an OpenAPI file; it is read, never run."""
+        if not store.can_attach_api_spec():
+            return []
+        attached = store.get_api_spec() is not None
+        return [Choice("spec", "Replace OpenAPI spec" if attached else "Attach OpenAPI spec",
+                       "a .json or .yaml OpenAPI 3 / Swagger 2 file; read, never run")]
 
     def _compose_approved(self) -> ComposeResult:
         yield from _request_message()
@@ -197,8 +208,8 @@ class TemplateScreen(ReconixScreen):
         elif state == "choose":
             self.app.choose_template(choice)
         elif state == "review":
-            {"approve": self.app.approve_scope, "edit": self.app.edit_scope,
-             "reject": self.app.reject_scope}[choice]()
+            {"approve": self.app.approve_scope, "spec": self.app.attach_api_spec,
+             "edit": self.app.edit_scope, "reject": self.app.reject_scope}[choice]()
         elif state == "approved":
             self.app.goto("plan")
         elif state == "stopped" and choice == "new":

@@ -124,6 +124,9 @@ Windows 10+ (there in a ConPTY pseudo console, through `pywinpty`, which
    **scope manifest**, shown in plain words (what it will test, what it may do, what it
    will never touch, its tools): approve it, edit it (methods, excluded paths, ports,
    tools, time limit), or reject it (nothing is tested; a fresh assessment starts).
+   On the API template, **Attach OpenAPI spec** reads a `.json` / `.yaml` OpenAPI 3 or
+   Swagger 2 file (read, never run; it never widens the scope) and fills the endpoint
+   count, plan and methods.
 3. **Plan** — every phase, the target login it may need, and each risky action with its
    exact request. **Run plan** starts testing; **Edit steps** changes where a risky
    action runs (see Approval).

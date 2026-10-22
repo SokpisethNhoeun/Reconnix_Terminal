@@ -74,11 +74,12 @@ class AgentMixin:
         # Approving the Reconix scope IS the authorization — tell the agent to proceed
         # autonomously and not ask again, so it starts scanning immediately.
         target = self.agent_request or store.get_assessment().target
+        spec = store.api_spec_handoff()      # "" without an attached OpenAPI spec
         self._send_to_agent(
             f"Assess {target}. The operator has approved the scope and authorized this "
             "engagement — treat the target as authorized and do NOT ask for authorization or "
             "confirmation. Begin immediately: run reconnaissance, then adapt and test based on "
-            "what you find, and report findings as you go.")
+            "what you find, and report findings as you go." + (f" {spec}" if spec else ""))
 
     def _send_to_agent(self, text: str) -> None:
         """Record the operator line and run one agent turn in a worker.

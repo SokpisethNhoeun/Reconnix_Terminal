@@ -11,7 +11,7 @@ from .. import store
 from ..flow import screen_for
 from ..models import Choice
 from ..screens.choice import ChoiceScreen
-from ..screens.forms import ApprovalEditForm, ScopeEditForm
+from ..screens.forms import ApprovalEditForm, OpenApiForm, ScopeEditForm
 from ..store import agent_run
 
 
@@ -141,6 +141,10 @@ class ActionsMixin:
 
     def edit_scope(self) -> None:
         self.open_dialog(ScopeEditForm(), lambda _result: self.refresh_view())
+
+    def attach_api_spec(self) -> None:
+        """Ask for an OpenAPI file (the API template's scope draft); the store reads it."""
+        self.open_dialog(OpenApiForm(), lambda _result: self.refresh_view())
 
     # --- editing where a gated action runs ("Edit params", the plan's "Edit steps") --------
     def edit_approval(self, request_id: str) -> None:

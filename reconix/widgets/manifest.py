@@ -23,6 +23,14 @@ def manifest_text(scope: ScopeManifest) -> Text:
     if summary.tools:
         text.append("\n\nTools it will use: ", style=f"bold {theme.TEXT}")
         text.append(", ".join(summary.tools), style=theme.MUTED)
+    spec = store.get_api_spec() if scope.kind == "api" else None
+    if spec is not None:
+        text.append("\n\nAPI spec  ", style=f"bold {theme.TEXT}")
+        text.append(f"{spec.label} · {spec.total} endpoints · {', '.join(spec.methods)}",
+                    style=theme.MUTED)
+        if spec.out_of_scope_servers:
+            text.append("\nOut of scope  ", style=f"bold {theme.TEXT}")
+            text.append(", ".join(spec.out_of_scope_servers), style=theme.MEDIUM)
     return text
 
 
